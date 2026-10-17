@@ -1,0 +1,280 @@
+# Roadmap
+
+> agility-bridge — an unofficial, open-source MCP server that gives AI agents safe access to **Digital.ai Agility**
+> (every asset type, read and opt-in write) with each member's own access token. Runs locally (stdio), self-hosted
+> (Node / Docker) or as a **Cloudflare Worker** reachable from every device.
+
+Status: **design phase** (2026-10-16) — nothing is implemented; Phase 0 is next. Architecture:
+[ARCHITECTURE.md](ARCHITECTURE.md) · Decisions: [adr/](adr/) · Facts & limits: [RESEARCH.md](RESEARCH.md) · Security:
+[THREAT_MODEL.md](THREAT_MODEL.md) · Lessons: [LESSONS-LEARNED.md](LESSONS-LEARNED.md) · Task rules:
+[tasks/README.md](tasks/README.md) · Open questions: [pending-decisions/phase-0.md](pending-decisions/phase-0.md)
+
+## Guiding principles
+
+1. **Local-first, cloud-optional.** Every feature works without a Cloudflare account; the Worker is one deployment
+   target among three.
+2. **Runtime-agnostic core.** Web-standard APIs only in core packages; runtime code lives in adapters (ADR-0004).
+3. **Read-only and least privilege by default.** Access is the intersection of workspace and grant; writes are a
+   separate, opt-in product with human approval (ADR-0008, ADR-0013).
+4. **Every asset type from day one, safely.** A validated generic query tool with bound parameters covers what typed
+   tools do not; no raw API passthrough (ADR-0012).
+5. **Security is a feature.** Threat model updated in the same PR as risky changes; tokens never leave the server
+   unencrypted; Agility content is always untrusted.
+6. **Built for agents.** One tool contract, compact outputs, actionable errors, honest partial results, a small
+   catalogue (ADR-0015, L-005, L-155).
+7. **Evidence before building, verification every phase.** Platform behaviour is measured in Phase 0 spikes against a
+   real Agility sandbox and real clients; every phase ends with a review and a live pass (L-001, L-003, L-004).
+
+## Phases at a glance
+
+| Phase | Theme | What you can do afterwards | Release |
+|---|---|---|---|
+| **0** | Foundations, risk spikes, tool contract, sandbox | Repo public-ready; Agility API, SDK, clients, OAuth and Workers behaviour measured; tool contract frozen | — |
+| **1** | Core engine + stdio | `npx agility-bridge` in every primary client; read **any** asset type (stories, defects, tasks, tests, epics, issues, requests, custom types) plus typed work-item, team and sprint tools | v0.1 |
+| **2** | Access model + self-hosted HTTP | A team server (Node/Docker, SQLite) with per-workspace URLs, per-device tokens, encrypted bring-your-own tokens, audit log, admin API and CLI | v0.2 |
+| **3** | Cloudflare Worker | The same server on Workers + D1, reachable from every device | v0.3 |
+| **4** | Identity + admin panel | Google / GitHub / Cloudflare Access / OIDC sign-in; manage everything in the browser; members bring their own Agility tokens | v0.4 |
+| **5** | OAuth 2.1 | claude.ai web, Claude mobile and IDEs connect with OAuth; per-device sessions | v0.5 |
+| **6** | Tool breadth | Portfolio, sprints, conversations, history, reports, prompts, resources, evals | v0.6 |
+| **7** | Opt-in writes | Comments, status, effort, owners, sprint moves, creating work items, field updates, close/reopen — approved by a person | v0.7 |
+| **8** | Power features | Cache, deep links, MCP Apps charts, `doctor`, import/export, client plugins, telemetry, keychain, quotas, MCP Tasks | v0.8–0.9 |
+| **9** | Hardening + launch | Final threat-model review, external review, performance, docs site, support policy | **v1.0** |
+
+```mermaid
+flowchart LR
+  P0[0 Foundations & spikes] --> P1[1 Core + stdio]
+  P1 --> P2[2 Access + HTTP]
+  P2 --> P3[3 Cloudflare]
+  P3 --> P4[4 Identity + admin]
+  P4 --> P5[5 OAuth]
+  P2 --> P6[6 Tool breadth]
+  P2 --> P7[7 Opt-in writes]
+  P4 --> P7
+  P5 --> P7
+  P6 --> P8[8 Power features]
+  P7 --> P8
+  P8 --> P9[9 Hardening + 1.0]
+```
+
+**Parallelism.** P0-10 (prior art) can run anytime. Phase 6 depends only on Phase 2, so tool breadth can run in parallel
+with the remote platform (Phases 3–5) and its tasks are largely independent of each other. The write framework (P7-01)
+needs Phase 2; the approval page (P7-02) needs the panel sessions (P4-02); the Phase 7 review needs OAuth (P5-10) to
+verify the `mcp:write` scope end to end.
+
+## How the lessons shaped this plan
+
+The plan front-loads the work that is cheapest early and most expensive late ([LESSONS-LEARNED.md](LESSONS-LEARNED.md)):
+
+- **An owner-decision gate before any Phase 0 work** (P0-14) settles the few choices that shape the repository, the
+  sandbox and the tool contract (L-009).
+- **A real Agility sandbox and a live-test harness in Phase 0** (P0-12), and a live pass at the end of every phase, not
+  only before launch (L-003, L-004).
+- **The tool contract and the default catalogue are frozen in Phase 0** (P0-11), with lints from Phase 1 (P1-13), so
+  forty tools do not grow forty conventions (L-005, L-030, L-155).
+- **The query compiler is a Phase 1 security component** with property tests (P1-04), because Agility's `with` binding
+  is substitution, not a prepared statement (L-139) and quotas can count errors (L-138).
+- **Both MCP protocol eras from the first spike** (P0-07): the two most common IDE clients do not speak the newest
+  revision yet (L-011).
+- **Release isolation, provenance and staged publishing in the first release** (P1-15), not as later fixes (L-127).
+- **Security inventories from the first storage task** (P2-15), not a pre-launch retrofit (L-120).
+- **Writes are designed with two approval channels** (elicitation and an out-of-band page, P7-01/P7-02) because the
+  main IDE clients cannot be elicited over stateless HTTP (L-156).
+- **Every phase reserves room for follow-ups**: review findings become new tasks in the same phase folder before its
+  release.
+
+## Releases
+
+Each phase ends with a release (v0.1 … v0.9, then v1.0) **if the owner chooses per-phase releases** (pending decision
+D-03); the alternative is to publish only from a later phase. Every release is published from GitHub Actions with npm
+provenance, a GitHub Release with SBOM and checksums, and (from Phase 2) a signed container image.
+
+## Decision log
+
+| Date | Decision | Where |
+|---|---|---|
+| 2026-10-16 | Name `agility-bridge` (`AB_` variables, `ab_` tokens); Apache-2.0 with DCO; Markdown tasks and ADRs | ADR-0001 – 0003 |
+| 2026-10-16 | Same architecture for every runtime: TypeScript monorepo, runtime-agnostic core, Hono; stdio, Node/Docker and Cloudflare Worker all in scope for 1.0 | ADR-0004, ADR-0005 |
+| 2026-10-16 | Read-only by default; typed write tools opt-in per workspace/grant with human approval by default | ADR-0013 |
+| 2026-10-16 | Typed tools **and** a validated, read-only generic query tool with bound parameters; no raw API passthrough | ADR-0012 |
+| 2026-10-16 | Bring-your-own Agility token by default; shared tokens only for read-only grants; writes always with the caller's own token | ADR-0008 |
+| 2026-10-16 | Hosted and on-premises Agility instances; HTTPS only (loopback for tests); custom CA bundles; access tokens only | ADR-0014 |
+| 2026-10-16 | Primary clients documented equally: GitHub Copilot (VS Code, JetBrains, CLI), Claude (Code, Desktop, web, mobile), Cursor, Windsurf, MCP Inspector | ADR-0016 |
+| 2026-10-16 | "Workspace" names agility-bridge's unit of access; "Agility project" always means Agility's `Scope` | ARCHITECTURE §4 |
+
+## Task index
+
+Generated from task front matter (`pnpm tasks index` once P0-05 exists; generated by hand for this first version).
+Status lives in each task file.
+
+<!-- tasks:start -->
+### Phase 0
+
+| ID | Task | Priority | Depends on | Status |
+|---|---|---|---|---|
+| P0-01 | [Bootstrap the monorepo](tasks/phase-0-foundations/P0-01-repo-bootstrap.md) | high | P0-14 | todo |
+| P0-02 | [License, community and security policy files](tasks/phase-0-foundations/P0-02-license-community.md) | high | P0-01 | todo |
+| P0-03 | [CI pipeline](tasks/phase-0-foundations/P0-03-ci-pipeline.md) | high | P0-01 | todo |
+| P0-04 | [Security tooling baseline](tasks/phase-0-foundations/P0-04-security-tooling.md) | high | P0-03 | todo |
+| P0-05 | [Agent workflow and task tooling](tasks/phase-0-foundations/P0-05-agent-workflow.md) | high | P0-01 | todo |
+| P0-06 | [Spike: Agility API behaviour, limits and fixtures](tasks/phase-0-foundations/P0-06-spike-agility-api.md) | high | P0-01, P0-12 | todo |
+| P0-07 | [Spike: MCP SDK v2 dual-era handler with real clients](tasks/phase-0-foundations/P0-07-spike-mcp-sdk-clients.md) | high | P0-01 | todo |
+| P0-08 | [Spike: OAuth 2.1 portability on Node and Workers](tasks/phase-0-foundations/P0-08-spike-oauth.md) | high | P0-07 | todo |
+| P0-09 | [Spike: Cloudflare Workers limits with Agility-shaped payloads](tasks/phase-0-foundations/P0-09-spike-workers-limits.md) | high | P0-01 | todo |
+| P0-10 | [Prior-art review](tasks/phase-0-foundations/P0-10-prior-art-review.md) | medium | — | todo |
+| P0-11 | [Tool contract and conventions](tasks/phase-0-foundations/P0-11-tool-contract.md) | high | P0-06, P0-07, P0-14 | todo |
+| P0-12 | [Agility sandbox and live-verification harness](tasks/phase-0-foundations/P0-12-sandbox-live-harness.md) | high | P0-03, P0-14 | todo |
+| P0-13 | [Spike results and go/no-go for Phase 1](tasks/phase-0-foundations/P0-13-spike-results-go-no-go.md) | high | P0-02, P0-04, P0-05, P0-06, P0-07, P0-08, P0-09, P0-10, P0-11, P0-12 | todo |
+| P0-14 | [Owner decision gate for Phase 0](tasks/phase-0-foundations/P0-14-owner-decision-gate.md) | high | — | todo |
+
+### Phase 1
+
+| ID | Task | Priority | Depends on | Status |
+|---|---|---|---|---|
+| P1-01 | [Core skeleton, tool registry and error model](tasks/phase-1-core-stdio/P1-01-core-skeleton.md) | high | P0-13 | todo |
+| P1-02 | [Agility HTTP client (instances, auth, retries, limiter, budget)](tasks/phase-1-core-stdio/P1-02-agility-client.md) | high | P1-01 | todo |
+| P1-03 | [Metadata service (meta.v1) and schema snapshot](tasks/phase-1-core-stdio/P1-03-metadata-service.md) | high | P1-02 | todo |
+| P1-04 | [Query builder, safety and limits](tasks/phase-1-core-stdio/P1-04-query-compiler.md) | high | P1-03 | todo |
+| P1-05 | [Output shaping v1 and untrusted-data envelope](tasks/phase-1-core-stdio/P1-05-output-shaping.md) | high | P1-01 | todo |
+| P1-06 | [Asset identity and name resolution](tasks/phase-1-core-stdio/P1-06-asset-identity.md) | high | P1-03, P1-04 | todo |
+| P1-07 | [Tools: whoami, list_projects, list_asset_types, describe_asset_type](tasks/phase-1-core-stdio/P1-07-tools-discovery.md) | high | P1-03, P1-05, P1-12 | todo |
+| P1-08 | [Tools: query_assets and get_assets](tasks/phase-1-core-stdio/P1-08-tools-generic-query.md) | high | P1-04, P1-05, P1-06, P1-12 | todo |
+| P1-09 | [Tools: search_work_items, get_work_item, list_my_work](tasks/phase-1-core-stdio/P1-09-tools-work-items.md) | high | P1-08 | todo |
+| P1-10 | [Tools: list_teams, get_team, list_sprints, list_members](tasks/phase-1-core-stdio/P1-10-tools-planning-context.md) | medium | P1-06, P1-08 | todo |
+| P1-11 | [CLI with stdio mode (environment and YAML configuration)](tasks/phase-1-core-stdio/P1-11-cli-stdio.md) | high | P1-07, P1-08 | todo |
+| P1-12 | [Test harness (fixtures, contract tests, probes, live suite)](tasks/phase-1-core-stdio/P1-12-test-harness.md) | high | P1-01, P0-12 | todo |
+| P1-13 | [Generated tool reference, naming and description lints, tools/list budget](tasks/phase-1-core-stdio/P1-13-tool-reference-lints.md) | medium | P0-11, P1-08 | todo |
+| P1-14 | [Docs: quickstart and client setup guides](tasks/phase-1-core-stdio/P1-14-docs-quickstart-clients.md) | high | P1-11 | todo |
+| P1-15 | [Release pipeline and v0.1.0](tasks/phase-1-core-stdio/P1-15-release-v0-1.md) | high | P1-09, P1-10, P1-11, P1-12, P1-13, P1-14 | todo |
+| P1-16 | [Phase 1 review and live verification](tasks/phase-1-core-stdio/P1-16-phase-1-review.md) | high | P1-15 | todo |
+
+### Phase 2
+
+| ID | Task | Priority | Depends on | Status |
+|---|---|---|---|---|
+| P2-01 | [Storage interface, schema and migrations](tasks/phase-2-access-http/P2-01-storage-schema-migrations.md) | high | P1-16 | todo |
+| P2-02 | [SQLite adapter for Node](tasks/phase-2-access-http/P2-02-sqlite-adapter.md) | high | P2-01 | todo |
+| P2-03 | [Secrets encryption and master-key rotation](tasks/phase-2-access-http/P2-03-secrets-encryption.md) | high | P2-01 | todo |
+| P2-04 | [Access model and effective-permission resolver](tasks/phase-2-access-http/P2-04-access-model.md) | high | P2-01, P2-03 | todo |
+| P2-05 | [Device access tokens](tasks/phase-2-access-http/P2-05-device-tokens.md) | high | P2-04 | todo |
+| P2-06 | [HTTP app (Hono) with per-workspace MCP endpoints](tasks/phase-2-access-http/P2-06-http-app.md) | high | P2-05 | todo |
+| P2-07 | [Rate limiting (pluggable)](tasks/phase-2-access-http/P2-07-rate-limiting.md) | high | P2-06 | todo |
+| P2-08 | [Audit log](tasks/phase-2-access-http/P2-08-audit-log.md) | high | P2-06 | todo |
+| P2-09 | [Admin REST API](tasks/phase-2-access-http/P2-09-admin-api.md) | high | P2-04, P2-05, P2-08 | todo |
+| P2-10 | [CLI management commands (local and remote)](tasks/phase-2-access-http/P2-10-cli-management.md) | medium | P2-09 | todo |
+| P2-11 | [Docker image](tasks/phase-2-access-http/P2-11-docker-image.md) | medium | P2-06 | todo |
+| P2-12 | [Authorization and isolation test suite](tasks/phase-2-access-http/P2-12-authz-isolation-suite.md) | high | P2-06 | todo |
+| P2-13 | [Agility credential validation](tasks/phase-2-access-http/P2-13-credential-validation.md) | medium | P2-03, P2-04 | todo |
+| P2-14 | [Pass-through workspaces (optional, off by default)](tasks/phase-2-access-http/P2-14-passthrough-mode.md) | low | P2-06, P2-08 | todo |
+| P2-15 | [Security inventories (cryptography, logging, data protection)](tasks/phase-2-access-http/P2-15-security-inventories.md) | medium | P2-03, P2-08 | todo |
+| P2-16 | [Self-hosting docs and executable-docs check](tasks/phase-2-access-http/P2-16-self-hosting-docs.md) | medium | P2-11 | todo |
+| P2-17 | [Phase 2 review and live verification](tasks/phase-2-access-http/P2-17-phase-2-review.md) | high | P2-02, P2-07, P2-10, P2-12, P2-13, P2-14, P2-15, P2-16 | todo |
+
+### Phase 3
+
+| ID | Task | Priority | Depends on | Status |
+|---|---|---|---|---|
+| P3-01 | [Worker entry, bindings and boot single-flight](tasks/phase-3-cloudflare/P3-01-worker-entry.md) | high | P2-17 | todo |
+| P3-02 | [D1 adapter and shared migration runner](tasks/phase-3-cloudflare/P3-02-d1-adapter.md) | high | P3-01 | todo |
+| P3-03 | [Workers limits presets and per-call budgets](tasks/phase-3-cloudflare/P3-03-workers-limits.md) | high | P3-01 | todo |
+| P3-04 | [Rate limiting on Workers](tasks/phase-3-cloudflare/P3-04-workers-rate-limiting.md) | medium | P3-01 | todo |
+| P3-05 | [Cloudflare setup script](tasks/phase-3-cloudflare/P3-05-cloudflare-setup.md) | high | P3-02 | todo |
+| P3-06 | [Worker test suite (workerd)](tasks/phase-3-cloudflare/P3-06-worker-tests.md) | medium | P3-02 | todo |
+| P3-07 | [Cloudflare docs (deploy, limits, costs, custom domain)](tasks/phase-3-cloudflare/P3-07-cloudflare-docs.md) | medium | P3-05 | todo |
+| P3-08 | [Scheduled jobs: audit purge and key rotation on D1](tasks/phase-3-cloudflare/P3-08-scheduled-jobs.md) | medium | P3-02 | todo |
+| P3-09 | [Self-hosted to Worker migration](tasks/phase-3-cloudflare/P3-09-migrate-to-worker.md) | low | P3-02 | todo |
+| P3-10 | [CPU benchmark and cost check](tasks/phase-3-cloudflare/P3-10-cpu-benchmark.md) | low | P3-03 | todo |
+| P3-11 | [Phase 3 review and staging verification](tasks/phase-3-cloudflare/P3-11-phase-3-review.md) | high | P3-04, P3-06, P3-07, P3-08, P3-09, P3-10 | todo |
+
+### Phase 4
+
+| ID | Task | Priority | Depends on | Status |
+|---|---|---|---|---|
+| P4-01 | [Identity providers and owner bootstrap](tasks/phase-4-identity-admin/P4-01-identity-providers.md) | high | P3-11 | todo |
+| P4-02 | [Admin sessions, roles, CSRF and re-authentication](tasks/phase-4-identity-admin/P4-02-admin-sessions.md) | high | P4-01 | todo |
+| P4-03 | [Admin UI scaffold](tasks/phase-4-identity-admin/P4-03-admin-ui-scaffold.md) | high | P4-02 | todo |
+| P4-04 | [Admin screens: instances, credentials, workspaces, grants, tokens, users](tasks/phase-4-identity-admin/P4-04-admin-screens.md) | high | P4-03 | todo |
+| P4-05 | [Audit viewer and usage statistics](tasks/phase-4-identity-admin/P4-05-audit-viewer.md) | medium | P4-03 | todo |
+| P4-06 | [Connect page with client snippets](tasks/phase-4-identity-admin/P4-06-connect-page.md) | medium | P4-04 | todo |
+| P4-07 | [Member self-service: bring your own Agility token](tasks/phase-4-identity-admin/P4-07-member-self-service.md) | high | P4-04 | todo |
+| P4-08 | [Browser E2E and DAST baseline](tasks/phase-4-identity-admin/P4-08-e2e-dast.md) | medium | P4-04 | todo |
+| P4-09 | [Admin security review (owner boundaries on every writer)](tasks/phase-4-identity-admin/P4-09-admin-security-review.md) | high | P4-04, P4-05, P4-06, P4-07 | todo |
+| P4-10 | [Admin documentation](tasks/phase-4-identity-admin/P4-10-admin-docs.md) | medium | P4-04 | todo |
+| P4-11 | [Phase 4 review](tasks/phase-4-identity-admin/P4-11-phase-4-review.md) | high | P4-08, P4-09, P4-10 | todo |
+
+### Phase 5
+
+| ID | Task | Priority | Depends on | Status |
+|---|---|---|---|---|
+| P5-01 | [OAuth 2.1 authorization server](tasks/phase-5-oauth/P5-01-oauth-server.md) | high | P4-11 | todo |
+| P5-02 | [Protected resource metadata per workspace](tasks/phase-5-oauth/P5-02-protected-resource-metadata.md) | high | P5-01 | todo |
+| P5-03 | [Client registration: CIMD and DCR](tasks/phase-5-oauth/P5-03-client-registration.md) | high | P5-01 | todo |
+| P5-04 | [Consent screen and device handling](tasks/phase-5-oauth/P5-04-consent-devices.md) | high | P5-01 | todo |
+| P5-05 | [Token lifecycle and refresh concurrency](tasks/phase-5-oauth/P5-05-token-lifecycle.md) | high | P5-01 | todo |
+| P5-06 | [Real-client compatibility matrix (OAuth)](tasks/phase-5-oauth/P5-06-client-matrix-oauth.md) | high | P5-02, P5-03, P5-04, P5-05 | todo |
+| P5-07 | [OAuth documentation](tasks/phase-5-oauth/P5-07-oauth-docs.md) | medium | P5-06 | todo |
+| P5-08 | [Admin: connected apps and devices](tasks/phase-5-oauth/P5-08-admin-oauth-apps.md) | medium | P5-05 | todo |
+| P5-09 | [Abuse controls for unauthenticated endpoints](tasks/phase-5-oauth/P5-09-oauth-abuse-controls.md) | medium | P5-03 | todo |
+| P5-10 | [Phase 5 review](tasks/phase-5-oauth/P5-10-phase-5-review.md) | high | P5-07, P5-08, P5-09 | todo |
+
+### Phase 6
+
+| ID | Task | Priority | Depends on | Status |
+|---|---|---|---|---|
+| P6-01 | [Portfolio tools (epics and portfolio items)](tasks/phase-6-tool-breadth/P6-01-tools-portfolio.md) | high | P2-17 | todo |
+| P6-02 | [Planning tools (sprints, schedules, capacity)](tasks/phase-6-tool-breadth/P6-02-tools-planning.md) | high | P2-17 | todo |
+| P6-03 | [Quality views (tests, regression assets, defects)](tasks/phase-6-tool-breadth/P6-03-tools-quality.md) | medium | P2-17 | todo |
+| P6-04 | [Collaboration tools (conversations, links, attachment metadata)](tasks/phase-6-tool-breadth/P6-04-tools-collaboration.md) | medium | P2-17 | todo |
+| P6-05 | [History and activity tools](tasks/phase-6-tool-breadth/P6-05-tools-history.md) | medium | P2-17 | todo |
+| P6-06 | [Requests, issues and other asset types](tasks/phase-6-tool-breadth/P6-06-other-asset-types.md) | medium | P2-17 | todo |
+| P6-07 | [Composite reports](tasks/phase-6-tool-breadth/P6-07-composite-reports.md) | high | P6-01, P6-02, P6-05 | todo |
+| P6-08 | [MCP prompts (workflows)](tasks/phase-6-tool-breadth/P6-08-mcp-prompts.md) | medium | P6-07 | todo |
+| P6-09 | [MCP resources](tasks/phase-6-tool-breadth/P6-09-mcp-resources.md) | medium | P2-17 | todo |
+| P6-10 | [Tool evaluations](tasks/phase-6-tool-breadth/P6-10-tool-evals.md) | medium | P6-07 | todo |
+| P6-11 | [Cost accounting and composite grants](tasks/phase-6-tool-breadth/P6-11-cost-composite-grants.md) | medium | P6-07 | todo |
+| P6-12 | [Consistency pass (arguments, outputs, paging, tool count)](tasks/phase-6-tool-breadth/P6-12-consistency-pass.md) | medium | P6-07, P6-08, P6-09 | todo |
+| P6-13 | [Phase 6 review and live verification](tasks/phase-6-tool-breadth/P6-13-phase-6-review.md) | high | P6-03, P6-04, P6-06, P6-10, P6-11, P6-12 | todo |
+
+### Phase 7
+
+| ID | Task | Priority | Depends on | Status |
+|---|---|---|---|---|
+| P7-01 | [Write framework (enablement, approval, dry run, audit intent)](tasks/phase-7-writes/P7-01-write-framework.md) | high | P2-17, P0-07 | todo |
+| P7-02 | [Out-of-band approval page](tasks/phase-7-writes/P7-02-approval-page.md) | high | P7-01, P4-02 | todo |
+| P7-03 | [Deployment-wide write limiter](tasks/phase-7-writes/P7-03-write-limiter.md) | high | P7-01 | todo |
+| P7-04 | [Writes wave 1: comment, status, effort, owners, sprint](tasks/phase-7-writes/P7-04-writes-wave-1.md) | high | P7-01, P7-03 | todo |
+| P7-05 | [Writes wave 2: create work items and update fields](tasks/phase-7-writes/P7-05-writes-wave-2.md) | medium | P7-04 | todo |
+| P7-06 | [Lifecycle operations: close and reopen](tasks/phase-7-writes/P7-06-lifecycle-operations.md) | medium | P7-04 | todo |
+| P7-07 | [Sandbox write verification](tasks/phase-7-writes/P7-07-sandbox-write-verification.md) | high | P7-02, P7-05, P7-06 | todo |
+| P7-08 | [Write documentation and threat-model update](tasks/phase-7-writes/P7-08-write-docs-threat-model.md) | medium | P7-07 | todo |
+| P7-09 | [Phase 7 review](tasks/phase-7-writes/P7-09-phase-7-review.md) | high | P7-08, P5-10 | todo |
+
+### Phase 8
+
+| ID | Task | Priority | Depends on | Status |
+|---|---|---|---|---|
+| P8-01 | [Query cache](tasks/phase-8-power-features/P8-01-query-cache.md) | medium | P6-13 | todo |
+| P8-02 | [Deep links to the Agility UI](tasks/phase-8-power-features/P8-02-deep-links.md) | low | P6-13 | todo |
+| P8-03 | [MCP Apps views](tasks/phase-8-power-features/P8-03-mcp-apps-views.md) | low | P6-13 | todo |
+| P8-04 | [doctor command](tasks/phase-8-power-features/P8-04-doctor.md) | medium | P6-13 | todo |
+| P8-05 | [Configuration import and export](tasks/phase-8-power-features/P8-05-config-import-export.md) | low | P6-13 | todo |
+| P8-06 | [Client integrations (Claude Code plugin, VS Code and Copilot snippets)](tasks/phase-8-power-features/P8-06-client-integrations.md) | low | P6-13 | todo |
+| P8-07 | [Self-monitoring with OpenTelemetry](tasks/phase-8-power-features/P8-07-self-monitoring.md) | low | P6-13 | todo |
+| P8-08 | [OS keychain support](tasks/phase-8-power-features/P8-08-os-keychain.md) | low | P6-13 | todo |
+| P8-09 | [Per-grant quotas and usage](tasks/phase-8-power-features/P8-09-quotas-usage.md) | low | P6-13 | todo |
+| P8-10 | [MCP Tasks for long-running reports](tasks/phase-8-power-features/P8-10-mcp-tasks.md) | low | P6-13 | todo |
+| P8-11 | [Lazy auth and public tool catalogue](tasks/phase-8-power-features/P8-11-lazy-auth-catalogue.md) | low | P6-13 | todo |
+| P8-12 | [Phase 8 review](tasks/phase-8-power-features/P8-12-phase-8-review.md) | high | P8-01, P8-02, P8-03, P8-04, P8-05, P8-06, P8-07, P8-08, P8-09, P8-10, P8-11, P7-09 | todo |
+
+### Phase 9
+
+| ID | Task | Priority | Depends on | Status |
+|---|---|---|---|---|
+| P9-01 | [Threat model final review and evidence map](tasks/phase-9-hardening-launch/P9-01-threat-model-final.md) | high | P8-12 | todo |
+| P9-02 | [External security review](tasks/phase-9-hardening-launch/P9-02-external-review.md) | high | P9-01 | todo |
+| P9-03 | [Performance and cost review](tasks/phase-9-hardening-launch/P9-03-performance-cost.md) | medium | P8-12 | todo |
+| P9-04 | [Documentation site](tasks/phase-9-hardening-launch/P9-04-docs-site.md) | medium | P8-12 | todo |
+| P9-05 | [Support, versioning and deprecation policy](tasks/phase-9-hardening-launch/P9-05-support-policy.md) | medium | P8-12 | todo |
+| P9-06 | [ASVS L2 mapping and OpenSSF Best Practices](tasks/phase-9-hardening-launch/P9-06-asvs-openssf.md) | medium | P9-01 | todo |
+| P9-07 | [Release verification guide and backport path](tasks/phase-9-hardening-launch/P9-07-release-verification-backports.md) | medium | P8-12 | todo |
+| P9-08 | [Launch checklist and 1.0.0](tasks/phase-9-hardening-launch/P9-08-launch-1-0.md) | high | P9-02, P9-03, P9-04, P9-05, P9-06, P9-07 | todo |
+<!-- tasks:end -->

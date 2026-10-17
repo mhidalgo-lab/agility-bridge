@@ -1,0 +1,52 @@
+# ADR-0009 — Authentication: device tokens first, OAuth 2.1 next; admin sign-in providers
+
+- **Status:** proposed (pending spike P0-08)
+- **Date:** 2026-10-16
+- **Related:** P2-05, P4-01, P4-02, P5-01 – P5-09, L-024, L-029, L-066, L-067, L-086 – L-094
+
+## Context
+
+IDE and CLI clients (VS Code, JetBrains, Copilot CLI, Claude Code, Cursor, Windsurf) can send a static header. Hosted
+clients (claude.ai web, Claude mobile, desktop remote connectors) require OAuth 2.1 with discovery. Admins need to sign
+in to a panel without the project managing passwords.
+
+## Decision
+
+1. **Device tokens first** (Phase 2): `ab_live_<43 base62>_<6 base62 CRC-32>` (`ab_test_…` on non-production
+   deployments), 256-bit random, SHA-256 at rest, constant-time comparison, bound to one workspace, 90-day default
+   expiry, shown once.
+2. **Admin sign-in** (Phase 4): Google, GitHub, Cloudflare Access and any OpenID Connect provider; deny by default with
+   allowlists; one `(idp, subject)` identity per user; the first owner is bootstrapped with a single-use setup link
+   whose code travels in the URL fragment. A break-glass admin token for automation and recovery is **generated** by
+   `agility-bridge admin-token` (typed `ab_admin_…`, 256-bit), passed as `AB_ADMIN_TOKEN`/`AB_ADMIN_TOKEN_FILE`, kept
+   only as a digest in memory, compared in constant time and rate-limited on failure; values that are not generated
+   tokens are refused at boot.
+3. **OAuth 2.1 for MCP clients** (Phase 5), the server acting as its own authorization server:
+   - RFC 9728 protected resource metadata per workspace URL; `WWW-Authenticate` challenge on 401.
+   - RFC 8707 audience binding: a token for workspace A fails at workspace B; refresh cannot retarget.
+   - PKCE S256 for every client; form-encoded token endpoint; RFC 9207 `iss`.
+   - Client ID Metadata Documents fetched by the server with an SSRF guard enforced at connect time (or CIMD disabled on
+     a runtime that cannot do that); Dynamic Client Registration as a capped, expiring compatibility path.
+   - Scopes `mcp:read` and `mcp:write` (write consent is separate and never remembered).
+   - Access tokens 1 hour; rotating refresh tokens 30 days with a bounded reuse interval (default 30 s) for concurrent
+     refreshes; reuse outside the window revokes the device.
+   - All provider state in the storage `kv` table (never isolate memory); codes consumed atomically.
+   - **Secrets at rest**: authorization codes, access tokens and refresh tokens are 256-bit opaque values stored
+     **hash-only**; grant properties and any recoverable transient secret (PKCE verifier, nonce, refresh-reuse successor)
+     are envelope-encrypted; token-family metadata holds nothing secret. Tests scan storage, backups, logs and audit
+     rows for plaintext bearer values.
+   - A device is replaced only after a successful code exchange, never on a GET.
+4. The MCP-side credential (device token or OAuth token) is **never forwarded to Agility**; the Agility token comes only
+   from the stored credential (or, in a pass-through workspace, from the caller's `X-Agility-Token` header).
+
+## Consequences
+
+- Laptops and IDEs work from Phase 2; phones and claude.ai from Phase 5.
+- The project carries an OAuth server: higher security-review cost, mitigated by the spike (P0-08) and a dedicated
+  review (P5-10).
+
+## Alternatives considered
+
+- **Delegating MCP OAuth to Agility's own OAuth2 grants:** rejected for 1.0; Agility OAuth2 grants are configured per
+  instance by members, have their own expiry semantics, and would not carry our grants, scopes or audit.
+- **Third-party identity broker only:** possible behind the generic OIDC provider; not required.
