@@ -375,8 +375,12 @@ Checked 2026-10 in Cloudflare documentation; P0-09 measures with Agility-shaped 
   Solutions** (unrelated). Package descriptions must say "Digital.ai Agility".
 - **Digital.ai** offers an official MCP server for its **Release** product, not for Agility. —
   [Release MCP server](https://docs.digital.ai/release/docs/next/how-to/release-mcp-server)
-- Comparable work-management MCP servers to review in P0-10 (scope, tool design, write gating, auth): GitHub's MCP
-  server, Atlassian's remote MCP server (Jira), Azure DevOps MCP servers and Linear's MCP server.
+- **Comparable work-management MCP servers** (GitHub, Atlassian Rovo, Azure DevOps, Linear), the Agility SDKs and the
+  Release MCP server were reviewed in P0-10 (2026-10-20). None binds query values (JQL, WIQL and Agility `where` filters
+  are strings the caller builds), and none ties write approval to the exact change; both are agility-bridge
+  differentiators (ADR-0012, ADR-0013). The SDK pages never mention `query.v1` or `with` variables, so the binding
+  behaviour remains a P0-06 question. Matrix, adopt / avoid / differentiate lists and follow-ups:
+  [research/prior-art.md](research/prior-art.md).
 
 ## 8. Open questions for the Phase 0 spikes
 
