@@ -3,13 +3,13 @@
 These instructions apply to every AI coding agent (and human) working in this repository.
 
 > Status: **Phase 0**. The monorepo is bootstrapped (P0-01) and `pnpm lint`, `pnpm typecheck`, `pnpm test` and
-> `pnpm build` run; packages are still placeholders. `pnpm tasks` arrives with P0-05.
+> `pnpm build` run; packages are still placeholders. `pnpm tasks` drives the plan (P0-05).
 
 ## Start here
 
 1. Read [`docs/ROADMAP.md`](docs/ROADMAP.md) (phases, principles) and [`docs/tasks/README.md`](docs/tasks/README.md)
    (task rules).
-2. Pick a task: the first `todo` task whose `depends_on` are all `done` (`pnpm tasks next` once it exists).
+2. Pick a task: the first `todo` task whose `depends_on` are all `done` (`pnpm tasks next`).
 3. Read the task file, the ADRs it references, the lessons it lists under **Lessons applied**
    ([`docs/LESSONS-LEARNED.md`](docs/LESSONS-LEARNED.md)) and the relevant sections of
    [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

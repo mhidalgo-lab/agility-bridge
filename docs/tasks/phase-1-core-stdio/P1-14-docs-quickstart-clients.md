@@ -1,6 +1,6 @@
 ---
 id: P1-14
-title: Docs: quickstart and client setup guides
+title: "Docs: quickstart and client setup guides"
 phase: 1
 status: todo
 priority: high

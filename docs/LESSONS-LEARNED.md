@@ -24,7 +24,7 @@ How to use it:
 
 | Theme | Lessons |
 |---|---|
-| [A. Planning and process](#a-planning-and-process) | L-001 – L-010 |
+| [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
 | [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153 |
@@ -41,7 +41,7 @@ How to use it:
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126 |
-| [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132 |
+| [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149 |
 | [Top 20](#top-20) | the lessons that save the most time |
@@ -103,6 +103,13 @@ pending-decisions file for the owner.
 Each mitigation in the threat model maps to code, a test and, if anything remains, a named residual risk.
 *Why:* security documents drift ahead of the code; claims without tests are discovered as gaps right before launch.
 *Applied in:* [THREAT_MODEL.md](THREAT_MODEL.md), P9-01.
+
+**L-158 — Parse hand-written metadata with the real parser from day one.**
+Front matter that looks fine to people can be invalid for the parser: 17 task titles such as `Tools: whoami, …` were
+unquoted YAML with a second `: `, so a strict parser rejected them and dropped their tasks, turning their dependants'
+`depends_on` into "unknown". Validate generated or hand-written metadata in CI as soon as it exists, not when the first
+tool needs it.
+*Applied in:* P0-05 (`pnpm tasks lint`), [tasks/README.md](tasks/README.md).
 
 ## B. MCP protocol and SDK
 

@@ -1,6 +1,6 @@
 ---
 id: P1-10
-title: Tools: list_teams, get_team, list_sprints, list_members
+title: "Tools: list_teams, get_team, list_sprints, list_members"
 phase: 1
 status: todo
 priority: medium

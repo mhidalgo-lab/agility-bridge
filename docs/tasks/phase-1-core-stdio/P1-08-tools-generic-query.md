@@ -1,6 +1,6 @@
 ---
 id: P1-08
-title: Tools: query_assets and get_assets
+title: "Tools: query_assets and get_assets"
 phase: 1
 status: todo
 priority: high

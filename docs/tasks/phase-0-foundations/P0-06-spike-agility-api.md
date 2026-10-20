@@ -1,6 +1,6 @@
 ---
 id: P0-06
-title: Spike: Agility API behaviour, limits and fixtures
+title: "Spike: Agility API behaviour, limits and fixtures"
 phase: 0
 status: todo
 priority: high

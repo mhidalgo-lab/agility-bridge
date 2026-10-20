@@ -1,6 +1,6 @@
 ---
 id: P5-08
-title: Admin: connected apps and devices
+title: "Admin: connected apps and devices"
 phase: 5
 status: todo
 priority: medium

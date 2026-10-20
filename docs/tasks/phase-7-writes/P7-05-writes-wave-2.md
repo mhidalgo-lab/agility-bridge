@@ -1,6 +1,6 @@
 ---
 id: P7-05
-title: Writes wave 2: create work items and update fields
+title: "Writes wave 2: create work items and update fields"
 phase: 7
 status: todo
 priority: medium

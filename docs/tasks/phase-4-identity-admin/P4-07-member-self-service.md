@@ -1,6 +1,6 @@
 ---
 id: P4-07
-title: Member self-service: bring your own Agility token
+title: "Member self-service: bring your own Agility token"
 phase: 4
 status: todo
 priority: high

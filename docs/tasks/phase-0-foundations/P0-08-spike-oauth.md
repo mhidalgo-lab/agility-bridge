@@ -1,6 +1,6 @@
 ---
 id: P0-08
-title: Spike: OAuth 2.1 portability on Node and Workers
+title: "Spike: OAuth 2.1 portability on Node and Workers"
 phase: 0
 status: todo
 priority: high
