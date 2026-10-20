@@ -65,7 +65,7 @@ because HTTP is stateless (ADR-0005). Applied to the documented eras ([client co
 |---|---|---|
 | VS Code (Copilot), Cursor (≤ 2025-11-25) | elicitation, if declared | **approval page only** |
 | JetBrains (Copilot) | elicitation, if declared | approval page unless it negotiates 2026-07-28 (era unknown) |
-| Claude Code, Copilot CLI (2026-07-28) | elicitation | elicitation (`input_required`); **verified for Copilot CLI 1.0.87 on stdio and HTTP** |
+| Claude Code, Copilot CLI (2026-07-28) | elicitation | elicitation (`input_required`); **verified: Copilot CLI 1.0.87 and Claude Code 2.1.304, approve and decline, stdio and HTTP** |
 | Windsurf / Devin Desktop (2026-07-28, elicitation not claimed) | approval page or refusal | approval page |
 | MCP Inspector CLI 2.11.0 | none (the CLI does not elicit) | none |
 
@@ -119,10 +119,10 @@ should build the tool registry this way. The serialised list is about 1.6 KB per
 | Client | Version | Transport | Listed | Call | Era | Elicitation | Source |
 |---|---|---|---|---|---|---|---|
 | MCP Inspector CLI | 2.11.0 | HTTP (Node, workerd), stdio | ✅ | ✅ | 2025 | ❌ (CLI) | this spike, 2026-10-20 |
-| Claude Code | 2.1.287 | HTTP, HTTP + `Authorization` header, stdio | ✅ | ✅ | 2026-07-28 | not tested | relic-bridge P0-07, 2026-10-02 |
 | GitHub Copilot (desktop) | 2026-10 | HTTP | ✅ | ✅ | — | not tested | relic-bridge P0-07, 2026-10-02 |
-| **GitHub Copilot CLI** | **1.0.87** | HTTP (Node) and stdio, `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ **prompt shown and approved on both** (`input_required`) | owner, 2026-10-20 |
-| VS Code, JetBrains, Claude Code (re-run), Claude Desktop, Cursor, Windsurf / Devin Desktop | — | — | — | — | — | — | **owner checklist** |
+| **GitHub Copilot CLI** | **1.0.87** | HTTP (Node) and stdio, `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ **prompt shown; approve and decline both work on both** (`input_required`) | owner, 2026-10-20 |
+| **Claude Code** | **2.1.304** | HTTP (Node) and stdio, `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ **prompt shown; approve and decline both work on both** (`input_required`) | owner, 2026-10-20 |
+| VS Code, JetBrains, Claude Desktop, Cursor, Windsurf / Devin Desktop | — | — | — | — | — | — | **owner checklist** |
 
 **GitHub Copilot CLI 1.0.87** (owner run, 2026-10-20, Linux, all four spike servers added with `copilot mcp add`, the
 test prompt from the checklist):
@@ -134,11 +134,26 @@ test prompt from the checklist):
   server-side schema validation with the full JSON Schema error list (`must be equal to one of the allowed values`, …,
   `must match exactly one schema in oneOf`); `get_work_item B-99999` came back as a tool error (`AB_NOT_FOUND`).
 - `add_comment` on both `team` servers **showed an approval prompt**; approving it returned `approved via
-  input_required`. The owner approved every prompt, so the **decline path was not exercised** (both second calls were
-  approved too); it is still to check.
+  input_required`. In a second run the owner declined: both transports returned `AB_APPROVAL_DECLINED via
+  input_required` as a tool error.
 - Read-only calls ran without a confirmation prompt in this session (the session's tool-permission settings were not
   recorded). The model did not see `readOnlyHint` annotations.
 - No connection failures or timeouts.
+
+**Claude Code 2.1.304** (owner run, 2026-10-20, Linux, the same four servers added with `claude mcp add`, the same
+prompt):
+
+- Same tool lists per workspace; `add_comment` not exposed on `viewer`.
+- `era=modern` over **HTTP and stdio**: Claude Code negotiates 2026-07-28 on both.
+- `query_assets` returned the `{rows, total: 2, nextCursor: null}` object; the unknown operator was refused with the same
+  server-side schema error; `get_work_item B-99999` came back as an error (`AB_NOT_FOUND`).
+- `add_comment` on both `team` servers: the owner saw and answered the approval prompt; approving returned
+  `approved via input_required`, declining returned `AB_APPROVAL_DECLINED via input_required` as an error.
+- Read-only calls ran without a prompt, but that session ran in a bypass-permissions mode, so it says nothing about
+  Claude Code's default behaviour. The model saw names, descriptions and input schemas, not annotations.
+
+**Conclusion so far:** both 2026-07-28 CLIs approve and refuse writes through elicitation on stdio **and** remote HTTP,
+exactly as the server-side matrix predicted; no approval page is needed for them.
 
 The relic-bridge rows come from a sibling project by the same maintainer that uses the same SDK and server pattern; a
 client's protocol behaviour does not depend on the server's domain, so they are carried over with their source and
