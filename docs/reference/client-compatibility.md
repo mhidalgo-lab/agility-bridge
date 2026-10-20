@@ -15,7 +15,7 @@ agility-bridge (version, date).
 |---|---|---|---|---|---|---|---|---|---|---|
 | GitHub Copilot in VS Code | ≤ 2025-11-25 | ✅ | ✅ | ✅ (`headers`) | ✅ DCR + CIMD | ✅ form | ✅ | ❌ | ✅ / ✅ | 128 per request |
 | GitHub Copilot in JetBrains IDEs | ? | ✅ | ✅ | ✅ (`requestInit.headers`) | ✅ DCR (preview) | ✅ form | ❌ | ❌ | ✅ / ✅ | ? |
-| GitHub Copilot CLI | 2026-07-28 (v1.0.81) | ✅ | ✅ | ✅ | ✅ DCR + CIMD + device code | ✅ form + URL | ❌ | ❌ | ? / ? | none (lazy loading) |
+| GitHub Copilot CLI | 2026-07-28 (v1.0.81; **V** 1.0.87 stdio + HTTP) | ✅ | ✅ | ✅ | ✅ DCR + CIMD + device code | ✅ form + URL | ❌ | ❌ | ? / ? | none (lazy loading) |
 | Claude Code | 2026-07-28 (v2.1.292) | ✅ | ✅ | ✅ | ✅ DCR + CIMD | ✅ form + URL | ✅ | ? | ✅ / ✅ | none (tool search) |
 | Claude Desktop | via Code tab / connectors | ✅ (`.mcpb` extensions, config file) | ✅ (connectors) | ✅ (≤ 4, beta) | ✅ CIMD / DCR | Code tab ✅; Chat tab ? | ? | ? | ✅ / ✅ | ? |
 | claude.ai web | hosted | ❌ | ✅ (public IPv4 only) | ✅ (beta) | ✅ CIMD / DCR / own client | ? | ✅ | ? | ? / ? | ? |
@@ -32,6 +32,7 @@ ChatGPT connectors, Gemini CLI.
 
 | Client | Version | Date | What was verified | Source |
 |---|---|---|---|---|
+| GitHub Copilot CLI | 1.0.87 | 2026-10-20 | **V** stdio and HTTP with a static `Authorization` header; 2026-07-28 on both; `structuredContent`; server-side schema errors shown; per-workspace tool lists; **write approval prompt shown and approved on both transports** (`input_required`); decline not yet exercised | P0-07, owner run |
 | MCP Inspector CLI | 2.11.0 | 2026-10-20 | **V** stdio and HTTP (Node, workerd); 2025 era; `structuredContent`; static `Authorization` header; no elicitation in the CLI (writes refused with `AB_APPROVAL_UNAVAILABLE`); `-e` reaches a stdio server | P0-07 spike |
 | Claude Code | 2.1.287 | 2026-10-02 | listed and called over stdio, HTTP and HTTP with a static header; 2026-07-28; sends `Mcp-Method`/`Mcp-Name` and a long-lived `subscriptions/listen` | relic-bridge P0-07 (same SDK; not yet re-run against agility-bridge) |
 | GitHub Copilot (desktop) | 2026-10 | 2026-10-02 | listed and called over HTTP | relic-bridge P0-07 (same SDK; not yet re-run against agility-bridge) |
@@ -46,7 +47,7 @@ on 2025-era HTTP. The rest of the matrix is the owner's checklist in
 |---|---|---|---|
 | VS Code | ✅ | device token in a password `input`, or OAuth (Phase 5) | stdio: elicitation · remote: approval page (2025-era HTTP cannot be elicited) |
 | JetBrains | ✅ | device token (stored in plain text by the IDE: use short expiry) or OAuth preview | stdio: elicitation · remote: approval page |
-| Copilot CLI | ✅ | device token or OAuth | elicitation (stdio and 2026-07-28 HTTP) |
+| Copilot CLI | ✅ | device token or OAuth | elicitation on stdio and HTTP (**V** 1.0.87, approve path) |
 | Claude Code | ✅ | device token or OAuth | elicitation |
 | Claude Desktop | ✅ (config file or extension) | OAuth connector | Code tab: elicitation · Chat tab: approval page until elicitation is verified |
 | claude.ai web / mobile | — | OAuth connector (public HTTPS) | approval page (open the link on the phone, sign in) |

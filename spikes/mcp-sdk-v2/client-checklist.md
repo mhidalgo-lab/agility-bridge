@@ -36,7 +36,7 @@ PORT=8787 pnpm node          # HTTP: http://127.0.0.1:8787/w/team/mcp (or /w/vie
 |---|---|---|---|
 | GitHub Copilot in VS Code | ☐ | ☐ | `.vscode/mcp.json`, header in `headers` |
 | GitHub Copilot in JetBrains | ☐ | ☐ | header under `requestInit.headers` |
-| GitHub Copilot CLI | ☐ | ☐ | `copilot mcp add`; a `tools` allowlist is required |
+| GitHub Copilot CLI | ☑ 1.0.87 | ☑ 1.0.87 | done 2026-10-20 except the decline path |
 | Claude Code | ☐ | ☐ | `claude mcp add --scope local …`; remove afterwards |
 | Claude Desktop | ☐ | — | `claude_desktop_config.json`; HTTP connectors need a public URL (P5-06) |
 | Cursor | ☐ | ☐ | `~/.cursor/mcp.json` |
