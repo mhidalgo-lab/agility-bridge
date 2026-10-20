@@ -19,7 +19,8 @@
     "agility-bridge": "./dist/index.mjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE"
   ],
   "publishConfig": {
     "access": "public",

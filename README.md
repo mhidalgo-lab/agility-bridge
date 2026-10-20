@@ -75,9 +75,10 @@ Setup for every supported client (including password prompts in VS Code instead 
 - **Research:** [Agility APIs, MCP, OAuth and platform facts](docs/RESEARCH.md)
 - **Security:** [threat model](docs/THREAT_MODEL.md)
 - **Lessons learned:** [engineering rules and known failure modes](docs/LESSONS-LEARNED.md)
-- **Contributors and AI agents:** [AGENTS.md](AGENTS.md)
-
-License, contribution guide, security policy and code of conduct arrive with task P0-02.
+- **Contributors and AI agents:** [contributing](CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) ·
+  [code of conduct](CODE_OF_CONDUCT.md)
+- **Security policy:** [SECURITY.md](SECURITY.md) (report vulnerabilities privately) ·
+  [repository settings](docs/security/repo-settings.md)
 
 ## Development
 
@@ -88,13 +89,14 @@ Cloudflare Worker. You need Node.js 24 or later; pnpm is pinned through `package
 ```sh
 corepack enable
 pnpm install          # also installs the git hooks (Biome on commit, DCO sign-off check)
-pnpm lint             # Biome, web-standard import check, SPDX header check
+pnpm lint             # Biome, web-standard import check, SPDX headers, workflow hardening rules
 pnpm typecheck
 pnpm test
 pnpm build
 ```
 
-Commits follow Conventional Commits and carry a DCO sign-off (`git commit -s`); see [AGENTS.md](AGENTS.md).
+Commits follow Conventional Commits and carry a DCO sign-off (`git commit -s`); see [CONTRIBUTING.md](CONTRIBUTING.md)
+and [AGENTS.md](AGENTS.md).
 
 ## Data and terms
 
@@ -113,5 +115,5 @@ Digital.ai, Agility and VersionOne are trademarks of their respective owners.
 
 ## License
 
-[Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0), with DCO sign-off for contributions
+[Apache-2.0](LICENSE) (see also [NOTICE](NOTICE)), with DCO sign-off for contributions
 ([ADR-0003](docs/adr/0003-license-apache-2.md)).

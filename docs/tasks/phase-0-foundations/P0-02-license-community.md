@@ -2,12 +2,12 @@
 id: P0-02
 title: License, community and security policy files
 phase: 0
-status: todo
+status: review
 priority: high
 depends_on: [P0-01]
 adr: ["0002", "0003"]
 lessons: [L-132, L-135]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P0-02 — License, community and security policy files
@@ -24,10 +24,10 @@ A public-ready repository: license, notice, contribution rules with DCO, a secur
 - Disclaimer and Acceptable Use Policy note (ADR-0002) in the README.
 
 ## Acceptance criteria
-- [ ] All files present and linked from the README.
-- [ ] `SECURITY.md` names the private reporting channel and the response targets.
-- [ ] The disclaimer text is identical everywhere it appears (README, npm description draft, docs).
-- [ ] The PR template checklist matches AGENTS.md (tests incl. negative authorization, docs, threat model, no secrets or real data, changeset, DCO).
+- [x] All files present and linked from the README.
+- [x] `SECURITY.md` names the private reporting channel and the response targets.
+- [x] The disclaimer text is identical everywhere it appears (README, npm description draft, docs). *(Enforced by `scripts/test/disclaimer.test.ts` for README, NOTICE, the npm README and ADR-0002.)*
+- [x] The PR template checklist matches AGENTS.md (tests incl. negative authorization, docs, threat model, no secrets or real data, changeset, DCO).
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.

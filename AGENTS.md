@@ -14,6 +14,8 @@ These instructions apply to every AI coding agent (and human) working in this re
    ([`docs/LESSONS-LEARNED.md`](docs/LESSONS-LEARNED.md)) and the relevant sections of
    [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 4. If a later-phase task is vague, **refine it first** (scope + acceptance criteria) in a separate commit.
+5. Setup, commits, CI and the PR checklist: [`CONTRIBUTING.md`](CONTRIBUTING.md). Security reports go through
+   [`SECURITY.md`](SECURITY.md), never public issues.
 
 ## Hard rules
 
