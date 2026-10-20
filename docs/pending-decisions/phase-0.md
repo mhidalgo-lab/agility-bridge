@@ -166,11 +166,12 @@
 ## Owner checklist (manual actions, in order)
 
 1. ~~Reserve the npm package name~~ (done 2026-10-19, `agility-bridge@0.0.0`) and enable 2FA; later configure trusted publishing and staged publishing (P1-15).
-2. Repository settings: rulesets (no force push or deletion, PRs required, squash merges, required checks), secret
-   scanning and push protection, private vulnerability reporting, Dependabot alerts, read-only default Actions
-   permissions, approval for first-time contributors' workflows (P0-03, P0-04).
-3. Environments: `live` (reviewers, `main` only, `AB_LIVE_*` secrets), `release` (reviewers, `main` and tags), `staging`
-   (Phase 3).
+2. ~~Repository settings~~ (done 2026-10-20, mirroring `mhidalgo-lab/relic-bridge`): rulesets for `main` and
+   `release/*` (no force push or deletion, PRs required, squash only, 0 approvals, resolved threads), secret scanning
+   and push protection, private vulnerability reporting, Dependabot alerts, read-only default Actions permissions,
+   approval for all outside contributors' workflows. **Pending:** required status checks, added with CI (P0-03).
+3. ~~Environments~~ (done 2026-10-20): `live` (owner as reviewer, `main` only), `release` (owner as reviewer, `main`,
+   `release/*` and `v*` tags), `staging` and `github-pages` (`main` only). **Pending:** `AB_LIVE_*` secrets (P0-12).
 4. Agility sandbox (D-01): the owner's read-only account in a third-party tenant (no seed data, nothing modified);
    confirm that the tenant's company is aware of read-only API testing; access token as an `AB_LIVE_*` secret (P0-12).
 5. Writable Agility sandbox (Digital.ai trial or similar) with reader and writer members and synthetic seed data,

@@ -21,12 +21,17 @@ Every PR runs the same checks as local development, on GitHub-hosted runners, wi
 - Workflow lint (actionlint), DCO check, Conventional PR title check.
 - Hardening: actions pinned by full SHA, `permissions: contents: read` by default, harden-runner with egress audit (block once the allowlist is known), concurrency cancellation, no `pull_request_target`, no secrets for fork PRs.
 - pnpm store caching; a time budget for the whole pipeline.
+- Add a `required_status_checks` rule to the existing "Protect main" and "Protect release/*" rulesets (applied
+  2026-10-20 without it, because no CI existed yet), with the check names this task creates, mirroring
+  `mhidalgo-lab/relic-bridge` (build matrix per Node version, workflow lint, dependency audit and review, DCO, Conventional
+  PR title, CodeQL, gitleaks, authorization suite as they come to exist).
 
 ## Acceptance criteria
 - [ ] CI is green on a sample PR in under 15 minutes.
 - [ ] A test fails when a workflow uses an unpinned action or broad permissions.
 - [ ] The Windows job runs a SQLite placeholder test.
 - [ ] `docs/security/repo-settings.md` lists the required checks and branch rules.
+- [ ] Both rulesets require the CI checks; a PR with a failing check cannot be merged.
 
 ## Security notes
 THREAT_MODEL T18. GitHub-hosted runners only; never a fallback to self-hosted runners for public PRs (L-129).
