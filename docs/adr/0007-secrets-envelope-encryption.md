@@ -29,6 +29,12 @@ created them. A leaked database or backup must not leak usable tokens.
   rotation of the Agility tokens themselves after a suspected database leak.
 - Lost master key = all stored tokens must be re-entered (documented recovery).
 
+## Evidence (P0-09, 2026-10-20)
+
+HKDF-SHA-256 → AES-256-GCM (random 96-bit IV, record id as additional data) sealed on Node opens on workerd and the
+reverse, and a wrong additional-data value is refused on workerd
+([results](../../spikes/workers-limits/RESULTS.md) §4).
+
 ## Alternatives considered
 
 - **Plaintext with file permissions:** rejected.

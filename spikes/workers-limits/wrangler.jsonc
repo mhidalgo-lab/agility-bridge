@@ -1,0 +1,11 @@
+// P0-09 spike Worker. Local only (`wrangler dev`): the D1 database is local and its id is a placeholder.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agility-bridge-spike-limits",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-26",
+  "send_metrics": false,
+  "d1_databases": [
+    { "binding": "DB", "database_name": "spike", "database_id": "00000000-0000-0000-0000-000000000000" }
+  ]
+}

@@ -36,6 +36,14 @@ request. One agent must not be able to exhaust a customer's Agility tenant.
 - Predictable cost per call and clear errors (`AB_BUDGET_EXHAUSTED`, `AB_AGILITY_RATE_LIMITED`).
 - The numbers are starting points; P0-06/P0-09 measurements and P3-10/P9-03 benchmarks revise them.
 
+## Evidence (P0-09, 2026-10-20)
+
+From [spikes/workers-limits/RESULTS.md](../../spikes/workers-limits/RESULTS.md): read + parse + shape costs 2.3 ms (p50,
+Node) at 512 KiB and about 4.5 ms with the production factor measured on Workers Free, so the **512 KiB Free / 8 MiB
+Paid and Node response caps stand**, as do the budget presets. `meta.v1` for a whole instance is 4–5 MB, so on Workers
+the metadata service loads one asset type at a time (P1-03). Production numbers with Agility-shaped payloads are the
+owner's checklist ([deploy-and-measure.md](../../spikes/workers-limits/deploy-and-measure.md)).
+
 ## Alternatives considered
 
 - **Let Agility or the platform fail naturally:** rejected; error-count quotas punish the user's own token.
