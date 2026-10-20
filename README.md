@@ -1,8 +1,9 @@
 # agility-bridge
 
-> **Status: design phase (pre-alpha).** Nothing is implemented or published yet. This repository currently holds the
-> plan: architecture, decisions, research, threat model, lessons learned and a task-by-task roadmap. Phase 0
-> (foundations and risk spikes) is next — see the [roadmap](docs/ROADMAP.md).
+> **Status: Phase 0 (pre-alpha).** No features yet. This repository holds the plan (architecture, decisions,
+> research, threat model, lessons learned and a task-by-task roadmap) and the bootstrapped monorepo; Phase 0
+> (foundations and risk spikes) is under way — see the [roadmap](docs/ROADMAP.md). The npm package `agility-bridge` is
+> only a name placeholder until v0.1.
 
 An open-source [Model Context Protocol](https://modelcontextprotocol.io) server that lets AI agents — GitHub Copilot
 (VS Code, JetBrains, CLI), Claude (Code, Desktop, claude.ai, mobile), Cursor, Windsurf and others — work with
@@ -77,6 +78,23 @@ Setup for every supported client (including password prompts in VS Code instead 
 - **Contributors and AI agents:** [AGENTS.md](AGENTS.md)
 
 License, contribution guide, security policy and code of conduct arrive with task P0-02.
+
+## Development
+
+A pnpm monorepo in TypeScript ([ADR-0004](docs/adr/0004-typescript-runtime-agnostic-core.md)): `packages/*` hold the
+runtime-agnostic core and adapters, `apps/cli` is the published `agility-bridge` command and `apps/worker` the
+Cloudflare Worker. You need Node.js 24 or later; pnpm is pinned through `packageManager`.
+
+```sh
+corepack enable
+pnpm install          # also installs the git hooks (Biome on commit, DCO sign-off check)
+pnpm lint             # Biome, web-standard import check, SPDX header check
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+Commits follow Conventional Commits and carry a DCO sign-off (`git commit -s`); see [AGENTS.md](AGENTS.md).
 
 ## Data and terms
 

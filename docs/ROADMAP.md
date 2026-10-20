@@ -4,7 +4,7 @@
 > (every asset type, read and opt-in write) with each member's own access token. Runs locally (stdio), self-hosted
 > (Node / Docker) or as a **Cloudflare Worker** reachable from every device.
 
-Status: **design phase** (2026-10-16) — nothing is implemented; Phase 0 is next. Architecture:
+Status: **Phase 0** (2026-10-20) — the monorepo is bootstrapped (P0-01); no features yet. Architecture:
 [ARCHITECTURE.md](ARCHITECTURE.md) · Decisions: [adr/](adr/) · Facts & limits: [RESEARCH.md](RESEARCH.md) · Security:
 [THREAT_MODEL.md](THREAT_MODEL.md) · Lessons: [LESSONS-LEARNED.md](LESSONS-LEARNED.md) · Task rules:
 [tasks/README.md](tasks/README.md) · Open questions: [pending-decisions/phase-0.md](pending-decisions/phase-0.md)
@@ -112,7 +112,7 @@ Status lives in each task file.
 
 | ID | Task | Priority | Depends on | Status |
 |---|---|---|---|---|
-| P0-01 | [Bootstrap the monorepo](tasks/phase-0-foundations/P0-01-repo-bootstrap.md) | high | P0-14 | todo |
+| P0-01 | [Bootstrap the monorepo](tasks/phase-0-foundations/P0-01-repo-bootstrap.md) | high | P0-14 | review |
 | P0-02 | [License, community and security policy files](tasks/phase-0-foundations/P0-02-license-community.md) | high | P0-01 | todo |
 | P0-03 | [CI pipeline](tasks/phase-0-foundations/P0-03-ci-pipeline.md) | high | P0-01 | todo |
 | P0-04 | [Security tooling baseline](tasks/phase-0-foundations/P0-04-security-tooling.md) | high | P0-03 | todo |
@@ -125,7 +125,7 @@ Status lives in each task file.
 | P0-11 | [Tool contract and conventions](tasks/phase-0-foundations/P0-11-tool-contract.md) | high | P0-06, P0-07, P0-14 | todo |
 | P0-12 | [Agility sandbox and live-verification harness](tasks/phase-0-foundations/P0-12-sandbox-live-harness.md) | high | P0-03, P0-14 | todo |
 | P0-13 | [Spike results and go/no-go for Phase 1](tasks/phase-0-foundations/P0-13-spike-results-go-no-go.md) | high | P0-02, P0-04, P0-05, P0-06, P0-07, P0-08, P0-09, P0-10, P0-11, P0-12 | todo |
-| P0-14 | [Owner decision gate for Phase 0](tasks/phase-0-foundations/P0-14-owner-decision-gate.md) | high | — | review |
+| P0-14 | [Owner decision gate for Phase 0](tasks/phase-0-foundations/P0-14-owner-decision-gate.md) | high | — | done |
 
 ### Phase 1
 

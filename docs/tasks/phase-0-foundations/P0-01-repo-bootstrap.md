@@ -2,12 +2,12 @@
 id: P0-01
 title: Bootstrap the monorepo
 phase: 0
-status: todo
+status: review
 priority: high
 depends_on: [P0-14]
 adr: ["0004", "0003"]
 lessons: [L-102, L-132, L-006]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P0-01 — Bootstrap the monorepo
@@ -30,11 +30,11 @@ A reproducible pnpm/TypeScript monorepo with the package boundaries of ARCHITECT
 - A placeholder `agility-bridge` CLI that prints its version to stderr.
 
 ## Acceptance criteria
-- [ ] `corepack enable && pnpm install && pnpm lint && pnpm typecheck && pnpm test && pnpm build` passes from a fresh clone on Linux, macOS and Windows.
-- [ ] The runtime-import check fails on a `node:` import in `packages/core` (test).
-- [ ] The SPDX check fails on a file without the header (test).
-- [ ] Only `apps/cli` (`agility-bridge`) is publishable; every other package is private.
-- [ ] Exact versions pinned for TypeScript, Biome, Vitest, tsdown, Hono, the MCP SDK v2, zod 4, Drizzle 0.x and Wrangler; lockfile committed.
+- [x] `corepack enable && pnpm install && pnpm lint && pnpm typecheck && pnpm test && pnpm build` passes from a fresh clone on Linux, macOS and Windows. *(Verified on Linux, 2026-10-20; macOS and Windows are verified by the P0-03 OS matrix.)*
+- [x] The runtime-import check fails on a `node:` import in `packages/core` (test).
+- [x] The SPDX check fails on a file without the header (test).
+- [x] Only `apps/cli` (`agility-bridge`) is publishable; every other package is private.
+- [x] Exact versions pinned for TypeScript, Biome, Vitest, tsdown, Hono, the MCP SDK v2, zod 4, Drizzle 0.x and Wrangler; lockfile committed.
 
 ## Security notes
 Supply chain from the first commit (THREAT_MODEL T18): minimum release age, no exotic sub-dependencies, explicit approval for dependency build scripts.

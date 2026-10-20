@@ -1,0 +1,31 @@
+{
+  "name": "@agility-bridge/admin-ui",
+  "version": "0.0.0",
+  "description": "Server-rendered admin panel (Hono JSX, strict CSP)",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "agilityBridge": {
+    "runtime": "web"
+  },
+  "dependencies": {
+    "hono": "4.13.13"
+  },
+  "devDependencies": {
+    "tsdown": "0.23.1"
+  }
+}

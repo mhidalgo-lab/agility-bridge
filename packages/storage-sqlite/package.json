@@ -1,0 +1,17 @@
+{
+  "name": "@agility-bridge/storage-sqlite",
+  "version": "0.0.0",
+  "description": "SQLite adapter for the Storage interface on Node (node:sqlite)",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "agilityBridge": {
+    "runtime": "node"
+  }
+}

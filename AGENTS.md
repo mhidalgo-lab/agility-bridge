@@ -2,8 +2,8 @@
 
 These instructions apply to every AI coding agent (and human) working in this repository.
 
-> Status: the repository is in the **design phase**. Nothing is implemented yet; the plan lives in `docs/`. Commands
-> such as `pnpm tasks` and `pnpm test` exist once Phase 0 tasks P0-01 and P0-05 are done.
+> Status: **Phase 0**. The monorepo is bootstrapped (P0-01) and `pnpm lint`, `pnpm typecheck`, `pnpm test` and
+> `pnpm build` run; packages are still placeholders. `pnpm tasks` arrives with P0-05.
 
 ## Start here
 

@@ -1,0 +1,31 @@
+{
+  "name": "@agility-bridge/storage",
+  "version": "0.0.0",
+  "description": "Storage interface, schema and adapters (memory, YAML, D1)",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "agilityBridge": {
+    "runtime": "web"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.4"
+  },
+  "devDependencies": {
+    "tsdown": "0.23.1"
+  }
+}

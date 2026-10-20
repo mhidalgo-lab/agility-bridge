@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": [],
+    "lib": ["es2023", "webworker"],
+    "declaration": false,
+    "isolatedDeclarations": false
+  },
+  "include": ["src", "test"]
+}

@@ -1,0 +1,49 @@
+{
+  "name": "agility-bridge",
+  "version": "0.0.0",
+  "mcpName": "io.github.mhidalgo-lab/agility-bridge",
+  "description": "Unofficial MCP server for Digital.ai Agility: let AI agents work with every asset type using your own access token",
+  "license": "Apache-2.0",
+  "author": "Matias Hidalgo",
+  "homepage": "https://github.com/mhidalgo-lab/agility-bridge#readme",
+  "bugs": {
+    "url": "https://github.com/mhidalgo-lab/agility-bridge/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mhidalgo-lab/agility-bridge.git",
+    "directory": "apps/cli"
+  },
+  "type": "module",
+  "bin": {
+    "agility-bridge": "./dist/index.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "agility",
+    "digital.ai",
+    "versionone",
+    "ai-agents"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "agilityBridge": {
+    "runtime": "node"
+  },
+  "devDependencies": {
+    "tsdown": "0.23.1"
+  }
+}
