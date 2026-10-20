@@ -351,6 +351,11 @@ Checked 2026-10 in Cloudflare documentation; P0-09 measures with Agility-shaped 
 - **npm trusted publishing** (OIDC from GitHub Actions) needs npm CLI ≥ 11.5.1 and a GitHub-hosted runner; **staged
   publishing** keeps a published version private until a maintainer approves it with 2FA. —
   [trusted publishers](https://docs.npmjs.com/trusted-publishers), [staged publishing](https://docs.npmjs.com/staged-publishing) *(re-verify)*
+- **npm staged publishing, observed 2026-10-19** (npm CLI 11.16.0, publishing `agility-bridge@0.0.0`): staged
+  publishing needs npm CLI ≥ 11.15.0 (`npm stage publish|list|view|download|approve`). The first publish of a new name
+  created a public stub `0.0.0-stage` ("Temporary package placeholder for staged publishing"). Approval asked for
+  browser-based 2FA, which fails with `EOTP` in a non-interactive shell; once approved, the version became `latest`. —
+  [staged publishing](https://docs.npmjs.com/staged-publishing), live
 - `pnpm pack` resolves `workspace:` dependencies and adds the root `LICENSE`, but not `NOTICE` or `README.md`; include
   them explicitly.
 - **MCP Registry**: servers are described by a `server.json` (package, transport, environment variables marked secret or

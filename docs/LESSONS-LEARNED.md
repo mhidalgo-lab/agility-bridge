@@ -788,6 +788,13 @@ Minimum release age for new versions, no trust downgrades, blocked exotic sub-de
 approvals, and published advisory deadlines (critical 7 days, high 14, moderate 30).
 *Applied in:* P0-02, P0-04.
 
+**L-157 — Verify a publish against the registry, not through a wrapped client.**
+A local npm wrapper that enforces a minimum release age (here Safe-chain) hides versions published minutes ago, so
+`npm view` reports a successful publish as missing and a retry fails with 403 "cannot publish over 0.0.0". Check
+`https://registry.npmjs.org/<name>` directly and compare the shasum. A first staged publish also creates a public
+`0.0.0-stage` stub, and the 2FA approval needs an interactive terminal.
+*Applied in:* P1-15.
+
 ## S. Documentation and configuration
 
 **L-133 — Execute the documentation.**

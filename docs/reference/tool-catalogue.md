@@ -28,10 +28,11 @@
 | `portfolio` | on | `list_portfolio_items`, `get_portfolio_tree` |
 | `collaboration` | on | `get_conversations`, `list_attachments` |
 | `history` | on | `get_asset_history`, `list_recent_changes` |
+| `attachments` | off (enable per workspace; `AB_ATTACHMENT_DOWNLOAD`) | `get_attachment` |
 | `reports` | off (enable per workspace) | `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage`, `work_item_quality` |
 | `writes` | **off** | `add_comment`, `update_status`, `log_effort`, `assign_owners`, `move_to_sprint`, `create_work_item`, `update_fields`, `close_asset`, `reopen_asset` |
 
-Default: 20 read tools. Everything: 25 read + 9 write = 34.
+Default: 20 read tools. Everything: 26 read + 9 write = 35.
 
 ## Read tools
 
@@ -62,6 +63,7 @@ Default: 20 read tools. Everything: 25 read + 9 write = 34.
 | `get_portfolio_tree` | portfolio | 8 | An epic with its descendants (sub-epics, backlog items) and roll-ups (estimate, done %, open defects); depth-bounded. |
 | `get_conversations` | collaboration | 3 | Comments on an asset, newest first. Paged. |
 | `list_attachments` | collaboration | 2 | Attachment metadata (name, size, type, author, date) for an asset; content download is not offered by default (THREAT_MODEL A8). |
+| `get_attachment` | attachments | 3 | Opt-in, off by default (D-08): the text content of one attachment of an asset in scope, within the size and content-type allowlists, inside the untrusted-data envelope; never rendered or executed (THREAT_MODEL A8). |
 | `get_asset_history` | history | 4 | What changed on an asset over a bounded window (status, owners, estimate, sprint, …) from the authoritative history. |
 | `list_recent_changes` | history | 4 | Assets changed recently in an Agility project or team (bounded window). Paged. |
 | `sprint_health` | reports | 12 | Progress vs time, scope change, blocked or unowned or unestimated items, defects opened during the sprint; honest `partial`. |

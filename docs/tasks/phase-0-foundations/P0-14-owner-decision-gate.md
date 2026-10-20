@@ -2,12 +2,12 @@
 id: P0-14
 title: Owner decision gate for Phase 0
 phase: 0
-status: todo
+status: review
 priority: high
 depends_on: []
 adr: ["0001"]
 lessons: [L-009]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P0-14 — Owner decision gate for Phase 0
@@ -21,8 +21,8 @@ Answer the few owner decisions that shape the first Phase 0 tasks before those t
 - Owner applies the repository settings needed for CI (see the owner checklist).
 
 ## Acceptance criteria
-- [ ] The five gate decisions are answered with a date; the rest are listed with a target task.
-- [ ] P0-01, P0-11 and P0-12 reference the answers they depend on.
+- [x] The five gate decisions are answered with a date; the rest are listed with a target task.
+- [x] P0-01, P0-11 and P0-12 reference the answers they depend on.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.

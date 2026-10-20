@@ -370,6 +370,8 @@ validate input + metadata (operation allowed, attributes writable, values typed)
 | `AB_ASSET_TYPES_ALLOW` / `AB_ASSET_TYPES_DENY` | all / none | asset-type limits |
 | `AB_GENERIC_QUERY` | `on` | enable `query_assets` / `get_assets` |
 | `AB_MEMBER_EMAILS` | `off` | include member emails in output |
+| `AB_ATTACHMENT_DOWNLOAD` | `off` | enable `get_attachment` (D-08) |
+| `AB_ATTACHMENT_MAX_BYTES` / `AB_ATTACHMENT_TYPES` | `1048576` / text types | attachment content size cap and content-type allowlist |
 | `AB_LIMITS_MAX_LIMIT` | `100` | maximum rows per call (hard 1,000) |
 | `AB_LIMITS_MAX_RESPONSE_BYTES` | `8388608` (Workers Free 524288) | upstream response cap |
 | `AB_CALL_BUDGET` | per runtime | Agility requests per tool call |
@@ -404,6 +406,7 @@ Full list with inputs, risk class and phase: [reference/tool-catalogue.md](refer
 | Work items | `search_work_items`, `get_work_item`, `list_my_work` | 1 |
 | Planning context | `list_teams`, `get_team`, `list_sprints`, `list_members` | 1 |
 | Portfolio, planning, collaboration, history | `get_sprint`, `list_portfolio_items`, `get_portfolio_tree`, `get_conversations`, `list_attachments`, `get_asset_history`, `list_recent_changes` | 6 |
+| Attachment content (opt-in, off by default) | `get_attachment` | 6 |
 | Reports (composites) | `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage`, `work_item_quality` | 6 |
 | Writes (opt-in) | `add_comment`, `update_status`, `log_effort`, `assign_owners`, `move_to_sprint`, `create_work_item`, `update_fields`, `close_asset`, `reopen_asset` | 7 |
 

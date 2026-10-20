@@ -100,6 +100,7 @@ provenance, a GitHub Release with SBOM and checksums, and (from Phase 2) a signe
 | 2026-10-16 | Hosted and on-premises Agility instances; HTTPS only (loopback for tests); custom CA bundles; access tokens only | ADR-0014 |
 | 2026-10-16 | Primary clients documented equally: GitHub Copilot (VS Code, JetBrains, CLI), Claude (Code, Desktop, web, mobile), Cursor, Windsurf, MCP Inspector | ADR-0016 |
 | 2026-10-16 | "Workspace" names agility-bridge's unit of access; "Agility project" always means Agility's `Scope` | ARCHITECTURE §4 |
+| 2026-10-19 | Owner answered D-01 – D-24. Live tests use a read-only third-party tenant (writable sandbox needed before Phase 7); npm `agility-bridge`, Node ≥ 24, releases every phase; opt-in attachment download in 1.0 (deviates from the recommendation); all others as recommended | [pending-decisions/phase-0.md](pending-decisions/phase-0.md) |
 
 ## Task index
 
@@ -124,7 +125,7 @@ Status lives in each task file.
 | P0-11 | [Tool contract and conventions](tasks/phase-0-foundations/P0-11-tool-contract.md) | high | P0-06, P0-07, P0-14 | todo |
 | P0-12 | [Agility sandbox and live-verification harness](tasks/phase-0-foundations/P0-12-sandbox-live-harness.md) | high | P0-03, P0-14 | todo |
 | P0-13 | [Spike results and go/no-go for Phase 1](tasks/phase-0-foundations/P0-13-spike-results-go-no-go.md) | high | P0-02, P0-04, P0-05, P0-06, P0-07, P0-08, P0-09, P0-10, P0-11, P0-12 | todo |
-| P0-14 | [Owner decision gate for Phase 0](tasks/phase-0-foundations/P0-14-owner-decision-gate.md) | high | — | todo |
+| P0-14 | [Owner decision gate for Phase 0](tasks/phase-0-foundations/P0-14-owner-decision-gate.md) | high | — | review |
 
 ### Phase 1
 
@@ -223,7 +224,7 @@ Status lives in each task file.
 | P6-01 | [Portfolio tools (epics and portfolio items)](tasks/phase-6-tool-breadth/P6-01-tools-portfolio.md) | high | P2-17 | todo |
 | P6-02 | [Planning tools (sprints, schedules, capacity)](tasks/phase-6-tool-breadth/P6-02-tools-planning.md) | high | P2-17 | todo |
 | P6-03 | [Quality views (tests, regression assets, defects)](tasks/phase-6-tool-breadth/P6-03-tools-quality.md) | medium | P2-17 | todo |
-| P6-04 | [Collaboration tools (conversations, links, attachment metadata)](tasks/phase-6-tool-breadth/P6-04-tools-collaboration.md) | medium | P2-17 | todo |
+| P6-04 | [Collaboration tools (conversations, links, attachments)](tasks/phase-6-tool-breadth/P6-04-tools-collaboration.md) | medium | P2-17 | todo |
 | P6-05 | [History and activity tools](tasks/phase-6-tool-breadth/P6-05-tools-history.md) | medium | P2-17 | todo |
 | P6-06 | [Requests, issues and other asset types](tasks/phase-6-tool-breadth/P6-06-other-asset-types.md) | medium | P2-17 | todo |
 | P6-07 | [Composite reports](tasks/phase-6-tool-breadth/P6-07-composite-reports.md) | high | P6-01, P6-02, P6-05 | todo |

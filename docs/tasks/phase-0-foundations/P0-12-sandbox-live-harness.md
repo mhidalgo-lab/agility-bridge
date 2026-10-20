@@ -15,22 +15,37 @@ owner: ""
 ## Goal
 A safe Agility sandbox, a protected way to run live tests and a template for evidence, before any spike or tool depends on real behaviour.
 
+## Decisions
+- D-01 (2026-10-19): the only instance is the owner's personal account in a third-party company's hosted tenant, usable
+  **strictly read-only**. No seed data is created and nothing in that tenant is modified; a writable sandbox comes
+  before Phase 7 (P7-07). No on-premises instance for now (D-13).
+
 ## Scope
-- Owner obtains a hosted sandbox instance (and, if possible, an on-premises test instance).
-- Two least-privilege members (reader, writer) with personal access tokens.
-- Seed plan: parent/child Agility projects, teams with their own workflows, sprints, members, backlog items, defects, tasks, tests, epics with categories (Feature, Initiative), issues, requests, regression tests/plans/suites, test sets, custom fields, conversations, attachments.
+- Owner confirms that the tenant's company is aware of read-only API testing with the owner's account.
+- One member (the owner's account) with a personal access token, stored only as an `AB_LIVE_*` environment secret.
+  Reader/writer permission differences are covered by mocks until the writable sandbox exists.
+- Inventory instead of a seed plan: which of these exist and are visible to the account (counts and asset types only,
+  no content): parent/child Agility projects, teams with their own workflows, sprints, members, backlog items, defects,
+  tasks, tests, epics with categories (Feature, Initiative), issues, requests, regression tests/plans/suites, test sets,
+  custom fields, conversations, attachments. Gaps are listed for the writable sandbox.
+- A read-only guard in the live harness: only `GET` requests and `query.v1`/`meta.v1` reads reach the tenant; any other
+  method or endpoint fails the test before it is sent.
+- No rate-limit, quota or error-count probing against the third-party tenant (those wait for the writable sandbox).
 - GitHub `live` environment restricted to `main`, with required reviewers and `AB_LIVE_*` secrets.
-- Live-suite skeleton (`vitest.live.config`): read-only, never on fork PRs, never prints tokens.
-- `docs/dev/verification.md`: evidence template (date, instance version, workspace, asset numbers, expected vs actual, redactions) and the fixture-sanitisation checklist.
+- Live-suite skeleton (`vitest.live.config`): read-only, never on fork PRs, never prints tokens or tenant content.
+- `docs/dev/verification.md`: evidence template (date, instance version, workspace, asset numbers, expected vs actual,
+  redactions; shapes and counts only for the third-party tenant) and the synthetic-fixture checklist.
 
 ## Acceptance criteria
-- [ ] Both members' tokens validated against the sandbox.
-- [ ] Seed data created and documented with asset numbers.
+- [ ] The token is validated against the tenant with a read-only probe.
+- [ ] Inventory documented (asset types and counts, no content or names from the tenant).
+- [ ] The read-only guard refuses a non-`GET` request and a write endpoint (tests).
 - [ ] The live workflow runs a trivial read-only probe from `main`.
 - [ ] Template and checklist committed.
 
 ## Security notes
-Tokens only as environment secrets; synthetic seed data (THREAT_MODEL T8, A5).
+Tokens only as environment secrets. The tenant holds real third-party data: nothing from it is committed (no fixtures,
+not even sanitised ones); fixtures are synthetic, written by hand (THREAT_MODEL T8, A5).
 
 ## Lessons applied
 - L-003 — Plan live verification from Phase 0, not at the end.
