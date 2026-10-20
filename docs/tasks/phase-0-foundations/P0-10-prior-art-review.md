@@ -2,7 +2,7 @@
 id: P0-10
 title: Prior-art review
 phase: 0
-status: review
+status: done
 priority: medium
 depends_on: []
 adr: []

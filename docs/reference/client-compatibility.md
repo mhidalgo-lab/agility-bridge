@@ -1,7 +1,8 @@
 # MCP client compatibility
 
-> Status: **documented, unverified** (2026-10-16). Every cell below comes from vendor documentation, changelogs or
-> forums (sources at the end); **none has been verified against agility-bridge yet**. Verification happens in P0-07
+> Status: **documented, partly verified** (2026-10-20). Cells come from vendor documentation, changelogs or forums
+> (sources at the end) unless marked **V**: P0-07 verified MCP Inspector against the agility-bridge spike, and carried
+> over two clients from relic-bridge's spike with the same SDK (see *Verified so far*). Verification happens in P0-07
 > (stdio and HTTP, both protocol eras), P5-06 (OAuth) and every phase review. A verified cell records the client version
 > and the date ([ADR-0016](../adr/0016-mcp-client-support.md), L-023).
 
@@ -27,6 +28,18 @@ Secondary clients (best effort, not in the release gate): GitHub Copilot cloud a
 `COPILOT_MCP_*` secrets, no OAuth, no prompts/resources, **no approval step**), Visual Studio, Zed, Cline, Roo Code,
 ChatGPT connectors, Gemini CLI.
 
+## Verified so far
+
+| Client | Version | Date | What was verified | Source |
+|---|---|---|---|---|
+| MCP Inspector CLI | 2.11.0 | 2026-10-20 | **V** stdio and HTTP (Node, workerd); 2025 era; `structuredContent`; static `Authorization` header; no elicitation in the CLI (writes refused with `AB_APPROVAL_UNAVAILABLE`); `-e` reaches a stdio server | P0-07 spike |
+| Claude Code | 2.1.287 | 2026-10-02 | listed and called over stdio, HTTP and HTTP with a static header; 2026-07-28; sends `Mcp-Method`/`Mcp-Name` and a long-lived `subscriptions/listen` | relic-bridge P0-07 (same SDK; not yet re-run against agility-bridge) |
+| GitHub Copilot (desktop) | 2026-10 | 2026-10-02 | listed and called over HTTP | relic-bridge P0-07 (same SDK; not yet re-run against agility-bridge) |
+
+Measured server-side (P0-07): elicitation can approve a write on **stdio** (either era) and on **2026-07-28 HTTP**, never
+on 2025-era HTTP. The rest of the matrix is the owner's checklist in
+[`spikes/mcp-sdk-v2/client-checklist.md`](../../spikes/mcp-sdk-v2/client-checklist.md).
+
 ## How agility-bridge features map to each client
 
 | Client | Local (stdio) | Remote | Write approval channel (Phase 7) |
@@ -40,7 +53,7 @@ ChatGPT connectors, Gemini CLI.
 | Cursor | ✅ | device token (via `${env:…}`) or OAuth | stdio: elicitation · remote: approval page |
 | Windsurf / Devin Desktop | ✅ | device token | approval page (remote); stdio writes refused unless the operator relaxes approval |
 | Copilot cloud agent | — | device token in `COPILOT_MCP_*` secret | **none**: writes refused (no elicitation, no browser) |
-| MCP Inspector | ✅ | both | elicitation (to verify) |
+| MCP Inspector | ✅ | both | CLI: none (**V** 2.11.0, writes refused); web UI: to verify |
 
 Consequences for the design:
 

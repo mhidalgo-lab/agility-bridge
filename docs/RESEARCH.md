@@ -246,10 +246,14 @@ Checked 2026-10 in specifications and SDK documentation; P0-07 re-verifies with 
   batches (reject them before the SDK). The default body limit is 4 MiB. Host/Origin validation is hostname-based and
   lets a missing `Origin` through. Prompts and resources are registered with `listChanged: true` unless set explicitly.
   `ProtocolError(code, message, data)` produces stable JSON-RPC errors; other thrown errors become `-32603`. The SDK has
-  no server-side Tasks runtime; task storage and `tasks/*` routing are the application's job. Converting every tool
-  schema on each request can dominate CPU on constrained runtimes, so converted schemas should be cached (P0-07
-  measures it). — SDK repository
+  no server-side Tasks runtime; task storage and `tasks/*` routing are the application's job. — SDK repository
   [typescript-sdk](https://github.com/modelcontextprotocol/typescript-sdk)
+- **Measured with SDK 2.3.1** (P0-07, 2026-10-20, *live* on Node 24 and local workerd; [results](../spikes/mcp-sdk-v2/RESULTS.md)):
+  both eras pass on Node, workerd (no `nodejs_compat`) and stdio; the 2025-era HTTP path answered a two-request JSON-RPC
+  batch; converting tool schemas to JSON Schema once and registering them with `fromJsonSchema` makes a per-request
+  25-tool `tools/list` about 7× cheaper (0.70 ms vs 4.89 ms p50; 40 tools 0.91 ms vs 7.60 ms). Write approval: 2025-era
+  push elicitation (`ctx.mcpReq.elicitInput`) works on stdio only; 2026-07-28 `inputRequired(...)` works on stdio and
+  HTTP; both need the client to declare the capability.
 
 ## 3. MCP clients
 
@@ -264,8 +268,11 @@ Summary only; the per-client matrix, configuration formats and verification stat
 - **Annotations**: only VS Code uses `readOnlyHint` (to skip confirmation); no surveyed client changes its UI for
   `destructiveHint`. Safety cannot rely on annotations (L-154).
 - **Elicitation**: form mode in VS Code, JetBrains, Cursor; form and URL mode in Claude Code and Copilot CLI; not in the
-  Copilot cloud agent, Zed or Gemini CLI. Over stateless remote HTTP, 2025-era clients cannot be elicited, so remote write
-  approval needs an out-of-band path for VS Code and Cursor (L-156, P7-02).
+  Copilot cloud agent, Zed or Gemini CLI. Over stateless remote HTTP, 2025-era clients cannot be elicited (*live*, P0-07:
+  even a client that declares elicitation is refused, because each request builds a server that never saw its
+  capabilities), so remote write approval needs an out-of-band path for VS Code and Cursor (L-156, P7-02).
+- **MCP Inspector CLI 2.11.0** (*live*, P0-07): 2025 era on HTTP and stdio, renders `structuredContent`, cannot elicit;
+  `-e KEY=value` reaches a stdio server's environment.
 - **Remote authentication**: static headers everywhere (JetBrains nests them under `requestInit.headers`; Claude Desktop
   and claude.ai allow a few headers in a beta UI); OAuth with DCR and CIMD in VS Code, Claude, Copilot CLI and Inspector;
   DCR plus static clients in Cursor; the Copilot cloud agent supports no OAuth (static headers from `COPILOT_MCP_*`

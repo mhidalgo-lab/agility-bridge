@@ -1,0 +1,8 @@
+// P0-07 spike Worker. Local only (`wrangler dev`); no account or resource ids.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agility-bridge-spike-mcp",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-26",
+  "send_metrics": false
+}

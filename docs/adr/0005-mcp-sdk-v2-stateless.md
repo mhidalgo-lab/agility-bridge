@@ -1,6 +1,7 @@
 # ADR-0005 — MCP SDK v2, stateless HTTP, dual protocol era
 
-- **Status:** proposed (pending spike P0-07)
+- **Status:** proposed (runtime evidence from P0-07 recorded below, 2026-10-20; acceptance waits for the owner's
+  real-client checks in `spikes/mcp-sdk-v2/client-checklist.md`)
 - **Date:** 2026-10-16
 - **Related:** P0-07, P1-01, P2-06, L-011 – L-019, L-023
 
@@ -31,6 +32,23 @@ not keep per-session state in memory.
 - Server-initiated notifications are not available on HTTP; long work uses explicit handles or the Tasks extension.
 - The P0-07 spike must confirm SDK behaviour with real clients (headers, `subscriptions/listen`, elicitation per client,
   `tools/list` size) before this ADR is accepted.
+
+## Evidence (P0-07, 2026-10-20)
+
+From [spikes/mcp-sdk-v2/RESULTS.md](../../spikes/mcp-sdk-v2/RESULTS.md), SDK 2.3.1:
+
+- `createMcpHandler(factory, { legacy: 'stateless' })` serves both eras on Node and local workerd, without
+  `nodejs_compat`; `serveStdio(factory)` pins the era per connection. The grant reaches the factory through
+  `authInfo.extra`; the SDK never reads headers, so bearer and workspace checks stay in the Hono route.
+- **Batches:** the 2025-era path answered a two-request JSON-RPC batch, so the "rejected before the SDK" rule above is
+  required, not defensive (P2-06).
+- **Elicitation:** works on stdio (both eras) and on 2026-07-28 HTTP through `inputRequired(...)`, never on 2025-era HTTP
+  (a stateless request has no client capabilities). VS Code, Cursor and probably JetBrains therefore need the approval
+  page for remote writes (P7-02).
+- **Per-request construction:** register tool schemas converted to JSON Schema once per process (`fromJsonSchema`):
+  0.70 ms vs 4.89 ms p50 for a 25-tool `tools/list` (P1-01).
+- Real clients: MCP Inspector CLI 2.11.0 verified here; Claude Code 2.1.287 and GitHub Copilot (desktop) were verified
+  with the same SDK pattern in relic-bridge's spike (2026-10-02). The rest of the matrix is the owner's checklist.
 
 ## Alternatives considered
 

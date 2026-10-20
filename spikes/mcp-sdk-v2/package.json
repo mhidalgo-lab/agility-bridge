@@ -1,0 +1,25 @@
+{
+  "name": "spike-mcp-sdk-v2",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "node": "tsx src/node.ts",
+    "stdio": "tsx src/stdio.ts",
+    "worker": "wrangler dev --port 8788",
+    "test": "tsx test/run.ts",
+    "bench": "tsx test/bench.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.4",
+    "@modelcontextprotocol/client": "2.3.1",
+    "@modelcontextprotocol/server": "2.3.1",
+    "hono": "4.13.13",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261013.1",
+    "tsx": "4.23.15",
+    "wrangler": "4.149.0"
+  }
+}
