@@ -100,6 +100,7 @@ provenance, a GitHub Release with SBOM and checksums, and (from Phase 2) a signe
 | 2026-10-16 | Hosted and on-premises Agility instances; HTTPS only (loopback for tests); custom CA bundles; access tokens only | ADR-0014 |
 | 2026-10-16 | Primary clients documented equally: GitHub Copilot (VS Code, JetBrains, CLI), Claude (Code, Desktop, web, mobile), Cursor, Windsurf, MCP Inspector | ADR-0016 |
 | 2026-10-16 | "Workspace" names agility-bridge's unit of access; "Agility project" always means Agility's `Scope` | ARCHITECTURE §4 |
+| 2026-10-19 | Owner answered D-01 – D-24. Live tests use a read-only third-party tenant (writable sandbox needed before Phase 7); npm `agility-bridge`, Node ≥ 24, releases every phase; opt-in attachment download in 1.0 (deviates from the recommendation); all others as recommended | [pending-decisions/phase-0.md](pending-decisions/phase-0.md) |
 
 ## Task index
 
