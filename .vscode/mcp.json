@@ -1,0 +1,26 @@
+{
+  "servers": {
+    "ab-spike-http-team": {
+      "type": "http",
+      "url": "http://127.0.0.1:8787/w/team/mcp",
+      "headers": { "Authorization": "Bearer ab_spike_team" }
+    },
+    "ab-spike-http-viewer": {
+      "type": "http",
+      "url": "http://127.0.0.1:8787/w/viewer/mcp",
+      "headers": { "Authorization": "Bearer ab_spike_viewer" }
+    },
+    "ab-spike-stdio-team": {
+      "type": "stdio",
+      "command": "/home/matias/Projects/tools/agility-bridge/spikes/mcp-sdk-v2/node_modules/.bin/tsx",
+      "args": ["/home/matias/Projects/tools/agility-bridge/spikes/mcp-sdk-v2/src/stdio.ts"],
+      "env": { "AB_SPIKE_WORKSPACE": "team" }
+    },
+    "ab-spike-stdio-viewer": {
+      "type": "stdio",
+      "command": "/home/matias/Projects/tools/agility-bridge/spikes/mcp-sdk-v2/node_modules/.bin/tsx",
+      "args": ["/home/matias/Projects/tools/agility-bridge/spikes/mcp-sdk-v2/src/stdio.ts"],
+      "env": { "AB_SPIKE_WORKSPACE": "viewer" }
+    }
+  }
+}

@@ -34,13 +34,14 @@ PORT=8787 pnpm node          # HTTP: http://127.0.0.1:8787/w/team/mcp (or /w/vie
 
 | Client | stdio | HTTP | Notes |
 |---|---|---|---|
-| GitHub Copilot in VS Code | ☐ | ☐ | `.vscode/mcp.json`, header in `headers` |
-| GitHub Copilot in JetBrains | ☐ | ☐ | header under `requestInit.headers` |
-| GitHub Copilot CLI | ☐ | ☐ | `copilot mcp add`; a `tools` allowlist is required |
-| Claude Code | ☐ | ☐ | `claude mcp add --scope local …`; remove afterwards |
+| GitHub Copilot in VS Code | ☑ 2026-10-20 | ☑ 2026-10-20 | 2026-07-28 on both; approve and decline work |
+| GitHub Copilot in JetBrains | not tested (WSL) | ☑ 2026-10-20 | 2025 era; writes refused over HTTP as predicted |
+| GitHub Copilot CLI | ☑ 1.0.87 | ☑ 1.0.87 | done 2026-10-20 |
+| Claude Code | ☑ 2.1.304 | ☑ 2.1.304 | done 2026-10-20 |
 | Claude Desktop | ☐ | — | `claude_desktop_config.json`; HTTP connectors need a public URL (P5-06) |
-| Cursor | ☐ | ☐ | `~/.cursor/mcp.json` |
-| Windsurf / Devin Desktop | ☐ | ☐ | `~/.config/devin/mcp_config.json` |
+| Cursor | — | — | not tested (no subscription) |
+| Windsurf / Devin Desktop | — | — | not tested (no subscription) |
+| MCP Inspector CLI 2.11.0 | ☑ both eras | ☑ both eras | done 2026-10-20 (agent run) |
 | MCP Inspector (web UI, `--protocol-era modern`) | ☐ | ☐ | does the web UI elicit? |
 
 claude.ai web and Claude mobile need a public HTTPS URL and are verified with OAuth in P5-06, not here.

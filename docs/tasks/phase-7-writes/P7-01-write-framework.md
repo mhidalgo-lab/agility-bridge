@@ -23,6 +23,9 @@ One pipeline that every write tool uses, so no write can skip enablement, approv
 - `dry_run`, `confirm`, elicitation approval (stdio and 2026-07-28 requests), approval ledger (hash of canonical mutation + actor + target + expiry, single use), refusal errors (`AB_WRITE_APPROVAL_UNAVAILABLE`, `AB_WRITE_APPROVAL_DECLINED`, `AB_WRITE_CONFLICT`).
 - Durable intent audit before sending; outcome audit after; no retries; read-lag note.
 - `whoami` and dry runs report the approval channel available to this client.
+- Check the request's declared elicitation capability **before** asking for approval: on 2026-07-28 the SDK turns an
+  `inputRequired(...)` sent to a client without the capability into a protocol error, so the framework returns its own
+  `AB_WRITE_APPROVAL_UNAVAILABLE` tool error instead (P0-07 finding 7).
 - Approval state per runtime (ADR-0013): `kv` ledger and durable intent audit in remote modes; in stdio an in-process ledger, HMAC-protected multi round-trip state and intent/outcome logged to stderr. `AB_WRITE_APPROVAL=off` only in stdio mode, pending D-10.
 - `tools/list` budget test with the write group enabled.
 

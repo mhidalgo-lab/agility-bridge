@@ -231,8 +231,10 @@ tools in groups that workspaces enable explicitly.
 *Applied in:* P0-11, P1-13, P6-12.
 
 **L-156 — Plan write approval for clients that cannot elicit.**
-VS Code and Cursor speak only 2025-era revisions, whose stateless remote HTTP requests cannot be elicited; the 2026-07-28
-revision elicits through multi round-trip requests instead. Elicitation alone would lock primary clients out of remote
+Clients that speak only 2025-era revisions over remote HTTP cannot be elicited, because stateless requests carry no
+client capabilities; the 2026-07-28 revision elicits through multi round-trip requests instead. In P0-07 (2026-10-20)
+Copilot in JetBrains was such a client, while VS Code, Claude Code and Copilot CLI had already moved to 2026-07-28;
+which clients are affected changes from release to release. Elicitation alone would lock those clients out of remote
 writes: offer an out-of-band approval page (signed-in, bound to the exact change, single-use) as the alternative.
 *Applied in:* [ADR-0013](adr/0013-opt-in-writes-human-approval.md), P7-01, P7-02.
 
