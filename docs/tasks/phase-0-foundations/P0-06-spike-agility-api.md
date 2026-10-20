@@ -26,16 +26,22 @@ Measure how Agility really behaves for everything the core will depend on, answe
 - Whether administrators can define custom asset types or only custom fields and list values; how custom fields appear in metadata.
 - Team membership semantics: team-room participants, a roster relation, or only derivation from assignments.
 - History: `Hist` vs `asof` cost; an activity-stream sample.
-- Errors: 400/401/404/405/429/500 bodies and content types; rate-limit quotas on the sandbox, `RetryAfter` accuracy, the error-count quota (sandbox only, carefully).
+- Errors: 400/401/404/405/429/500 bodies and content types, as far as reads can trigger them. Rate-limit quotas,
+  `RetryAfter` accuracy and the error-count quota are **not** probed on the third-party tenant (D-01); they move to the
+  writable sandbox and stay on the "not verified" list until then.
 - Latency and response sizes for typical queries (25 and 100 work items with owners and status).
-- Writes in the sandbox: single-target `api/asset` update vs `rest-1.v1` POST; whether `previewOnly=true` is side-effect free; creating a comment (`Expression`) and effort (`Actual`); `QuickClose` and `Reactivate`; read-after-write lag.
+- Writes are **out of scope** for this spike (D-01: the only tenant is read-only). Single-target `api/asset` update vs
+  `rest-1.v1` POST, `previewOnly=true` side effects, comments (`Expression`), effort (`Actual`), `QuickClose`,
+  `Reactivate` and read-after-write lag are measured on the writable sandbox before Phase 7 (P7-07) and listed as
+  "not verified" here.
 - `assetdetail.v1` links per asset type; attachment metadata.
 - On-premises instance if available: version, TLS with a private CA, base-URL shapes.
 
 ## Acceptance criteria
 - [ ] `spikes/agility-api/RESULTS.md` with exact measurements, instance versions and dates, and an explicit "not verified" list.
 - [ ] Every fact in RESEARCH §1 is marked `live`, `docs` or corrected.
-- [ ] Sanitised fixtures committed (names, ids, emails, URLs replaced); gitleaks clean; a manual sanitisation checklist signed in the PR.
+- [ ] Synthetic fixtures written by hand to match the measured shapes; nothing from the third-party tenant is committed (D-01), not even sanitised responses; gitleaks clean; the synthetic-fixture checklist signed in the PR.
+- [ ] Every probe ran through the P0-12 read-only guard.
 - [ ] ADR-0011 accepted or superseded with evidence; ADR-0010 and ADR-0014 numbers updated.
 - [ ] Every surprise becomes a lesson in LESSONS-LEARNED.md.
 

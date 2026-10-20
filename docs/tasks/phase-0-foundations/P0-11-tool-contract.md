@@ -15,6 +15,16 @@ owner: ""
 ## Goal
 Freeze the tool contract — names, arguments, outputs, errors, paging, envelope, kinds, costs, deprecations — and the default catalogue before the first tool is built.
 
+## Decisions
+- D-05 (2026-10-19): every read group on by default except `reports` (20 read tools); `writes` off.
+- D-06 (2026-10-19): member emails off by default, enabled per workspace (`AB_MEMBER_EMAILS` in stdio).
+- D-07 (2026-10-19): generic query on; starting limits 30 fields, nesting depth 2, 5 aggregations, 3 `any_of` groups,
+  100 rows per call (hard 1,000), revisited with P0-06 measurements.
+- D-08 (2026-10-19): an opt-in attachment-download tool in its own `attachments` group, off by default (35 tools with
+  every group and all writes).
+- D-19 (2026-10-19): `sprint` in arguments; descriptions say "backlog item (story)" and "sprint (iteration)"; schemas use
+  the API names.
+
 ## Scope
 - Finalise docs/dev/tool-conventions.md with what the spikes taught (status vocabulary, number formats, paging semantics, estimate units).
 - Accept ADR-0015.

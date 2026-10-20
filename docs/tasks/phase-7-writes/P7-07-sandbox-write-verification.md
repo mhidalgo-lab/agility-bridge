@@ -17,6 +17,11 @@ owner: ""
 ## Goal
 Rehearse every write against the sandbox before writes are enabled anywhere.
 
+## Prerequisite
+- A writable Agility sandbox (Digital.ai trial or similar) with reader and writer members and synthetic seed data
+  (D-01: the Phase 0 tenant is read-only and must never be written to). The write probes and quota measurements deferred
+  from P0-06 run here first.
+
 ## Scope
 - Procedure: dry-run each tool, apply one per asset type, read back, repeat (no-op), conflict test, cleanup, disable writes; record evidence and read-lag observations.
 

@@ -125,7 +125,7 @@ Status lives in each task file.
 | P0-11 | [Tool contract and conventions](tasks/phase-0-foundations/P0-11-tool-contract.md) | high | P0-06, P0-07, P0-14 | todo |
 | P0-12 | [Agility sandbox and live-verification harness](tasks/phase-0-foundations/P0-12-sandbox-live-harness.md) | high | P0-03, P0-14 | todo |
 | P0-13 | [Spike results and go/no-go for Phase 1](tasks/phase-0-foundations/P0-13-spike-results-go-no-go.md) | high | P0-02, P0-04, P0-05, P0-06, P0-07, P0-08, P0-09, P0-10, P0-11, P0-12 | todo |
-| P0-14 | [Owner decision gate for Phase 0](tasks/phase-0-foundations/P0-14-owner-decision-gate.md) | high | — | todo |
+| P0-14 | [Owner decision gate for Phase 0](tasks/phase-0-foundations/P0-14-owner-decision-gate.md) | high | — | review |
 
 ### Phase 1
 

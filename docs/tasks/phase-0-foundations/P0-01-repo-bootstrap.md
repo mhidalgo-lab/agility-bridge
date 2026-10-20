@@ -15,8 +15,13 @@ owner: ""
 ## Goal
 A reproducible pnpm/TypeScript monorepo with the package boundaries of ARCHITECTURE §2, so later tasks add code, not structure.
 
+## Decisions
+- D-02 (2026-10-19): unscoped npm package `agility-bridge` (a `0.0.0` placeholder reserves the name),
+  `ghcr.io/mhidalgo-lab/agility-bridge`, MCP Registry `io.github.mhidalgo-lab/agility-bridge`, docs on GitHub Pages.
+- D-15 (2026-10-19): Node 24 LTS and later (`engines: ">=24"`); CI covers 24 and the current LTS.
+
 ## Scope
-- pnpm workspace; Node 24 LTS pinned (`.nvmrc`, `engines`); pnpm pinned through `packageManager` and corepack.
+- pnpm workspace; Node 24 LTS pinned (`.nvmrc`, `engines: ">=24"`); pnpm pinned through `packageManager` and corepack.
 - Packages `core`, `storage`, `storage-sqlite`, `auth`, `http-app`, `admin-ui`; apps `cli`, `worker`.
 - `tsconfig.base.json` with `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `isolatedDeclarations`.
 - Biome (lint + format), Vitest workspace configuration, tsdown builds, Changesets, Lefthook (format, lint, DCO sign-off on commit-msg).
