@@ -2,7 +2,7 @@
 id: P0-14
 title: Owner decision gate for Phase 0
 phase: 0
-status: review
+status: done
 priority: high
 depends_on: []
 adr: ["0001"]

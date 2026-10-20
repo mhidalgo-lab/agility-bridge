@@ -1,0 +1,33 @@
+{
+  "name": "@agility-bridge/http-app",
+  "version": "0.0.0",
+  "description": "Hono HTTP app: per-workspace MCP endpoints, admin API, OAuth routes",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "agilityBridge": {
+    "runtime": "web"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.3.1",
+    "hono": "4.13.13",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "tsdown": "0.23.1"
+  }
+}

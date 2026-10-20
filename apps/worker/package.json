@@ -1,0 +1,19 @@
+{
+  "name": "@agility-bridge/worker",
+  "version": "0.0.0",
+  "description": "Cloudflare Worker entry for agility-bridge",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "dev": "wrangler dev",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "agilityBridge": {
+    "runtime": "workers"
+  },
+  "devDependencies": {
+    "wrangler": "4.149.0"
+  }
+}

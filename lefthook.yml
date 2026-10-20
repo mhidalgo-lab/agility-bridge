@@ -1,0 +1,12 @@
+# Git hooks (P0-01). Installed automatically by `pnpm install`. Secret scanning joins in P0-04.
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: '*.{ts,tsx,js,mjs,json,jsonc}'
+      run: pnpm exec biome check --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+commit-msg:
+  commands:
+    dco:
+      run: |
+        grep -qE '^Signed-off-by: .+ <.+>' {1} || { echo "Missing DCO sign-off. Use git commit -s"; exit 1; }

@@ -1,0 +1,11 @@
+// agility-bridge on Cloudflare Workers. Placeholder from P0-01; bindings (D1, rate limits, secrets) arrive in Phase 3.
+// No account or resource ids are committed.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agility-bridge",
+  "main": "src/index.ts",
+  // No `nodejs_compat`: every package is web-standard (docs/adr/0004-typescript-runtime-agnostic-core.md).
+  "compatibility_date": "2026-09-26",
+  "workers_dev": false,
+  "send_metrics": false
+}
