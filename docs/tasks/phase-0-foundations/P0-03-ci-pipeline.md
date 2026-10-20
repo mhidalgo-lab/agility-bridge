@@ -2,12 +2,12 @@
 id: P0-03
 title: CI pipeline
 phase: 0
-status: todo
+status: review
 priority: high
 depends_on: [P0-01]
 adr: ["0003", "0004"]
 lessons: [L-129, L-130, L-104, L-123]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P0-03 — CI pipeline
@@ -27,11 +27,11 @@ Every PR runs the same checks as local development, on GitHub-hosted runners, wi
   PR title, CodeQL, gitleaks, authorization suite as they come to exist).
 
 ## Acceptance criteria
-- [ ] CI is green on a sample PR in under 15 minutes.
-- [ ] A test fails when a workflow uses an unpinned action or broad permissions.
-- [ ] The Windows job runs a SQLite placeholder test.
-- [ ] `docs/security/repo-settings.md` lists the required checks and branch rules.
-- [ ] Both rulesets require the CI checks; a PR with a failing check cannot be merged.
+- [x] CI is green on a sample PR in under 15 minutes. *(PR #3: slowest job 47 s, 2026-10-20.)*
+- [x] A test fails when a workflow uses an unpinned action or broad permissions.
+- [x] The Windows job runs a SQLite placeholder test.
+- [x] `docs/security/repo-settings.md` lists the required checks and branch rules.
+- [x] Both rulesets require the CI checks; a PR with a failing check cannot be merged. *(Verified with throwaway PR #4: failing DCO and PR-title checks, state `BLOCKED`.)*
 
 ## Security notes
 THREAT_MODEL T18. GitHub-hosted runners only; never a fallback to self-hosted runners for public PRs (L-129).
