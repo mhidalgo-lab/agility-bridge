@@ -110,9 +110,19 @@ should build the tool registry this way. The serialised list is about 1.6 KB per
    requests (`test/heap.ts` reproduces both cases; lesson L-159).
 4. **No `nodejs_compat` flag** is needed for the MCP layer on Workers, and the 2020-12 schemas (`$defs`, `oneOf`,
    `const`) validate server-side on workerd and Node alike.
-5. **MCP Inspector CLI 2.11.0** negotiates the 2025 era on HTTP and stdio, renders `structuredContent`, cannot answer
-   elicitation (so writes are refused with `AB_APPROVAL_UNAVAILABLE`), and its `-e KEY=value` flag now reaches a stdio
-   server's environment (it did not in relic-bridge's run with 2.8.0).
+5. **MCP Inspector CLI 2.11.0** defaults to the 2025 era for ad-hoc targets and speaks 2026-07-28 with
+   `--protocol-era modern`, on HTTP and stdio; it cannot answer elicitation; its `-e KEY=value` flag reaches a stdio
+   server's environment (it did not in relic-bridge's run with 2.8.0). Full matrix below.
+7. **A 2026-07-28 client without elicitation gets a protocol error, not our tool error.** On the 2025 era the spike's
+   `add_comment` catches the failed `elicitInput` and returns `AB_APPROVAL_UNAVAILABLE` as a tool error. On 2026-07-28,
+   returning `inputRequired(...)` to a client that did not declare the capability makes the SDK answer with an error
+   (`Cannot request input 'approval' (elicitation/create): the request's client capabilities do not declare the required
+   capability`), which clients show as a failure rather than an actionable refusal. P7-01 must check the request's
+   declared capabilities before asking and return its own `AB_WRITE_APPROVAL_UNAVAILABLE` tool error.
+8. **Nullable output fields as `type` arrays are flagged as unportable.** `--strict` warns on
+   `outputSchema.properties.nextCursor` (`type: ["string", "null"]`, from zod `.nullable()`): legal JSON Schema, but a
+   client that maps tool schemas to a single-`type` dialect (the OpenAPI subset used for Gemini function declarations)
+   may reject the tool or drop the constraint. Input for the tool conventions (P0-11) and the schema lint (P1-13).
 6. **Bearer handling is the app's job**: the SDK never reads headers. The Hono route resolves the workspace and token
    first and hands the grant to the factory through `authInfo.extra` (no module state, L-013).
 
@@ -120,7 +130,7 @@ should build the tool registry this way. The serialised list is about 1.6 KB per
 
 | Client | Version | Transport | Listed | Call | Era | Elicitation | Source |
 |---|---|---|---|---|---|---|---|
-| MCP Inspector CLI | 2.11.0 | HTTP (Node, workerd), stdio | ✅ | ✅ | 2025 | ❌ (CLI) | this spike, 2026-10-20 |
+| MCP Inspector CLI | 2.11.0 | HTTP (Node, workerd), stdio | ✅ | ✅ | 2025 by default, 2026-07-28 with `--protocol-era modern` | ❌ (CLI) | this spike, 2026-10-20 |
 | GitHub Copilot (desktop) | 2026-10 | HTTP | ✅ | ✅ | — | not tested | relic-bridge P0-07, 2026-10-02 |
 | **GitHub Copilot CLI** | **1.0.87** | HTTP (Node) and stdio, `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ **prompt shown; approve and decline both work on both** (`input_required`) | owner, 2026-10-20 |
 | **Claude Code** | **2.1.304** | HTTP (Node) and stdio, `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ **prompt shown; approve and decline both work on both** (`input_required`) | owner, 2026-10-20 |
@@ -184,6 +194,20 @@ saw several approve and decline rounds):
 - `add_comment`: approving returned `approved via input_required`; declining returned `AB_APPROVAL_DECLINED via
   input_required` (as an error), on both transports.
 - Read-only calls ran without a confirmation step visible to the model; the model saw no annotations.
+
+**MCP Inspector CLI 2.11.0, full matrix** (this spike, 2026-10-20; `--format json`, so the raw MCP result is visible):
+4 servers × {`--protocol-era legacy`, `--protocol-era modern`}, all passing:
+
+| Check | Result on all 8 combinations |
+|---|---|
+| `tools/list` | `team`: 4 tools, `viewer`: 3; `readOnlyHint: true` on the reads, `false` on `add_comment`; `outputSchema` only on `query_assets` |
+| `whoami` | `era=legacy` or `era=modern`, as requested |
+| `query_assets` | `structuredContent` present, `total: 2` |
+| unknown operator | the SDK's input-validation error returned as a **tool result** (server-side validation) |
+| `get_work_item B-99999` | `AB_NOT_FOUND`, `isError: true` |
+| `add_comment` on `viewer` | `tool_not_found` |
+| `add_comment` on `team` | 2025 era: `AB_APPROVAL_UNAVAILABLE` (`isError: true`); 2026-07-28: SDK error (finding 7) |
+| `tools/list --strict` | one portability warning (finding 8) |
 
 **Conclusion so far:** both 2026-07-28 CLIs approve and refuse writes through elicitation on stdio **and** remote HTTP,
 exactly as the server-side matrix predicted; no approval page is needed for them. Copilot in JetBrains speaks the 2025

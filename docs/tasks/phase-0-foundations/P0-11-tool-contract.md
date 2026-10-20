@@ -34,6 +34,9 @@ Freeze the tool contract — names, arguments, outputs, errors, paging, envelope
 - Decide the follow-ups proposed by the prior-art review (P0-10, [docs/research/prior-art.md](../../research/prior-art.md)
   §Proposed follow-ups): deferred-tool fallback, aliases on rename, read-only connection variant, operator caps,
   lint additions and negative query fixtures.
+- Decide how nullable fields appear in input and output schemas: MCP Inspector's `--strict` flags `type: ["string",
+  "null"]` (zod `.nullable()`) as unportable to single-`type` dialects (P0-07 finding 8); prefer omitting the field, and
+  have the P1-13 schema lint enforce the choice.
 
 ## Acceptance criteria
 - [ ] Conventions marked final; ADR-0015 accepted.

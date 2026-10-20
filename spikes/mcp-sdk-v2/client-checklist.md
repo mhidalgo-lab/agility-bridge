@@ -41,6 +41,7 @@ PORT=8787 pnpm node          # HTTP: http://127.0.0.1:8787/w/team/mcp (or /w/vie
 | Claude Desktop | ☐ | — | `claude_desktop_config.json`; HTTP connectors need a public URL (P5-06) |
 | Cursor | — | — | not tested (no subscription) |
 | Windsurf / Devin Desktop | — | — | not tested (no subscription) |
+| MCP Inspector CLI 2.11.0 | ☑ both eras | ☑ both eras | done 2026-10-20 (agent run) |
 | MCP Inspector (web UI, `--protocol-era modern`) | ☐ | ☐ | does the web UI elicit? |
 
 claude.ai web and Claude mobile need a public HTTPS URL and are verified with OAuth in P5-06, not here.

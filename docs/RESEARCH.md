@@ -255,7 +255,9 @@ Checked 2026-10 in specifications and SDK documentation; P0-07 re-verifies with 
   batch; converting tool schemas to JSON Schema once and registering them with `fromJsonSchema` makes a per-request
   25-tool `tools/list` about 7× cheaper (0.70 ms vs 4.89 ms p50; 40 tools 0.91 ms vs 7.60 ms). Write approval: 2025-era
   push elicitation (`ctx.mcpReq.elicitInput`) works on stdio only; 2026-07-28 `inputRequired(...)` works on stdio and
-  HTTP; both need the client to declare the capability.
+  HTTP; both need the client to declare the capability, and on 2026-07-28 an `inputRequired(...)` sent to a client
+  without it becomes an SDK error rather than a tool result. Input-schema validation failures come back as tool results,
+  not JSON-RPC errors.
 
 ## 3. MCP clients
 
