@@ -2,12 +2,12 @@
 id: P0-03
 title: CI pipeline
 phase: 0
-status: todo
+status: review
 priority: high
 depends_on: [P0-01]
 adr: ["0003", "0004"]
 lessons: [L-129, L-130, L-104, L-123]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P0-03 — CI pipeline
