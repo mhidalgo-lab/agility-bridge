@@ -31,6 +31,9 @@ Freeze the tool contract — names, arguments, outputs, errors, paging, envelope
 - Default tool groups and budgets: default catalogue ≤ 25 tools, everything < 40, a serialized `tools/list` size budget.
 - The final `AB_*` error-code list.
 - Specifications (with examples) for the naming, description, secret-field and size lints built in P1-13.
+- Decide the follow-ups proposed by the prior-art review (P0-10, [docs/research/prior-art.md](../../research/prior-art.md)
+  §Proposed follow-ups): deferred-tool fallback, aliases on rename, read-only connection variant, operator caps,
+  lint additions and negative query fixtures.
 
 ## Acceptance criteria
 - [ ] Conventions marked final; ADR-0015 accepted.

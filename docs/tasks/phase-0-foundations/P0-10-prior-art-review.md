@@ -2,12 +2,12 @@
 id: P0-10
 title: Prior-art review
 phase: 0
-status: todo
+status: review
 priority: medium
 depends_on: []
 adr: []
 lessons: [L-001]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P0-10 — Prior-art review
@@ -21,8 +21,8 @@ Learn from existing work-management MCP servers and Agility integrations before 
 - Candidates: GitHub's MCP server, Atlassian's remote MCP server (Jira), Azure DevOps MCP servers, Linear's MCP server, the abandoned Agility prototype, the Agility SDKs (Java, Python, JavaScript) for API usage patterns, Digital.ai's Release MCP server.
 
 ## Acceptance criteria
-- [ ] `docs/research/prior-art.md` with the matrix and adopt / avoid / differentiate lists, dated.
-- [ ] Catalogue or convention changes proposed as follow-up tasks where warranted.
+- [x] `docs/research/prior-art.md` with the matrix and adopt / avoid / differentiate lists, dated.
+- [x] Catalogue or convention changes proposed as follow-up tasks where warranted. *(Seven proposals, routed to P0-11 as inputs rather than new task files: each changes a convention or a task P0-11 already owns.)*
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.
