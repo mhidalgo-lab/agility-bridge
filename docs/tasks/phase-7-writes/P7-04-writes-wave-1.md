@@ -1,6 +1,6 @@
 ---
 id: P7-04
-title: Writes wave 1: comment, status, effort, owners, sprint
+title: "Writes wave 1: comment, status, effort, owners, sprint"
 phase: 7
 status: todo
 priority: high

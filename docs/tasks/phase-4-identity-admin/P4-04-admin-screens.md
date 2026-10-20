@@ -1,6 +1,6 @@
 ---
 id: P4-04
-title: Admin screens: instances, credentials, workspaces, grants, tokens, users
+title: "Admin screens: instances, credentials, workspaces, grants, tokens, users"
 phase: 4
 status: todo
 priority: high

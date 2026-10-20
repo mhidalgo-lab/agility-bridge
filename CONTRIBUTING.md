@@ -20,7 +20,7 @@ Requirements: **Node.js 24 or later** (see `.nvmrc`) and **pnpm** through Corepa
 ```sh
 corepack enable
 pnpm install          # also installs the git hooks (lefthook)
-pnpm lint             # Biome, web-standard import check, SPDX headers, workflow hardening rules
+pnpm lint             # Biome, web-standard imports, SPDX headers, workflow rules, task files (pnpm tasks lint)
 pnpm typecheck
 pnpm test
 pnpm build
@@ -39,13 +39,13 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §2 and §9. In short:
 
 ## Working on a task
 
-1. Pick a task: the first `todo` task whose dependencies are all `done` (see the index in
-   [`docs/ROADMAP.md`](docs/ROADMAP.md); `pnpm tasks next` arrives with P0-05).
+1. Pick a task: `pnpm tasks next` (the first `todo` task whose dependencies are all `done`; `--all` lists every
+   candidate). See [`docs/tasks/README.md`](docs/tasks/README.md) for every `pnpm tasks` command.
 2. Branch: `task/<ID>-<short-name>`, e.g. `task/P1-04-query-compiler`.
 3. Set `status: in-progress` and `owner` in the task file.
 4. Read the ADRs and lessons the task lists. Stay in scope; extra work becomes a new task file
    (`docs/tasks/_template.md`).
-5. Tick the acceptance criteria, update the docs it lists, set `status: review` and update the ROADMAP index.
+5. Tick the acceptance criteria, update the docs it lists, set `status: review` and run `pnpm tasks index`.
 6. Open a pull request using the template.
 
 A new lesson (a review finding, a live-test surprise, a client quirk) goes into

@@ -1,6 +1,6 @@
 ---
 id: P0-09
-title: Spike: Cloudflare Workers limits with Agility-shaped payloads
+title: "Spike: Cloudflare Workers limits with Agility-shaped payloads"
 phase: 0
 status: todo
 priority: high

@@ -1,6 +1,6 @@
 ---
 id: P1-07
-title: Tools: whoami, list_projects, list_asset_types, describe_asset_type
+title: "Tools: whoami, list_projects, list_asset_types, describe_asset_type"
 phase: 1
 status: todo
 priority: high

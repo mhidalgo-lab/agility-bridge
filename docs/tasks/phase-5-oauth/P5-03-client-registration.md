@@ -1,6 +1,6 @@
 ---
 id: P5-03
-title: Client registration: CIMD and DCR
+title: "Client registration: CIMD and DCR"
 phase: 5
 status: todo
 priority: high

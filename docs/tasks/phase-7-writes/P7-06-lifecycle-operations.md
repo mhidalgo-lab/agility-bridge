@@ -1,6 +1,6 @@
 ---
 id: P7-06
-title: Lifecycle operations: close and reopen
+title: "Lifecycle operations: close and reopen"
 phase: 7
 status: todo
 priority: medium

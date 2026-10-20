@@ -18,7 +18,7 @@ docs/tasks/
 ```yaml
 ---
 id: P1-04            # PHASE-NN (NNN after 99), never reused
-title: Query builder, safety and limits
+title: Query builder, safety and limits   # quote it if it contains ": " ("Tools: …")
 phase: 1
 status: todo         # todo | in-progress | blocked | review | done | dropped
 priority: high       # high | medium | low
@@ -29,11 +29,23 @@ owner: ""            # human or agent working on it (optional)
 ---
 ```
 
+`pnpm tasks lint` (part of `pnpm lint`, so CI runs it) checks every task file: the id format, that the file name
+starts with the id and sits in the folder of its phase, the status and priority values, that `depends_on` ids exist and
+form no cycle, that each `adr` has a `docs/adr/NNNN-*.md` file and each lesson an `**L-NNN — …**` entry in
+`docs/LESSONS-LEARNED.md`, and that the ROADMAP index is current.
+
+| Command | What it does |
+|---|---|
+| `pnpm tasks next [--all]` | The next task to work on (lowest phase, then highest priority, then id; `--all` lists every candidate) |
+| `pnpm tasks list [--phase N] [--status S]` | Tasks, optionally filtered |
+| `pnpm tasks graph` | The dependency graph as a Mermaid flowchart |
+| `pnpm tasks index` | Regenerates the task index in `docs/ROADMAP.md` between the `tasks:start`/`tasks:end` markers |
+| `pnpm tasks lint` | Validates the front matter and the index (above) |
+
 ## Rules for humans and agents
 
 1. **Choose** the lowest-phase, highest-priority task whose dependencies are all `done` — `pnpm tasks next` (add
    `--all` to see every candidate), `pnpm tasks list --phase 1 --status todo`, or `pnpm tasks graph` for a Mermaid view.
-   (The tooling arrives with P0-05; until then use the index in [ROADMAP.md](../ROADMAP.md).)
 2. **Claim it**: set `status: in-progress` and `owner`, on a branch named `task/<ID>-<slug>`.
 3. **Read first**: the ADRs listed in `adr` and the lessons listed in `lessons`.
 4. **Stay in scope**: anything extra becomes a new task file rather than a bigger PR.

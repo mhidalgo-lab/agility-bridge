@@ -1,6 +1,6 @@
 ---
 id: P3-08
-title: Scheduled jobs: audit purge and key rotation on D1
+title: "Scheduled jobs: audit purge and key rotation on D1"
 phase: 3
 status: todo
 priority: medium
