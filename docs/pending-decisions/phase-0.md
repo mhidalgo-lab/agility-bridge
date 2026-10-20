@@ -25,7 +25,7 @@
 - **Options:** npm `agility-bridge` (unscoped) or a scope; container `ghcr.io/mhidalgo-lab/agility-bridge`; MCP Registry
   namespace `io.github.mhidalgo-lab/agility-bridge`; docs on GitHub Pages or a custom domain.
 - **Recommendation:** reserve the unscoped npm name now; GitHub Pages for docs until a domain is needed.
-- **Owner (2026-10-19):** As recommended: unscoped npm `agility-bridge` (free on npm as of 2026-10-19; reserve it now),
+- **Owner (2026-10-19):** As recommended: unscoped npm `agility-bridge` (placeholder `0.0.0` published 2026-10-19 by the owner's npm account),
   `ghcr.io/mhidalgo-lab/agility-bridge`, MCP Registry `io.github.mhidalgo-lab/agility-bridge`, docs on GitHub Pages
   until a domain is needed.
 
@@ -165,7 +165,7 @@
 
 ## Owner checklist (manual actions, in order)
 
-1. Reserve the npm package name and enable 2FA; later configure trusted publishing and staged publishing (P1-15).
+1. ~~Reserve the npm package name~~ (done 2026-10-19, `agility-bridge@0.0.0`) and enable 2FA; later configure trusted publishing and staged publishing (P1-15).
 2. Repository settings: rulesets (no force push or deletion, PRs required, squash merges, required checks), secret
    scanning and push protection, private vulnerability reporting, Dependabot alerts, read-only default Actions
    permissions, approval for first-time contributors' workflows (P0-03, P0-04).
