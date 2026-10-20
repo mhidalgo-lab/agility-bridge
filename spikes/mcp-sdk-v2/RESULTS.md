@@ -134,8 +134,8 @@ should build the tool registry this way. The serialised list is about 1.6 KB per
 | GitHub Copilot (desktop) | 2026-10 | HTTP | ✅ | ✅ | — | not tested | relic-bridge P0-07, 2026-10-02 |
 | **GitHub Copilot CLI** | **1.0.87** | HTTP (Node) and stdio, `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ **prompt shown; approve and decline both work on both** (`input_required`) | owner, 2026-10-20 |
 | **Claude Code** | **2.1.304** | HTTP (Node) and stdio, `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ **prompt shown; approve and decline both work on both** (`input_required`) | owner, 2026-10-20 |
-| **GitHub Copilot in JetBrains** | plugin version to record | HTTP (Node), `team` and `viewer`; stdio not tested (unreliable from WSL) | ✅ | ✅ | **2025** | ❌ no prompt; writes refused with `AB_APPROVAL_UNAVAILABLE` | owner, 2026-10-20 |
-| **GitHub Copilot in VS Code** | version to record | HTTP (Node) and stdio (Remote WSL), `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ approve and decline work on both (`input_required`) | owner, 2026-10-20 |
+| **GitHub Copilot in JetBrains** | plugin 1.19.2 (Windows 11) | HTTP (Node), `team` and `viewer`; stdio not tested (unreliable from WSL) | ✅ | ✅ | **2025** | ❌ no prompt; writes refused with `AB_APPROVAL_UNAVAILABLE` | owner, 2026-10-20 |
+| **GitHub Copilot in VS Code** | VS Code 1.142.0 (Windows 11, Remote WSL) | HTTP (Node) and stdio (Remote WSL), `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ approve and decline work on both (`input_required`) | owner, 2026-10-20 |
 | Claude Desktop | — | — | — | — | — | — | **owner checklist** |
 | Cursor, Windsurf / Devin Desktop | — | — | — | — | — | — | not tested (no subscription); community reports through the client-compatibility issue template |
 
@@ -167,7 +167,8 @@ prompt):
 - Read-only calls ran without a prompt, but that session ran in a bypass-permissions mode, so it says nothing about
   Claude Code's default behaviour. The model saw names, descriptions and input schemas, not annotations.
 
-**GitHub Copilot in JetBrains** (owner run, 2026-10-20, HTTP only; the IDE runs on Windows against the spike in WSL,
+**GitHub Copilot in JetBrains** (owner run, 2026-10-20, Windows 11, GitHub Copilot plugin 1.19.2, the latest stable on that
+date per the JetBrains Marketplace (released 2026-10-19, `1.19.2-261-windows-x64`, for IDE builds 261+); HTTP only; the IDE runs on Windows against the spike in WSL,
 and stdio from WSL is unreliable in the owner's experience). The servers were named `agility-team` and `agility-viewer`
 in the IDE, and their tools appear prefixed (`agility-team-whoami`, …):
 
@@ -181,7 +182,9 @@ in the IDE, and their tools appear prefixed (`agility-team-whoami`, …):
   writes from JetBrains need the approval page (P7-02). The decline path does not apply.
 - Read-only calls ran without asking for confirmation.
 
-**GitHub Copilot in VS Code** (owner run, 2026-10-20; VS Code opened through Remote WSL, the four servers in a
+**GitHub Copilot in VS Code** (owner run, 2026-10-20, Windows 11, VS Code 1.142.0, the latest stable for `win32-x64` on that
+date per the VS Code update API (released 2026-10-15); the Marketplace's last listed Copilot Chat release is 0.48.1
+(2026-05-15), so the Copilot Chat build in use is whatever ships with or alongside 1.142.0 *(unverified)*. VS Code opened through Remote WSL, the four servers in a
 git-ignored `.vscode/mcp.json`; the chat ran in a "critique" mode that repeated the whole sequence, so each `team` server
 saw several approve and decline rounds):
 
