@@ -13,7 +13,7 @@ agility-bridge (version, date).
 
 | Client | Protocol eras | stdio | Streamable HTTP | Static headers | OAuth 2.1 | Elicitation | MCP Apps | Tasks | Prompts / resources | Tool cap |
 |---|---|---|---|---|---|---|---|---|---|---|
-| GitHub Copilot in VS Code | ≤ 2025-11-25 | ✅ | ✅ | ✅ (`headers`) | ✅ DCR + CIMD | ✅ form | ✅ | ❌ | ✅ / ✅ | 128 per request |
+| GitHub Copilot in VS Code | 2026-07-28 on stdio and HTTP (**V** 2026-10-20; documented as ≤ 2025-11-25 before) | ✅ | ✅ | ✅ (`headers`) | ✅ DCR + CIMD | ✅ form | ✅ | ❌ | ✅ / ✅ | 128 per request |
 | GitHub Copilot in JetBrains IDEs | 2025 era over HTTP (**V** 2026-10-20) | ✅ | ✅ | ✅ (`requestInit.headers`) | ✅ DCR (preview) | ✅ form | ❌ | ❌ | ✅ / ✅ | ? |
 | GitHub Copilot CLI | 2026-07-28 (v1.0.81; **V** 1.0.87 stdio + HTTP) | ✅ | ✅ | ✅ | ✅ DCR + CIMD + device code | ✅ form + URL | ❌ | ❌ | ? / ? | none (lazy loading) |
 | Claude Code | 2026-07-28 (v2.1.292) | ✅ | ✅ | ✅ | ✅ DCR + CIMD | ✅ form + URL | ✅ | ? | ✅ / ✅ | none (tool search) |
@@ -33,6 +33,7 @@ ChatGPT connectors, Gemini CLI.
 | Client | Version | Date | What was verified | Source |
 |---|---|---|---|---|
 | GitHub Copilot CLI | 1.0.87 | 2026-10-20 | **V** stdio and HTTP with a static `Authorization` header; 2026-07-28 on both; `structuredContent`; server-side schema errors shown; per-workspace tool lists; **write approval prompt shown; approve and decline work on both transports** (`input_required`) | P0-07, owner run |
+| GitHub Copilot in VS Code | version to record | 2026-10-20 | **V** stdio (Remote WSL) and HTTP with a static header; **2026-07-28 on both**; per-workspace tool lists; server-side schema errors; **write approval: approve and decline work on both transports** (`input_required`); errors shown with an `MCP server '<name>':` prefix | P0-07, owner run |
 | GitHub Copilot in JetBrains | plugin version to record | 2026-10-20 | **V** HTTP with a static header (IDE on Windows, server in WSL); **2025 era**; per-workspace tool lists (tools shown prefixed with the server name); server-side schema errors shown; **no approval prompt: writes refused with `AB_APPROVAL_UNAVAILABLE`**, so remote writes need the approval page; stdio not tested | P0-07, owner run |
 | MCP Inspector CLI | 2.11.0 | 2026-10-20 | **V** stdio and HTTP (Node, workerd); 2025 era; `structuredContent`; static `Authorization` header; no elicitation in the CLI (writes refused with `AB_APPROVAL_UNAVAILABLE`); `-e` reaches a stdio server | P0-07 spike |
 | Claude Code | 2.1.304 | 2026-10-20 | **V** stdio and HTTP with a static `Authorization` header; 2026-07-28 on both; per-workspace tool lists; server-side schema errors shown; **write approval prompt shown; approve and decline work on both transports** (`input_required`) | P0-07, owner run (relic-bridge also saw 2.1.287 send `Mcp-Method`/`Mcp-Name` and a long-lived `subscriptions/listen`) |
@@ -46,7 +47,7 @@ on 2025-era HTTP. The rest of the matrix is the owner's checklist in
 
 | Client | Local (stdio) | Remote | Write approval channel (Phase 7) |
 |---|---|---|---|
-| VS Code | ✅ | device token in a password `input`, or OAuth (Phase 5) | stdio: elicitation · remote: approval page (2025-era HTTP cannot be elicited) |
+| VS Code | ✅ | device token in a password `input`, or OAuth (Phase 5) | elicitation on stdio and HTTP (**V** 2026-10-20, 2026-07-28); approval page only if a release falls back to the 2025 era |
 | JetBrains | ✅ | device token (stored in plain text by the IDE: use short expiry) or OAuth preview | stdio: elicitation (not verified) · remote: approval page (**V**: 2025-era HTTP, writes refused with `AB_APPROVAL_UNAVAILABLE`) |
 | Copilot CLI | ✅ | device token or OAuth | elicitation on stdio and HTTP (**V** 1.0.87) |
 | Claude Code | ✅ | device token or OAuth | elicitation on stdio and HTTP (**V** 2.1.304) |
@@ -59,11 +60,11 @@ on 2025-era HTTP. The rest of the matrix is the owner's checklist in
 
 Consequences for the design:
 
-- **Both protocol eras are mandatory** (VS Code and Cursor reject a 2026-07-28-only server) — [ADR-0005](../adr/0005-mcp-sdk-v2-stateless.md).
+- **Both protocol eras are mandatory** (Copilot in JetBrains and MCP Inspector CLI speak 2025-era revisions, verified; Cursor documented) — [ADR-0005](../adr/0005-mcp-sdk-v2-stateless.md).
 - **Keep the default catalogue well under 40 tools** (Cursor) and remember Windsurf's 100-tool budget is shared with
   other servers — L-155, P0-11.
 - **Do not rely on annotations** for safety: only VS Code uses `readOnlyHint` (to skip confirmation) — L-154.
-- **Write approval needs an out-of-band page** for VS Code, Cursor, JetBrains and mobile over HTTP — L-156, P7-02.
+- **Write approval needs an out-of-band page** for 2025-era clients over HTTP (JetBrains verified, Cursor documented) and for mobile — L-156, P7-02.
 - **Hosted Claude connectors** need a public, IPv4-reachable HTTPS URL; private or on-premises-only deployments serve
   IDE and CLI clients only (or need a tunnel).
 

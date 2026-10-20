@@ -215,9 +215,11 @@ Checked 2026-10 in specifications and SDK documentation; P0-07 re-verifies with 
   (the server answers `input_required` and the client repeats the call with the answers), deprecates roots, sampling and
   logging (12-month grace period), makes Client ID Metadata Documents the standard client registration and requires
   RFC 9207 issuer validation. — [2026-07-28 announcement](https://blog.modelcontextprotocol.io/posts/2026-07-28/)
-- **Adoption is uneven (October 2026):** Claude Code, Copilot CLI, Windsurf/Devin Desktop and MCP Inspector speak
-  2026-07-28; **VS Code (GitHub Copilot) and Cursor are capped at 2025-11-25** and reject a server that only speaks the
-  new revision. Serving both eras is mandatory ([client compatibility](reference/client-compatibility.md)).
+- **Adoption is uneven (October 2026):** Claude Code, Copilot CLI, Windsurf/Devin Desktop and MCP Inspector v2 speak
+  2026-07-28; Cursor was documented as capped at 2025-11-25 *(unverified)*. VS Code (GitHub Copilot) was documented the
+  same way, but **P0-07 found it on 2026-07-28** over stdio and HTTP (2026-10-20, *live*), while **Copilot in JetBrains
+  and MCP Inspector CLI 2.11.0 negotiate a 2025-era revision** (*live*). Serving both eras is mandatory
+  ([client compatibility](reference/client-compatibility.md)).
 - **Batching** was removed in 2025-06-18. — [changelog](https://modelcontextprotocol.io/specification/2025-06-18/changelog)
 - **Headers on the legacy path**: `Mcp-Method`/`Mcp-Name` are only trustworthy after modern-era validation; legacy
   requests can carry arbitrary values, so audit and rate limiting must read the JSON body there.
@@ -260,9 +262,11 @@ Checked 2026-10 in specifications and SDK documentation; P0-07 re-verifies with 
 Summary only; the per-client matrix, configuration formats and verification status are in
 [reference/client-compatibility.md](reference/client-compatibility.md).
 
-- **Protocol eras**: VS Code (Copilot) and Cursor negotiate up to 2025-11-25 only; Claude Code (from v2.1.292,
+- **Protocol eras**: Cursor negotiates up to 2025-11-25 only *(documented, unverified)*; Claude Code (from v2.1.292,
   2026-10-06), Copilot CLI (v1.0.81, 2026-08-27), Windsurf/Devin Desktop (v3.10.67, 2026-10-12) and MCP Inspector v2
-  (explicit `protocolEra` switch) speak 2026-07-28.
+  (explicit `protocolEra` switch) speak 2026-07-28. *live, P0-07 (2026-10-20):* 2026-07-28 on stdio and HTTP for
+  VS Code (Copilot), Claude Code 2.1.304 and Copilot CLI 1.0.87; a 2025-era revision for Copilot in JetBrains (HTTP)
+  and MCP Inspector CLI 2.11.0.
 - **Tool-count caps**: Cursor 40 tools; Windsurf/Devin Desktop 100 enabled tools across all servers; VS Code 128 tools per
   request (with automatic "virtual tool" grouping). A small default catalogue matters (L-155).
 - **Annotations**: only VS Code uses `readOnlyHint` (to skip confirmation); no surveyed client changes its UI for
@@ -270,7 +274,9 @@ Summary only; the per-client matrix, configuration formats and verification stat
 - **Elicitation**: form mode in VS Code, JetBrains, Cursor; form and URL mode in Claude Code and Copilot CLI; not in the
   Copilot cloud agent, Zed or Gemini CLI. Over stateless remote HTTP, 2025-era clients cannot be elicited (*live*, P0-07:
   even a client that declares elicitation is refused, because each request builds a server that never saw its
-  capabilities), so remote write approval needs an out-of-band path for VS Code and Cursor (L-156, P7-02).
+  capabilities), so remote write approval needs an out-of-band path for 2025-era clients: Copilot in JetBrains
+  (verified) and Cursor (documented) (L-156, P7-02). VS Code, Claude Code and Copilot CLI approved and declined writes
+  through `input_required` on stdio and HTTP (*live*, P0-07).
 - **MCP Inspector CLI 2.11.0** (*live*, P0-07): 2025 era on HTTP and stdio, renders `structuredContent`, cannot elicit;
   `-e KEY=value` reaches a stdio server's environment.
 - **Remote authentication**: static headers everywhere (JetBrains nests them under `requestInit.headers`; Claude Desktop

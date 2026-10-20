@@ -18,8 +18,8 @@ not keep per-session state in memory.
 - **HTTP is stateless:** one `createMcpHandler(factory, { legacy: 'stateless' })` per app; the factory builds a fresh
   server per request with only the caller's granted tools; the resolved access scope travels in `authInfo.extra`.
 - **Both eras are served** on every runtime (stdio pins the era per connection). This is mandatory, not a nicety: in
-  October 2026 VS Code (GitHub Copilot) and Cursor negotiate only up to 2025-11-25 and reject a server that speaks only
-  2026-07-28, while Claude Code, Copilot CLI, Windsurf/Devin Desktop and MCP Inspector already use 2026-07-28
+  October 2026 Copilot in JetBrains, MCP Inspector CLI and (documented) Cursor negotiate only 2025-era revisions, while
+  Claude Code, Copilot CLI, VS Code (verified in P0-07) and Windsurf/Devin Desktop use 2026-07-28
   ([RESEARCH §3](../RESEARCH.md#3-mcp-clients)). Features that need per-request capabilities (elicitation through multi
   round-trip requests, the Tasks extension) are offered only to requests that declare them.
 - `tools.listChanged`, `prompts.listChanged` and `resources.listChanged` are `false` on HTTP; clients reconnect after
@@ -43,8 +43,9 @@ From [spikes/mcp-sdk-v2/RESULTS.md](../../spikes/mcp-sdk-v2/RESULTS.md), SDK 2.3
 - **Batches:** the 2025-era path answered a two-request JSON-RPC batch, so the "rejected before the SDK" rule above is
   required, not defensive (P2-06).
 - **Elicitation:** works on stdio (both eras) and on 2026-07-28 HTTP through `inputRequired(...)`, never on 2025-era HTTP
-  (a stateless request has no client capabilities). VS Code, Cursor and probably JetBrains therefore need the approval
-  page for remote writes (P7-02).
+  (a stateless request has no client capabilities). Verified with real clients: Copilot CLI 1.0.87, Claude Code
+  2.1.304 and VS Code approve and decline over stdio and HTTP; Copilot in JetBrains (2025 era) is refused over HTTP and
+  needs the approval page for remote writes (P7-02), as does Cursor if it is still on 2025-11-25.
 - **Per-request construction:** register tool schemas converted to JSON Schema once per process (`fromJsonSchema`):
   0.70 ms vs 4.89 ms p50 for a 25-tool `tools/list` (P1-01).
 - Real clients: MCP Inspector CLI 2.11.0 verified here; Claude Code 2.1.287 and GitHub Copilot (desktop) were verified

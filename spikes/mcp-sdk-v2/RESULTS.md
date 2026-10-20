@@ -63,7 +63,8 @@ because HTTP is stateless (ADR-0005). Applied to the documented eras ([client co
 
 | Client | stdio | Remote HTTP |
 |---|---|---|
-| VS Code (Copilot), Cursor (≤ 2025-11-25) | elicitation, if declared | **approval page only** |
+| VS Code (Copilot) | elicitation | elicitation (`input_required`); **verified on stdio and HTTP, 2026-07-28** (documented as ≤ 2025-11-25 before) |
+| Cursor (documented ≤ 2025-11-25; not tested) | elicitation, if declared | **approval page only** |
 | JetBrains (Copilot) | elicitation, if declared (stdio not verified) | **approval page** (verified: 2025 era over HTTP, writes refused) |
 | Claude Code, Copilot CLI (2026-07-28) | elicitation | elicitation (`input_required`); **verified: Copilot CLI 1.0.87 and Claude Code 2.1.304, approve and decline, stdio and HTTP** |
 | Windsurf / Devin Desktop (2026-07-28, elicitation not claimed) | approval page or refusal | approval page |
@@ -94,7 +95,8 @@ should build the tool registry this way. The serialised list is about 1.6 KB per
 ## Findings
 
 1. **2025-era HTTP cannot elicit** (above). It confirms L-025 and L-156 with evidence: the out-of-band approval page
-   (P7-02) is required for VS Code, Cursor and JetBrains over HTTP.
+   (P7-02) is required for 2025-era clients over HTTP. With real clients that is Copilot in JetBrains (verified) and
+   Cursor (documented); VS Code turned out to speak 2026-07-28 and approves remotely.
 2. **The SDK accepts JSON-RPC batches on the 2025-era path** (2.3.1): a two-request array with
    `mcp-protocol-version: 2025-11-25` was answered with two results, although batching was removed from the protocol in
    2025-06-18. ADR-0005 already says batches are rejected *before* the SDK; P2-06 must do it in the Hono app (refuse a
@@ -123,7 +125,9 @@ should build the tool registry this way. The serialised list is about 1.6 KB per
 | **GitHub Copilot CLI** | **1.0.87** | HTTP (Node) and stdio, `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ **prompt shown; approve and decline both work on both** (`input_required`) | owner, 2026-10-20 |
 | **Claude Code** | **2.1.304** | HTTP (Node) and stdio, `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ **prompt shown; approve and decline both work on both** (`input_required`) | owner, 2026-10-20 |
 | **GitHub Copilot in JetBrains** | plugin version to record | HTTP (Node), `team` and `viewer`; stdio not tested (unreliable from WSL) | ✅ | ✅ | **2025** | ❌ no prompt; writes refused with `AB_APPROVAL_UNAVAILABLE` | owner, 2026-10-20 |
-| VS Code, Claude Desktop, Cursor, Windsurf / Devin Desktop | — | — | — | — | — | — | **owner checklist** |
+| **GitHub Copilot in VS Code** | version to record | HTTP (Node) and stdio (Remote WSL), `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ approve and decline work on both (`input_required`) | owner, 2026-10-20 |
+| Claude Desktop | — | — | — | — | — | — | **owner checklist** |
+| Cursor, Windsurf / Devin Desktop | — | — | — | — | — | — | not tested (no subscription); community reports through the client-compatibility issue template |
 
 **GitHub Copilot CLI 1.0.87** (owner run, 2026-10-20, Linux, all four spike servers added with `copilot mcp add`, the
 test prompt from the checklist):
@@ -167,9 +171,24 @@ in the IDE, and their tools appear prefixed (`agility-team-whoami`, …):
   writes from JetBrains need the approval page (P7-02). The decline path does not apply.
 - Read-only calls ran without asking for confirmation.
 
+**GitHub Copilot in VS Code** (owner run, 2026-10-20; VS Code opened through Remote WSL, the four servers in a
+git-ignored `.vscode/mcp.json`; the chat ran in a "critique" mode that repeated the whole sequence, so each `team` server
+saw several approve and decline rounds):
+
+- Tool lists match the grants; `add_comment` absent on `viewer`.
+- `whoami` answered **`era=modern` over HTTP and stdio**: this VS Code Copilot release negotiates 2026-07-28, although
+  it was documented as capped at 2025-11-25.
+- `query_assets` returned `{rows, total: 2, nextCursor: null}`; the unknown operator was refused by the same
+  server-side schema error; `get_work_item B-99999` returned `AB_NOT_FOUND`. VS Code prefixes results it treats as errors
+  with `MCP server '<name>': `.
+- `add_comment`: approving returned `approved via input_required`; declining returned `AB_APPROVAL_DECLINED via
+  input_required` (as an error), on both transports.
+- Read-only calls ran without a confirmation step visible to the model; the model saw no annotations.
+
 **Conclusion so far:** both 2026-07-28 CLIs approve and refuse writes through elicitation on stdio **and** remote HTTP,
 exactly as the server-side matrix predicted; no approval page is needed for them. Copilot in JetBrains speaks the 2025
-era over HTTP and cannot approve remote writes, also as predicted: it needs the approval page.
+era over HTTP and cannot approve remote writes, also as predicted: it needs the approval page. VS Code is the surprise:
+it already speaks 2026-07-28 and approves writes remotely, so among the tested clients only JetBrains needs the page.
 
 The relic-bridge rows come from a sibling project by the same maintainer that uses the same SDK and server pattern; a
 client's protocol behaviour does not depend on the server's domain, so they are carried over with their source and

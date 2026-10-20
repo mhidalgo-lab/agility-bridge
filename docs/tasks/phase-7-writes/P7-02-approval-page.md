@@ -15,7 +15,7 @@ owner: ""
 > Later-phase task: **refine scope and acceptance criteria before starting** (tasks/README rule 7).
 
 ## Goal
-Clients that cannot elicit (VS Code and Cursor over remote HTTP, mobile apps) can still have a person approve the exact change.
+Clients that cannot elicit (2025-era clients over remote HTTP, such as Copilot in JetBrains as verified in P0-07, and mobile apps) can still have a person approve the exact change.
 
 ## Scope
 - `AB_WRITE_APPROVAL_PENDING` result with a short-lived link to `/approve/<id>` in the signed-in panel.
@@ -25,7 +25,7 @@ Clients that cannot elicit (VS Code and Cursor over remote HTTP, mobile apps) ca
 - Owner decision D-12 recorded (keep or drop).
 
 ## Acceptance criteria
-- [ ] Phishing and forgery tests (other user, other change, expired, replayed); end-to-end with VS Code over HTTP on staging.
+- [ ] Phishing and forgery tests (other user, other change, expired, replayed); end-to-end over HTTP on staging with a client that cannot elicit (Copilot in JetBrains, or MCP Inspector CLI).
 
 ## Security notes
 THREAT_MODEL A13, T31.
