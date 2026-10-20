@@ -169,7 +169,7 @@
 2. ~~Repository settings~~ (done 2026-10-20, mirroring `mhidalgo-lab/relic-bridge`): rulesets for `main` and
    `release/*` (no force push or deletion, PRs required, squash only, 0 approvals, resolved threads), secret scanning
    and push protection, private vulnerability reporting, Dependabot alerts, read-only default Actions permissions,
-   approval for all outside contributors' workflows. **Pending:** required status checks, added with CI (P0-03).
+   approval for all outside contributors' workflows; required status checks added 2026-10-20 (P0-03).
 3. ~~Environments~~ (done 2026-10-20): `live` (owner as reviewer, `main` only), `release` (owner as reviewer, `main`,
    `release/*` and `v*` tags), `staging` and `github-pages` (`main` only). **Pending:** `AB_LIVE_*` secrets (P0-12).
 4. Agility sandbox (D-01): the owner's read-only account in a third-party tenant (no seed data, nothing modified);
