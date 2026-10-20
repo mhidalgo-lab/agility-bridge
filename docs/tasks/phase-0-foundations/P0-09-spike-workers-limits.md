@@ -2,7 +2,7 @@
 id: P0-09
 title: "Spike: Cloudflare Workers limits with Agility-shaped payloads"
 phase: 0
-status: blocked
+status: review
 priority: high
 depends_on: [P0-01]
 adr: ["0010", "0014"]
@@ -24,20 +24,11 @@ Measure CPU, subrequests, memory and cache behaviour on the Free and Paid plans 
 - Storage and crypto portability prototype: the same schema and conditional statements on `node:sqlite` and local D1, and WebCrypto AES-256-GCM + HKDF round trips across Node and workerd (input for ADR-0006 and ADR-0007).
 
 ## Acceptance criteria
-- [ ] `spikes/workers-limits/RESULTS.md` with numbers per plan. *(local numbers and relic-bridge's Free-plan production reference recorded; Agility-shaped production numbers per plan pending the owner)*
+- [x] `spikes/workers-limits/RESULTS.md` with numbers per plan. *(Free: measured in production on 2026-10-20. Paid: not available on the owner's account; the Paid presets keep the documented limits.)*
 - [x] Response caps and budget presets in ADR-0010 confirmed or changed.
 - [x] XML parser chosen with measurements.
 - [x] The private-CA limitation recorded for ADR-0014.
 - [x] The storage and crypto prototype passes on both runtimes, or the differences are recorded for ADR-0006 and ADR-0007.
-
-## Blocker
-
-Local measurements, the XML parser choice, the storage and crypto prototype and the private-CA evidence are done
-([RESULTS.md](../../../spikes/workers-limits/RESULTS.md), 2026-10-20). Production numbers per plan (CPU and cold starts on
-Free and Paid, Cache API on `workers.dev` vs a custom domain, Rate Limiting binding, the private-CA failure in
-production) need the owner's Cloudflare account: run
-[`spikes/workers-limits/deploy-and-measure.md`](../../../spikes/workers-limits/deploy-and-measure.md), record the results,
-then set the task back to `in-progress`.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.

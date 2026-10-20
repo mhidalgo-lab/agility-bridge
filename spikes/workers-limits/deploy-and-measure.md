@@ -1,7 +1,12 @@
-# P0-09 owner checklist: production measurements
+# P0-09 production measurements
 
-What needs the owner's Cloudflare account. Deploy the spike Worker for a short session, measure, then delete everything.
-No Agility token and no account ids are committed; the Worker serves synthetic data only.
+How the production run in [RESULTS.md](RESULTS.md) §6 was done (2026-10-20, through the Cloudflare API), and how to repeat
+it with wrangler. Deploy for a short session, measure, then delete everything. No Agility token and no account ids are
+committed; the Workers serve synthetic data and the public example instance's schema only.
+
+Two Workers: `agility-bridge-spike-limits` (`wrangler.jsonc`, plus a service binding `MOCK`, a `ratelimit` binding
+`RATE_LIMITER` with `limit: 5, period: 10`, and `observability.enabled`) and `agility-bridge-spike-mock`
+(`wrangler.mock.jsonc`). Deploy the mock first.
 
 ## 1. Deploy
 
@@ -9,10 +14,12 @@ No Agility token and no account ids are committed; the Worker serves synthetic d
 cd spikes/workers-limits && pnpm install
 pnpm exec wrangler login
 pnpm exec wrangler d1 create agility-bridge-spike   # copy the database_id into a git-ignored wrangler.deploy.jsonc
+pnpm exec wrangler deploy -c wrangler.mock.jsonc
 pnpm exec wrangler deploy -c wrangler.deploy.jsonc
 ```
 
-`wrangler.deploy.jsonc` is `wrangler.jsonc` with the real `database_id` and `"workers_dev": true`. Add it to
+`wrangler.deploy.jsonc` is `wrangler.jsonc` with the real `database_id`, `"workers_dev": true`, the `MOCK` and
+`RATE_LIMITER` bindings and `"observability": { "enabled": true }`. Add it to
 `.git/info/exclude` (it holds an account-specific id).
 
 ## 2. Measure (Free plan first, then Paid if available)
@@ -32,4 +39,5 @@ pnpm exec wrangler deploy -c wrangler.deploy.jsonc
 ## 3. Record and clean up
 
 - Copy the numbers into RESULTS.md (new section "Production", with the date and the plan) and into RESEARCH §5.
-- `pnpm exec wrangler delete` and `pnpm exec wrangler d1 delete agility-bridge-spike`.
+- `pnpm exec wrangler delete -c wrangler.deploy.jsonc`, `pnpm exec wrangler delete -c wrangler.mock.jsonc` and
+  `pnpm exec wrangler d1 delete agility-bridge-spike`.

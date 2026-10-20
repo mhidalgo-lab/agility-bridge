@@ -1,0 +1,8 @@
+// P0-09 mock Agility upstream (src/mock.ts), deployed next to the measured Worker for production runs.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agility-bridge-spike-mock",
+  "main": "src/mock.ts",
+  "compatibility_date": "2026-09-26",
+  "send_metrics": false
+}
