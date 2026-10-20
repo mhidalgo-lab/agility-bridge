@@ -2,12 +2,12 @@
 id: P0-04
 title: Security tooling baseline
 phase: 0
-status: todo
+status: in-progress
 priority: high
 depends_on: [P0-03]
 adr: []
 lessons: [L-130, L-132, L-010]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P0-04 — Security tooling baseline
@@ -24,9 +24,9 @@ Static analysis, secret scanning, dependency review and a scorecard from the fir
 - Repository settings checklist (rulesets, secret scanning and push protection, private vulnerability reporting, environments) for the owner.
 
 ## Acceptance criteria
-- [ ] A planted fake token in a test path fails gitleaks (proving each custom rule fires); an allowlist covers the test fixture.
+- [x] A planted fake token in a test path fails gitleaks (proving each custom rule fires); an allowlist covers the test fixture. *(`scripts/check-gitleaks-rules.ts`, run in the gitleaks job; verified locally that removing a fixture fails it)*
 - [ ] CodeQL runs on PRs; Scorecard publishes results.
-- [ ] Renovate configuration validates.
+- [x] Renovate configuration validates. *(`renovate-config-validator --strict`, Renovate 44.172.2, 2026-10-20; `scripts/test/renovate.test.ts` checks the tool-pin manager)*
 - [ ] The owner has applied and ticked the repository settings checklist.
 
 ## Security notes

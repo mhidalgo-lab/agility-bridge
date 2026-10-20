@@ -1,0 +1,54 @@
+# gitleaks config (P0-04, THREAT_MODEL T8). The default ruleset plus agility-bridge's own secrets.
+# Planted fakes for every custom rule live in scripts/test/fixtures/secrets/ and are allowlisted by path only (never by
+# a word such as "test", which would also hide real `ab_test_` tokens). scripts/check-gitleaks-rules.ts proves that each
+# rule fires on its fixture.
+title = "agility-bridge"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "agility-bridge-device-token"
+description = "agility-bridge device token: ab_live_ / ab_test_ + 43 base62 + _ + 6 base62 checksum (ARCHITECTURE §4, P2-05)"
+regex = '''\bab_(?:live|test)_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}\b'''
+keywords = ["ab_live_", "ab_test_"]
+
+[[rules]]
+id = "agility-bridge-admin-token"
+description = "agility-bridge break-glass admin token (ab_admin_ prefix; exact format fixed in P2-09)"
+regex = '''\bab_admin_[0-9A-Za-z_-]{24,}\b'''
+keywords = ["ab_admin_"]
+
+[[rules]]
+id = "agility-bridge-master-key"
+description = "agility-bridge master key: v<N>: + 32 bytes in base64 (ADR-0007)"
+regex = '''\bv[0-9]{1,3}:[A-Za-z0-9+/]{43}='''
+keywords = [":"]
+
+[[rules]]
+id = "agility-bridge-master-key-assignment"
+description = "agility-bridge master key in an AB_MASTER_KEY assignment (bare base64 is version 1)"
+regex = '''(?i)\bAB_MASTER_KEY(?:_PREVIOUS)?\s*[=:]\s*['"]?(?:v[0-9]{1,3}:)?[A-Za-z0-9+/]{43}='''
+keywords = ["ab_master_key"]
+
+[[rules]]
+id = "agility-access-token-assignment"
+description = "Digital.ai Agility access token in an AB_*AGILITY_TOKEN assignment (token format unverified until P0-06)"
+regex = '''(?i)\bAB_(?:LIVE_)?AGILITY_TOKEN\s*[=:]\s*['"]?([A-Za-z0-9+/._=-]{20,})'''
+secretGroup = 1
+entropy = 3.0
+keywords = ["agility_token"]
+
+[[rules]]
+id = "agility-access-token-bearer"
+description = "High-entropy bearer token in an Authorization header (generic until P0-06 shows the Agility format)"
+regex = '''(?i)\bauthorization\s*[:=]\s*['"]?bearer\s+([A-Za-z0-9+/._=-]{24,})'''
+secretGroup = 1
+entropy = 3.5
+keywords = ["bearer"]
+
+# BEGIN fixture allowlist (removed by scripts/check-gitleaks-rules.ts)
+[[allowlists]]
+description = "Planted fake secrets that prove each custom rule fires"
+paths = ['''^scripts/test/fixtures/secrets/''']
+# END fixture allowlist

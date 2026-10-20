@@ -34,13 +34,22 @@ From `.github/workflows/ci.yml` (P0-03):
 - `DCO sign-off`
 - `Conventional PR title`
 
-To be added when their jobs exist: `CodeQL`, `Secret scan (gitleaks)`, `Dependency audit`, `Dependency review` (P0-04)
-and `Authorization suite` (P2-12). The macOS and Windows jobs (`SQLite and CLI (…)`) run on every PR but are not
+From `.github/workflows/security.yml` (P0-04):
+
+- `CodeQL`
+- `Secret scan (gitleaks)`
+- `Dependency audit`
+- `Dependency review`
+
+To be added when its job exists: `Authorization suite` (P2-12). The macOS and Windows jobs (`SQLite and CLI (…)`) run on every PR but are not
 required, as in relic-bridge.
 
 ## Code security
 
 - Dependabot alerts on; Dependabot security updates off (updates come through Renovate, P0-04).
+- **CodeQL** through `.github/workflows/security.yml` (`security-extended`, JavaScript/TypeScript and Actions; PRs,
+  `main`, weekly), not the "default setup", so the two do not conflict. **OpenSSF Scorecard** runs on `main`, weekly
+  and on branch-protection changes, and publishes to scorecard.dev.
 - **Secret scanning on, with push protection.**
 - **Private vulnerability reporting on** (the channel `SECURITY.md` names, P0-02).
 
@@ -51,6 +60,20 @@ required, as in relic-bridge.
 - Workflows from **all outside contributors** need approval before they run. CI runs on GitHub-hosted runners only, never
   self-hosted (L-129); `pull_request_target` is not used. `scripts/check-workflows.ts` (in `pnpm lint`) enforces SHA
   pins, read-only default permissions, harden-runner on Linux jobs and pinned checksums for downloaded tools.
+
+## Apps
+
+- **Renovate** GitHub App, installed for this repository only (owner action). It reads `renovate.json`: weekly,
+  grouped, releases at least 3 days old, majors behind dependency-dashboard approval, actions pinned by digest, CI tool
+  binaries pinned by tag and sha256.
+
+## Owner checklist (P0-04)
+
+- [x] Rulesets, required checks from CI, secret scanning and push protection, private vulnerability reporting,
+      Dependabot alerts, Actions policy and environments (applied 2026-10-19/20, above).
+- [ ] Install the Renovate GitHub App for this repository.
+- [ ] Add the four P0-04 checks to both rulesets once they have run on `main` (above).
+- [ ] After the first Scorecard run on `main`, confirm the results appear on scorecard.dev and in code scanning.
 
 ## Environments
 

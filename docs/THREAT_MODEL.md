@@ -75,7 +75,7 @@ All `planned` unless stated. Tasks name where the mitigation is built.
 | T5 | Expensive or unbounded work on our server | D | Per-call budgets, page and field caps, byte caps before parsing, deadlines, rate limits, quotas | P1-02, P1-04, P2-07, P8-09 |
 | T6 | Prompt injection through returned content | T, E | Untrusted-data envelope on every output path, caps, read-only default, human approval for writes (see A1) | P1-05, P7-01 |
 | T7 | Database or backup theft reveals Agility tokens | I | AES-256-GCM envelope encryption with AAD; master key never beside the data; `0600` files; rotation | P2-03 |
-| T8 | Secrets in logs, errors, audit or output | I | Central redaction (token shapes, headers, URLs, JSON fields, env-style names); no raw upstream bodies; exact-value scrub in diagnostics | P1-01, P2-08 |
+| T8 | Secrets in logs, errors, audit or output | I | Central redaction (token shapes, headers, URLs, JSON fields, env-style names); no raw upstream bodies; exact-value scrub in diagnostics; committed secrets caught by gitleaks with custom rules for device, admin and Agility tokens and the master key, in CI over the full history and in the pre-commit hook, each rule proven by a planted fixture | P0-04, P1-01, P2-08 |
 | T9 | OAuth code interception, redirect abuse, refresh replay, token theft from storage | S, I | PKCE S256 for all; exact redirect matching; single-use codes; rotating refresh with bounded reuse window; audience binding; codes and tokens stored hash-only, grant properties encrypted | P5-01, P5-05 |
 | T10 | Registration floods and consent phishing | S, D | DCR caps per IP and deployment, expiry; consent shows redirect host and an "unverified" label; no auto-approval | P5-03, P5-04, P5-09 |
 | T11 | SSRF through CIMD, OIDC discovery or other fetched URLs | I, E | HTTPS only; private, loopback, link-local and metadata ranges blocked at connect time; no redirects; size and time limits | P4-01, P5-03, P8-07 |
@@ -85,7 +85,7 @@ All `planned` unless stated. Tasks name where the mitigation is built.
 | T15 | Revoked access still usable through caches | E | Access cache ≤ 60 s, cleared on change; checks on every refresh | P2-06, P5-05 |
 | T16 | Cross-workspace cache mixing | I | Cache keys include every scope dimension; authorize before lookup; encrypted shared cache | P8-01 |
 | T17 | Repudiation of reads or writes | R | Audit rows with user, device, grant, tool, asset numbers, approval hash; write intent recorded before mutation (see A6) | P2-08, P7-01 |
-| T18 | Malicious dependency, action or artifact | T | Frozen lockfile, minimum release age, pinned actions by SHA, separate publish job, provenance, SBOM, signed image | P0-03, P0-04, P1-15 |
+| T18 | Malicious dependency, action or artifact | T | Frozen lockfile, minimum release age, pinned actions by SHA, separate publish job, provenance, SBOM, signed image; CodeQL, `pnpm audit` and dependency review on every PR; Renovate with a 3-day release age and approval for majors; OpenSSF Scorecard | P0-03, P0-04, P1-15 |
 | T19 | Enumeration of workspaces or instances | I | Same 401 for unknown slug and bad token; authenticate before revealing existence | P2-06 |
 | T20 | Public endpoint abuse | D | Minimal unauthenticated routes; per-IP limits; body caps; minimal health output | P2-06, P2-07 |
 | T21 | Credential or grant bleed through module state | I, E | Per-request immutable context; two-workspace concurrency tests | P1-01, P2-12 |

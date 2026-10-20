@@ -1,0 +1,55 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices", ":semanticCommits", ":dependencyDashboard", ":gitSignOff"],
+  "description": "P0-04: weekly, grouped, mature releases only (3 days), majors need approval, GitHub Actions pinned by digest, CI tool binaries pinned by tag and sha256.",
+  "schedule": ["before 6am on monday"],
+  "timezone": "UTC",
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "prConcurrentLimit": 5,
+  "labels": ["dependencies"],
+  "commitMessageSuffix": "",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "pinDigests": true
+    },
+    {
+      "description": "CI tool binaries pinned in workflows (actionlint, gitleaks), one PR per tool.",
+      "matchManagers": ["custom.regex"],
+      "matchDatasources": ["github-release-attachments"],
+      "labels": ["dependencies", "ci"]
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "dev dependencies (non-major)"
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "minimumReleaseAge": null
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "downloaded CI tools pinned by release tag and tarball sha256. The github-release-attachments datasource finds the current digest in the release's checksums file and takes the new one from the same file of the new release, so the tag and the digest change in one PR.",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>github-release-attachments) depName=(?<depName>[\\w.-]+/[\\w.-]+)\\n\\s*[A-Z0-9_]+_VERSION: (?<currentValue>v\\d+\\.\\d+\\.\\d+)\\n(?:\\s*#.*\\n)*\\s*[A-Z0-9_]+_SHA256: (?<currentDigest>[a-f0-9]{64})\\n"
+      ],
+      "versioningTemplate": "semver-coerced"
+    }
+  ],
+  "ignorePaths": ["**/node_modules/**", "spikes/**"]
+}

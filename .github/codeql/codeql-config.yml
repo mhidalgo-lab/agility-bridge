@@ -1,0 +1,5 @@
+# CodeQL configuration for the security workflow (P0-04).
+name: agility-bridge CodeQL
+paths-ignore:
+  # Self-contained research spikes (RESULTS.md in each); never built into a package, published or deployed.
+  - spikes

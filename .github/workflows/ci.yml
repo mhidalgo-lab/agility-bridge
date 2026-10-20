@@ -67,6 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
+      # renovate: datasource=github-release-attachments depName=rhysd/actionlint
       ACTIONLINT_VERSION: v1.7.12
       # sha256 of the linux/amd64 tarball, pinned here so a tampered release cannot also replace its checksums file.
       ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
