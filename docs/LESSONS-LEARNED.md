@@ -40,7 +40,7 @@ How to use it:
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149 |
@@ -763,6 +763,13 @@ reads, refusals, dry runs and applied writes.
 **L-126 — Browser E2E and a DAST scan find what unit tests miss.**
 Schedule both against the admin panel.
 *Applied in:* P4-08.
+
+**L-159 — Benchmarks must yield to the event loop between requests.**
+A loop of `await handler.fetch(...)` never ends the current job, so V8 keeps every request's `WeakRef` targets (the
+request's `AbortSignal`, and through its listeners the transport and the whole per-request MCP server) alive until the
+loop ends: the P0-07 benchmark ran out of memory and looked like an SDK leak. One `setImmediate` turn per request, as on
+a real server, keeps the heap flat. Before blaming a library for a leak, read the heap snapshot's retainer path.
+*Applied in:* [spikes/mcp-sdk-v2](../spikes/mcp-sdk-v2/RESULTS.md), P0-09, P3-10, P9-03.
 
 ## R. CI, release and supply chain
 

@@ -14,3 +14,5 @@ agility-bridge.yaml
 !examples/**/agility-bridge.yaml
 .DS_Store
 spikes/**/results/
+# Spikes are self-contained experiments (results in RESULTS.md); their lockfiles are not committed.
+spikes/**/pnpm-lock.yaml
