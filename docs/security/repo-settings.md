@@ -68,3 +68,4 @@ Secrets live only in environments, never at repository level.
 - Package `agility-bridge` owned by the maintainer's npm account; `0.0.0` is a name placeholder (D-02, 2026-10-19).
 - 2FA on. Trusted publishing from the `release` environment and staged publishing arrive with P1-15; no long-lived
   npm tokens.
+
