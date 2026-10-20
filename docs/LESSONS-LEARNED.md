@@ -28,10 +28,10 @@ How to use it:
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
 | [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153 |
-| [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152 |
+| [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070 |
-| [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078 |
+| [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094 |
 | [K. Admin UI](#k-admin-ui) | L-095 |
@@ -391,6 +391,13 @@ token for reads with a service token for writes.
 *Why:* mixed identities make Agility history attribute changes to the wrong member and break the permission model.
 *Applied in:* P1-02, P2-04.
 
+**L-160 — Map opaque TLS failures to an actionable error.**
+On Workers, a self-signed, untrusted-root or expired certificate fails `fetch` with `internal error; reference = …`,
+which never mentions TLS. The Agility client turns any connection-level failure into an `AB_` error that names the
+likely causes (certificate not trusted, host unreachable) and, for on-premises instances with a private CA, points to
+the Node or Docker deployment.
+*Applied in:* [spikes/workers-limits](../spikes/workers-limits/RESULTS.md), P1-02, ADR-0014.
+
 ## F. Query safety and limits
 
 **L-057 — Never build upstream queries from strings.**
@@ -507,6 +514,12 @@ group/world-readable key files.
 Define what moves (instances, credentials, workspaces, grants, tokens, audit) and what does not (sessions, OAuth devices); refuse a
 non-empty target.
 *Applied in:* P3-09.
+
+**L-161 — Decide on `RETURNING` rows, not driver change counters.**
+After a cascading delete, D1 reports the cascaded rows in `meta.changes` while `node:sqlite` reports only the statement's
+own rows. Conditional writes (optimistic versions, capped counters, revocations) read their outcome from `RETURNING`,
+which both drivers return identically.
+*Applied in:* [spikes/workers-limits](../spikes/workers-limits/RESULTS.md), ADR-0006, P2-01.
 
 ## I. HTTP, rate limiting and abuse
 

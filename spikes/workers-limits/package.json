@@ -1,0 +1,24 @@
+{
+  "name": "spike-workers-limits",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "dependencies": {
+    "@xmldom/xmldom": "0.9.12",
+    "fast-xml-parser": "5.11.2",
+    "saxes": "6.0.0",
+    "txml": "6.0.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261013.1",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15",
+    "wrangler": "4.149.0"
+  },
+  "scripts": {
+    "worker": "wrangler dev --port 8790",
+    "bench": "tsx src/node-bench.ts",
+    "xml": "tsx src/xml-bench.ts",
+    "portability": "tsx src/portability.ts"
+  }
+}

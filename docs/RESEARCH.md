@@ -52,7 +52,7 @@ Abbreviation: **DL** = `https://docs.digital.ai/agility/docs/developerlibrary/` 
 | `rest-1.v1/New` | `/rest-1.v1/New/<AssetType>?ctx=<OID>` | GET, XML | Template for a new asset (defaults, context copy) | DL rest-1-v1-endpoints |
 | `query.v1` | `/query.v1` | POST (GET), JSON or YAML in, JSON out | Read-only, nested selections, several queries per call | [DL tour of query.v1](https://docs.digital.ai/agility/docs/developerlibrary/tour-query-v-1) |
 | `query.legacy.v1` | `/query.legacy.v1` | as above | Same, accepting Basic auth or the browser session cookie | DL tour of query.v1 |
-| `meta.v1` | `/meta.v1[/<AssetType>[/<Attribute or Operation>]]` | GET, XML, **no authentication** | Schema: asset types, attributes, types, inheritance, operations, validators | [DL meta API](https://docs.digital.ai/agility/docs/developerlibrary/meta-api) |
+| `meta.v1` | `/meta.v1[/<AssetType>[/<Attribute or Operation>]]` | GET, XML or **JSON** (`Accept: application/json`, *live* 2026-10-20), **no authentication** | Schema: asset types, attributes, types, inheritance, operations, validators | [DL meta API](https://docs.digital.ai/agility/docs/developerlibrary/meta-api) |
 | `api/asset` (Bulk API) | `/api/asset[?previewOnly=true]` | POST, JSON (object or array) | Create, update, add/remove relations, execute operations; deferred execution with `previewOnly` | [Bulk API](https://docs.digital.ai/agility/docs/agility-bulk-api), [quickstart](https://docs.digital.ai/agility/docs/bulk-api-quickstart), [advanced topics](https://docs.digital.ai/agility/docs/advanced-bulk-topics) |
 | `api/ActivityStream` | `/api/ActivityStream/<OID>` | GET, JSON | Activity feed; "may not contain every change" | [DL activity stream](https://docs.digital.ai/agility/docs/developerlibrary/activity-stream) |
 | `attachments.img` | `/attachments.img/<id>` | GET / POST multipart | Attachment content (two steps: create the `Attachment` asset, then upload) | [DL attachments](https://docs.digital.ai/agility/docs/developerlibrary/working-with-attachments-and-images) |
@@ -341,7 +341,14 @@ Checked 2026-10 in Cloudflare documentation; P0-09 measures with Agility-shaped 
   `fetch`, and private networks are reachable only through Cloudflare connectivity products (e.g. a tunnel). On-premises
   instances with a private CA therefore need the Node/Docker deployment ([ADR-0014](adr/0014-supported-agility-installations.md)). *(verify in P0-09)*
 - **No `DOMParser`** in Workers: XML from `meta.v1`, `Hist` and `rest-1.v1` needs a pure-JavaScript parser with entity
-  expansion disabled.
+  expansion disabled. P0-09 chose **saxes 6** (streaming, 8 KB gzip, refuses custom and external entities, about 1 ms
+  for an 83 KB `meta.v1/Story`) and prefers JSON wherever Agility serves it. *live, P0-09*
+- **Measured in P0-09** (2026-10-20, [results](../spikes/workers-limits/RESULTS.md)): `meta.v1` for all 175 asset types
+  is 4.1 MB of XML or 4.8 MB of JSON (one type about 83–97 KB), so a Worker loads metadata per asset type; read + parse +
+  shape costs about 3.5–4.5 ms per MB on Node (about 9 ms per MB in production, from relic-bridge's Workers Free run),
+  so the 512 KiB Free cap stands; an untrusted certificate fails `fetch` on workerd with an opaque `internal error;
+  reference = …` (L-160); local D1 and `node:sqlite` agree on STRICT tables, foreign keys, `ON CONFLICT … DO UPDATE …
+  WHERE … RETURNING` and JSON functions, but D1's `meta.changes` includes cascaded rows (L-161). *live (local), P0-09*
 - **Browser Integrity Check / bot protection** on custom domains can answer non-browser MCP clients with error 1010 or
   403; a WAF exception for the MCP paths is needed.
 

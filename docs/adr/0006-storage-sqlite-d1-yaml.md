@@ -33,6 +33,14 @@ database at all.
 - D1 limits (statement size, bound parameters, no interactive transactions) constrain query design for everyone.
 - Audit and OAuth state are unavailable in stdio mode by design (write outcomes are logged to stderr there).
 
+## Evidence (P0-09, 2026-10-20)
+
+The same STRICT schema and conditional statements ran on `node:sqlite` and local D1
+([results](../../spikes/workers-limits/RESULTS.md) §4): 13 of 14 steps identical (UNIQUE, STRICT and foreign-key errors,
+optimistic `UPDATE … RETURNING`, capped `ON CONFLICT … DO UPDATE … WHERE … RETURNING`, `json_extract`, `unixepoch`).
+The difference: D1's `meta.changes` counts cascaded rows, so outcomes are read from `RETURNING` rows (L-161).
+`node:sqlite` needs `PRAGMA foreign_keys = ON` per connection.
+
 ## Alternatives considered
 
 - **PostgreSQL for self-hosting:** rejected for 1.0; a second dialect doubles migrations and tests.
