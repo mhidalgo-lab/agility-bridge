@@ -64,7 +64,7 @@ because HTTP is stateless (ADR-0005). Applied to the documented eras ([client co
 | Client | stdio | Remote HTTP |
 |---|---|---|
 | VS Code (Copilot), Cursor (≤ 2025-11-25) | elicitation, if declared | **approval page only** |
-| JetBrains (Copilot) | elicitation, if declared | approval page unless it negotiates 2026-07-28 (era unknown) |
+| JetBrains (Copilot) | elicitation, if declared (stdio not verified) | **approval page** (verified: 2025 era over HTTP, writes refused) |
 | Claude Code, Copilot CLI (2026-07-28) | elicitation | elicitation (`input_required`); **verified: Copilot CLI 1.0.87 and Claude Code 2.1.304, approve and decline, stdio and HTTP** |
 | Windsurf / Devin Desktop (2026-07-28, elicitation not claimed) | approval page or refusal | approval page |
 | MCP Inspector CLI 2.11.0 | none (the CLI does not elicit) | none |
@@ -122,7 +122,8 @@ should build the tool registry this way. The serialised list is about 1.6 KB per
 | GitHub Copilot (desktop) | 2026-10 | HTTP | ✅ | ✅ | — | not tested | relic-bridge P0-07, 2026-10-02 |
 | **GitHub Copilot CLI** | **1.0.87** | HTTP (Node) and stdio, `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ **prompt shown; approve and decline both work on both** (`input_required`) | owner, 2026-10-20 |
 | **Claude Code** | **2.1.304** | HTTP (Node) and stdio, `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ **prompt shown; approve and decline both work on both** (`input_required`) | owner, 2026-10-20 |
-| VS Code, JetBrains, Claude Desktop, Cursor, Windsurf / Devin Desktop | — | — | — | — | — | — | **owner checklist** |
+| **GitHub Copilot in JetBrains** | plugin version to record | HTTP (Node), `team` and `viewer`; stdio not tested (unreliable from WSL) | ✅ | ✅ | **2025** | ❌ no prompt; writes refused with `AB_APPROVAL_UNAVAILABLE` | owner, 2026-10-20 |
+| VS Code, Claude Desktop, Cursor, Windsurf / Devin Desktop | — | — | — | — | — | — | **owner checklist** |
 
 **GitHub Copilot CLI 1.0.87** (owner run, 2026-10-20, Linux, all four spike servers added with `copilot mcp add`, the
 test prompt from the checklist):
@@ -152,8 +153,23 @@ prompt):
 - Read-only calls ran without a prompt, but that session ran in a bypass-permissions mode, so it says nothing about
   Claude Code's default behaviour. The model saw names, descriptions and input schemas, not annotations.
 
+**GitHub Copilot in JetBrains** (owner run, 2026-10-20, HTTP only; the IDE runs on Windows against the spike in WSL,
+and stdio from WSL is unreliable in the owner's experience). The servers were named `agility-team` and `agility-viewer`
+in the IDE, and their tools appear prefixed (`agility-team-whoami`, …):
+
+- Tool lists match the grants; `add_comment` absent on `viewer`.
+- `whoami` answered **`era=legacy`**: Copilot in JetBrains negotiates a 2025-era revision over HTTP.
+- `query_assets` returned `{rows, total: 2, nextCursor}`; the unknown operator was refused by the same server-side schema
+  error; `get_work_item B-99999` returned `AB_NOT_FOUND`.
+- `add_comment`: **no prompt**; the result was `AB_APPROVAL_UNAVAILABLE: this client cannot answer an approval prompt
+  here (Client does not support form elicitation.)`. That is the 2025-era HTTP case from the server-side matrix: a
+  stateless request carries no client capabilities, so elicitation cannot work whatever the client supports. Remote
+  writes from JetBrains need the approval page (P7-02). The decline path does not apply.
+- Read-only calls ran without asking for confirmation.
+
 **Conclusion so far:** both 2026-07-28 CLIs approve and refuse writes through elicitation on stdio **and** remote HTTP,
-exactly as the server-side matrix predicted; no approval page is needed for them.
+exactly as the server-side matrix predicted; no approval page is needed for them. Copilot in JetBrains speaks the 2025
+era over HTTP and cannot approve remote writes, also as predicted: it needs the approval page.
 
 The relic-bridge rows come from a sibling project by the same maintainer that uses the same SDK and server pattern; a
 client's protocol behaviour does not depend on the server's domain, so they are carried over with their source and
