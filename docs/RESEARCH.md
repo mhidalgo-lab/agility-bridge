@@ -333,20 +333,24 @@ Checked 2026-10 in Cloudflare documentation; P0-09 measures with Agility-shaped 
   near the first caller. — [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/)
 - **Rate Limiting binding**: `limit({ key })` → `{ success }`, periods of 10 or 60 s, per location and eventually
   consistent — a backstop only. — [Rate limiting binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
-- **Cache API**: per data centre, not replicated; counts toward subrequest limits; may be a no-op on `workers.dev`
-  and unavailable behind Cloudflare Access *(verify in P0-09)*. —
+- **Cache API**: per data centre, not replicated; counts toward subrequest limits; unavailable behind Cloudflare Access
+  *(unverified)*. On `workers.dev` it **worked** in P0-09 (`put` then `match` hit within and across requests, Free plan,
+  2026-10-20, *live*); a custom domain is still to check (P3-03). —
   [Cache API](https://developers.cloudflare.com/workers/runtime-apis/cache/)
 - **Cross-request I/O**: a promise for I/O started by one request must not be awaited by another (it can hang or fail).
 - **Outbound TLS**: Workers verify publicly trusted certificates only; there is no option to trust a private CA for
   `fetch`, and private networks are reachable only through Cloudflare connectivity products (e.g. a tunnel). On-premises
-  instances with a private CA therefore need the Node/Docker deployment ([ADR-0014](adr/0014-supported-agility-installations.md)). *(verify in P0-09)*
+  instances with a private CA therefore need the Node/Docker deployment ([ADR-0014](adr/0014-supported-agility-installations.md)).
+  *live, P0-09:* a deployed Worker gets **HTTP 526** for self-signed, untrusted-root and expired certificates (local
+  workerd throws an opaque error instead, L-160).
 - **No `DOMParser`** in Workers: XML from `meta.v1`, `Hist` and `rest-1.v1` needs a pure-JavaScript parser with entity
   expansion disabled. P0-09 chose **saxes 6** (streaming, 8 KB gzip, refuses custom and external entities, about 1 ms
   for an 83 KB `meta.v1/Story`) and prefers JSON wherever Agility serves it. *live, P0-09*
 - **Measured in P0-09** (2026-10-20, [results](../spikes/workers-limits/RESULTS.md)): `meta.v1` for all 175 asset types
   is 4.1 MB of XML or 4.8 MB of JSON (one type about 83–97 KB), so a Worker loads metadata per asset type; read + parse +
-  shape costs about 3.5–4.5 ms per MB on Node (about 9 ms per MB in production, from relic-bridge's Workers Free run),
-  so the 512 KiB Free cap stands; an untrusted certificate fails `fetch` on workerd with an opaque `internal error;
+  shape costs about 3.5–4.5 ms per MB on Node and **about 8 ms per MB on a deployed Worker** (Free plan: 4 ms p50 /
+  8 ms p99 at 512 KiB, 8 / 18 ms at 1 MB, 39 / 56 ms at 5 MB, nothing terminated), so the 512 KiB Free cap stands; the
+  Rate Limiting binding let 8 of 10 calls through against a limit of 5 per 10 s (a backstop only); an untrusted certificate fails `fetch` on workerd with an opaque `internal error;
   reference = …` (L-160); local D1 and `node:sqlite` agree on STRICT tables, foreign keys, `ON CONFLICT … DO UPDATE …
   WHERE … RETURNING` and JSON functions, but D1's `meta.changes` includes cascaded rows (L-161). *live (local), P0-09*
 - **Browser Integrity Check / bot protection** on custom domains can answer non-browser MCP clients with error 1010 or

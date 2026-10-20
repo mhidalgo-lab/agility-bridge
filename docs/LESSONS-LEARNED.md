@@ -392,10 +392,11 @@ token for reads with a service token for writes.
 *Applied in:* P1-02, P2-04.
 
 **L-160 — Map opaque TLS failures to an actionable error.**
-On Workers, a self-signed, untrusted-root or expired certificate fails `fetch` with `internal error; reference = …`,
-which never mentions TLS. The Agility client turns any connection-level failure into an `AB_` error that names the
-likely causes (certificate not trusted, host unreachable) and, for on-premises instances with a private CA, points to
-the Node or Docker deployment.
+A self-signed, untrusted-root or expired certificate looks different on each runtime: local workerd throws
+`internal error; reference = …`, which never mentions TLS, and a deployed Worker gets an ordinary response with
+**HTTP 526**. The Agility client treats both, and any connection-level failure, as an `AB_` error that names the likely
+causes (certificate not trusted, host unreachable) and, for on-premises instances with a private CA, points to the Node
+or Docker deployment. A 526 must never be read as an Agility response.
 *Applied in:* [spikes/workers-limits](../spikes/workers-limits/RESULTS.md), P1-02, ADR-0014.
 
 ## F. Query safety and limits

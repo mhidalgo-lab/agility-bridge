@@ -1,7 +1,7 @@
 # P0-09 results: Cloudflare Workers limits with Agility-shaped payloads
 
-Date: 2026-10-20. Status: **local measurements, parser choice and portability prototype done; production numbers per
-plan need the owner's Cloudflare account** ([`deploy-and-measure.md`](deploy-and-measure.md)). Payloads are synthetic,
+Date: 2026-10-20. Status: **done.** Local measurements, parser choice and portability prototype, plus a production run on
+the owner's **Workers Free** account (§6); the account has no Paid plan, so Paid stays on the documented limits. Payloads are synthetic,
 except the public `meta.v1` of Digital.ai's example instance (schema only, no content), which is downloaded to the
 git-ignored `results/` folder and never committed.
 
@@ -104,13 +104,44 @@ From local workerd: `https://self-signed.badssl.com/`, `https://untrusted-root.b
 the public Agility host works (200). Workers offer no option to trust a private CA, so an on-premises instance with a
 private CA needs the Node or Docker deployment, as ADR-0014 decided; the Agility client must map this opaque failure to
 an actionable `AB_` error ("could not connect securely: certificate not trusted, or the host is unreachable") (lesson
-L-160). The production Worker's behaviour is part of the owner's checklist.
+L-160). In **production** the same three hosts do not throw at all: `fetch` resolves with **HTTP 526** (Cloudflare's
+"invalid SSL certificate"), so the client must handle both shapes (§6).
 
-## 6. Not measured here (owner's Cloudflare account)
+## 6. Production run (Workers Free, 2026-10-20)
 
-Per-plan production CPU with Agility-shaped payloads (Free and Paid), cold starts, the Cache API on `workers.dev` versus
-a custom domain, the Rate Limiting binding, subrequest accounting with retries, and the private-CA failure in production:
-[`deploy-and-measure.md`](deploy-and-measure.md).
+Deployed through the Cloudflare API to the owner's Free account: the measured Worker (`src/worker.ts`) with D1, a Rate
+Limiting binding and Workers Logs, and a mock Agility upstream (`src/mock.ts`) behind a service binding, so generating
+payloads is not billed to the measured Worker. The uploaded bundles were checked against the local SHA-256. Load came
+from one client in Buenos Aires (colo `EZE`): 50 calls per payload size, 0.3 s apart, 20 s between sizes; 20 calls of the
+real `meta.v1/Story`. CPU from Workers Logs (`$workers.cpuTimeMs`, whole milliseconds; the logs held 256 of about 290
+requests). Everything was deleted afterwards; the account's other Workers and databases were not touched.
+
+| Payload | n | CPU p50 | p90 | p99 | max | Wall p50 (in Worker) | Outcome |
+|---|---|---|---|---|---|---|---|
+| 10 KB | 44 | 0 ms | 1 | 1 | 2 | 3 ms | all `ok` |
+| 100 KB | 47 | 1 ms | 2 | 3 | 3 | 5 ms | all `ok` |
+| **512 KiB** (Free cap) | 45 | **4 ms** | 7 | 8 | 8 | 10 ms | all `ok` |
+| 1 MB | 49 | 8 ms | 12 | 18 | 22 | 15 ms | all `ok` |
+| 5 MB | 38 | 39 ms | 53 | 56 | 61 | 58 ms | all `ok` |
+| `meta.v1/Story`, real, JSON (97 KB) over the internet | 18 | 2 ms | 3 | 3 | 3 | 171 ms | all `ok` |
+
+- **About 8 ms of CPU per MB** in production (relic-bridge measured about 9). The 512 KiB Free cap costs about 4 ms p50
+  and 8 ms p99, which fits the 10 ms budget with room for the SDK; 1 MB already reaches 18–22 ms at the tail.
+- **Free did not terminate anything**, even at 61 ms of CPU (relic-bridge saw the same). The documented 10 ms limit is
+  enforced leniently; the presets still design to it.
+- Over-cap request (`1 MB` with a 512 KiB cap): refused while streaming after 4 ms of CPU, before parsing.
+- `/d1` on real D1: identical to the local run in §4, **including `changes: 2` on the cascade**; 13 ms CPU and 2.9 s
+  wall for the 17 statements (the first request created the tables in a new database).
+- **Cache API on `workers.dev`:** `put` then `match` hit, both in the same request and in a later request. RESEARCH said
+  it may be a no-op there; on this account it works (per data centre, as documented). A custom domain was not tested.
+- **Rate Limiting binding** (`limit: 5`, `period: 10`): 8 of 10 back-to-back calls succeeded before refusals started; it
+  is per location and eventually consistent, so it stays a backstop (L-099).
+- **Untrusted certificates** (self-signed, untrusted root, expired): `fetch` resolved with **HTTP 526**, no exception.
+- **Real Agility from a Worker:** the public example instance's `meta.v1/Story` JSON (97 KB, 149 attributes) loads and
+  parses in 2 ms of CPU; the wall time is the network (171 ms).
+- **Not measured:** the Paid plan (not available on the account); cold starts of the real server (this Worker does not
+  load the MCP SDK, so its cold path is not representative; relic-bridge measured 17–35 ms CPU with the SDK on Free);
+  a custom domain for the Cache API (before P3-03).
 
 ## Reproduce
 
@@ -125,3 +156,5 @@ pnpm worker &                  # local workerd + D1 on port 8790
 pnpm portability               # node:sqlite vs D1, crypto round trip
 curl "localhost:8790/tls?url=https://self-signed.badssl.com/"
 ```
+
+Production: [`deploy-and-measure.md`](deploy-and-measure.md).

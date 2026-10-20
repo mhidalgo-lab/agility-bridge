@@ -41,8 +41,9 @@ request. One agent must not be able to exhaust a customer's Agility tenant.
 From [spikes/workers-limits/RESULTS.md](../../spikes/workers-limits/RESULTS.md): read + parse + shape costs 2.3 ms (p50,
 Node) at 512 KiB and about 4.5 ms with the production factor measured on Workers Free, so the **512 KiB Free / 8 MiB
 Paid and Node response caps stand**, as do the budget presets. `meta.v1` for a whole instance is 4–5 MB, so on Workers
-the metadata service loads one asset type at a time (P1-03). Production numbers with Agility-shaped payloads are the
-owner's checklist ([deploy-and-measure.md](../../spikes/workers-limits/deploy-and-measure.md)).
+the metadata service loads one asset type at a time (P1-03). In production on Workers Free (§6 of the results) the
+512 KiB cap costs 4 ms CPU p50 and 8 ms p99, and 1 MB reaches 18–22 ms at the tail, which confirms the Free cap; the
+Paid presets stay on the documented limits (no Paid account was available).
 
 ## Alternatives considered
 
