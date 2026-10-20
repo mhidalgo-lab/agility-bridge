@@ -1,0 +1,40 @@
+name: Client compatibility report
+description: Tell us how agility-bridge behaves in an MCP client (works, partly works, fails)
+labels: [client-compatibility, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reports feed docs/reference/client-compatibility.md. Never paste tokens, instance URLs you can't share or
+        Agility content.
+  - type: input
+    id: client
+    attributes: { label: MCP client and exact version, placeholder: "VS Code 1.10x with GitHub Copilot Chat 0.3x" }
+    validations: { required: true }
+  - type: input
+    id: os
+    attributes: { label: Operating system, placeholder: "Windows 11 / macOS 26 / Ubuntu 24.04" }
+  - type: input
+    id: version
+    attributes: { label: agility-bridge version, placeholder: "0.1.0" }
+    validations: { required: true }
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      options: [stdio, HTTP with device token, HTTP with OAuth]
+    validations: { required: true }
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options: [Works, Partly works, Fails]
+    validations: { required: true }
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: >-
+        Configuration (without secrets), what you tried, what happened. Useful extras: tool list shown, approval
+        prompts (elicitation), structured output rendering, errors.
+    validations: { required: true }
