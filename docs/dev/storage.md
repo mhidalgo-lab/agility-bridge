@@ -111,9 +111,31 @@ Bind integers in SQL arithmetic with `CAST(? AS INTEGER)`: `node:sqlite` binds J
 3. Add its checksum to `FROZEN` once the release that ships it is cut.
 4. Keep D1 limits in mind (P0-09): no interactive transactions, 100 bound parameters per statement.
 
-## SQLite driver (`packages/storage-sqlite`)
+## SQLite on Node (`packages/storage-sqlite`)
 
-`createSqliteDriver(db)` wraps one `DatabaseSync` connection: it turns `PRAGMA foreign_keys` on (off by default on every
-`node:sqlite` connection) and refuses the connection if that fails, caches prepared statements, binds values only as
-parameters, and runs a batch as `BEGIN IMMEDIATE … COMMIT` (rolled back on any error). Opening files safely (mode
-`0600`, WAL, busy timeout, backups) is P2-02.
+`openSqliteStorage({ path, now?, busyTimeoutMs?, onWarning? })` opens the database of `agility-bridge serve` and
+migrates it (ADR-0006, L-076):
+
+- The directory is created with mode `0700` (parents too); an existing one writable by others produces a warning
+  through `onWarning`, because whoever can write there can swap files.
+- The file is created with `O_CREAT | O_EXCL | O_NOFOLLOW` and mode `0600`. An existing file is opened with
+  `O_NOFOLLOW`, must be a regular file, and is tightened to `0600` through the opened handle (`fchmod`). A symbolic
+  link, dangling or not, is refused (`UnsafeFileError`) and its target is left untouched.
+- `node:sqlite` cannot open with `O_NOFOLLOW`, so after SQLite opens the path the adapter checks that it still names the
+  file it checked (same device and inode, not a link) before using it.
+- WAL mode (`synchronous = NORMAL`), a busy timeout (default 5 s) and foreign keys on. SQLite creates the `-wal` and
+  `-shm` files with the database's mode, so they are `0600` too (tested).
+- `createSqliteDriver(db)` wraps one connection: foreign keys on (refused if that fails), cached prepared statements,
+  values only as bound parameters, batches as `BEGIN IMMEDIATE … COMMIT` rolled back on any error.
+
+**Backups** — `storage.backup(target)` writes a consistent copy with `VACUUM INTO` while the server keeps running, into
+a new file created exclusively with mode `0600` (directory `0700`). An existing target or a symbolic link is refused;
+a failed backup removes its partial file.
+
+**Restore** — `restoreSqliteBackup(backup, target)` checks the backup (SQLite integrity check, an agility-bridge
+database, not written by a newer release) and copies it into a new `0600` file; it never overwrites. Stop the server,
+restore to a new path, point `AB_DB_PATH` at it (or move it into place) and start: the open migrates it. Backups made
+by `backup` are self-contained (no `-wal` file to copy).
+
+Permission and symbolic-link tests run on Linux and macOS; Windows runs the rest, including the contract suite on a
+real file (L-104).
