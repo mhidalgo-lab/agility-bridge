@@ -37,12 +37,15 @@ note, raw rows in `structuredContent`) must each be caught.
 
 ## Fixtures
 
-Synthetic Agility responses live in `packages/core/test/fixtures/agility/` (see its README). They are written by hand
+Synthetic Agility responses live in `packages/core/test/fixtures/agility/` (see its README); `meta-snapshot.json` is the
+synthetic `meta.v1` of the 33 asset types the tools rely on, served by `new FakeAgility({ meta: snapshot })`. They are written by hand
 to the shapes measured in P0-06; nothing is copied from or derived from the third-party tenant (D-01). Sign the
 synthetic-fixture checklist in [verification](verification.md) for every new or changed fixture.
 
 ## Live suite
 
 `live/*.live.test.ts` run against the read-only tenant through the P0-12 guard: `inventory` (size buckets), and
-`client` (the production client and shaper through `guardedFetch`, metadata drift against the product attributes in
-`live/expected-metadata.ts`, paging by `ID` with `limit + 1`). See [verification](verification.md).
+`client` (the production client and shaper through `guardedFetch`, metadata drift of the committed snapshot
+`packages/core/test/fixtures/agility/meta-snapshot.json` on product attributes, paging by `ID` with `limit + 1`). The
+same drift check runs weekly against Digital.ai's public example instance (`pnpm metadata:drift`, *Metadata drift*
+workflow; no token, public schema only). See [verification](verification.md).

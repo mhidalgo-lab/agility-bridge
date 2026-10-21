@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 // P1-12 live suite: the production client, output shaper and metadata assumptions against the read-only tenant.
 // Every request goes through guardedFetch (the P0-12 guard); the suite asserts on counts and shapes and prints nothing
-// from the tenant. About 13 read requests, one at a time.
+// from the tenant. About 40 read requests, one at a time.
 import { describe, expect, it } from 'vitest';
 import {
+  AbError,
   type AgilityClient,
   agilityClient,
   canonicalInstanceUrl,
   closedBreaker,
   createBudget,
   DEFAULT_LIMITS,
+  metadataDrift,
+  parseAssetType,
   Secret,
   Semaphore,
   shapeList,
@@ -18,11 +21,12 @@ import {
   type ToolContext,
   webCryptoRandom,
 } from '../packages/core/src/index.ts';
+import snapshotJson from '../packages/core/test/fixtures/agility/meta-snapshot.json' with { type: 'json' };
 import { liveTarget } from './env.ts';
-import { EXPECTED_ATTRIBUTES } from './expected-metadata.ts';
 import { guardedFetch } from './guarded-fetch.ts';
 
 const target = liveTarget();
+const SNAPSHOT = snapshotJson as unknown as Record<string, unknown>;
 
 function liveContext(): ToolContext {
   if (target === undefined) throw new Error('no live target');
@@ -33,7 +37,7 @@ function liveContext(): ToolContext {
     projects: { allowed: [], includeChildren: true },
     assetTypes: { deny: [] },
     limits: DEFAULT_LIMITS,
-    budget: createBudget(50),
+    budget: createBudget(100),
     limiter: new Semaphore(1),
     breaker: closedBreaker,
     fetch: guardedFetch(target),
@@ -58,16 +62,26 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
     expect(ctx.budget.used).toBe(1);
   });
 
-  it('finds every product attribute the tools rely on (metadata drift, L-053)', async () => {
-    const missing: string[] = [];
-    for (const [type, attributes] of Object.entries(EXPECTED_ATTRIBUTES)) {
-      const res = await client.meta<{ Attributes?: Record<string, unknown> }>(type);
-      expect(res.etag ?? '').toMatch(/^"[0-9.]+"$/);
-      const names = new Set(Object.keys(res.data.Attributes ?? {}));
-      for (const a of attributes) if (!names.has(`${type}.${a}`)) missing.push(`${type}.${a}`);
+  it('matches the committed metadata snapshot on product attributes (metadata drift, L-053)', {
+    timeout: 120_000,
+  }, async () => {
+    const drift: string[] = [];
+    for (const [type, body] of Object.entries(SNAPSHOT)) {
+      // Synthetic custom types exist only in the fixture.
+      if (type.startsWith('Custom_')) continue;
+      const expected = parseAssetType(body);
+      let actual: ReturnType<typeof parseAssetType> | undefined;
+      try {
+        const res = await client.meta(type);
+        expect(res.etag ?? '').toMatch(/^"[0-9.]+"$/);
+        actual = parseAssetType(res.data);
+      } catch (error) {
+        if (!(error instanceof AbError) || error.code !== 'AB_NOT_FOUND') throw error;
+      }
+      drift.push(...metadataDrift(expected, actual));
     }
-    // Product attribute names only: safe to print.
-    expect(missing).toEqual([]);
+    // Product attribute names only (custom attributes are never compared): safe to print.
+    expect(drift).toEqual([]);
   });
 
   it('pages by ID without overlap and learns "more available" from limit + 1', async () => {

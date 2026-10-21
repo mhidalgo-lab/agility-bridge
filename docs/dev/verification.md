@@ -29,8 +29,8 @@ What it checks (about 40 read requests, one at a time):
 - `live/client.live.test.ts` (P1-12): the **production client** from `packages/core` sends every request through
   `live/guarded-fetch.ts`, which applies the same read-only guard to each `Request` (writes are refused before they are
   sent, tested in `scripts/test/live-guard.test.ts`). It checks authentication and budget accounting, **metadata
-  drift** (every product attribute the tools rely on, listed in `live/expected-metadata.ts`, exists; a failure names
-  only product attributes), paging by `ID` with `limit + 1`, and the output shaper on real rows (envelope present,
+  drift** (the committed synthetic `meta.v1` snapshot against the tenant on product attributes: names, types, multi-value,
+  relation targets and bases; a failure names only product attributes), paging by `ID` with `limit + 1`, and the output shaper on real rows (envelope present,
   `structuredContent` rows equal to the rows shown, no `null`). Assertions are on counts and shapes only.
 
 ## Tenant inventory (2026-10-21, Agility 26.0.3.2, hosted)

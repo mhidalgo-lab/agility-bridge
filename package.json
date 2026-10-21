@@ -1,7 +1,7 @@
 {
   "name": "agility-bridge-monorepo",
   "private": true,
-  "description": "Unofficial MCP server for Digital.ai Agility \u2014 monorepo root",
+  "description": "Unofficial MCP server for Digital.ai Agility — monorepo root",
   "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@12.11.2",
@@ -19,7 +19,8 @@
     "changeset": "changeset",
     "prepare": "lefthook install || true",
     "tasks": "node scripts/tasks.ts",
-    "test:live": "vitest run --config vitest.live.config.ts"
+    "test:live": "vitest run --config vitest.live.config.ts",
+    "metadata:drift": "node scripts/metadata-drift.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
