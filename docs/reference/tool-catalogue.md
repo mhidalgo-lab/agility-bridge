@@ -32,7 +32,7 @@
 | `reports` | off (enable per workspace) | `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage`, `work_item_quality` |
 | `writes` | **off** | `add_comment`, `update_status`, `log_effort`, `assign_owners`, `move_to_sprint`, `create_work_item`, `update_fields`, `close_asset`, `reopen_asset` |
 
-Default: 20 read tools. Everything: 26 read + 9 write = 35.
+Default: 20 read tools (costs are worst cases with a cold metadata cache, verified by the cost tests). Everything: 26 read + 9 write = 35.
 
 ## Read tools
 
@@ -40,11 +40,11 @@ Default: 20 read tools. Everything: 26 read + 9 write = 35.
 
 | Tool | Group | Cost | What it does | Key arguments | Output highlights |
 |---|---|---|---|---|---|
-| `whoami` | core | 2 | Show the connection: instance, the member behind the token, workspace, allowed Agility projects and asset types, enabled groups, limits, budgets, and whether writes and which approval channel are available. | — | `member`, `instance`, `workspace`, `limits`, `writes: { enabled, approval: elicitation \| page \| unavailable \| not_required }` |
-| `list_projects` | core | 2 | List the Agility projects this workspace allows, with parent, state and schedule. Paged. | `contains`, `include_closed`, `limit`, `cursor` | `projects[] { oid, name, parent, state, schedule }` |
-| `list_asset_types` | core | 2 | List the asset types this workspace allows on the instance, with base type, number prefix and scope strategy; types the workspace does not allow are not listed. | `contains` | `assetTypes[] { name, base, prefix, scopeStrategy }` |
-| `describe_asset_type` | core | 2 | Describe one asset type: attributes (type, relation target, multi-value, custom, read-only), operations, statuses, field tiers. | `asset_type`, `contains` | `attributes[]`, `operations[]`, `statuses[]`, `tiers` |
-| `query_assets` | query | 3 | Query any allowed asset type with structured filters, fields and sort; values are always bound, scope is enforced. Paged. | `asset_type`, `fields`, `filters`, `any_of`, `project`, `include_closed`, `sort`, `as_of`, `limit`, `cursor`, `format` | rows with identity columns, `total`, `nextCursor` |
+| `whoami` | core | 2 | Show the connection: instance and version, the member behind the token, workspace, allowed Agility projects and asset types, enabled groups, limits by unit, the per-call budget, and whether writes and which approval channel are available. | — | `member { oid, name, username }`, `instance { id, url, version }`, `workspace { id, name, groups }`, `projects`, `assetTypes`, `limits`, `budget { requestsPerCall, requestsUsed }`, `writes: { enabled, approval: elicitation \| page \| unavailable \| not_required }` |
+| `list_projects` | core | 4 | List the Agility projects this workspace allows (with sub-projects when included), with parent, state and schedule, sorted by name. Paged. | `contains`, `include_closed`, `limit`, `cursor`, `format` | `items[] { assetType, oid, name, state, parent { oid, name }, schedule { oid, name } }`, `nextCursor` |
+| `list_asset_types` | core | 24 | List the asset types this workspace allows on the instance, with base type, number prefix and scope strategy; types the workspace does not allow are not listed. The first call loads metadata per type (cached for an hour). | `contains`, `format` | `items[] { assetType, base, prefix, scopeStrategy, scopePath }` |
+| `describe_asset_type` | core | 5 | Describe one asset type: attributes (type, relation target, multi-value, custom, read-only, required), operations, statuses, field tiers. | `asset_type`, `contains`, `format` | `assetType`, `base`, `abstract`, `scopeStrategy`, `attributes[]`, `operations[]`, `statuses[] { oid, name, category, inactive, team }`, `tiers { minimal, default, full }` |
+| `query_assets` | query | 3 | Query any allowed asset type with structured filters, fields and sort; values are always bound, scope is enforced. Paged. | `asset_type`, `fields`, `filters`, `any_of`, `project`, `include_closed`, `sort`, `as_of`, `limit`, `cursor`, `format` | rows with identity columns, `nextCursor` (Agility returns no totals) |
 | `get_assets` | query | 3 | Get one or more assets by number (`B-01234`, `D-…`, `TK-…`, `AT-…`) or OID token with chosen fields. | `assets`, `fields`, `minimal_output` | `assets[]`, `notFound[]` (not found or not visible) |
 | `search_work_items` | work | 4 | Search backlog items, defects, tasks and tests by Agility project, team, sprint, owner, status or text. Paged. | `asset_type` (Story \| Defect \| Task \| Test), `project`, `team`, `sprint`, `member`, `status`, `status_category`, `contains`, `include_closed`, `limit`, `cursor` | `items[] { number, assetType, name, status, owners, sprint, estimate }` |
 | `get_work_item` | work | 5 | One work item with description and acceptance criteria (as text), owners, status, sprint, parent epic, child tasks and tests, links and comment count. | `asset`, `minimal_output` | `item`, `children[]`, `parent`, `links[]` |

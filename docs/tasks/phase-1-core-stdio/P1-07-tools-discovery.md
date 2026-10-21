@@ -2,12 +2,12 @@
 id: P1-07
 title: "Tools: whoami, list_projects, list_asset_types, describe_asset_type"
 phase: 1
-status: todo
+status: review
 priority: high
 depends_on: [P1-03, P1-05, P1-12]
 adr: ["0015"]
 lessons: [L-025, L-042, L-043, L-147, L-155]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P1-07 — Tools: whoami, list_projects, list_asset_types, describe_asset_type
@@ -21,9 +21,9 @@ Let an agent learn where it is and what it can reach before it queries anything.
 - Shapes as in docs/reference/tool-catalogue.md.
 
 ## Acceptance criteria
-- [ ] Contract tests (schemas, description and naming lints).
-- [ ] Negative authorization: disallowed asset types are hidden and refused.
-- [ ] Names and metadata strings enveloped; declared costs verified by the cost test.
+- [x] Contract tests (schemas, description and naming lints). *(first convention checks in `test/contract.test.ts`; P1-13 builds the full lints)*
+- [x] Negative authorization: disallowed asset types are hidden and refused.
+- [x] Names and metadata strings enveloped; declared costs verified by the cost test.
 
 ## Security notes
 THREAT_MODEL T3, A12.

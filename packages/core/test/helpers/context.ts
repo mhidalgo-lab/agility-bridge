@@ -20,6 +20,12 @@ export function makeContext(
   return {
     requestId: crypto.randomUUID(),
     instance: { id: 'env', baseUrl: 'https://agility.example.com/SyntheticInstance' },
+    workspace: {
+      id: 'default',
+      name: 'Default',
+      groups: ['core', 'query', 'work', 'planning', 'people'],
+      writes: { enabled: false, approval: 'unavailable' },
+    },
     credential: { id: 'cred-1', kind: 'personal', token: new Secret('FAKE-token-1') },
     projects: { allowed: [], includeChildren: true },
     assetTypes: { deny: [] },

@@ -143,6 +143,12 @@ describe('guardedFetch (P1-12: the production client behind the guard)', () => {
     const ctx = {
       requestId: 'r',
       instance: { id: 'live', baseUrl: TARGET.baseUrl },
+      workspace: {
+        id: 'live',
+        name: 'Live',
+        groups: ['core'],
+        writes: { enabled: false, approval: 'unavailable' as const },
+      },
       credential: { id: 'live', kind: 'personal' as const, token: new Secret(TARGET.token) },
       projects: { allowed: [], includeChildren: true },
       assetTypes: { deny: [] },

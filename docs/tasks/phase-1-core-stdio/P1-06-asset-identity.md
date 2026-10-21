@@ -2,7 +2,7 @@
 id: P1-06
 title: Asset identity and name resolution
 phase: 1
-status: review
+status: done
 priority: high
 depends_on: [P1-03, P1-04]
 adr: ["0012"]

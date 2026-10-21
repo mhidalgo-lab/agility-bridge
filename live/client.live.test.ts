@@ -7,6 +7,7 @@ import {
   AbError,
   type AgilityClient,
   agilityClient,
+  buildMcpServer,
   canonicalInstanceUrl,
   closedBreaker,
   compileQuery,
@@ -27,7 +28,9 @@ import {
   type ToolContext,
   webCryptoRandom,
 } from '../packages/core/src/index.ts';
+import { CORE_TOOLS } from '../packages/core/src/tools/index.ts';
 import snapshotJson from '../packages/core/test/fixtures/agility/meta-snapshot.json' with { type: 'json' };
+import { rpc } from '../packages/core/test/helpers/mcp.ts';
 import { liveTarget } from './env.ts';
 import { guardedFetch } from './guarded-fetch.ts';
 
@@ -39,6 +42,12 @@ function liveContext(): ToolContext {
   return {
     requestId: crypto.randomUUID(),
     instance: { id: 'live', baseUrl: canonicalInstanceUrl(target.baseUrl) },
+    workspace: {
+      id: 'live',
+      name: 'Live',
+      groups: ['core'],
+      writes: { enabled: false, approval: 'unavailable' },
+    },
     credential: { id: 'live', kind: 'personal', token: new Secret(target.token) },
     projects: { allowed: [], includeChildren: true },
     assetTypes: { deny: [] },
@@ -218,6 +227,21 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
       await resolveSprint(scoped, 'current');
     } catch (error) {
       expect(error instanceof AbError && ['AB_AMBIGUOUS', 'AB_NOT_FOUND'].includes(error.code)).toBe(true);
+    }
+  });
+
+  it('runs every catalogue tool on the tenant without an error (counts only)', {
+    timeout: 180_000,
+  }, async () => {
+    for (const tool of CORE_TOOLS) {
+      const fresh: ToolContext = { ...ctx, metadata: new MetadataService(), budget: createBudget(60) };
+      const args = tool.name === 'describe_asset_type' ? { asset_type: 'Story' } : {};
+      const result = await rpc(() => buildMcpServer({ tools: [tool], ctx: fresh }), 'tools/call', {
+        name: tool.name,
+        arguments: args,
+      });
+      expect(result['isError'], tool.name).toBeUndefined();
+      expect(fresh.budget.used, tool.name).toBeLessThanOrEqual(tool.cost);
     }
   });
 });

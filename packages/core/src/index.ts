@@ -14,6 +14,7 @@ export { canonicalInstanceUrl } from './agility/instance.ts';
 export { CredentialLimiters, Semaphore } from './agility/limiter.ts';
 export { parseXml, type XmlElement } from './agility/xml.ts';
 export {
+  type ApprovalChannel,
   type AssetTypeScope,
   type Breaker,
   type Budget,
@@ -32,6 +33,7 @@ export {
   systemClock,
   type ToolContext,
   unboundedLimiter,
+  type WorkspaceInfo,
   webCryptoRandom,
 } from './context.ts';
 export {

@@ -35,6 +35,18 @@ export interface AssetTypeScope {
   readonly deny: readonly string[];
 }
 
+/** How a write would be approved for this caller (ADR-0013); the stdio host and HTTP access model decide it. */
+export type ApprovalChannel = 'elicitation' | 'page' | 'unavailable' | 'not_required';
+
+/** The agility-bridge workspace this request runs in (configuration, never Agility data). */
+export interface WorkspaceInfo {
+  readonly id: string;
+  readonly name: string;
+  /** Tool groups enabled for this caller. */
+  readonly groups: readonly string[];
+  readonly writes: { readonly enabled: boolean; readonly approval: ApprovalChannel };
+}
+
 /** Query limits (tool conventions; units in the names, L-042). Tightened per grant upstream. */
 export interface Limits {
   /** Default rows per list call. */
@@ -127,6 +139,7 @@ export const webCryptoRandom: Random = Object.freeze({
 export interface ToolContext {
   readonly requestId: string;
   readonly instance: InstanceRef;
+  readonly workspace: WorkspaceInfo;
   readonly credential: Credential;
   readonly projects: ProjectScope;
   readonly assetTypes: AssetTypeScope;
