@@ -119,6 +119,22 @@ The server probes a new address without any token before using it, and validates
 ([access model](access-model.md#credential-validation)). The Cloudflare Worker deployment cannot trust private CAs;
 use this server for such instances.
 
+## Pass-through workspaces (optional)
+
+For a simple shared server that stores **no** Agility tokens: with `AB_PASSTHROUGH=on`, an owner can make a workspace
+pass-through (`agility-bridge workspace set <workspace-id> --credential-source passthrough`). Its callers send their
+own Agility access token in the `X-Agility-Token` header instead of a device token, on the workspace's normal address.
+
+- **HTTPS only**: the server refuses the header on a plain-HTTP request (behind a proxy, it trusts
+  `X-Forwarded-Proto: https` only with `AB_TRUSTED_PROXY_HOPS`).
+- The token is checked against the workspace's instance (the member behind it), then trusted for 5 minutes by its
+  keyed fingerprint (HMAC); the token itself is never stored or logged. The audit log and the rate limits identify
+  callers by that fingerprint (`pt:…`).
+- Every workspace control applies unchanged: Agility projects, asset types, tools, limits, rate limits. There are no
+  grants, and **never write tools** (read-only in 1.0, D-04).
+- Anyone with a valid token for the instance and network access to the server can use such a workspace: keep it on a
+  private network, and prefer per-user grants with device tokens when you need to know who is who.
+
 ## Docker
 
 The image runs `agility-bridge serve` as the non-root user `65532` on distroless Node 24, with a read-only root

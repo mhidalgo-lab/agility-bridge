@@ -7,6 +7,8 @@ export type JsonObject = { [key: string]: JsonValue };
 
 export type Role = 'owner' | 'admin' | 'member';
 export type ValidationStatus = 'unvalidated' | 'valid' | 'invalid';
+/** `stored`: grants use stored credentials; `passthrough`: callers send their own Agility token (P2-14). */
+export type CredentialSource = 'stored' | 'passthrough';
 export type AuditKind = 'tool_call' | 'write' | 'auth' | 'admin';
 export type AuditStatus = 'ok' | 'error' | 'denied';
 
@@ -79,6 +81,7 @@ export interface Workspace {
   /** A shared credential of the same instance. */
   defaultCredentialId: string | null;
   writePolicy: JsonObject;
+  credentialSource: CredentialSource;
   createdAt: number;
   updatedAt: number;
   disabledAt: number | null;
@@ -200,6 +203,7 @@ export type WorkspacePatch = Partial<
     | 'limits'
     | 'defaultCredentialId'
     | 'writePolicy'
+    | 'credentialSource'
     | 'disabledAt'
   >
 >;

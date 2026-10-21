@@ -21,7 +21,8 @@ All in the server database ([schema](../../packages/storage/src/schema.ts),
 | `kv` | Short-lived records (key-check values, rate-limit counters keyed by address, token or grant id) | Operation | Their own expiry | Expiry purge |
 
 Not stored: Agility content (titles, descriptions, comments, custom fields), tool arguments, request bodies, plaintext
-tokens, the master key.
+tokens, the master key, and the Agility tokens callers send to pass-through workspaces (only their HMAC fingerprint
+appears, in the audit log and in memory for 5 minutes; P2-14).
 
 **Export**: owners and admins read every record through the admin API (`GET /api/admin/v1/…`, secrets excluded) or
 the CLI (`… list`, `audit tail`); the database file itself is the operator's.

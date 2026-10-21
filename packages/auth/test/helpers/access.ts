@@ -92,6 +92,7 @@ export function workspace(over: Partial<Workspace> = {}): Workspace {
     limits: {},
     defaultCredentialId: 'c-shared',
     writePolicy: {},
+    credentialSource: 'stored',
     disabledAt: null,
     ...stamp,
     ...over,

@@ -189,6 +189,8 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
 
   const checkWorkspaceWrites = (input: Partial<NewWorkspaceInput>) => {
     if (input.writePolicy !== undefined) needOwner(actor, 'change write settings');
+    // A pass-through workspace serves anyone with a token for its instance: owners decide that (P2-14).
+    if (input.credentialSource === 'passthrough') needOwner(actor, 'make a workspace pass-through');
     if (writeTools(input.enabledTools).length > 0) needOwner(actor, 'enable write tools');
   };
   const workspaces = {

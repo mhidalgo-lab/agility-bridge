@@ -105,6 +105,7 @@ follows in the self-hosting guide.
 | `AB_AUDIT_RETENTION_DAYS` | `90` | Days the [audit log](audit-log.md) keeps rows; `0` keeps them forever |
 | `AB_CREDENTIAL_REVALIDATION_HOURS` | `24` | Hours between revalidations of stored Agility tokens ([access model](access-model.md#credential-validation)); `0` = never |
 | `AB_ADMIN_TOKEN_FILE` or `AB_ADMIN_TOKEN` | unset | The break-glass admin token from `agility-bridge admin-token`; turns on the [admin API](../reference/admin-api.md) (`404` without it). Hand-made values are refused |
+| `AB_PASSTHROUGH` | `off` | `on` lets [pass-through workspaces](self-hosting.md#pass-through-workspaces-optional) accept the caller's own Agility token (`X-Agility-Token`, HTTPS only, read-only) |
 | `AB_ADMIN_URL` | unset | For the [management commands](cli.md): the server to manage through its admin API (HTTPS), instead of the local database |
 
 ### Rate limits

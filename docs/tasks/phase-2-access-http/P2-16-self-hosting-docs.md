@@ -2,7 +2,7 @@
 id: P2-16
 title: Self-hosting docs and executable-docs check
 phase: 2
-status: review
+status: done
 priority: medium
 depends_on: [P2-11]
 adr: []

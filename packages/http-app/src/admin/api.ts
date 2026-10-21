@@ -111,6 +111,7 @@ const WorkspaceOut = z
     limits: Json,
     defaultCredentialId: z.string().nullable(),
     writePolicy: Json,
+    credentialSource: z.enum(['stored', 'passthrough']),
     createdAt: z.number(),
     updatedAt: z.number(),
     disabledAt: z.number().nullable(),
@@ -201,6 +202,7 @@ const NewWorkspace = z.strictObject({
   limits: Json.optional(),
   defaultCredentialId: Id.nullable().optional(),
   writePolicy: Json.optional(),
+  credentialSource: z.enum(['stored', 'passthrough']).optional(),
 });
 const WorkspacePatch = NewWorkspace.omit({ instanceId: true })
   .partial()

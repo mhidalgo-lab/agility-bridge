@@ -70,6 +70,8 @@ export interface ServeConfig {
   readonly auditRetentionDays: number;
   /** Hours between credential revalidations (default 24; 0 = never). */
   readonly revalidationHours: number;
+  /** `AB_PASSTHROUGH=on`: pass-through workspaces accept the caller's own Agility token (P2-14, off by default). */
+  readonly passthrough: boolean;
 }
 
 /** The default data directory (`$XDG_DATA_HOME` or `~/.local/share`; `%LOCALAPPDATA%` on Windows). */
@@ -196,7 +198,14 @@ export function loadServeConfig(env: Env): ServeConfig {
       0,
       8_760,
     ),
+    passthrough: onOff('AB_PASSTHROUGH', env['AB_PASSTHROUGH']),
   };
+}
+
+function onOff(name: string, value: string | undefined): boolean {
+  if (value === undefined || value === '' || value === 'off') return false;
+  if (value === 'on') return true;
+  throw new ConfigError(`${name} must be on or off.`);
 }
 
 function rateLimitSwitch(value: string | undefined): boolean {
@@ -226,6 +235,14 @@ export async function startServe(
   });
   if (env['AB_WRITE_TOOLS'] === 'on')
     logger.warn('AB_WRITE_TOOLS is on, but this version has no write tools.');
+  if (!config.rateLimits.enabled) {
+    logger.warn('AB_RATE_LIMIT is off: no request, token or authentication-failure limits.');
+  }
+  if (config.passthrough) {
+    logger.warn(
+      'AB_PASSTHROUGH is on: pass-through workspaces accept any valid Agility token of their instance.',
+    );
+  }
   const keys = readMasterKeys(env, { dataDir: dirname(config.dbPath) });
   const keyring = await Keyring.create(keys.current, keys.previous);
   const storage = await openSqliteStorage({ path: config.dbPath, onWarning: (m) => logger.warn(m) });
@@ -284,6 +301,17 @@ export async function startServe(
     allowedOrigins: config.allowedOrigins,
     accessCacheTtlSeconds: config.accessCacheTtlSeconds,
     limits: createRequestLimits(new MemoryRateLimiter(), config.rateLimits, logger),
+    ...(config.passthrough
+      ? {
+          passthrough: {
+            validator: credentialValidator(hostServices),
+            // HTTPS only (P2-14): directly, or through a trusted proxy that says so.
+            secure: (c) =>
+              new URL(c.req.url).protocol === 'https:' ||
+              (config.trustedProxyHops > 0 && c.req.header('x-forwarded-proto') === 'https'),
+          },
+        }
+      : {}),
     ...(adminVerifier === undefined
       ? {}
       : {

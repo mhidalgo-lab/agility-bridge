@@ -55,8 +55,10 @@ carry `requestId`.
 | warn | `credential revalidated after Agility refused it` | `credential` (id), `status` | [serve.ts](../../apps/cli/src/serve.ts) |
 | error | `credential revalidation failed` | `error` (class) | [serve.ts](../../apps/cli/src/serve.ts) |
 | warn | `AB_WRITE_TOOLS is on, but this version has no write tools.` | — | [serve.ts](../../apps/cli/src/serve.ts) |
+| warn | `AB_RATE_LIMIT is off: no request, token or authentication-failure limits.` | — | [serve.ts](../../apps/cli/src/serve.ts) |
+| warn | `AB_PASSTHROUGH is on: pass-through workspaces accept any valid Agility token of their instance.` | — | [serve.ts](../../apps/cli/src/serve.ts) |
 | warn | `Not configured: tools are listed, and every call explains how to set AB_AGILITY_URL and AB_AGILITY_TOKEN.` | — | [stdio.ts](../../apps/cli/src/stdio.ts) |
-| warn | configuration and key warnings | the text only (data directory permissions, stranded or retired key versions, deprecated settings, `AB_RATE_LIMIT` off) | [serve.ts](../../apps/cli/src/serve.ts), [credentials.ts](../../packages/auth/src/secrets/credentials.ts) |
+| warn | configuration and key warnings | the text only (data directory permissions, stranded or retired key versions, deprecated settings) | [serve.ts](../../apps/cli/src/serve.ts), [credentials.ts](../../packages/auth/src/secrets/credentials.ts) |
 
 Never logged: tokens of any kind, the master key, request or response bodies, tool arguments, Agility content (outside
 the redacted, debug-level error body), client IP addresses (they go to the audit log only).

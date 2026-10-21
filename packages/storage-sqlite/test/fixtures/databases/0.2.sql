@@ -63,6 +63,7 @@ CREATE TABLE workspaces (
   limits TEXT NOT NULL CHECK ((json_valid(limits) AND json_type(limits) = 'object')),
   default_credential_id TEXT REFERENCES credentials (id) ON DELETE RESTRICT,
   write_policy TEXT NOT NULL CHECK ((json_valid(write_policy) AND json_type(write_policy) = 'object')),
+  credential_source TEXT NOT NULL CHECK (credential_source IN ('stored', 'passthrough')),
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   disabled_at INTEGER
@@ -127,13 +128,13 @@ CREATE TABLE kv (
   value TEXT NOT NULL,
   expires_at INTEGER
 ) STRICT;
-INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (1, 'init', '71637fb1bfc1f81752a7934559ddc6ba24481f9b0b15cd3c67ff700f0b86a125', 1792540800000);
+INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (1, 'init', '357a846646072119af32b6b5764ce54fae071b7989f49ad5f49c541d8e139d59', 1792540800000);
 INSERT INTO users (id, email, display_name, idp, idp_subject, role, created_at, updated_at, disabled_at) VALUES ('u-owner', 'owner@example.test', 'Owner', NULL, NULL, 'owner', 1792540800000, 1792540800000, NULL);
 INSERT INTO users (id, email, display_name, idp, idp_subject, role, created_at, updated_at, disabled_at) VALUES ('u-member', 'member@example.test', NULL, 'github', '1001', 'member', 1792540800000, 1792540800000, NULL);
 INSERT INTO instances (id, label, base_url, tls, number_prefixes, meta_fingerprint, created_at, updated_at, disabled_at) VALUES ('i-main', 'Main', 'https://agility.example.test/Main', NULL, '{"Story":"S"}', '"1.0"', 1792540800000, 1792540800000, NULL);
 INSERT INTO credentials (id, instance_id, owner_user_id, label, token_ciphertext, token_iv, key_version, token_hint, validation_status, validation_error_code, validated_at, member_oid, member_name, member_username, reachable_scope_ids, created_at, updated_at, revoked_at) VALUES ('c-shared', 'i-main', NULL, 'Service member', 'FIXTURE-NOT-A-CIPHERTEXT', 'FIXTURE-IV', 1, 'wxyz', 'unvalidated', NULL, NULL, NULL, NULL, NULL, NULL, 1792540800000, 1792540800000, NULL);
 INSERT INTO credentials (id, instance_id, owner_user_id, label, token_ciphertext, token_iv, key_version, token_hint, validation_status, validation_error_code, validated_at, member_oid, member_name, member_username, reachable_scope_ids, created_at, updated_at, revoked_at) VALUES ('c-member', 'i-main', 'u-member', 'Personal', 'FIXTURE-NOT-A-CIPHERTEXT', 'FIXTURE-IV', 1, 'abcd', 'valid', NULL, 1792540800000, 'Member:20', 'Fixture Member', NULL, '["Scope:1001"]', 1792540800000, 1792540800000, NULL);
-INSERT INTO workspaces (id, slug, name, instance_id, allowed_scope_ids, include_child_scopes, asset_types, enabled_tools, limits, default_credential_id, write_policy, created_at, updated_at, disabled_at) VALUES ('w-team', 'team', 'Team', 'i-main', '["Scope:1001"]', 1, '{"deny":["Request"]}', '["whoami","query_assets"]', '{"maxLimit":50}', 'c-shared', '{}', 1792540800000, 1792540800000, NULL);
+INSERT INTO workspaces (id, slug, name, instance_id, allowed_scope_ids, include_child_scopes, asset_types, enabled_tools, limits, default_credential_id, write_policy, credential_source, created_at, updated_at, disabled_at) VALUES ('w-team', 'team', 'Team', 'i-main', '["Scope:1001"]', 1, '{"deny":["Request"]}', '["whoami","query_assets"]', '{"maxLimit":50}', 'c-shared', '{}', 'stored', 1792540800000, 1792540800000, NULL);
 INSERT INTO grants (id, workspace_id, user_id, label, credential_id, tools, scope_ids, asset_types, limits, rate_limit, created_at, updated_at, expires_at, revoked_at) VALUES ('g-member', 'w-team', 'u-member', NULL, 'c-member', NULL, NULL, NULL, '{}', NULL, 1792540800000, 1792540800000, NULL, NULL);
 INSERT INTO grants (id, workspace_id, user_id, label, credential_id, tools, scope_ids, asset_types, limits, rate_limit, created_at, updated_at, expires_at, revoked_at) VALUES ('g-bot', 'w-team', NULL, 'CI bot', NULL, '["whoami"]', NULL, NULL, '{}', NULL, 1792540800000, 1792540800000, 1792540800001, NULL);
 INSERT INTO access_tokens (id, grant_id, prefix, token_hash, label, created_at, expires_at, last_used_at, revoked_at) VALUES ('t-laptop', 'g-member', 'ab_live_Ab12', '0000000000000000000000000000000000000000000000000000000000000000', 'laptop', 1792540800000, 1792627200000, NULL, NULL);

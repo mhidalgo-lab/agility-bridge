@@ -71,6 +71,7 @@ export const migration0001: Migration = {
   limits TEXT NOT NULL ${json('limits', 'object', false)},
   default_credential_id TEXT REFERENCES credentials (id) ON DELETE RESTRICT,
   write_policy TEXT NOT NULL ${json('write_policy', 'object', false)},
+  credential_source TEXT NOT NULL CHECK (credential_source IN ('stored', 'passthrough')),
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   disabled_at INTEGER

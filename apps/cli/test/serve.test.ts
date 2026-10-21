@@ -89,6 +89,19 @@ describe('serve configuration', () => {
   });
 });
 
+describe('startup warnings', () => {
+  it('warns when rate limits are off or pass-through is on', async () => {
+    const lines: string[] = [];
+    running = await startServe(env({ AB_RATE_LIMIT: 'off', AB_PASSTHROUGH: 'on' }), {
+      sink: (l) => lines.push(l),
+    });
+    const log = lines.join('\n');
+    expect(log).toContain('AB_RATE_LIMIT is off');
+    expect(log).toContain('AB_PASSTHROUGH is on');
+    expect(() => loadServeConfig({ AB_PASSTHROUGH: 'yes' })).toThrow(ConfigError);
+  });
+});
+
 describe('serve over HTTP', () => {
   it('serves a workspace to its device token and nothing to anyone else', async () => {
     const lines: string[] = [];
