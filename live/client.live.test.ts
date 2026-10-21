@@ -9,8 +9,10 @@ import {
   agilityClient,
   canonicalInstanceUrl,
   closedBreaker,
+  compileQuery,
   createBudget,
   DEFAULT_LIMITS,
+  MetadataService,
   metadataDrift,
   parseAssetType,
   Secret,
@@ -129,5 +131,52 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
     expect(items).toHaveLength(rows.length);
     expect(out.text.match(/^<untrusted-data id="[0-9a-f]{16}" source="stories">$/m)).not.toBeNull();
     expect(JSON.stringify(out.structured)).not.toContain('null');
+  });
+
+  it('runs every compiled query shape on the tenant (scope strategies, dead-asset filters, aggregations)', {
+    timeout: 120_000,
+  }, async () => {
+    const scopes = await client.query<Rows>({
+      from: 'Scope',
+      select: ['ID'],
+      sort: ['ID'],
+      page: { start: 0, size: 1 },
+    });
+    const scope = String(scopes.data[0]?.[0]?.['_oid'] ?? '');
+    expect(scope).toMatch(/^Scope:\d+$/);
+    const scoped: ToolContext = {
+      ...ctx,
+      metadata: new MetadataService(),
+      projects: { allowed: [scope], includeChildren: true },
+    };
+    const cases = [
+      {
+        assetType: 'Story',
+        fields: ['Number', 'Status.Name', 'Children.@Count', 'Actuals.Value.@Sum'],
+        anyOf: [
+          [{ field: 'Estimate', op: 'ge' as const, value: 1 }],
+          [{ field: 'Timebox', op: 'is_set' as const }],
+        ],
+      },
+      {
+        assetType: 'Defect',
+        fields: ['Number'],
+        filters: [{ field: 'Name', op: 'contains' as const, value: "zz'|(" }],
+        includeClosed: true,
+      },
+      { assetType: 'Task', fields: ['Number', 'Parent:Story.Number'] },
+      { assetType: 'Attachment', fields: ['Name'] },
+      { assetType: 'Scope', fields: ['Name'] },
+      { assetType: 'Timebox', fields: ['Name', 'BeginDate'] },
+      { assetType: 'Actual', fields: ['Value'] },
+      { assetType: 'Story', fields: ['Number'], asOf: new Date(Date.now() - 7 * 86_400_000).toISOString() },
+    ];
+    for (const input of cases) {
+      const q = await compileQuery(scoped, { ...input, limit: 2 });
+      const res = await agilityClient(scoped).query<Rows>(q.body);
+      // Counts only: each shape is valid query.v1 and returns at most limit + 1 rows.
+      expect(res.status, input.assetType).toBe(200);
+      expect((res.data[0] ?? []).length).toBeLessThanOrEqual(3);
+    }
   });
 });

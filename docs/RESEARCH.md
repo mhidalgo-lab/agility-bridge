@@ -119,6 +119,11 @@ except `group`, and adds `op` (POST only). *docs*
   (body or headers), and `rest-1.v1/Data` reported only `pageSize`/`pageStart` (no `total`) in XML and JSON;
   **`rest-1.v1` answers JSON** with `Accept: application/json` (`{_type, pageSize, pageStart, Assets}`). P0-06 checks
   whether this depends on the version.
+- **Filter composition (live, P1-04, 2026-10-21):** the entries of `filter` are ANDed (`["ID=$me","ID!=$me"]` returns
+  no rows), parentheses group inside an entry, and an OR inside one entry does not leak into the others. Compiled
+  shapes accepted by 26.0.3.2: `(Scope=$s|Scope.ParentAndUp=$s)` with a list, `Asset:Workitem.Scope=$s`,
+  `Schedule.ScheduledScopes=$s` on `Timebox`, `Parent:Story.Number` in `select`, `Children[AssetState!='Dead'].@Count`,
+  `Actuals[IsDeleted='false'].Value.@Sum`, `IsDeleted=$v` on `Actual`, `Name~=$v` and `asof` with a timestamp. — *live*
 - **Dates**: ISO 8601 with `Z` and up to 7 fractional digits (e.g. `2018-08-24T15:06:53.1347214Z`); date-only values are
   accepted; `ChangeDate`/`ChangeDateUTC`-style pairs exist, and the semantic difference is not documented. *docs*
 - **Binding**: `with` substitutes named constants into the same filter grammar; it is not a prepared-statement channel,
