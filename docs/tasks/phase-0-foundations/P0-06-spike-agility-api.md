@@ -2,7 +2,7 @@
 id: P0-06
 title: "Spike: Agility API behaviour, limits and fixtures"
 phase: 0
-status: in-progress
+status: review
 priority: high
 depends_on: [P0-01, P0-12]
 adr: ["0010", "0011", "0012", "0014"]
@@ -42,7 +42,7 @@ Measure how Agility really behaves for everything the core will depend on, answe
 - [x] Every fact in RESEARCH §1 is marked `live`, `docs` or corrected.
 - [x] Synthetic fixtures written by hand to match the measured shapes; nothing from the third-party tenant is committed (D-01), not even sanitised responses; gitleaks clean; the synthetic-fixture checklist signed in the PR. *(packages/core/test/fixtures/agility/, checklist signed in the PR)*
 - [x] Every probe ran through the P0-12 read-only guard.
-- [ ] ADR-0011 accepted or superseded with evidence; ADR-0010 and ADR-0014 numbers updated. *(evidence and numbers added; acceptance of ADR-0011 is the owner's)*
+- [x] ADR-0011 accepted or superseded with evidence; ADR-0010 and ADR-0014 numbers updated. *(ADR-0011 accepted by the owner with amendments, 2026-10-21)*
 - [x] Every surprise becomes a lesson in LESSONS-LEARNED.md. *(L-162, L-163)*
 
 ## Security notes

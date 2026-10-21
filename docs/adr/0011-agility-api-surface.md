@@ -1,6 +1,7 @@
 # ADR-0011 — Agility API surface: which endpoint for what
 
-- **Status:** proposed (pending spike P0-06)
+- **Status:** accepted (owner, 2026-10-21, with the P0-06 amendments below; the write rows stay unverified until the
+  writable sandbox, P7-07)
 - **Date:** 2026-10-16
 - **Related:** [RESEARCH.md](../RESEARCH.md) §1, P0-06, P1-02, P1-03, P1-04, P6-05, P7-01, L-137 – L-149
 
@@ -18,9 +19,9 @@ rules uniform.
 
 | Use | Endpoint | Notes |
 |---|---|---|
-| All reads (lists, details, nested children, aggregates) | `POST query.v1` (JSON) | Values only through `with`; explicit `page {start,size}` always; `needTotal: true` when a total is shown. |
-| Point-in-time and history | `query.v1` with `asof`; `rest-1.v1/Hist` for change history | `Hist` is authoritative; ActivityStream only as a hint. |
-| Schema discovery and validation | `GET meta.v1` (XML) | Cached per instance and metadata version; snapshot committed for fixtures. |
+| All reads (lists, details, nested children, aggregates) | `POST query.v1` (JSON) | Values only through `with`, with no commas in scalar values (L-162); explicit `page {start,size}` always; "more available" from fetching `size + 1` rows instead of totals (no total on 26.0.3.2); default sort by `ID` (L-163). |
+| Point-in-time and history | `query.v1` with `asof`; `rest-1.v1/Hist` (JSON) for change history | `Hist` is authoritative; ActivityStream only as a hint. |
+| Schema discovery and validation | `GET meta.v1` (JSON, `Accept: application/json`) | One asset type at a time on Workers; cached per instance and `ETag` (`"<version>.<schema stamp>"`); fixtures are synthetic (D-01). |
 | Single-asset updates and operations | `api/asset` (JSON) with `from: "<OID token>"`, or `rest-1.v1/Data` POST | Chosen in P0-06. Never a `where`/`filter`-based multi-asset update. |
 | Creating assets | `api/asset` create (or `rest-1.v1/Data` POST), defaults from `rest-1.v1/New` | Dry run via `previewOnly=true` if P0-06 confirms it never applies changes. |
 | UI links | `assetdetail.v1?number=` / `?oid=` | Built from the pinned instance origin only. |
@@ -29,14 +30,14 @@ rules uniform.
 Not used in 1.0: Data Mart (SQL, separate product surface), `loc.v1`/`loc-2.v1` (optional later for labels), webhook
 subscriptions (no server-side event handling in 1.0), the OKR audit-log API.
 
-Request conventions: `Accept: application/json` where supported, an identifying `User-Agent`, no redirects followed
-with credentials, response bytes capped before parsing, XML parsed with a pure-JavaScript parser that works on Workers
-(no `DOMParser` there) and with entity expansion disabled.
+Request conventions: `Accept: application/json` (served by `query.v1`, `meta.v1` and `rest-1.v1` `Data`/`Hist`), an
+identifying `User-Agent`, no redirects followed with credentials, response bytes capped before parsing; any remaining
+XML parsed with saxes (P0-09: streaming, no entity expansion, works on Workers).
 
 ## Consequences
 
 - Reads share one query compiler and one set of safety rules (ADR-0012).
-- XML parsing is still needed for `meta.v1`, `Hist` and possibly writes.
+- XML parsing is no longer needed for reads (JSON everywhere measured); it may still be needed for some write paths.
 - The API authentication table documents `query.v1` as accepting every authentication method except NTLM, so access
   tokens are supported (RESEARCH §1.3). If P0-06 nevertheless finds an instance (e.g. an older on-premises version)
   where they fail, reads fall back to `rest-1.v1/Data` with the same compiler and a new ADR records it.
