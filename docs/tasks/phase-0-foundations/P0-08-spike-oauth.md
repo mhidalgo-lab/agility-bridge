@@ -2,12 +2,12 @@
 id: P0-08
 title: "Spike: OAuth 2.1 portability on Node and Workers"
 phase: 0
-status: todo
+status: in-progress
 priority: high
 depends_on: [P0-07]
 adr: ["0009"]
-lessons: [L-002, L-024, L-029, L-086, L-087, L-088, L-089, L-090, L-094]
-owner: ""
+lessons: [L-002, L-024, L-029, L-086, L-087, L-088, L-089, L-090, L-094, L-164]
+owner: "Matias Hidalgo"
 ---
 
 # P0-08 — Spike: OAuth 2.1 portability on Node and Workers
@@ -23,8 +23,8 @@ Prove that an OAuth 2.1 authorization server with one protected resource per wor
 - A multi-isolate test proving that all state lives in storage.
 
 ## Acceptance criteria
-- [ ] `spikes/oauth/RESULTS.md` with real-client results, callback URLs and observed time budgets.
-- [ ] Cross-workspace token rejection and a parallel-refresh test demonstrated.
+- [ ] `spikes/oauth/RESULTS.md` with real-client results, callback URLs and observed time budgets. *(local results recorded; deploy and real clients pending)*
+- [x] Cross-workspace token rejection and a parallel-refresh test demonstrated. *(locally on workerd and Node; repeat in production)*
 - [ ] ADR-0009 accepted or superseded.
 
 ## Security notes

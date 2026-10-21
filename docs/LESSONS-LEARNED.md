@@ -33,7 +33,7 @@ How to use it:
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164 |
 | [K. Admin UI](#k-admin-ui) | L-095 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -612,6 +612,13 @@ their sessions.
 Token endpoints accept `application/x-www-form-urlencoded`; PKCE S256 for every client; `resource` on authorization,
 token and refresh requests.
 *Applied in:* P5-01, P5-05.
+
+**L-164 — The OAuth provider keeps one refresh token per grant.**
+With `workers-oauth-provider` 1.2.3, five parallel refreshes with one refresh token all succeed, but afterwards only
+the last new refresh token works; a client that kept another one must sign in again. The library offers no reuse
+interval, so the one ADR-0009 promises is ours to build (a per-grant refresh family in storage) and to test with
+parallel refreshes.
+*Applied in:* [spikes/oauth](../spikes/oauth/RESULTS.md), ADR-0009, P5-05.
 
 ## K. Admin UI
 
