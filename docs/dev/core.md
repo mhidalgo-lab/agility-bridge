@@ -87,3 +87,17 @@ field is redacted: secret-named keys at any depth are blanked, and free text los
 `x-api-key` values, `*_PASSWORD`/`*_SECRET`/`*_TOKEN` assignments, JWTs, well-known provider tokens and PEM blocks
 (L-117). The corpus in `packages/core/test/redact.test.ts` also lists benign text that must survive; add a case for
 every new secret shape.
+
+## Agility client
+
+`agilityClient(ctx)` is the only way to reach Agility; see [ARCHITECTURE §6.1](../ARCHITECTURE.md#61-agility-http-client-p1-02)
+for its endpoints, retries, breaker, caps and error mapping. Hosts own one `CredentialLimiters` and one
+`CircuitBreakers` per process and put `limiters.for(instance, credential)` and `breakers.for(instance, credential)` into
+each context, with the `fetch` pinned for the instance (`createNodeFetch({ caFile })` on Node). Tests inject a fake
+`fetch` (`packages/core/test/agility/fake.ts`) and a no-op `sleep`.
+
+## Workspace imports
+
+`@agility-bridge/core` exports a `source` condition pointing at `src/index.ts`. TypeScript (`customConditions`) and
+Vitest resolve it, so other packages typecheck and test against the sources without building core first; builds use
+`dist`.

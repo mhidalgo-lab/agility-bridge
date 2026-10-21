@@ -19,6 +19,7 @@
     "declaration": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": []
+    "types": [],
+    "customConditions": ["source"]
   }
 }

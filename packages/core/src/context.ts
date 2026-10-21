@@ -46,6 +46,8 @@ export interface Limits {
   readonly maxAnyOfGroups: number;
   /** Upstream response cap, enforced while streaming (ADR-0010). */
   readonly maxResponseBytes: number;
+  /** Timeout of one Agility request, body included (ADR-0010: 20 s). */
+  readonly requestTimeoutMs: number;
   /** Include member emails in output (D-06, off by default). */
   readonly memberEmails: boolean;
 }
@@ -59,6 +61,7 @@ export const DEFAULT_LIMITS: Limits = Object.freeze({
   maxAggregations: 5,
   maxAnyOfGroups: 3,
   maxResponseBytes: 512 * 1024,
+  requestTimeoutMs: 20_000,
   memberEmails: false,
 });
 
@@ -76,6 +79,20 @@ export interface Budget {
 export interface Limiter {
   run<T>(task: () => Promise<T>): Promise<T>;
 }
+
+/**
+ * The circuit breaker of one instance and credential (ADR-0010). Hosts keep the state per process, keyed by both, so
+ * one member's throttling never blocks another (`CircuitBreakers` in `agility/breaker.ts`).
+ */
+export interface Breaker {
+  /** Milliseconds until the breaker closes again; 0 when closed. */
+  openForMs(): number;
+  onRateLimited(retryAfterMs?: number): void;
+  onSuccess(): void;
+}
+
+/** The `fetch` the Agility client uses: the global one, or one with a custom CA dispatcher on Node (ADR-0014). */
+export type FetchLike = (request: Request) => Promise<Response>;
 
 export interface Clock {
   now(): number;
@@ -117,6 +134,9 @@ export interface ToolContext {
   readonly limits: Limits;
   readonly budget: Budget;
   readonly limiter: Limiter;
+  readonly breaker: Breaker;
+  /** Pinned at configuration time with the instance; never chosen by a request (L-055). */
+  readonly fetch: FetchLike;
   readonly metadata?: MetadataServiceRef;
   readonly logger: Logger;
   readonly clock: Clock;
@@ -150,6 +170,13 @@ export function createBudget(limit: number): Budget {
 
 /** A limiter that applies no bound (tests). Hosts use a per-credential semaphore (P1-02). */
 export const unboundedLimiter: Limiter = Object.freeze({ run: <T>(task: () => Promise<T>) => task() });
+
+/** A breaker that never opens (tests and hosts that do not throttle). */
+export const closedBreaker: Breaker = Object.freeze({
+  openForMs: () => 0,
+  onRateLimited: () => {},
+  onSuccess: () => {},
+});
 
 /** Freeze a context so a handler cannot change what later code of the same request sees. */
 export function freezeContext(ctx: ToolContext): ToolContext {

@@ -1,12 +1,28 @@
 // SPDX-License-Identifier: Apache-2.0
-// Public surface of @agility-bridge/core (P1-01): contracts every tool and host relies on.
+// Public surface of @agility-bridge/core: contracts every tool and host relies on (P1-01) and the Agility client (P1-02).
+
+export { readCapped } from './agility/body.ts';
+export { type CircuitBreakerOptions, CircuitBreakers } from './agility/breaker.ts';
+export {
+  AgilityClient,
+  type AgilityClientOptions,
+  type AgilityResponse,
+  agilityClient,
+  type QueryBody,
+} from './agility/client.ts';
+export { canonicalInstanceUrl } from './agility/instance.ts';
+export { CredentialLimiters, Semaphore } from './agility/limiter.ts';
+export { parseXml, type XmlElement } from './agility/xml.ts';
 export {
   type AssetTypeScope,
+  type Breaker,
   type Budget,
   type Clock,
   type Credential,
+  closedBreaker,
   createBudget,
   DEFAULT_LIMITS,
+  type FetchLike,
   freezeContext,
   type InstanceRef,
   type Limiter,
