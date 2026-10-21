@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // P0-12: the live harness's read-only guard and shape-only output (D-01, THREAT_MODEL A15).
-import { describe, expect, it, vi } from 'vitest';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+import { readPrivateEnvFile } from '../../live/env.ts';
 import { ReadOnlyViolation, readOnlyFetch } from '../../live/readonly-fetch.ts';
 import { shape } from '../../live/shape.ts';
 
@@ -91,5 +95,29 @@ describe('shape', () => {
       ],
     ]);
     expect(JSON.stringify(shape(tenant))).not.toMatch(/Secret|ACME|1001|Story:/);
+  });
+});
+
+describe('readPrivateEnvFile', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ab-liveenv-'));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('reads a chmod-600 file and refuses a group- or world-readable one', () => {
+    const file = join(dir, 'live.env');
+    writeFileSync(
+      file,
+      '# comment\nAB_LIVE_AGILITY_URL="https://agility.example.com/Inst"\nexport AB_LIVE_AGILITY_TOKEN=FAKE\n',
+    );
+    chmodSync(file, 0o600);
+    expect(readPrivateEnvFile(file)).toEqual({
+      AB_LIVE_AGILITY_URL: 'https://agility.example.com/Inst',
+      AB_LIVE_AGILITY_TOKEN: 'FAKE',
+    });
+    chmodSync(file, 0o644);
+    expect(() => readPrivateEnvFile(file)).toThrow(/chmod 600/);
+  });
+
+  it('returns undefined when the file does not exist', () => {
+    expect(readPrivateEnvFile(join(dir, 'missing.env'))).toBeUndefined();
   });
 });
