@@ -177,6 +177,7 @@ export type CredentialPatch = Partial<
   Pick<
     Credential,
     | 'label'
+    | 'tokenHint'
     | 'validationStatus'
     | 'validationErrorCode'
     | 'validatedAt'

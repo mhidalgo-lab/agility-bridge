@@ -82,7 +82,7 @@ export const FIELDS: Readonly<Record<TableName, Readonly<Record<string, Field>>>
     tokenCiphertext: req('text'),
     tokenIv: req('text'),
     keyVersion: req('version'),
-    tokenHint: req('hint'),
+    tokenHint: req('hint', true),
     validationStatus: def('validation', 'unvalidated'),
     validationErrorCode: opt('label'),
     validatedAt: opt('time'),
