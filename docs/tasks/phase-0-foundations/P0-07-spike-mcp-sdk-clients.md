@@ -2,7 +2,7 @@
 id: P0-07
 title: "Spike: MCP SDK v2 dual-era handler with real clients"
 phase: 0
-status: review
+status: done
 priority: high
 depends_on: [P0-01]
 adr: ["0005", "0016"]

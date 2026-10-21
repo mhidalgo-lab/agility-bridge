@@ -16,3 +16,4 @@ agility-bridge.yaml
 spikes/**/results/
 # Spikes are self-contained experiments (results in RESULTS.md); their lockfiles are not committed.
 spikes/**/pnpm-lock.yaml
+live/results/

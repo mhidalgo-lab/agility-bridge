@@ -2,12 +2,12 @@
 id: P0-12
 title: Agility sandbox and live-verification harness
 phase: 0
-status: todo
+status: in-progress
 priority: high
 depends_on: [P0-03, P0-14]
 adr: ["0011"]
 lessons: [L-003, L-122, L-125]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P0-12 — Agility sandbox and live-verification harness
@@ -37,11 +37,11 @@ A safe Agility sandbox, a protected way to run live tests and a template for evi
   redactions; shapes and counts only for the third-party tenant) and the synthetic-fixture checklist.
 
 ## Acceptance criteria
-- [ ] The token is validated against the tenant with a read-only probe.
-- [ ] Inventory documented (asset types and counts, no content or names from the tenant).
-- [ ] The read-only guard refuses a non-`GET` request and a write endpoint (tests).
-- [ ] The live workflow runs a trivial read-only probe from `main`.
-- [ ] Template and checklist committed.
+- [x] The token is validated against the tenant with a read-only probe. *(`query.v1` with a bearer token, 2026-10-21: HTTP 200, one `IsSelf` member)*
+- [x] Inventory documented (asset types and counts, no content or names from the tenant). *(docs/dev/verification.md, as coarse levels because the repository is public)*
+- [x] The read-only guard refuses a non-`GET` request and a write endpoint (tests). *(scripts/test/live-guard.test.ts)*
+- [ ] The live workflow runs a trivial read-only probe from `main`. *(`.github/workflows/live.yml`; to run from `main` after merge)*
+- [x] Template and checklist committed. *(docs/dev/verification.md)*
 
 ## Security notes
 Tokens only as environment secrets. The tenant holds real third-party data: nothing from it is committed (no fixtures,
