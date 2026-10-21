@@ -121,7 +121,10 @@ export const searchWorkItems: ToolDefinition = defineTool({
   // Capped at run time: metadata for the types and their relations, name resolution, the project tree, one page.
   cost: COST,
   inputSchema: z.object({
-    asset_type: z.enum(WORK_ITEM_TYPES).optional().describe('Story, Defect, Task or Test; default all four.'),
+    asset_type: z
+      .enum(WORK_ITEM_TYPES)
+      .optional()
+      .describe('Story, Defect, Task or Test; all four when omitted.'),
     project: z
       .string()
       .min(1)
@@ -147,7 +150,10 @@ export const searchWorkItems: ToolDefinition = defineTool({
       .describe('Rollup category of the status.'),
     contains: containsArg('items'),
     include_closed: includeClosedArg,
-    sort_by: z.enum(['id', 'name', 'recently_changed']).optional().describe('Default id (cheap and stable).'),
+    sort_by: z
+      .enum(['id', 'name', 'recently_changed'])
+      .default('id')
+      .describe('id is cheap and stable; recently_changed costs about a second per call.'),
     limit: limitArg,
     cursor: cursorArg,
     format: formatArg,

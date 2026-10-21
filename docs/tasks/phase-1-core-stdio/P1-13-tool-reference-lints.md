@@ -2,12 +2,12 @@
 id: P1-13
 title: Generated tool reference, naming and description lints, tools/list budget
 phase: 1
-status: todo
+status: review
 priority: medium
 depends_on: [P0-11, P1-08]
 adr: ["0015"]
 lessons: [L-022, L-030, L-031, L-134, L-150, L-155]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P1-13 — Generated tool reference, naming and description lints, tools/list budget
@@ -22,8 +22,8 @@ Keep the tool surface consistent and documented automatically.
 - Test that tool definitions contain no instance-derived strings (THREAT_MODEL A12).
 
 ## Acceptance criteria
-- [ ] CI fails on any violation; the reference is regenerated and committed.
-- [ ] Budget numbers (count and characters) recorded in the PR.
+- [x] CI fails on any violation; the reference is regenerated and committed.
+- [x] Budget numbers (count and characters) recorded in the PR.
 
 ## Security notes
 THREAT_MODEL A12.

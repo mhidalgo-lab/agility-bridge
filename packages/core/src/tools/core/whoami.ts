@@ -21,7 +21,12 @@ export const whoami: ToolDefinition = defineTool({
     workspace: z.looseObject({ id: z.string(), name: z.string(), groups: z.array(z.string()) }),
     projects: z.looseObject({ allowed: z.array(z.string()), includeChildProjects: z.boolean() }),
     assetTypes: z.looseObject({ allow: z.array(z.string()).optional(), deny: z.array(z.string()) }),
-    limits: z.record(z.string(), z.union([z.number(), z.boolean()])),
+    limits: z.looseObject({
+      maxRows: z.number(),
+      maxResponseBytes: z.number(),
+      requestTimeoutMs: z.number(),
+      memberEmails: z.boolean(),
+    }),
     budget: z.looseObject({ requestsPerCall: z.number(), requestsUsed: z.number() }),
     writes: z.looseObject({ enabled: z.boolean(), approval: z.string() }),
   }),

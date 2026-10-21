@@ -35,8 +35,8 @@ export const listMyWork: ToolDefinition = defineTool({
       .string()
       .min(1)
       .max(200)
-      .optional()
-      .describe('me (default), a username, a name or Member:<id>.'),
+      .default('me')
+      .describe('The owner: me, a username, a name or Member:<id>.'),
     include_closed: includeClosedArg,
     limit: limitArg,
     cursor: cursorArg,

@@ -1,13 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 // MCP contract of the catalogue (P1-12): what tools/list shows, its count and size budgets. Tool tasks extend the
-// snapshot when they add a tool; P1-13 adds the naming and description lints.
+// snapshot when they add a tool; the naming, description and schema lints are in lint.test.ts (P1-13).
 import { describe, expect, it } from 'vitest';
+import { buildMcpServer, createBudget, MetadataService } from '../src/index.ts';
 import { CORE_TOOLS } from '../src/tools/index.ts';
+import snapshotJson from './fixtures/agility/meta-snapshot.json' with { type: 'json' };
 import {
   DEFAULT_CATALOGUE_MAX_BYTES,
   DEFAULT_CATALOGUE_MAX_TOOLS,
+  FakeAgility,
+  FULL_CATALOGUE_MAX_BYTES,
+  makeContext,
   toolsListContract,
 } from './harness/index.ts';
+import { rpc } from './helpers/mcp.ts';
 
 describe('tools/list contract', () => {
   it('stays within the default catalogue budgets', async () => {
@@ -169,4 +175,33 @@ describe('tools/list contract', () => {
       for (const arg of Object.keys(shape)) expect(arg).toMatch(/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/);
     },
   );
+
+  it('stays within the budget with every optional group (writes and reports join in later phases)', async () => {
+    const contract = await toolsListContract(CORE_TOOLS);
+    expect(contract.bytes).toBeLessThanOrEqual(FULL_CATALOGUE_MAX_BYTES);
+    expect(contract.count).toBeLessThan(40);
+  });
+
+  it('is static: instance metadata never reaches tool definitions (THREAT_MODEL A12)', async () => {
+    const before = JSON.stringify(
+      await rpc(() => buildMcpServer({ tools: CORE_TOOLS, ctx: makeContext() }), 'tools/list'),
+    );
+    // Load an instance's metadata, custom fields and statuses through the tools, then list again.
+    const fake = new FakeAgility({
+      meta: snapshotJson as unknown as Record<string, unknown>,
+      assets: { StoryStatus: [{ _oid: 'StoryStatus:1', Name: 'Synthetic Ready For Review', Order: 1 }] },
+    });
+    const ctx = makeContext({
+      fetch: fake.fetch,
+      metadata: new MetadataService(),
+      budget: createBudget(100),
+    });
+    await rpc(() => buildMcpServer({ tools: CORE_TOOLS, ctx }), 'tools/call', {
+      name: 'describe_asset_type',
+      arguments: { asset_type: 'Story' },
+    });
+    const after = JSON.stringify(await rpc(() => buildMcpServer({ tools: CORE_TOOLS, ctx }), 'tools/list'));
+    expect(after).toBe(before);
+    expect(after).not.toMatch(/Custom_|Synthetic Ready|v1host|example\.com/);
+  });
 });

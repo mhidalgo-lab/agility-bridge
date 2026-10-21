@@ -38,13 +38,14 @@ export const getAssets: ToolDefinition = defineTool({
       .array(z.string().min(1).max(200))
       .max(30)
       .optional()
-      .describe('Attribute paths; default each type’s default tier.'),
+      .describe('Attribute paths; each type’s default tier when omitted.'),
     minimal_output: z.boolean().optional().describe('Only the minimal fields (identity and name).'),
     format: formatArg,
   }),
   outputSchema: z.looseObject({
     items: z.array(z.looseObject({ assetType: z.string(), oid: z.string() })),
     notFound: z.array(z.string()),
+    truncated: z.boolean().optional(),
   }),
   handler: async (input, outer) => {
     const ctx = { ...outer, budget: capBudget(outer.budget, COST) };
