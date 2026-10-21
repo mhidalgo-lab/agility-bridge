@@ -115,7 +115,7 @@ Status lives in each task file.
 | P0-01 | [Bootstrap the monorepo](tasks/phase-0-foundations/P0-01-repo-bootstrap.md) | high | P0-14 | done |
 | P0-02 | [License, community and security policy files](tasks/phase-0-foundations/P0-02-license-community.md) | high | P0-01 | done |
 | P0-03 | [CI pipeline](tasks/phase-0-foundations/P0-03-ci-pipeline.md) | high | P0-01 | done |
-| P0-04 | [Security tooling baseline](tasks/phase-0-foundations/P0-04-security-tooling.md) | high | P0-03 | todo |
+| P0-04 | [Security tooling baseline](tasks/phase-0-foundations/P0-04-security-tooling.md) | high | P0-03 | in-progress |
 | P0-05 | [Agent workflow and task tooling](tasks/phase-0-foundations/P0-05-agent-workflow.md) | high | P0-01 | done |
 | P0-06 | [Spike: Agility API behaviour, limits and fixtures](tasks/phase-0-foundations/P0-06-spike-agility-api.md) | high | P0-01, P0-12 | todo |
 | P0-07 | [Spike: MCP SDK v2 dual-era handler with real clients](tasks/phase-0-foundations/P0-07-spike-mcp-sdk-clients.md) | high | P0-01 | blocked |

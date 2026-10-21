@@ -51,7 +51,12 @@ when we learn of an advisory that affects a version we ship:
 
 A fix that needs a major upgrade, or that no maintainer has released, may take longer; we then record the reason, the
 mitigation and whether the vulnerable code is reachable from agility-bridge. New dependency versions wait 3 days before
-they can be installed (`minimumReleaseAge` in `pnpm-workspace.yaml`), except security updates.
+they can be installed (`minimumReleaseAge` in `pnpm-workspace.yaml` and `renovate.json`), except security updates,
+which Renovate opens at once.
+
+**What blocks a merge:** `pnpm audit --audit-level high` and dependency review (`fail-on-severity: high`, licence
+allowlist) fail the build, and so do CodeQL and the gitleaks secret scan. Moderate and low advisories do not block a
+merge; they are tracked through Renovate's pull requests and dependency dashboard and fixed within the targets above.
 
 ## Scope
 

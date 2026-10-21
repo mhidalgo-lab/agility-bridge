@@ -65,8 +65,9 @@ section, with a one-line rule, an optional *Why*, and *Applied in* naming the ta
 
 ## Continuous integration
 
-Every pull request runs `.github/workflows/ci.yml` on GitHub-hosted runners. These checks are **required** before a
-merge (the rulesets have no bypass, see [`docs/security/repo-settings.md`](docs/security/repo-settings.md)):
+Every pull request runs `.github/workflows/ci.yml` and `.github/workflows/security.yml` on GitHub-hosted runners. These
+checks are **required** before a merge (the rulesets have no bypass, see
+[`docs/security/repo-settings.md`](docs/security/repo-settings.md)):
 
 | Check | What it runs |
 |---|---|
@@ -74,6 +75,14 @@ merge (the rulesets have no bypass, see [`docs/security/repo-settings.md`](docs/
 | `Workflow lint` | actionlint, downloaded with a pinned checksum |
 | `DCO sign-off` | every commit in the PR has a `Signed-off-by` trailer |
 | `Conventional PR title` | the PR title is a Conventional Commit |
+| `CodeQL` | CodeQL `security-extended` for JavaScript/TypeScript and GitHub Actions (spikes excluded) |
+| `Secret scan (gitleaks)` | gitleaks over the full history with `.gitleaks.toml`, then `scripts/check-gitleaks-rules.ts` proves each custom rule fires on its planted fixture |
+| `Dependency audit` | `pnpm audit --audit-level high` |
+| `Dependency review` | new dependencies: no high-severity advisories, licences from the allowlist |
+
+Optional but recommended: install [gitleaks](https://github.com/gitleaks/gitleaks#installing) so the pre-commit hook scans
+staged changes for secrets (CI always scans). A test that needs a secret-shaped value uses an obviously fake one; the
+only allowlisted place for realistic fakes is `scripts/test/fixtures/secrets/`.
 
 `SQLite and CLI (macos-latest / windows-latest, Node 24)` also runs on every PR (node:sqlite and the CLI on the other
 operating systems) but is not required.
