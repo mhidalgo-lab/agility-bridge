@@ -283,7 +283,15 @@ importers:
         specifier: 0.23.1
         version: 0.23.1(typescript@7.0.2)
 
-  packages/storage-sqlite: {}
+  packages/storage-sqlite:
+    dependencies:
+      '@agility-bridge/storage':
+        specifier: workspace:*
+        version: link:../storage
+    devDependencies:
+      drizzle-orm:
+        specifier: 0.45.4
+        version: 0.45.4
 
 packages:
 

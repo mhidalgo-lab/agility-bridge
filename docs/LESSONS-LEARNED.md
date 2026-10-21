@@ -567,6 +567,12 @@ own rows. Conditional writes (optimistic versions, capped counters, revocations)
 which both drivers return identically.
 *Applied in:* [spikes/workers-limits](../spikes/workers-limits/RESULTS.md), ADR-0006, P2-01.
 
+**L-173 — `node:sqlite` binds JavaScript numbers as `REAL`.**
+An atomic counter written as `CAST(CAST(value AS INTEGER) + ? AS TEXT)` stored `'3.0'` on `node:sqlite` (P2-01): the
+bound `1` arrived as a float. Cast bound numbers that take part in SQL arithmetic (`CAST(? AS INTEGER)`), and let the
+contract suite compare stored values exactly so the next driver difference shows up too.
+*Applied in:* P2-01, `packages/storage/src/sql/storage.ts`, [storage](dev/storage.md).
+
 ## I. HTTP, rate limiting and abuse
 
 **L-079 — Separate abuse controls per surface.**

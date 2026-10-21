@@ -2,12 +2,12 @@
 id: P2-01
 title: Storage interface, schema and migrations
 phase: 2
-status: todo
+status: review
 priority: high
 depends_on: [P1-16]
 adr: ["0006"]
 lessons: [L-071, L-072, L-073]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P2-01 — Storage interface, schema and migrations
@@ -24,9 +24,20 @@ A runtime-neutral storage layer with one schema and one migration history for No
 - `memory` adapter and the shared contract suite; one database fixture per released minor (starting now).
 
 ## Acceptance criteria
-- [ ] The contract suite passes on `memory` (SQLite and D1 adapters join in P2-02 and P3-02).
-- [ ] Concurrency tests for `take`, `setIfAbsent` and counters.
-- [ ] Deletion rules of ARCHITECTURE §4 enforced (cascades and restrictions).
+- [x] The contract suite passes on `memory` (SQLite and D1 adapters join in P2-02 and P3-02). *(It also passes on
+  the shared SQL implementation over `node:sqlite` `:memory:`, through the driver in `packages/storage-sqlite`; P2-02
+  adds file handling.)*
+- [x] Concurrency tests for `take`, `setIfAbsent` and counters. *(Plus `touch` and duplicate creates; on SQLite also
+  across two connections to one file.)*
+- [x] Deletion rules of ARCHITECTURE §4 enforced (cascades and restrictions).
+
+## Notes
+- The SQL implementation (`createSqlStorage` over a `SqlDriver`) lives here so that node:sqlite and D1 share every
+  statement; adapters only provide the driver.
+- Migrations are hand-written TypeScript modules (`src/migrations/`), one statement per entry, because Drizzle's
+  generator cannot express STRICT tables, CHECK constraints or triggers; a test compares the DDL with `schema.ts`.
+- Cross-row rules from ADR-0008 and THREAT_MODEL A14/T17 are triggers, so they hold for every writer.
+- Deleting a user that owns credentials or has grants is refused (ARCHITECTURE §4 did not say; disabling is the path).
 
 ## Security notes
 THREAT_MODEL T7 (no secrets stored in plain text), T17 (append-only audit).
@@ -37,8 +48,8 @@ THREAT_MODEL T7 (no secrets stored in plain text), T17 (append-only audit).
 - L-073 — One-time state is consumed atomically.
 
 ## Docs to update
-- docs/dev/storage.md (new)
-- docs/ARCHITECTURE.md §4
+- [x] docs/dev/storage.md (new)
+- [x] docs/ARCHITECTURE.md §4
 
 ## Out of scope
 - Anything not listed under Scope.

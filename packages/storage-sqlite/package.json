@@ -5,6 +5,12 @@
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
   "engines": {
     "node": ">=24"
   },
@@ -13,5 +19,11 @@
   },
   "agilityBridge": {
     "runtime": "node"
+  },
+  "dependencies": {
+    "@agility-bridge/storage": "workspace:*"
+  },
+  "devDependencies": {
+    "drizzle-orm": "0.45.4"
   }
 }
