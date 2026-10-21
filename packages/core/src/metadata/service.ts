@@ -91,6 +91,9 @@ export const DERIVED_SCOPE_PATHS: Readonly<Record<string, string>> = Object.free
   Expression: 'Mentions:Workitem.Scope',
 });
 
+const PROJECT_TREE_TTL_MS = 600_000;
+const MAX_PROJECT_TREE = 2_000;
+
 /** Global types tools may read through dedicated tools only (members, teams; list types are found by their base). */
 const GLOBAL_TYPES = new Set(['Member', 'Team']);
 
@@ -115,6 +118,7 @@ interface InstanceCache {
   readonly inflight: Map<string, Promise<AssetTypeMeta | null>>;
   prefixes?: Cached<ReadonlyMap<string, string>>;
   readonly statuses: Map<string, Cached<readonly StatusEntry[]>>;
+  readonly projectTrees: Map<string, Cached<readonly string[]>>;
 }
 
 function unknownType(name: string): AbError {
@@ -172,7 +176,7 @@ export class MetadataService {
   cache(instanceId: string): InstanceCache {
     let c = this.#instances.get(instanceId);
     if (c === undefined) {
-      c = { types: new Map(), inflight: new Map(), statuses: new Map() };
+      c = { types: new Map(), inflight: new Map(), statuses: new Map(), projectTrees: new Map() };
       this.#instances.set(instanceId, c);
     }
     return c;
@@ -181,6 +185,11 @@ export class MetadataService {
   /** @internal */
   fresh<T>(entry: Cached<T> | undefined): entry is Cached<T> {
     return entry !== undefined && this.#clock.now() - entry.at < this.#ttlMs;
+  }
+
+  /** @internal */
+  freshFor<T>(entry: Cached<T> | undefined, ttlMs: number): entry is Cached<T> {
+    return entry !== undefined && this.#clock.now() - entry.at < ttlMs;
   }
 
   /** @internal */
@@ -366,6 +375,49 @@ export class InstanceMetadata {
   async typesForPrefix(prefix: string): Promise<readonly string[]> {
     const map = await this.numberPrefixes();
     return [...map].filter(([, p]) => p === prefix.toUpperCase()).map(([t]) => t);
+  }
+
+  /**
+   * The allowed Agility projects and all their descendants (`ChildrenMeAndDown`), in one query, cached for 10 minutes.
+   * Predicates then use a plain `Scope=$list`, which costs about 0.27 s where `Scope.ParentAndUp` costs up to 5 s on
+   * large types (live, P1-06). The tree is instance data, not request data; the call that loads it pays for it.
+   */
+  async projectTree(allowed: readonly string[]): Promise<readonly string[]> {
+    const key = [...allowed].sort().join(',');
+    const cached = this.#cache.projectTrees.get(key);
+    if (this.#service.freshFor(cached, PROJECT_TREE_TTL_MS)) return cached.value;
+    const res = await agilityClient(this.#ctx).query<unknown[][]>({
+      from: 'Scope',
+      select: ['ChildrenMeAndDown'],
+      filter: ['ID=$ab_scope'],
+      with: { $ab_scope: [...allowed] },
+      sort: ['ID'],
+      page: { start: 0, size: allowed.length },
+    });
+    const rows = Array.isArray(res.data?.[0]) ? (res.data[0] as Array<Record<string, unknown>>) : [];
+    const tree = new Set<string>();
+    for (const r of rows) {
+      if (typeof r['_oid'] === 'string' && allowed.includes(r['_oid'])) tree.add(r['_oid']);
+      const children = r['ChildrenMeAndDown'];
+      for (const c of Array.isArray(children) ? children : []) {
+        const oid = typeof c === 'string' ? c : (c as { _oid?: unknown } | null)?._oid;
+        if (typeof oid === 'string' && /^Scope:\d{1,12}$/.test(oid)) tree.add(oid);
+      }
+    }
+    if (tree.size > MAX_PROJECT_TREE) {
+      throw new AbError(
+        ErrorCode.LimitQuery,
+        `The workspace's Agility projects have more than ${MAX_PROJECT_TREE} sub-projects.`,
+        {
+          hint: 'Allow fewer or lower-level Agility projects in the workspace, or turn off sub-projects.',
+          details: { limit: 'maxProjectTree', max: MAX_PROJECT_TREE, unit: 'projects', requested: tree.size },
+          localDetails: true,
+        },
+      );
+    }
+    const value = [...tree].sort();
+    this.#cache.projectTrees.set(key, { value, at: this.#service.now() });
+    return value;
   }
 
   /** The status list of an asset type, in order, from the instance (never hard-coded, L-142). */

@@ -12,9 +12,13 @@ import {
   compileQuery,
   createBudget,
   DEFAULT_LIMITS,
+  inScope,
   MetadataService,
   metadataDrift,
   parseAssetType,
+  resolveAsset,
+  resolveMember,
+  resolveSprint,
   Secret,
   Semaphore,
   shapeList,
@@ -177,6 +181,43 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
       // Counts only: each shape is valid query.v1 and returns at most limit + 1 rows.
       expect(res.status, input.assetType).toBe(200);
       expect((res.data[0] ?? []).length).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('resolves identifiers on the tenant and every scoped row passes the recheck (P1-06)', {
+    timeout: 120_000,
+  }, async () => {
+    const fresh: ToolContext = { ...ctx, metadata: new MetadataService(), budget: createBudget(60) };
+    expect((await resolveMember(fresh, 'me')).oid).toMatch(/^Member:\d+$/);
+    const sample = await agilityClient(fresh).query<Rows>({
+      from: 'Story',
+      select: ['Number', 'Scope'],
+      sort: ['ID'],
+      page: { start: 0, size: 1 },
+    });
+    const row = sample.data[0]?.[0] ?? {};
+    const number = String(row['Number'] ?? '');
+    const resolved = await resolveAsset(fresh, number);
+    expect(resolved.oid).toBe(row['_oid']);
+    expect(resolved.assetType).toBe('Story');
+    const scope = String((row['Scope'] as { _oid?: string } | undefined)?._oid ?? '');
+    expect(scope).toMatch(/^Scope:\d+$/);
+    const scoped: ToolContext = { ...fresh, projects: { allowed: [scope], includeChildren: true } };
+    expect((await resolveAsset(scoped, number)).oid).toBe(row['_oid']);
+    for (const assetType of ['Story', 'Timebox']) {
+      const q = await compileQuery(scoped, { assetType, fields: ['Name'], limit: 5 });
+      const rows = ((await agilityClient(scoped).query<Rows>(q.body)).data[0] ?? []) as Array<
+        Record<string, unknown>
+      >;
+      expect(
+        rows.every((r) => inScope(scoped, q, r)),
+        assetType,
+      ).toBe(true);
+    }
+    try {
+      await resolveSprint(scoped, 'current');
+    } catch (error) {
+      expect(error instanceof AbError && ['AB_AMBIGUOUS', 'AB_NOT_FOUND'].includes(error.code)).toBe(true);
     }
   });
 });

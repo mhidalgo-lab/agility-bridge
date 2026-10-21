@@ -57,6 +57,11 @@ export interface QueryInput {
 export interface CompileOptions {
   /** Global types (members, teams, list types) are compiled only for dedicated tools or an explicit allowance. */
   readonly allowGlobal?: boolean;
+  /**
+   * Abstract types with a direct `Scope` (`Workitem`, `PrimaryWorkitem`) may be queried by server code that resolves
+   * identifiers across types; every returned row's concrete `AssetType` is checked afterwards. Never from caller input.
+   */
+  readonly allowAbstract?: boolean;
 }
 
 export interface CompiledQuery {
@@ -68,6 +73,10 @@ export interface CompiledQuery {
   readonly offset: number;
   /** The selected paths, in order. */
   readonly fields: readonly string[];
+  /** Server-added selections used to recheck each row's scope (L-064); not part of the caller's fields. */
+  readonly recheck: readonly string[];
+  /** The Agility projects rows may belong to (the allowed ones and, when enabled, their descendants); empty = all. */
+  readonly scopes: readonly string[];
   /** The body with every bound value masked, for `_meta` and audit. */
   readonly masked: Readonly<Record<string, unknown>>;
   /** Canonical description of what the caller asked for, for the cursor binding. */
@@ -249,22 +258,29 @@ async function sentPath(ctx: ToolContext, type: string, resolved: ResolvedPath):
   return [`${relation}${live}`, ...rest].join('.');
 }
 
-/** The Agility-project restriction for one strategy, over the server-owned `$ab_scope` list. */
-function scopeToken(strategy: ScopeStrategy, includeChildren: boolean): string | undefined {
-  const either = (path: string) =>
-    includeChildren ? `(${path}=${SCOPE_VAR}|${path}.ParentAndUp=${SCOPE_VAR})` : `${path}=${SCOPE_VAR}`;
+/** The Agility-project restriction for one strategy, over `$ab_scope`: the allowed projects and their descendants. */
+function scopeToken(strategy: ScopeStrategy): string | undefined {
   switch (strategy.kind) {
     case 'direct':
     case 'derived':
-      return either(strategy.path);
+      return `${strategy.path}=${SCOPE_VAR}`;
     case 'workspace_bounded':
-      return strategy.via === 'self'
-        ? includeChildren
-          ? `(ID=${SCOPE_VAR}|ParentAndUp=${SCOPE_VAR})`
-          : `ID=${SCOPE_VAR}`
-        : either('Schedule.ScheduledScopes');
+      return strategy.via === 'self' ? `ID=${SCOPE_VAR}` : `Schedule.ScheduledScopes=${SCOPE_VAR}`;
     default:
       return undefined;
+  }
+}
+
+/** The selections that let `inScope` recheck a row (server-owned, exempt from the caller's field limits). */
+export function recheckFields(strategy: ScopeStrategy): string[] {
+  switch (strategy.kind) {
+    case 'direct':
+    case 'derived':
+      return [strategy.path];
+    case 'workspace_bounded':
+      return strategy.via === 'self' ? [] : ['Schedule.ScheduledScopes'];
+    default:
+      return [];
   }
 }
 
@@ -290,7 +306,12 @@ export async function compileQuery(
   ) {
     throw forbidden(`Asset type ${type} is not allowed in this workspace.`);
   }
-  const strategy = await md.scopeStrategy(type);
+  let strategy = await md.scopeStrategy(type);
+  if (strategy.kind === 'denied' && meta.abstract && options.allowAbstract === true) {
+    const scope = meta.attributes.get('Scope');
+    if (scope?.kind === 'Relation' && scope.relatedType === 'Scope' && !scope.multi)
+      strategy = { kind: 'direct', path: 'Scope' };
+  }
   if (strategy.kind === 'denied')
     throw forbidden(`Asset type ${type} cannot be read through agility-bridge.`);
   if (strategy.kind === 'global' && options.allowGlobal !== true) {
@@ -363,12 +384,28 @@ export async function compileQuery(
   // Server-owned predicates, each its own top-level entry (ANDed by query.v1).
   const serverEntries: string[] = [];
   const serverWith: Record<string, unknown> = {};
-  const scopes = ctx.projects.allowed;
-  for (const s of scopes)
+  const allowed = ctx.projects.allowed;
+  for (const s of allowed) {
     if (!SCOPE_OID_RE.test(s))
       throw new AbError(ErrorCode.Internal, 'Invalid Agility project in the workspace configuration.');
-  if (scopes.length > 0) {
-    const token = scopeToken(strategy, ctx.projects.includeChildren);
+  }
+  const restricted = allowed.length > 0 && strategy.kind !== 'global';
+  const scopes = !restricted
+    ? []
+    : ctx.projects.includeChildren
+      ? await md.projectTree(allowed)
+      : [...allowed];
+  if (restricted && scopes.length === 0) {
+    throw new AbError(
+      ErrorCode.AuthForbidden,
+      "None of the workspace's Agility projects is visible with this token.",
+      {
+        hint: 'Check the workspace configuration and that the member behind the token can see those projects.',
+      },
+    );
+  }
+  if (restricted) {
+    const token = scopeToken(strategy);
     if (token !== undefined) {
       serverEntries.push(token);
       serverWith[SCOPE_VAR] = [...scopes];
@@ -421,10 +458,11 @@ export async function compileQuery(
     asof = new Date(t).toISOString();
   }
 
+  const recheck = restricted ? recheckFields(strategy).filter((f) => !select.includes(f)) : [];
   const withValues = { ...binder.with, ...serverWith };
   const body: Record<string, unknown> = {
     from: type,
-    select,
+    select: [...select, ...recheck],
     ...(filterEntries.length + serverEntries.length > 0
       ? { filter: [...serverEntries, ...filterEntries] }
       : {}),
@@ -448,5 +486,5 @@ export async function compileQuery(
     includeClosed: input.includeClosed === true,
     ...(asof === undefined ? {} : { asOf: asof }),
   };
-  return { body, assetType: type, strategy, limit, offset, fields, masked, normalized };
+  return { body, assetType: type, strategy, limit, offset, fields, recheck, scopes, masked, normalized };
 }

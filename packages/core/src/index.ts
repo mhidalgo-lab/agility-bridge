@@ -46,6 +46,29 @@ export {
   type UntrustedRenderer,
 } from './errors.ts';
 export {
+  type Candidate,
+  type MatchResult,
+  matchName,
+  type Named,
+  normalizeName,
+  noSingleMatch,
+  similarity,
+} from './identity/match.ts';
+export { type AssetRef, parseAssetRef } from './identity/refs.ts';
+export {
+  type ResolvedAsset,
+  resolveAsset,
+  resolveByName,
+  resolveMember,
+  resolveProject,
+  resolveSprint,
+  resolveStatus,
+  resolveTeam,
+  runQuery,
+  type SprintOptions,
+} from './identity/resolve.ts';
+export { inScope, oidsOf } from './identity/scope.ts';
+export {
   createLogger,
   type Logger,
   type LoggerOptions,
@@ -127,6 +150,7 @@ export {
   type FilterOp,
   MAX_OFFSET,
   type QueryInput,
+  recheckFields,
   type SortInput,
 } from './query/compiler.ts';
 export { type CursorState, cursorBinding, decodeCursor, encodeCursor } from './query/cursor.ts';

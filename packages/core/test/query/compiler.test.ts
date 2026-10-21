@@ -17,7 +17,15 @@ import { FakeAgility, makeContext, propertyParams } from '../harness/index.ts';
 
 const SNAPSHOT = snapshotJson as unknown as Record<string, unknown>;
 const service = new MetadataService();
-const fake = new FakeAgility({ meta: SNAPSHOT });
+const fake = new FakeAgility({
+  meta: SNAPSHOT,
+  assets: {
+    Scope: [
+      { _oid: 'Scope:1001', ChildrenMeAndDown: [{ _oid: 'Scope:1001' }, { _oid: 'Scope:1002' }] },
+      { _oid: 'Scope:1002', ChildrenMeAndDown: [{ _oid: 'Scope:1002' }] },
+    ],
+  },
+});
 
 function ctx(over: Partial<ToolContext> = {}): ToolContext {
   return makeContext({
@@ -64,7 +72,7 @@ describe('compileQuery', () => {
     expect(q.body).toMatchInlineSnapshot(`
       {
         "filter": [
-          "(Scope=$ab_scope|Scope.ParentAndUp=$ab_scope)",
+          "Scope=$ab_scope",
           "AssetState=$ab_state",
           "Status.Name=$v1",
           "Estimate>=$v2",
@@ -83,6 +91,7 @@ describe('compileQuery', () => {
           "Status.Name",
           "Owners.Name",
           "Children[AssetState!='Dead'].@Count",
+          "Scope",
         ],
         "sort": [
           "-Estimate",
@@ -91,6 +100,7 @@ describe('compileQuery', () => {
         "with": {
           "$ab_scope": [
             "Scope:1001",
+            "Scope:1002",
           ],
           "$ab_state": [
             "0",
@@ -128,7 +138,9 @@ describe('compileQuery', () => {
     const effort = await compile({ assetType: 'Actual', fields: ['Value', 'Workitem.Number'] });
     expect(effort.body['filter']).toContain('IsDeleted=$ab_deleted');
     const sums = await compile({ assetType: 'Story', fields: ['Actuals.Value.@Sum'] });
-    expect(sums.body['select']).toEqual(["Actuals[IsDeleted='false'].Value.@Sum"]);
+    expect(sums.body['select']).toEqual(["Actuals[IsDeleted='false'].Value.@Sum", 'Scope']);
+    expect(sums.recheck).toEqual(['Scope']);
+    expect(sums.scopes).toEqual(['Scope:1001', 'Scope:1002']);
   });
 });
 
@@ -208,12 +220,8 @@ describe('values reach Agility only through `with` (L-057, L-139, L-162)', () =>
           const bound = (q.body['with'] as Record<string, unknown>)['$v1'];
           return (
             JSON.stringify(filter) ===
-              JSON.stringify([
-                '(Scope=$ab_scope|Scope.ParentAndUp=$ab_scope)',
-                'AssetState=$ab_state',
-                `Name${OP[op]}$v1`,
-              ]) &&
-            JSON.stringify(q.body['select']) === '["Number","Name"]' &&
+              JSON.stringify(['Scope=$ab_scope', 'AssetState=$ab_state', `Name${OP[op]}$v1`]) &&
+            JSON.stringify(q.body['select']) === '["Number","Name","Scope"]' &&
             JSON.stringify(bound) === JSON.stringify(op === 'in' ? [value, `${value}x`] : value)
           );
         },
@@ -249,7 +257,8 @@ describe('the scope predicate cannot be widened (L-059)', () => {
       ],
     });
     const filter = q.body['filter'] as string[];
-    expect(filter[0]).toBe('(Scope=$ab_scope|Scope.ParentAndUp=$ab_scope)');
+    expect(filter[0]).toBe('Scope=$ab_scope');
+    expect((q.body['with'] as Record<string, unknown>)['$ab_scope']).toEqual(['Scope:1001', 'Scope:1002']);
     // The caller's alternatives live in one parenthesised entry; query.v1 ANDs entries (verified live, P1-04).
     expect(filter.at(-1)).toBe('((Scope!=$v1)|(Number=$v2)|(Scope.Name~=$v3))');
     expect(filter.filter((f) => f.includes('$ab_scope'))).toHaveLength(1);
@@ -297,13 +306,13 @@ describe('the scope predicate cannot be widened (L-059)', () => {
 
 describe('scope strategy classes', () => {
   it.each([
-    ['Story', false, '(Scope=$ab_scope|Scope.ParentAndUp=$ab_scope)'],
-    ['Task', true, 'Scope=$ab_scope'],
-    ['Attachment', true, 'Asset:Workitem.Scope=$ab_scope'],
-    ['Link', false, '(Asset:Workitem.Scope=$ab_scope|Asset:Workitem.Scope.ParentAndUp=$ab_scope)'],
-    ['Scope', false, '(ID=$ab_scope|ParentAndUp=$ab_scope)'],
-    ['Scope', true, 'ID=$ab_scope'],
-    ['Timebox', true, 'Schedule.ScheduledScopes=$ab_scope'],
+    ['Story', false, 'Scope=$ab_scope', ['Scope:1001', 'Scope:1002']],
+    ['Task', true, 'Scope=$ab_scope', ['Scope:1001']],
+    ['Attachment', true, 'Asset:Workitem.Scope=$ab_scope', ['Scope:1001']],
+    ['Link', false, 'Asset:Workitem.Scope=$ab_scope', ['Scope:1001', 'Scope:1002']],
+    ['Scope', false, 'ID=$ab_scope', ['Scope:1001', 'Scope:1002']],
+    ['Scope', true, 'ID=$ab_scope', ['Scope:1001']],
+    ['Timebox', true, 'Schedule.ScheduledScopes=$ab_scope', ['Scope:1001']],
   ])('%s (direct children only: %s)', async (assetType, onlyDirect, token) => {
     const q = await compile(
       { assetType, fields: ['Name'] },
