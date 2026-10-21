@@ -2,7 +2,7 @@
 id: P0-04
 title: Security tooling baseline
 phase: 0
-status: in-progress
+status: review
 priority: high
 depends_on: [P0-03]
 adr: []
@@ -25,9 +25,9 @@ Static analysis, secret scanning, dependency review and a scorecard from the fir
 
 ## Acceptance criteria
 - [x] A planted fake token in a test path fails gitleaks (proving each custom rule fires); an allowlist covers the test fixture. *(`scripts/check-gitleaks-rules.ts`, run in the gitleaks job; verified locally that removing a fixture fails it)*
-- [ ] CodeQL runs on PRs; Scorecard publishes results.
+- [x] CodeQL runs on PRs; Scorecard publishes results. *(CodeQL on PR #12 and `main`; Scorecard 6.6 on scorecard.dev, 2026-10-21)*
 - [x] Renovate configuration validates. *(`renovate-config-validator --strict`, Renovate 44.172.2, 2026-10-20; `scripts/test/renovate.test.ts` checks the tool-pin manager)*
-- [ ] The owner has applied and ticked the repository settings checklist.
+- [x] The owner has applied and ticked the repository settings checklist. *(docs/security/repo-settings.md, 2026-10-21)*
 
 ## Security notes
 THREAT_MODEL T8, T18.

@@ -71,9 +71,17 @@ required, as in relic-bridge.
 
 - [x] Rulesets, required checks from CI, secret scanning and push protection, private vulnerability reporting,
       Dependabot alerts, Actions policy and environments (applied 2026-10-19/20, above).
-- [ ] Install the Renovate GitHub App for this repository.
-- [ ] Add the four P0-04 checks to both rulesets once they have run on `main` (above).
-- [ ] After the first Scorecard run on `main`, confirm the results appear on scorecard.dev and in code scanning.
+- [x] Install the Renovate GitHub App for this repository (2026-10-21; Dependency Dashboard is issue #14, the onboarding
+      PR #13 closed itself because `renovate.json` was already present).
+- [x] Add the four P0-04 checks to both rulesets once they have run on `main` (2026-10-21, above).
+- [x] After the first Scorecard run on `main`, confirm the results appear on scorecard.dev and in code scanning
+      (2026-10-21: score 6.6 for commit `90f85fc`; CodeQL and Scorecard analyses in code scanning).
+
+Scorecard baseline (2026-10-21, 6.6/10). Expected low checks: `Code-Review` 0 (single maintainer, 0 approvals, D-24),
+`Maintained` 0 (repository younger than 90 days), `CII-Best-Practices` 0 (P9-06), `Fuzzing` 0, `Packaging` and
+`Signed-Releases` not applicable until P1-15, `Branch-Protection` 3 (no required approvals or CODEOWNERS yet, D-24).
+Renovate reports `amannn/action-semantic-pull-request` (the Conventional PR title check) as possibly abandoned: last
+release 2025-08-22; it still works and is pinned by SHA.
 
 ## Environments
 
