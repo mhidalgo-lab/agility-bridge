@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import { agilityClient } from '../../agility/client.ts';
 import { capBudget } from '../../context.ts';
-import { runQuery } from '../../identity/resolve.ts';
+import { runPage } from '../../identity/resolve.ts';
 import { oidsOf } from '../../identity/scope.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { assetState, shapeList } from '../../output/result.ts';
@@ -85,8 +85,9 @@ export const listMembers: ToolDefinition = defineTool({
       },
       { allowGlobal: true, identityFields: ['AssetState'] },
     );
-    const { rows } = await runQuery(ctx, compiled);
-    const items = rows.slice(0, compiled.limit).map((r) => ({
+    const result = await runPage(ctx, compiled);
+    const { rows } = result;
+    const items = rows.map((r) => ({
       assetType: 'Member',
       oid: rowOid(r),
       name: r['Name'],
@@ -100,8 +101,8 @@ export const listMembers: ToolDefinition = defineTool({
       source: 'members',
       rows: items,
       columns: ['assetType', 'oid', 'state', 'name', 'username', ...(emails ? ['email'] : [])],
-      hasMore: rows.length > compiled.limit,
-      cursorFor: (shown) => encodeCursor(binding, { offset: offset + shown }),
+      hasMore: result.hasMore,
+      cursorFor: (shown) => encodeCursor(binding, { offset: result.next(shown) }),
       ...(input.format === undefined ? {} : { format: input.format }),
     });
   },

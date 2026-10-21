@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { agilityClient } from '../../agility/client.ts';
 import { capBudget } from '../../context.ts';
 import { AbError } from '../../errors.ts';
-import { resolveSprint, resolveTeam, runQuery } from '../../identity/resolve.ts';
+import { resolveSprint, resolveTeam, runPage } from '../../identity/resolve.ts';
 import { inScope, oidsOf, sanitizeRow } from '../../identity/scope.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { shapeList, shapeOutput, untrusted } from '../../output/result.ts';
@@ -46,7 +46,8 @@ export const listTeams: ToolDefinition = defineTool({
       },
       { allowGlobal: true, identityFields: ['AssetState'] },
     );
-    const { rows } = await runQuery(ctx, compiled);
+    const result = await runPage(ctx, compiled);
+    const { rows } = result;
     const items = rows
       .slice(0, compiled.limit)
       .map((r) => ({ assetType: 'Team', oid: rowOid(r), name: r['Name'] }));
@@ -54,8 +55,8 @@ export const listTeams: ToolDefinition = defineTool({
       summary: `${items.length} team${items.length === 1 ? '' : 's'}, sorted by name.`,
       source: 'teams',
       rows: items,
-      hasMore: rows.length > compiled.limit,
-      cursorFor: (shown) => encodeCursor(binding, { offset: offset + shown }),
+      hasMore: result.hasMore,
+      cursorFor: (shown) => encodeCursor(binding, { offset: result.next(shown) }),
       ...(input.format === undefined ? {} : { format: input.format }),
     });
   },

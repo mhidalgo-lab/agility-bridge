@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from 'zod';
 import { capBudget } from '../../context.ts';
-import { resolveProject, runQuery } from '../../identity/resolve.ts';
+import { resolveProject, runPage } from '../../identity/resolve.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { shapeList } from '../../output/result.ts';
 import { compileQuery, FILTER_OPS, type FilterInput } from '../../query/compiler.ts';
@@ -132,7 +132,8 @@ export const queryAssets: ToolDefinition = defineTool({
       { allowGlobal, identityFields: identity },
     );
     const info = await fieldInfo(ctx, type, compiled.fields);
-    const { rows, hidden } = await runQuery(ctx, compiled);
+    const result = await runPage(ctx, compiled);
+    const { rows, hidden } = result;
     const items = rows
       .slice(0, compiled.limit)
       .map((r) => toItem(r, type, compiled.fields, info, compiled.keys));
@@ -143,8 +144,8 @@ export const queryAssets: ToolDefinition = defineTool({
       rows: items,
       columns: ['number', 'assetType', 'oid', 'state', 'project', ...compiled.fields],
       richText: info.richText,
-      hasMore: rows.length > compiled.limit,
-      cursorFor: (shown) => encodeCursor(binding, { offset: offset + shown }),
+      hasMore: result.hasMore,
+      cursorFor: (shown) => encodeCursor(binding, { offset: result.next(shown) }),
       hiddenOutsideScope: hidden > 0,
       ...(input.format === undefined ? {} : { format: input.format }),
       meta: { query: compiled.masked },

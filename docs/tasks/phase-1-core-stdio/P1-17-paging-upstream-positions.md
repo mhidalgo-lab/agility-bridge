@@ -2,12 +2,12 @@
 id: P1-17
 title: Single-type paging counts upstream positions
 phase: 1
-status: todo
+status: review
 priority: low
 depends_on: [P1-16]
 adr: ["0015"]
 lessons: [L-064, L-170]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P1-17 — Single-type paging counts upstream positions
@@ -21,7 +21,7 @@ A row the upstream should not have returned never shifts a cursor (Phase 1 revie
   shown, as `multiPage` does.
 
 ## Acceptance criteria
-- [ ] With a fake that returns out-of-scope rows inside a page, walking the pages shows every in-scope row exactly once.
+- [x] With a fake that returns out-of-scope rows inside a page, walking the pages shows every in-scope row exactly once.
 
 ## Security notes
 THREAT_MODEL T3 (no data; correctness of paging only).
