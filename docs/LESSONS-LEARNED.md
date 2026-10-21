@@ -28,7 +28,7 @@ How to use it:
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
 | [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153 |
-| [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160 |
+| [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161 |
@@ -400,6 +400,14 @@ A self-signed, untrusted-root or expired certificate looks different on each run
 causes (certificate not trusted, host unreachable) and, for on-premises instances with a private CA, points to the Node
 or Docker deployment. A 526 must never be read as an Agility response.
 *Applied in:* [spikes/workers-limits](../spikes/workers-limits/RESULTS.md), P1-02, ADR-0014.
+
+**L-167 — Check hand-written fixtures against a real schema.**
+The P0-06 metadata fixture, written by hand from probe shapes, had `Name: "Story"`; in real `meta.v1` JSON an asset
+type's name is `Token` and `Name` is a reference object, so a parser built on the fixture failed on the first live run.
+The same check found that `ID` relates to the type itself and that `Actual` has no `AssetState`. Synthetic fixtures are
+compared with the public example instance (`pnpm metadata:drift`, weekly workflow) and the live suite, on product
+attributes only.
+*Applied in:* P1-03, [RESEARCH §1.6](RESEARCH.md#16-asset-model).
 
 ## F. Query safety and limits
 

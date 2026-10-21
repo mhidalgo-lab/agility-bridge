@@ -185,6 +185,19 @@ except `group`, and adds `op` (POST only). *docs*
   reaches projects through `Schedule`, and `Team` has **no member roster** relation.
 - **Custom attributes** use the `Custom_` prefix and carry `iscustom="True"` in `meta.v1`. *docs / unverified rule* —
   *live (P0-06):* the `Custom_` prefix holds; custom types seen: `Text`, `LongText`, `Date`, `Relation`.
+- **`meta.v1` JSON shape (live and public example instance, P1-03, 2026-10-21):** an asset type's **`Token` is its
+  name**; `Name` is an object `{ href, tokenref }` pointing at the type's Name attribute. Type keys: `_type`, `HREF`,
+  `Version`, `Name`, `Token`, `DisplayName`, `Abstract`, `Base`, `DefaultOrderBy`, `DefaultDisplayBy`, `ShortName`,
+  `Description`, `Attributes`, `Operations`. Attribute definitions carry `Name`, `Token`, `DisplayName`,
+  `AttributeType`, `IsReadOnly`, `IsRequired`, `IsMultivalue`, `IsCanned`, `IsCustom`, `Base`, `OrderByAttribute`,
+  `DisplayByAttribute`, `RelatedAsset` and `ReciprocalRelation`; operations `Name` and `Validator`. `AttributeType`
+  values seen: `AssetType`, `Boolean`, `Date`, `LocalizerTag` (e.g. `Role.Name`), `LongInt`, `LongText`, `Numeric`,
+  `Opaque`, `Rank`, `Relation`, `State`, `Text`. Every type's `ID` relates to the type itself. — *live + public*
+- **Status lists (live, P1-03):** `StoryStatus` and `EpicStatus` derive from `Status` (itself a `List`) and carry
+  `RollupState`; `TaskStatus` and `TestStatus` derive from `List` directly and have no rollup. Every list type has
+  `Order`, `Inactive` and a `Team` relation (team-specific workflows). — *live*
+- **`Actual` (effort) has no `AssetState`** (it has `IsDeleted`), no `Name` and no base type; `Role` and `Attachment`
+  report no base either. The dead-asset filter (L-143) must use `IsDeleted` for such types. — *live + public*
 - **Metadata fingerprint (live, P0-06):** `meta.v1` sends `ETag: "<version>.<schema stamp>"` and
   `Cache-Control: public, max-age≈2,600 s`; no `Last-Modified`. The whole schema is 5.1 MB of JSON (5.1 s).
 

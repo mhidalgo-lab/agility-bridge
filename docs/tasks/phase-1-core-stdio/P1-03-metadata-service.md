@@ -2,12 +2,12 @@
 id: P1-03
 title: Metadata service (meta.v1) and schema snapshot
 phase: 1
-status: todo
+status: review
 priority: high
 depends_on: [P1-02]
 adr: ["0011"]
-lessons: [L-052, L-053, L-141, L-142, L-148]
-owner: ""
+lessons: [L-052, L-053, L-141, L-142, L-148, L-167]
+owner: "Matias Hidalgo"
 ---
 
 # P1-03 — Metadata service (meta.v1) and schema snapshot
@@ -22,14 +22,17 @@ Know each instance's asset types, attributes, operations, statuses and number pr
 - Status lists per asset type (and team workflow where the instance has one).
 - Field tiers per asset type (`minimal`, `default`, `full`) computed from metadata plus overrides.
 - Scope strategy per asset type (direct, derived through a parent path, workspace-bounded, global, denied — ARCHITECTURE §6.3), from metadata plus the P0-06 findings; unclassified types are denied.
-- Sanitised snapshot generator and a CI drift check against the committed fixture.
+- Sanitised snapshot generator and a CI drift check against the committed fixture. *(Refined in P1-03: D-01 forbids
+  committing anything derived from the tenant, so the committed snapshot is synthetic, written from the product schema
+  and matching the public example instance; the drift check compares it with that public instance in CI (weekly
+  workflow, `pnpm metadata:drift`) and with the tenant in the live suite, on product attributes only.)*
 - Metadata strings are untrusted: they appear only in enveloped output, never in tool definitions (THREAT_MODEL A12).
 
 ## Acceptance criteria
-- [ ] Parses the committed snapshot; validates dot paths and downcasts; refuses unknown attributes.
-- [ ] Tier computation, prefix discovery (including `B-` and `S-` story prefixes) and scope-strategy classification tested.
-- [ ] Drift check script runs in CI against the snapshot.
-- [ ] Metadata loading cost is accounted in the budget and cached across calls.
+- [x] Parses the committed snapshot; validates dot paths and downcasts; refuses unknown attributes.
+- [x] Tier computation, prefix discovery (including `B-` and `S-` story prefixes) and scope-strategy classification tested.
+- [x] Drift check script runs in CI against the snapshot. *(`.github/workflows/metadata-drift.yml`, weekly and on demand)*
+- [x] Metadata loading cost is accounted in the budget and cached across calls.
 
 ## Security notes
 THREAT_MODEL A12.
@@ -40,10 +43,12 @@ THREAT_MODEL A12.
 - L-141 — Number prefixes vary per instance.
 - L-142 — Status, AssetState and rollup category are different things.
 - L-148 — Learn the model from metadata, then verify relations live.
+- L-167 — Check hand-written fixtures against a real schema.
 
 ## Docs to update
 - docs/ARCHITECTURE.md §6.2
 - docs/RESEARCH.md §1.6
+- docs/dev/testing.md, docs/dev/verification.md (drift check)
 
 ## Out of scope
 - Query compilation (P1-04)

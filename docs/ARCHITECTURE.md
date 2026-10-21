@@ -250,15 +250,35 @@ Raw Agility bodies are never returned to the client: the messages of a 400 trave
 
 ### 6.2 Metadata service (P1-03)
 
-- Fetches `meta.v1` per instance, parses asset types (name, base type, abstract flag), attributes (type, relation
-  target, multi-value, custom, required, read-only), operations and validators.
-- Caches per instance with a TTL (default 1 hour) and a fingerprint of the metadata; a change of fingerprint invalidates
-  compiled field tiers and prefix maps.
-- Answers: "is `Defect.Custom_Severity2` a valid attribute path and what type is it?", "which operations does `Story`
-  support?", "which attributes does the `minimal`/`default`/`full` tier of `Defect` include on this instance?".
-- **Number prefixes** (L-141): learned per instance (by sampling numbers per numbered asset type, with configuration
-  overrides) and used only as a hint; resolution by number always confirms through a query.
-- A reviewed, sanitised **metadata snapshot** is committed for fixtures and compared in CI (L-053).
+`packages/core/src/metadata/`. The host owns one `MetadataService` per process; tools use `metadataFor(ctx)`.
+
+- Fetches `meta.v1/<Type>` as JSON, **one asset type at a time** (the whole schema is 5.1 MB, P0-06), with the calling
+  tool's context: every load is charged to that call's budget, concurrent calls share one load, and later calls reuse
+  the cache (TTL 1 hour). The `ETag` (`"<version>.<schema stamp>"`) is the schema fingerprint: a new one drops every
+  cached type, status list and prefix map of the instance. An unknown type is cached as absent (`meta.v1` answers 404).
+- Parses asset types (`Token` is the type name; `Name` is a reference to its Name attribute), base type, abstract flag,
+  attributes (kind from `AttributeType`, relation target, multi-value, custom, read-only, required) and operations.
+  **Only identifiers are kept**, each checked against a strict pattern; display names and descriptions are dropped
+  because administrators can edit them (THREAT_MODEL A12).
+- `resolvePath(type, path)`: `.` follows relations, `Rel:Type` downcasts to a subtype of the relation's target (walking
+  `Base`), a final `@Count`/`@Sum`/`@Min`/`@Max`/`@Avg` aggregates a multi-value path, at most 5 segments; filters inside
+  paths are refused (the compiler builds them, ADR-0012).
+- **Number prefixes** (L-141): one `query.v1` call samples one number per numbered type (falling back to the types the
+  metadata confirms if Agility refuses one), configuration overrides win, and the map is a hint only: resolution by
+  number always confirms through a query (P1-06).
+- **Status lists** per asset type from the `Status` relation's list type, in `Order`, with `Inactive`, the owning `Team`
+  (team workflows) and, where the list type has `RollupState`, the rollup category (L-142).
+- **Field tiers** (`minimal`, `default`, `full`) computed from the attributes the type has, preferring the `…UTC` dates
+  (L-149), with custom attributes only in `full` and `full` capped at `limits.maxFields`; overrides are validated.
+- **Scope strategy** (below) classified from metadata: a single `Scope` relation to `Scope` is direct; `Attachment`,
+  `Link`, `Actual` and `Expression` use a derived path that must resolve on the instance; `Scope` and `Timebox` (through
+  `Schedule`) are workspace-bounded; `Member`, `Team` and every `List` subtype are global; abstract and unclassified
+  types are denied.
+- **Snapshot and drift** (L-053): a synthetic `meta.v1` snapshot of the 33 types the tools rely on is committed
+  (`packages/core/test/fixtures/agility/meta-snapshot.json`). Its product attributes match the public example instance
+  (26.2) and the read-only tenant (26.0.3.2). `pnpm metadata:drift` and the weekly *Metadata drift* workflow compare it
+  with the public example instance; the live suite compares it with the tenant. Both report product attribute names
+  only.
 
 ### 6.3 Query compiler (P1-04)
 

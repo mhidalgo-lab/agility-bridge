@@ -2,7 +2,7 @@
 id: P1-12
 title: Test harness (fixtures, contract tests, probes, live suite)
 phase: 1
-status: review
+status: done
 priority: high
 depends_on: [P1-01, P0-12]
 adr: []

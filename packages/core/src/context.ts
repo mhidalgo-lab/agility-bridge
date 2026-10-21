@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { AbError, ErrorCode } from './errors.ts';
 import type { Logger } from './logger.ts';
+import type { MetadataService } from './metadata/service.ts';
 import type { Secret } from './secret.ts';
 
 /** The Agility instance a request talks to. Defined by an owner or admin, never by a caller (ADR-0008). */
@@ -114,14 +115,6 @@ export const webCryptoRandom: Random = Object.freeze({
 });
 
 /**
- * The metadata service as tools see it (P1-03 implements it). Declared here so the context shape is fixed now;
- * hosts without one (tests of tools that need no metadata) leave it out.
- */
-export interface MetadataServiceRef {
-  readonly instanceId: string;
-}
-
-/**
  * Everything a tool handler may use. Built **per request**, frozen, and passed explicitly: nothing request-scoped may
  * live in module state (THREAT_MODEL T21, L-013).
  */
@@ -137,7 +130,8 @@ export interface ToolContext {
   readonly breaker: Breaker;
   /** Pinned at configuration time with the instance; never chosen by a request (L-055). */
   readonly fetch: FetchLike;
-  readonly metadata?: MetadataServiceRef;
+  /** The host's metadata service (P1-03); tools use `metadataFor(ctx)`. */
+  readonly metadata?: MetadataService;
   readonly logger: Logger;
   readonly clock: Clock;
   readonly random: Random;

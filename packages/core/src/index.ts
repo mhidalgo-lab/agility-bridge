@@ -27,7 +27,6 @@ export {
   type InstanceRef,
   type Limiter,
   type Limits,
-  type MetadataServiceRef,
   type ProjectScope,
   type Random,
   systemClock,
@@ -55,6 +54,31 @@ export {
   silentLogger,
   stderrSink,
 } from './logger.ts';
+export { metadataDrift } from './metadata/drift.ts';
+export {
+  ASSET_TYPE_NAME_RE,
+  type AssetTypeMeta,
+  ATTRIBUTE_KINDS,
+  ATTRIBUTE_NAME_RE,
+  type AttributeKind,
+  type AttributeMeta,
+  parseAssetType,
+} from './metadata/model.ts';
+export {
+  type Aggregation,
+  DERIVED_SCOPE_PATHS,
+  type FieldTiers,
+  InstanceMetadata,
+  MAX_PATH_SEGMENTS,
+  MetadataService,
+  type MetadataServiceOptions,
+  metadataFor,
+  NUMBERED_TYPES,
+  type ResolvedPath,
+  type ScopeStrategy,
+  type StatusCategory,
+  type StatusEntry,
+} from './metadata/service.ts';
 export {
   envelope,
   envelopeRenderer,
