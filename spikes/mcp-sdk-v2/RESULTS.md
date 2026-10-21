@@ -1,7 +1,8 @@
 # P0-07 results: MCP SDK v2 dual-era handler with real clients
 
-Date: 2026-10-20. Status: **runtimes, elicitation channels and schema caching verified locally; most of the real-client
-matrix needs the owner** ([`client-checklist.md`](client-checklist.md)). Nothing here used Agility or a real token: the
+Date: 2026-10-20 (closed 2026-10-21). Status: **done.** Runtimes, elicitation channels and schema caching verified
+locally; real clients verified by the owner (Copilot CLI, Claude Code, VS Code, JetBrains) and the agent (MCP Inspector
+CLI); Cursor, Windsurf and Claude Desktop not tested ([`client-checklist.md`](client-checklist.md)). ADR-0005 accepted. Nothing here used Agility or a real token: the
 tools return canned, synthetic data.
 
 ## Versions (all at least 3 days old)
@@ -136,7 +137,7 @@ should build the tool registry this way. The serialised list is about 1.6 KB per
 | **Claude Code** | **2.1.304** | HTTP (Node) and stdio, `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ **prompt shown; approve and decline both work on both** (`input_required`) | owner, 2026-10-20 |
 | **GitHub Copilot in JetBrains** | plugin 1.19.2 (Windows 11) | HTTP (Node), `team` and `viewer`; stdio not tested (unreliable from WSL) | ✅ | ✅ | **2025** | ❌ no prompt; writes refused with `AB_APPROVAL_UNAVAILABLE` | owner, 2026-10-20 |
 | **GitHub Copilot in VS Code** | VS Code 1.142.0 (Windows 11, Remote WSL) | HTTP (Node) and stdio (Remote WSL), `team` and `viewer` | ✅ | ✅ | **2026-07-28** on both | ✅ approve and decline work on both (`input_required`) | owner, 2026-10-20 |
-| Claude Desktop | — | — | — | — | — | — | **owner checklist** |
+| Claude Desktop | — | — | — | — | — | — | not tested: the app on Windows cannot reach the spike in WSL; covered with OAuth connectors in P5-06 |
 | Cursor, Windsurf / Devin Desktop | — | — | — | — | — | — | not tested (no subscription); community reports through the client-compatibility issue template |
 
 **GitHub Copilot CLI 1.0.87** (owner run, 2026-10-20, Linux, all four spike servers added with `copilot mcp add`, the

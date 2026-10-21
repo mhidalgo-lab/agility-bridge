@@ -12,7 +12,7 @@ Statuses: `proposed` · `accepted` · `accepted (pending spike PX-NN)` · `super
 | [0002](0002-name-and-trademark.md) | Project name `agility-bridge` and trademark posture | accepted (owner) |
 | [0003](0003-license-apache-2.md) | Apache-2.0 license with DCO | accepted (owner) |
 | [0004](0004-typescript-runtime-agnostic-core.md) | TypeScript monorepo, runtime-agnostic core, Hono | accepted (owner) |
-| [0005](0005-mcp-sdk-v2-stateless.md) | MCP SDK v2, stateless HTTP, dual protocol era | proposed (spike P0-07) |
+| [0005](0005-mcp-sdk-v2-stateless.md) | MCP SDK v2, stateless HTTP, dual protocol era | accepted (2026-10-21, P0-07) |
 | [0006](0006-storage-sqlite-d1-yaml.md) | One SQLite schema for Node and D1, YAML for stdio | proposed |
 | [0007](0007-secrets-envelope-encryption.md) | Envelope encryption of Agility access tokens | proposed |
 | [0008](0008-access-model.md) | Instances, credentials, workspaces, grants, device tokens; bring-your-own-token | accepted (token policy) / proposed |

@@ -2,7 +2,7 @@
 id: P0-07
 title: "Spike: MCP SDK v2 dual-era handler with real clients"
 phase: 0
-status: blocked
+status: review
 priority: high
 depends_on: [P0-01]
 adr: ["0005", "0016"]
@@ -22,18 +22,10 @@ Confirm that one SDK v2 server serves stdio and stateless HTTP for both protocol
 - Measure per-request server construction with 25 and 40 tools, with and without schema caching.
 
 ## Acceptance criteria
-- [ ] `spikes/mcp-sdk-v2/RESULTS.md` with the matrix; *(runtime and elicitation matrix done; real clients: MCP Inspector verified, the rest pending the owner)* verified cells copied into docs/reference/client-compatibility.md with client versions and dates.
-- [ ] ADR-0005 accepted or superseded.
+- [x] `spikes/mcp-sdk-v2/RESULTS.md` with the matrix; verified cells copied into docs/reference/client-compatibility.md with client versions and dates. *(Verified: Copilot CLI 1.0.87, Claude Code 2.1.304, VS Code 1.142.0, Copilot in JetBrains 1.19.2, MCP Inspector CLI 2.11.0. Not tested: Cursor and Windsurf (no subscription), Claude Desktop (cannot reach WSL).)*
+- [x] ADR-0005 accepted or superseded. *(accepted by the owner, 2026-10-21)*
 - [x] A recorded conclusion on which clients can approve writes through elicitation on which transport (input for P7-01 and P7-02).
 - [x] Schema-caching measurements recorded.
-
-## Blocker
-
-The spike, the automated matrix (Node, local workerd, stdio × both eras), the elicitation conclusion and the
-schema-caching measurements are done ([RESULTS.md](../../../spikes/mcp-sdk-v2/RESULTS.md), 2026-10-20). What remains
-needs the owner's client apps: run [`spikes/mcp-sdk-v2/client-checklist.md`](../../../spikes/mcp-sdk-v2/client-checklist.md)
-for VS Code, JetBrains, Copilot CLI, Claude Code, Claude Desktop, Cursor and Windsurf / Devin Desktop, record the cells,
-then accept (or supersede) ADR-0005. Set the task back to `in-progress` when that starts.
 
 ## Security notes
 No real Agility tokens; local servers plus a throwaway Worker.

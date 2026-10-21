@@ -1,7 +1,6 @@
 # ADR-0005 — MCP SDK v2, stateless HTTP, dual protocol era
 
-- **Status:** proposed (runtime evidence from P0-07 recorded below, 2026-10-20; acceptance waits for the owner's
-  real-client checks in `spikes/mcp-sdk-v2/client-checklist.md`)
+- **Status:** accepted (owner, 2026-10-21, on the P0-07 evidence below)
 - **Date:** 2026-10-16
 - **Related:** P0-07, P1-01, P2-06, L-011 – L-019, L-023
 
