@@ -163,6 +163,14 @@
   as a second maintainer joins (before 1.0 at the latest).
 - **Owner (2026-10-19):** As recommended.
 
+## Sign-offs
+
+- **2026-10-21 — Tool contract (P0-11):** the owner signed off the final [tool conventions](../dev/tool-conventions.md)
+  and accepted [ADR-0015](../adr/0015-tool-output-contract.md): no totals ("more available" via `limit + 1`), default
+  sort by `ID`, no commas in scalar filter values, no `null` or `type` arrays in schemas, approval capability checked
+  before asking, the final `AB_*` list (with `AB_AGILITY_TLS`), the `tools/list` budget (≤ 40 KB default, ≤ 72 KB with
+  every group), the lints, client hints that only narrow, and no deferred-tool mechanism for now.
+
 ## Owner checklist (manual actions, in order)
 
 1. ~~Reserve the npm package name~~ (done 2026-10-19, `agility-bridge@0.0.0`) and enable 2FA; later configure trusted publishing and staged publishing (P1-15).

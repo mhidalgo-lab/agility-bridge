@@ -22,7 +22,7 @@ Statuses: `proposed` · `accepted` · `accepted (pending spike PX-NN)` · `super
 | [0012](0012-structured-query-no-raw-passthrough.md) | Validated generic query tool with bound parameters; no raw passthrough | accepted (owner) |
 | [0013](0013-opt-in-writes-human-approval.md) | Opt-in write tools with human approval by default | accepted (policy) / proposed (approval details, D-10 – D-12) |
 | [0014](0014-supported-agility-installations.md) | Hosted and on-premises instances, HTTPS, custom CA, access tokens | accepted (owner) |
-| [0015](0015-tool-output-contract.md) | Tool output contract and untrusted-data envelope | proposed (P0-11) |
+| [0015](0015-tool-output-contract.md) | Tool output contract and untrusted-data envelope | accepted (2026-10-21, P0-11) |
 | [0016](0016-mcp-client-support.md) | MCP client support policy | accepted (owner) |
 
 "accepted (owner)" means the project owner took the decision on 2026-10-16 while reviewing the initial plan; the

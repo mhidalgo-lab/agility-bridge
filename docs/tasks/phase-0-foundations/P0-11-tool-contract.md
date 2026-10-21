@@ -2,12 +2,12 @@
 id: P0-11
 title: Tool contract and conventions
 phase: 0
-status: todo
+status: review
 priority: high
 depends_on: [P0-06, P0-07, P0-14]
 adr: ["0012", "0015"]
 lessons: [L-005, L-030, L-031, L-032, L-033, L-038, L-042, L-045, L-150, L-153, L-155]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P0-11 — Tool contract and conventions
@@ -39,10 +39,10 @@ Freeze the tool contract — names, arguments, outputs, errors, paging, envelope
   have the P1-13 schema lint enforce the choice.
 
 ## Acceptance criteria
-- [ ] Conventions marked final; ADR-0015 accepted.
-- [ ] Lint specifications include examples of refused names and descriptions.
-- [ ] The tool catalogue shows groups and counts.
-- [ ] Owner sign-off recorded in the pending decisions.
+- [x] Conventions marked final; ADR-0015 accepted. *(2026-10-21)*
+- [x] Lint specifications include examples of refused names and descriptions.
+- [x] The tool catalogue shows groups and counts.
+- [x] Owner sign-off recorded in the pending decisions. *(docs/pending-decisions/phase-0.md, Sign-offs)*
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.

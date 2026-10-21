@@ -228,6 +228,7 @@ storage, no audit table (write outcomes are logged to stderr) and no HTTP layer.
 | 5xx, network | `AB_AGILITY_UNAVAILABLE` | |
 | timeout | `AB_AGILITY_TIMEOUT` | |
 | redirect / HTML login page / non-Agility body | `AB_AGILITY_WRONG_INSTANCE` | check the instance URL (L-054) |
+| HTTP 526 (Workers) or a TLS failure | `AB_AGILITY_TLS` | the certificate is not trusted; private CAs need `AB_CA_FILE` on the Node/Docker deployment (L-160) |
 
 Raw Agility bodies are never returned to the client; they are logged redacted and truncated at debug level only.
 
@@ -343,6 +344,7 @@ validate input + metadata (operation allowed, attributes writable, values typed)
 | `AB_AGILITY_AUTH` | Agility rejected the token |
 | `AB_AGILITY_RATE_LIMITED` | Agility returned 429 (`retryAfterSeconds` included) |
 | `AB_AGILITY_TIMEOUT` / `AB_AGILITY_UNAVAILABLE` | Timeout / 5xx or network failure |
+| `AB_AGILITY_TLS` | Untrusted instance certificate (Workers: HTTP 526 or an opaque fetch error, L-160) |
 | `AB_AGILITY_WRONG_INSTANCE` | Redirect, login page or non-Agility response: check the instance URL |
 | `AB_AGILITY_ERROR` | Other unexpected Agility response |
 | `AB_WRITE_APPROVAL_PENDING` | Approval requested out of band: open the returned link, approve, then repeat the call |

@@ -2,7 +2,7 @@
 id: P0-06
 title: "Spike: Agility API behaviour, limits and fixtures"
 phase: 0
-status: review
+status: done
 priority: high
 depends_on: [P0-01, P0-12]
 adr: ["0010", "0011", "0012", "0014"]
