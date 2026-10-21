@@ -4,5 +4,11 @@
     "types": ["node"],
     "isolatedDeclarations": false
   },
-  "include": ["*.ts", "test/**/*.ts", "../live/**/*.ts", "../vitest.live.config.ts"]
+  "include": [
+    "*.ts",
+    "test/**/*.ts",
+    "../live/**/*.ts",
+    "../vitest.live.config.ts",
+    "../spikes/agility-api/*.ts"
+  ]
 }

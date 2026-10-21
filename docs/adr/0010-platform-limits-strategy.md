@@ -45,6 +45,12 @@ the metadata service loads one asset type at a time (P1-03). In production on Wo
 512 KiB cap costs 4 ms CPU p50 and 8 ms p99, and 1 MB reaches 18–22 ms at the tail, which confirms the Free cap; the
 Paid presets stay on the documented limits (no Paid account was available).
 
+P0-06 (2026-10-21, live Agility 26.0.3.2): a typical work-item row (number, name, status, owners, estimate, sprint,
+project) is about 430–460 bytes, so 100 rows are about 46 KB and the 512 KiB Free cap holds about 1,100 such rows; one
+`meta.v1` type is about 90 KB and the whole schema 5.1 MB (load per type on Workers). Latency per `query.v1` call is
+0.2–0.3 s, or about 1.1 s when sorting by `ChangeDate` (L-163), which counts against the 20 s upstream timeout and the
+per-call budget of composite tools.
+
 ## Alternatives considered
 
 - **Let Agility or the platform fail naturally:** rejected; error-count quotas punish the user's own token.

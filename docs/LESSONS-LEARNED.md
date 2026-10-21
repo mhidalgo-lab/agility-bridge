@@ -43,7 +43,7 @@ How to use it:
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136 |
-| [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149 |
+| [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163 |
 | [Top 20](#top-20) | the lessons that save the most time |
 
 ---
@@ -920,6 +920,21 @@ periodically and document revocation.
 Dates are ISO 8601 with `Z` and up to 7 fractional digits; `ChangeDate`/`ChangeDateUTC`-style pairs exist with
 undocumented semantics. Always send `Z`-suffixed UTC, prefer the `…UTC` attributes, and keep the raw value.
 *Applied in:* P1-04, P1-05.
+
+**L-162 — A comma in a bound value becomes a list.**
+`query.v1`'s `with` keeps quotes, `|`, `;`, parentheses, brackets and newlines literal, but splits a scalar value at
+commas: `Number = $v` with `$v = "x,B-01234"` matched `B-01234` on a live 26.0.3.2 tenant. A caller-controlled scalar
+can widen a filter into a list. The compiler refuses commas in scalar values (or turns them into an explicit list only
+where the argument is a list), and the property tests include this case.
+*Why:* found by the P0-06 binding probe; L-139 predicted substitution but not which characters survive it.
+*Applied in:* [spikes/agility-api](../spikes/agility-api/RESULTS.md), P1-04, THREAT_MODEL T4.
+
+**L-163 — Sorting by `ChangeDate` costs a second.**
+On a live tenant, `sort: ["-ChangeDate"]` cost about 1.1 s per call whatever was selected; `sort: ["ID"]` cost about
+0.23 s and pages stayed disjoint and repeatable. Default sorts use `ID`; "most recent first" is an explicit option
+whose cost the tool declares. And `needTotal` returned no total on 26.0.3.2: show "more available" (fetch `size + 1`),
+not a total.
+*Applied in:* [spikes/agility-api](../spikes/agility-api/RESULTS.md), P1-04, P1-08, ADR-0015.
 
 ---
 

@@ -1,0 +1,4 @@
+{
+  "error": "Synthetic error: unknown attribute",
+  "exceptions": [{ "type": "SyntheticException", "message": "Unknown attribute 'NoSuchAttribute' on Story (synthetic)" }]
+}
