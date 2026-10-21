@@ -13,7 +13,7 @@ const OUT = new URL('../docs/reference/tools.md', import.meta.url);
 
 type Json = Record<string, unknown>;
 
-const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+const cell = (s: string) => s.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
 function typeOf(schema: Json): string {
   if (Array.isArray(schema['enum']))
