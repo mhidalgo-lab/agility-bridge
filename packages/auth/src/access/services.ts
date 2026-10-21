@@ -18,7 +18,7 @@ import {
   type Workspace,
 } from '@agility-bridge/storage';
 import type { z } from 'zod';
-import { sealCredentialToken } from '../secrets/credentials.ts';
+import { openCredentialToken, sealCredentialToken } from '../secrets/credentials.ts';
 import type { Keyring } from '../secrets/keyring.ts';
 import { DEFAULT_TOKEN_DAYS, generateDeviceToken, type TokenEnvironment } from '../tokens/device.ts';
 import {
@@ -30,6 +30,7 @@ import {
   writePolicySchema,
 } from './policy.ts';
 import type { ToolInfo } from './resolve.ts';
+import { type CredentialValidator, UpstreamCheckError, type ValidationResult } from './validate.ts';
 
 export interface AccessServicesOptions {
   readonly storage: Storage;
@@ -40,6 +41,8 @@ export interface AccessServicesOptions {
   readonly now?: () => number;
   /** `live` on production deployments (device tokens `ab_live_…`), `test` elsewhere. Default `live`. */
   readonly environment?: TokenEnvironment;
+  /** Validates tokens and probes instance origins against Agility (P2-13); without it, nothing is validated. */
+  readonly validator?: CredentialValidator;
   /** Id generator (tests); default `<prefix>_<random>`. */
   readonly newId?: (prefix: string) => string;
 }
@@ -195,6 +198,50 @@ export function accessServices(options: AccessServicesOptions) {
     return warnings;
   }
 
+  /** Probes an origin without a token; returns the schema fingerprint, or undefined without a validator. */
+  async function probe(
+    instance: Pick<Instance, 'id' | 'baseUrl' | 'tls'>,
+  ): Promise<string | null | undefined> {
+    if (options.validator === undefined) return undefined;
+    const r = await options.validator.probe(instance);
+    if (!r.ok) throw new UpstreamCheckError(r.code, r.message);
+    return r.fingerprint;
+  }
+
+  /** Records a validation result; a transient failure keeps the previous status (and records its code). */
+  async function record(id: string, result: ValidationResult): Promise<Credential> {
+    if (result.status === 'valid') {
+      return storage.credentials.update(id, {
+        validationStatus: 'valid',
+        validationErrorCode: null,
+        validatedAt: now(),
+        memberOid: result.memberOid,
+        memberName: result.memberName,
+        memberUsername: result.memberUsername,
+        reachableScopeIds: result.reachableScopeIds,
+      });
+    }
+    if (result.status === 'invalid') {
+      return storage.credentials.update(id, {
+        validationStatus: 'invalid',
+        validationErrorCode: result.code,
+        validatedAt: now(),
+      });
+    }
+    return storage.credentials.update(id, { validationErrorCode: result.code });
+  }
+
+  /** Validates one credential against Agility now (P2-13). Without a validator, returns it unchanged. */
+  async function validateCredential(id: string): Promise<Credential> {
+    const c = await mustGet(storage.credentials.get(id), 'credential');
+    if (options.validator === undefined || c.revokedAt !== null) return c;
+    const keyring = options.keyring;
+    if (keyring === undefined) throw new Error('A keyring is required to validate Agility tokens.');
+    const instance = await mustGet(storage.instances.get(c.instanceId), 'instance');
+    const token = await openCredentialToken(keyring, c);
+    return record(id, await options.validator.validate(instance, id, token));
+  }
+
   const users = {
     async create(input: {
       email: string;
@@ -226,7 +273,13 @@ export function accessServices(options: AccessServicesOptions) {
       } catch (error) {
         throw new InvalidInputError(`baseUrl: ${(error as Error).message}`);
       }
-      return storage.instances.create({ ...input, id: newId('ins'), baseUrl });
+      const fingerprint = await probe({ id: 'new', baseUrl, tls: input.tls ?? null });
+      return storage.instances.create({
+        ...input,
+        id: newId('ins'),
+        baseUrl,
+        ...(fingerprint === undefined ? {} : { metaFingerprint: fingerprint }),
+      });
     },
     /** Label, number prefixes, metadata fingerprint, disabled state. The origin changes only through `retarget`. */
     async update(
@@ -256,13 +309,15 @@ export function accessServices(options: AccessServicesOptions) {
       id: string,
       target: { baseUrl: string; tls?: JsonObject | null },
     ): Promise<{ instance: Instance; revokedCredentials: number; revokedGrants: number }> {
-      await mustGet(storage.instances.get(id), 'instance');
+      const current = await mustGet(storage.instances.get(id), 'instance');
       let baseUrl: string;
       try {
         baseUrl = canonicalInstanceUrl(target.baseUrl);
       } catch (error) {
         throw new InvalidInputError(`baseUrl: ${(error as Error).message}`);
       }
+      // The new origin must answer like Agility before anything changes (THREAT_MODEL A14).
+      await probe({ id, baseUrl, tls: target.tls === undefined ? current.tls : target.tls });
       const t = now();
       let revokedCredentials = 0;
       for (const c of await storage.credentials.list({ instanceId: id })) {
@@ -303,13 +358,14 @@ export function accessServices(options: AccessServicesOptions) {
       if (instance.disabledAt !== null) throw new InvalidInputError('The instance is disabled.');
       const id = newId('crd');
       const sealed = await sealCredentialToken(keyring, id, token);
-      return storage.credentials.create({
+      await storage.credentials.create({
         id,
         instanceId: input.instanceId,
         ownerUserId: input.ownerUserId,
         label: input.label,
         ...sealed,
       });
+      return validateCredential(id);
     },
     /**
      * Replaces the token of a credential (a member's new token, a rotated service token). The credential becomes
@@ -337,7 +393,23 @@ export function accessServices(options: AccessServicesOptions) {
         { tokenCiphertext: sealed.tokenCiphertext, tokenIv: sealed.tokenIv, keyVersion: sealed.keyVersion },
       );
       if (!replaced) throw new ConflictError('The credential changed meanwhile; try again.');
-      return storage.credentials.update(id, { tokenHint: sealed.tokenHint });
+      await storage.credentials.update(id, { tokenHint: sealed.tokenHint });
+      return validateCredential(id);
+    },
+    /** Validates now: member, reachable projects, status (P2-13). */
+    validate: (id: string) => validateCredential(id),
+    /**
+     * Revalidates every unrevoked credential last validated before `olderThan` (or never), one at a time. Returns how
+     * many were checked; failures are recorded on the credential, never thrown.
+     */
+    async revalidate(olderThan: number): Promise<number> {
+      let n = 0;
+      for (const c of await storage.credentials.list()) {
+        if (c.revokedAt !== null || (c.validatedAt !== null && c.validatedAt >= olderThan)) continue;
+        await validateCredential(c.id).catch(() => undefined);
+        n++;
+      }
+      return n;
     },
     revoke: (id: string) => storage.credentials.update(id, { revokedAt: now() }),
     update: (id: string, patch: { label?: string }) => storage.credentials.update(id, patch),

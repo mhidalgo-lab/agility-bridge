@@ -45,3 +45,13 @@ export {
   type WithWarnings,
   type WorkspacePatchInput,
 } from './services.ts';
+export {
+  type CredentialValidator,
+  credentialValidator,
+  type ProbeResult,
+  probeInstance,
+  UpstreamCheckError,
+  type ValidationResult,
+  type ValidatorServices,
+  validateAgilityToken,
+} from './validate.ts';

@@ -195,6 +195,20 @@ agility-bridge credential replace <credential-id> [--from-file <value>]
 
 Local or remote.
 
+### `credential validate`
+
+Ask Agility now whose token it is and what it can reach.
+
+```text
+agility-bridge credential validate <credential-id>
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `<credential-id>` | argument | Credential id |
+
+Local or remote.
+
 ### `credential revoke`
 
 Revoke a credential.

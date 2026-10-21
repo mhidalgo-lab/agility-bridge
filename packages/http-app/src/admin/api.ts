@@ -618,6 +618,18 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
   add(
     {
       method: 'post',
+      path: '/credentials/{id}/validate',
+      ...cred,
+      params: true,
+      summary: 'Validate a credential against Agility now (member, reachable projects, status)',
+      out: CredentialOut,
+      audit: { action: 'credential.validate', targetType: 'credential' },
+    },
+    async (c, { id }) => credentialOut(await services(c).credentials.validate(id)),
+  );
+  add(
+    {
+      method: 'post',
       path: '/credentials/{id}/revoke',
       ...cred,
       params: true,

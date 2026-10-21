@@ -103,6 +103,7 @@ follows in the self-hosting guide.
 | `AB_TRUSTED_PROXY_HOPS` | `0` | Reverse proxies in front whose `X-Forwarded-For` entries are trusted for the client address |
 | `AB_CALL_BUDGET`, `AB_LIMITS_MAX_RESPONSE_BYTES` | `1000`, 8 MiB | Defaults for workspaces that set no limits |
 | `AB_AUDIT_RETENTION_DAYS` | `90` | Days the [audit log](audit-log.md) keeps rows; `0` keeps them forever |
+| `AB_CREDENTIAL_REVALIDATION_HOURS` | `24` | Hours between revalidations of stored Agility tokens ([access model](access-model.md#credential-validation)); `0` = never |
 | `AB_ADMIN_TOKEN_FILE` or `AB_ADMIN_TOKEN` | unset | The break-glass admin token from `agility-bridge admin-token`; turns on the [admin API](../reference/admin-api.md) (`404` without it). Hand-made values are refused |
 | `AB_ADMIN_URL` | unset | For the [management commands](cli.md): the server to manage through its admin API (HTTPS), instead of the local database |
 

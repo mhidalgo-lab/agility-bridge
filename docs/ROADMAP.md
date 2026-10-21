@@ -170,10 +170,10 @@ Status lives in each task file.
 | P2-07 | [Rate limiting (pluggable)](tasks/phase-2-access-http/P2-07-rate-limiting.md) | high | P2-06 | done |
 | P2-08 | [Audit log](tasks/phase-2-access-http/P2-08-audit-log.md) | high | P2-06 | done |
 | P2-09 | [Admin REST API](tasks/phase-2-access-http/P2-09-admin-api.md) | high | P2-04, P2-05, P2-08 | done |
-| P2-10 | [CLI management commands (local and remote)](tasks/phase-2-access-http/P2-10-cli-management.md) | medium | P2-09 | review |
+| P2-10 | [CLI management commands (local and remote)](tasks/phase-2-access-http/P2-10-cli-management.md) | medium | P2-09 | done |
 | P2-11 | [Docker image](tasks/phase-2-access-http/P2-11-docker-image.md) | medium | P2-06 | todo |
 | P2-12 | [Authorization and isolation test suite](tasks/phase-2-access-http/P2-12-authz-isolation-suite.md) | high | P2-06 | done |
-| P2-13 | [Agility credential validation](tasks/phase-2-access-http/P2-13-credential-validation.md) | medium | P2-03, P2-04 | todo |
+| P2-13 | [Agility credential validation](tasks/phase-2-access-http/P2-13-credential-validation.md) | medium | P2-03, P2-04 | review |
 | P2-14 | [Pass-through workspaces (optional, off by default)](tasks/phase-2-access-http/P2-14-passthrough-mode.md) | low | P2-06, P2-08 | todo |
 | P2-15 | [Security inventories (cryptography, logging, data protection)](tasks/phase-2-access-http/P2-15-security-inventories.md) | medium | P2-03, P2-08 | todo |
 | P2-16 | [Self-hosting docs and executable-docs check](tasks/phase-2-access-http/P2-16-self-hosting-docs.md) | medium | P2-11 | todo |

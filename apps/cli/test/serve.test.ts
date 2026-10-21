@@ -6,11 +6,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { accessServices, generateAdminToken, generateMasterKey, Keyring } from '@agility-bridge/auth';
 import { CORE_TOOLS } from '@agility-bridge/core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { type FixtureAgility, startFixtureAgility } from '../../../scripts/fixture-agility.ts';
 import { ConfigError } from '../src/config.ts';
 import { loadServeConfig, type RunningServer, startServe } from '../src/serve.ts';
 
 let dir: string;
+let agility: FixtureAgility;
+beforeAll(async () => {
+  agility = await startFixtureAgility();
+});
+afterAll(() => agility.close());
 let running: RunningServer | undefined;
 const KEY = generateMasterKey(1);
 
@@ -150,7 +156,7 @@ describe('admin API through serve', () => {
     const created = await fetch(`${running.url}/api/admin/v1/instances`, {
       method: 'POST',
       headers: { ...auth, 'content-type': 'application/json' },
-      body: JSON.stringify({ label: 'Main', baseUrl: 'https://agility.example.test/Main' }),
+      body: JSON.stringify({ label: 'Main', baseUrl: agility.url }),
     });
     expect(created.status).toBe(201);
     expect(
@@ -169,5 +175,37 @@ describe('admin API through serve', () => {
     await expect(
       startServe(env({ AB_ADMIN_TOKEN_FILE: join(dir, 'data', 'admin.token') }), { sink: () => {} }),
     ).rejects.toThrow(/inside the data directory/);
+  });
+});
+
+describe('revalidation after repeated Agility refusals', () => {
+  it('revalidates after 3 consecutive AB_AGILITY_AUTH errors, at most once per 10 minutes, and resets on success', async () => {
+    const { revalidateOnAuthErrors } = await import('../src/serve.ts');
+    const validated: string[] = [];
+    let t = 1_000_000;
+    const services = {
+      credentials: {
+        validate: async (id: string) => (validated.push(id), { id, validationStatus: 'invalid' }),
+      },
+    };
+    const trigger = revalidateOnAuthErrors(
+      services as never,
+      { warn: () => {}, error: () => {} } as never,
+      () => t,
+    );
+    trigger('c1', 'AB_AGILITY_AUTH');
+    trigger('c1', 'AB_AGILITY_AUTH');
+    trigger('c1', null); // a success in between resets the streak
+    trigger('c1', 'AB_AGILITY_AUTH');
+    trigger('c1', 'AB_AGILITY_AUTH');
+    expect(validated).toEqual([]);
+    trigger('c1', 'AB_AGILITY_AUTH');
+    await Promise.resolve();
+    expect(validated).toEqual(['c1']);
+    for (let i = 0; i < 3; i++) trigger('c1', 'AB_AGILITY_AUTH');
+    expect(validated).toEqual(['c1']);
+    t += 600_000;
+    for (let i = 0; i < 3; i++) trigger('c1', 'AB_AGILITY_AUTH');
+    expect(validated).toEqual(['c1', 'c1']);
   });
 });

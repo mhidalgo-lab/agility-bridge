@@ -97,27 +97,44 @@ const fake = new FakeAgility({
   },
 });
 
-const server = createServer(async (req, res) => {
-  const chunks: Buffer[] = [];
-  for await (const c of req) chunks.push(c as Buffer);
-  try {
-    const answer = await fake.fetch(
-      new Request(`http://127.0.0.1${req.url}`, {
-        method: req.method ?? 'GET',
-        ...(req.method === 'POST' ? { body: Buffer.concat(chunks) } : {}),
-      }),
-    );
-    res.writeHead(answer.status, Object.fromEntries(answer.headers));
-    res.end(Buffer.from(await answer.arrayBuffer()));
-  } catch (error) {
-    res
-      .writeHead(400, { 'content-type': 'application/json' })
-      .end(JSON.stringify({ error: String((error as Error).message) }));
-  }
-});
-server.listen(Number(process.argv[2] ?? 0), '127.0.0.1', () => {
-  const { port } = server.address() as AddressInfo;
-  console.error(
-    `Synthetic Agility at http://127.0.0.1:${port}/SyntheticInstance (any AB_AGILITY_TOKEN works)`,
-  );
-});
+export interface FixtureAgility {
+  /** Base URL of the synthetic instance, e.g. http://127.0.0.1:41234/SyntheticInstance. */
+  readonly url: string;
+  close(): Promise<void>;
+}
+
+/** Starts the synthetic Agility on 127.0.0.1 (port 0 = any free port). */
+export function startFixtureAgility(port = 0): Promise<FixtureAgility> {
+  const server = createServer(async (req, res) => {
+    const chunks: Buffer[] = [];
+    for await (const c of req) chunks.push(c as Buffer);
+    try {
+      const answer = await fake.fetch(
+        new Request(`http://127.0.0.1${req.url}`, {
+          method: req.method ?? 'GET',
+          ...(req.method === 'POST' ? { body: Buffer.concat(chunks) } : {}),
+        }),
+      );
+      res.writeHead(answer.status, Object.fromEntries(answer.headers));
+      res.end(Buffer.from(await answer.arrayBuffer()));
+    } catch (error) {
+      res
+        .writeHead(400, { 'content-type': 'application/json' })
+        .end(JSON.stringify({ error: String((error as Error).message) }));
+    }
+  });
+  return new Promise((resolve) => {
+    server.listen(port, '127.0.0.1', () => {
+      const { port: bound } = server.address() as AddressInfo;
+      resolve({
+        url: `http://127.0.0.1:${bound}/SyntheticInstance`,
+        close: () => new Promise<void>((done) => server.close(() => done())),
+      });
+    });
+  });
+}
+
+if (import.meta.main) {
+  const fixture = await startFixtureAgility(Number(process.argv[2] ?? 0));
+  console.error(`Synthetic Agility at ${fixture.url} (any AB_AGILITY_TOKEN works)`);
+}

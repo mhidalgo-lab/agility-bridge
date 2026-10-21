@@ -31,6 +31,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | `PATCH` | `/credentials/{id}` | Rename a credential | `label`: string | 200 Credential |
 | `DELETE` | `/credentials/{id}` | Delete an unused credential | — | 200 object |
 | `POST` | `/credentials/{id}/token` | Replace a credential's token (it becomes unvalidated) | `token`: string | 200 Credential |
+| `POST` | `/credentials/{id}/validate` | Validate a credential against Agility now (member, reachable projects, status) | — | 200 Credential |
 | `POST` | `/credentials/{id}/revoke` | Revoke a credential | — | 200 Credential |
 
 ## grants

@@ -264,6 +264,12 @@ export const COMMANDS: readonly CommandSpec[] = [
     }),
   },
   {
+    words: ['credential', 'validate'],
+    summary: 'Ask Agility now whose token it is and what it can reach',
+    args: [id('credential-id', 'Credential id')],
+    api: async (_r, p) => ({ method: 'POST', path: `/credentials/${enc(p.args[0] as string)}/validate` }),
+  },
+  {
     words: ['credential', 'revoke'],
     summary: 'Revoke a credential',
     args: [id('credential-id', 'Credential id')],

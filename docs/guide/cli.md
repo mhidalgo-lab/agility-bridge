@@ -52,6 +52,7 @@ only they can store it (the admin panel, Phase 4); nobody can store it for them.
 | Lost device | `agility-bridge token list <grant-id>`, then `agility-bridge token revoke <token-id>` |
 | Someone leaves | `agility-bridge grant revoke <grant-id>` (all their devices stop) |
 | Replace a service token | `agility-bridge credential replace <credential-id> --from-file ./new.token` |
+| Check a credential now | `agility-bridge credential validate <credential-id>` |
 | Retire a credential | `agility-bridge credential revoke <credential-id>`, later `agility-bridge credential delete <credential-id>` |
 | Remove a workspace | `agility-bridge workspace disable <workspace-id>` or `agility-bridge workspace delete <workspace-id>` |
 | Remove an instance | `agility-bridge instance delete <instance-id>` (only when unused) |
