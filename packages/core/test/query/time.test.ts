@@ -51,6 +51,12 @@ describe('parseTimeRange (L-061)', () => {
     expect(() => range(text)).toThrow(/time_range|not a valid date|not a date|ends before/),
   );
 
+  it('refuses long input before any regular expression runs', () => {
+    const t = performance.now();
+    expect(() => range(`2026-10-01${' '.repeat(100_000)}to 2026-10-02`)).toThrow(/too long/);
+    expect(performance.now() - t).toBeLessThan(100);
+  });
+
   it('refuses windows above the limit with AB_LIMIT_QUERY', () => {
     expect(() => range('last 400 days')).toThrow(/maxTimeRangeDays/);
     expect(() => range('last 30 days', NOW, 7)).toThrow(/at most 7 days/);

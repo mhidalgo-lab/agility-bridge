@@ -61,8 +61,10 @@ const iso = (t: number): string => new Date(t).toISOString();
  * `maxDays` and windows that end before they start are refused.
  */
 export function parseTimeRange(text: string, now: number, maxDays: number): TimeWindow {
-  const s = text.trim().toLowerCase().replace(/\s+/g, ' ');
-  if (s.length > 100) throw invalid('time_range is too long.');
+  // Cap the raw text before any regular expression runs on it (CodeQL js/polynomial-redos).
+  if (typeof text !== 'string' || text.length > 100) throw invalid('time_range is too long.');
+  const norm = text.trim().replace(/\s+/g, ' ');
+  const s = norm.toLowerCase();
   let since: number;
   let until = now;
   const rolling = /^last (\d{1,4}) (hour|day|week|month)s?$/.exec(s);
@@ -83,14 +85,16 @@ export function parseTimeRange(text: string, now: number, maxDays: number): Time
   } else if (s === 'last week') since = now - 7 * DAY;
   else if (s === 'last month') since = now - 30 * DAY;
   else if (rolling !== null) since = now - Number(rolling[1]) * (UNIT_MS[rolling[2] as string] as number);
-  else if (sinceMatch !== null) since = parseInstant(text.trim().slice(6));
+  else if (sinceMatch !== null) since = parseInstant(norm.slice(6));
   else if (between !== null) {
-    const [from = '', to = ''] = text.trim().split(/\s+to\s+/i);
+    const at = s.indexOf(' to ');
+    const from = norm.slice(0, at);
+    const to = norm.slice(at + 4);
     since = parseInstant(from);
     until = parseInstant(to, true);
   } else {
     throw invalid(
-      `time_range "${text.slice(0, 100)}" is not understood.`,
+      `time_range "${norm}" is not understood.`,
       'Use e.g. "last 14 days", "this week", "previous month", "since 2026-10-01" or "2026-10-01 to 2026-10-15" (UTC).',
     );
   }
