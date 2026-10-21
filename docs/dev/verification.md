@@ -87,3 +87,21 @@ Sign this in the PR for every new or changed fixture:
 - [ ] Hostile cases included where the fixture feeds tool output: quotes, HTML, prompt-injection text, very long strings,
       Unicode (L-122).
 - [ ] `gitleaks` passes locally or in CI.
+
+## Self-hosting walkthrough (P2-16)
+
+The setup the guides describe is executed, not just read (L-133): `scripts/walkthrough.ts` runs every shell block
+marked `<!-- walkthrough: N -->` in `docs/guide/self-hosting.md` and `docs/guide/cli.md`, in order and verbatim, in a
+fresh `node:24-bookworm` container (digest-pinned) that installs the package packed from the checkout. It substitutes
+only the npm name (→ the tarball), the example instance and public URLs (→ the synthetic Agility and the local server)
+and the `<…-id>` placeholders (→ the ids printed by the previous commands), prints each substitution, and redacts device
+tokens from its output. The CI Docker job runs it on every change; the image itself is covered by
+`scripts/docker-smoke.ts` in the same job.
+
+| Date | Where | Package | Result |
+|---|---|---|---|
+| 2026-10-21 | Fresh container (`node:24-bookworm@sha256:7b559cf7…`), Docker 29.9.1 on WSL2 | `agility-bridge-0.1.0.tgz` packed from the P2-16 branch | Passed: install, `init`, `admin-token`, instance (origin probe), credential (validated: member and projects), user, workspace, grant, device token, `serve`, `/health`, `tools/list` with the device token listing exactly the granted tools |
+
+A container is not a full virtual machine (no init system, no reverse proxy, no TLS); the systemd unit, the proxy
+configurations and the Compose file are validated separately (`docker compose config`, `caddy validate`) and by the
+image smoke test.

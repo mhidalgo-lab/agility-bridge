@@ -76,7 +76,17 @@ async function manage(spec: CommandSpec, rest: readonly string[], io: Io): Promi
       io.err(`agility-bridge: ${error.message}\nUsage: ${usage(spec)}`);
       return 2;
     }
-    if (error instanceof ConfigError) {
+    // Expected refusals from the local database, files and keys: a message, not a stack trace.
+    const expected = [
+      'ConfigError',
+      'UnsafeFileError',
+      'MigrationError',
+      'SecretsError',
+      'NotFoundError',
+      'ConflictError',
+      'InvalidInputError',
+    ];
+    if (error instanceof Error && expected.includes(error.name)) {
       io.err(`agility-bridge: ${error.message}`);
       return 1;
     }

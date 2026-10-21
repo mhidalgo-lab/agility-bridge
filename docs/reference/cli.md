@@ -461,6 +461,39 @@ agility-bridge audit tail [--limit <n>] [--kind <value>] [--workspace <value>]
 
 Local or remote.
 
+## backup
+
+### `backup`
+
+Write a consistent copy of the database to a new 0600 file while the server runs (local).
+
+```text
+agility-bridge backup <file>
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `<file>` | argument | The new backup file (never overwritten) |
+
+Local database only.
+
+## restore
+
+### `restore`
+
+Check a backup and copy it to a new database file (stop the server first).
+
+```text
+agility-bridge restore <backup> <target>
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `<backup>` | argument | A file written by `backup` |
+| `<target>` | argument | The new database file (never overwritten) |
+
+Runs without a server.
+
 ## keys
 
 ### `keys status`

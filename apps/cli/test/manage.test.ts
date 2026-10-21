@@ -205,6 +205,21 @@ describe('local and remote management', () => {
     expect(remote.err).toContain('local database only');
   });
 
+  it('backup writes a consistent copy that restore checks and copies, never overwriting', async () => {
+    const env = { AB_DATA_DIR: join(dir, 'd'), AB_MASTER_KEY_FILE: keyFile('k.key') };
+    await cli(['user', 'add', 'bo@example.test'], env);
+    const backup = join(dir, 'backups', 'b1.db');
+    expect((await cli(['backup', backup], env)).json).toEqual({ backup });
+    expect((await cli(['backup', backup], env)).code).toBe(1);
+    const restored = join(dir, 'restored', 'agility-bridge.db');
+    expect((await cli(['restore', backup, restored], {})).json).toEqual({ restored });
+    const users = await cli(['user', 'list'], { ...env, AB_DB_PATH: restored });
+    expect((users.json as { email: string }[]).map((u) => u.email)).toEqual(['bo@example.test']);
+    const again = await cli(['restore', backup, restored], {});
+    expect(again.code).toBe(1);
+    expect(again.err).toContain('exists');
+  });
+
   it('init writes a 0600 key once', async () => {
     const path = join(dir, 'cfg', 'master.key');
     const first = await cli(['init', '--key-file', path], {});

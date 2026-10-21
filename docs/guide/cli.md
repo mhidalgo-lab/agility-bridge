@@ -21,9 +21,10 @@ looks like a secret (`--token`, `--password`, …) is refused.
 
 ## First setup
 
+After [installing](self-hosting.md#install-node) (`agility-bridge init` wrote the master key), on the server host:
+
+<!-- walkthrough: 2 -->
 ```sh
-agility-bridge init
-agility-bridge admin-token > ~/.config/agility-bridge/admin.token && chmod 600 ~/.config/agility-bridge/admin.token
 export AB_MASTER_KEY_FILE=~/.config/agility-bridge/master.key
 agility-bridge instance add "Main" https://www7.v1host.com/YourInstance
 agility-bridge credential add --instance <instance-id> --label "Service member" --from-file ./service.token
@@ -33,9 +34,10 @@ agility-bridge grant add --workspace <workspace-id> --user <user-id> --tools who
 agility-bridge token issue <grant-id> --label "Ann's laptop"
 ```
 
-`init` writes the master key to `~/.config/agility-bridge/master.key` (never over an existing file); keep it away from
-the data directory and back it up separately ([secrets](secrets.md)). `token issue` prints the device token once: put
-it into the MCP client of that device ([client setup](clients.md)) at `https://<server>/w/team-mobile/mcp`.
+Each command prints the new record as JSON; use its `id` in the next command. `credential add` validates the token
+against Agility and shows the member behind it. `token issue` prints the device token once: put it into the MCP client
+of that device ([devices](multi-device.md)) at `https://<server>/w/team-mobile/mcp`. Keep the master key away from the
+data directory and back it up separately ([secrets](secrets.md)).
 
 Credentials added here are **shared** (a service member's token, used read-only). A member's own token is personal:
 only they can store it (the admin panel, Phase 4); nobody can store it for them.
@@ -59,6 +61,9 @@ only they can store it (the admin panel, Phase 4); nobody can store it for them.
 | Move an instance to a new address | `agility-bridge instance retarget <instance-id> https://new.example.com/Instance` (owners; revokes its credentials and grants) |
 | Remove a grant | `agility-bridge grant delete <grant-id>` |
 | Read the audit log | `agility-bridge audit tail --limit 50 --kind auth` |
+| Back up while the server runs (local only) | `agility-bridge backup /backups/agility-bridge-2026-10-21.db` |
+| Restore (server stopped) | `agility-bridge restore /backups/agility-bridge-2026-10-21.db /srv/agility-bridge/restored.db` |
+| A new break-glass admin token | `agility-bridge admin-token` (put it in a `0600` file for `AB_ADMIN_TOKEN_FILE`) |
 | Master-key rotation (local only) | `agility-bridge keys status`, `agility-bridge keys rotate --reason "yearly"`, `agility-bridge keys retire 1 --reason "rotation done"` |
 
 Changes take effect for new requests at once on the server that made them, and within the access cache (at most 60 s,

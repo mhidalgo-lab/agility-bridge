@@ -2,7 +2,7 @@
 id: P2-15
 title: Security inventories (cryptography, logging, data protection)
 phase: 2
-status: review
+status: done
 priority: medium
 depends_on: [P2-03, P2-08]
 adr: ["0007"]
