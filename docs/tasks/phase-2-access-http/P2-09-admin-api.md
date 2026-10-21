@@ -2,12 +2,12 @@
 id: P2-09
 title: Admin REST API
 phase: 2
-status: todo
+status: review
 priority: high
 depends_on: [P2-04, P2-05, P2-08]
 adr: ["0008"]
 lessons: [L-065, L-134]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P2-09 — Admin REST API
@@ -23,9 +23,23 @@ Everything an operator manages — instances, credentials, workspaces, grants, t
 - OpenAPI document served and the reference generated into docs.
 
 ## Acceptance criteria
-- [ ] Negative authorization tests for every route and role.
-- [ ] Tests: weak or hand-made admin tokens refused; an admin cannot change an instance origin; an owner change revokes the instance's credentials.
-- [ ] Generated `docs/reference/admin-api.md` committed.
+- [x] Negative authorization tests for every route and role. *(`packages/http-app/test/admin.test.ts`: every route
+  unauthenticated → 401 and as a member → 403/404, with a snapshot proving nothing changed; owner-only actions as an
+  admin → 403 and audited as denied; nobody stores another user's personal token. Mutation-checked.)*
+- [x] Tests: weak or hand-made admin tokens refused; an admin cannot change an instance origin; an owner change revokes the instance's credentials.
+- [x] Generated `docs/reference/admin-api.md` committed. *(`pnpm docs:admin-api`; a test compares it with the API.)*
+
+## Notes
+- `packages/auth/src/access/guards.ts`: `guardedServices(services, ctx, actor)` — the only entry for alternate writers
+  (L-065). Roles: owners everything; admins manage instances (not origins), shared credentials, workspaces, grants
+  and members; members only their own personal credentials and the tokens of their own grants (others' records read as
+  404, no existence oracle). Owner-only: origin/TLS changes (with a recent sign-in), owners and admins, write settings
+  and write tools (ADR-0013). Last active owner protected.
+- Break-glass token: `agility-bridge admin-token` prints `ab_admin_<43>_<6>`; `AB_ADMIN_TOKEN(_FILE)` refused unless
+  generated (checksum), file `0600` and outside the data directory; it acts as an owner with a recent sign-in but cannot
+  store anyone's personal token.
+- `packages/http-app/src/admin/`: OpenAPIHono routes, error envelope, body checks (JSON only when a body is present,
+  64 KiB), audit rows for every change and refusal, access cache cleared on change.
 
 ## Security notes
 THREAT_MODEL T3, T14, A5.
@@ -35,7 +49,7 @@ THREAT_MODEL T3, T14, A5.
 - L-134 — Generate references from code.
 
 ## Docs to update
-- docs/reference/admin-api.md (generated)
+- [x] docs/reference/admin-api.md (generated)
 
 ## Out of scope
 - Anything not listed under Scope.

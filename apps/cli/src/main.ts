@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
+
+import { generateAdminToken } from '@agility-bridge/auth';
 import pkg from '../package.json' with { type: 'json' };
 import { ConfigError, loadConfig } from './config.ts';
 import { startServe } from './serve.ts';
@@ -11,6 +13,7 @@ export const HELP = `agility-bridge ${VERSION}: an unofficial MCP server for Dig
 Usage:
   agility-bridge [stdio]      Serve MCP on stdin/stdout (the default; started by your MCP client)
   agility-bridge serve        Serve workspaces over HTTP at /w/<slug>/mcp (a team server; needs a master key)
+  agility-bridge admin-token  Print a new break-glass admin token for AB_ADMIN_TOKEN_FILE (shown once)
   agility-bridge --version    Print the version
   agility-bridge --help       Print this help
 
@@ -68,6 +71,13 @@ export function main(args: readonly string[], io: Io): number | 'serving' | Prom
     return 2;
   }
   if (command === 'serve' && rest.length === 0) return serve(io);
+  if (command === 'admin-token' && rest.length === 0) {
+    io.out(generateAdminToken());
+    io.err(
+      'agility-bridge: a new admin token (shown once). Store it in a 0600 file outside the data directory and set AB_ADMIN_TOKEN_FILE; anyone with it can administer the server.',
+    );
+    return 0;
+  }
   if ((command !== undefined && command !== 'stdio') || rest.length > 0) {
     io.err(`Unknown argument: ${(command !== 'stdio' ? command : rest[0])?.slice(0, 40)}\n\n${HELP}`);
     return 2;

@@ -32,6 +32,7 @@ import type { Storage } from '@agility-bridge/storage';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { type Context, Hono } from 'hono';
 import { AccessCache } from './access-cache.ts';
+import { ADMIN_BASE, type AdminApiOptions, createAdminApi } from './admin/api.ts';
 import { createEdge, type EdgeOptions } from './edge.ts';
 import { type ClassifiedRequest, classifyMcpMessage, jsonRpcError, readMcpBody } from './mcp-request.ts';
 
@@ -122,6 +123,8 @@ export interface HttpAppOptions extends EdgeOptions {
   readonly version: string;
   readonly maxBodyBytes?: number;
   readonly deadlineMs?: number;
+  /** The admin API at `/api/admin/v1` (P2-09); absent = the whole API answers 404. */
+  readonly admin?: Pick<AdminApiOptions, 'services' | 'audit' | 'authenticate'>;
 }
 
 export interface HttpApp {
@@ -234,6 +237,22 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     return c.json({ error: 'internal error' }, 500);
   });
   app.notFound((c) => c.json({ error: 'not found' }, 404));
+
+  if (options.admin !== undefined) {
+    app.route(
+      ADMIN_BASE,
+      createAdminApi({
+        ...options.admin,
+        storage: options.storage,
+        tools: options.access.tools,
+        onChange: () => cache.clear(),
+        ...(options.limits === undefined ? {} : { limits: options.limits }),
+        clientIp,
+        logger: services.logger,
+        clock: services.clock,
+      }),
+    );
+  }
 
   // Liveness and version only (L-151).
   app.get('/health', (c) => c.json({ status: 'ok' }));

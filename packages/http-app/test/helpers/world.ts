@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // A complete server for HTTP tests: memory storage, two workspaces on one fake Agility instance, personal credentials
 // for two users, device tokens, and a recorder of which Agility token reached the fake.
-import { accessServices, generateMasterKey, Keyring, type ToolInfo } from '@agility-bridge/auth';
+import { type Actor, accessServices, generateMasterKey, Keyring, type ToolInfo } from '@agility-bridge/auth';
 import {
   CircuitBreakers,
   CORE_TOOLS,
@@ -49,7 +49,17 @@ export interface World {
   /** Agility tokens that reached the fake, in order. */
   agilityTokens: string[];
   tokens: { alice: string; aliceB: string; bob: string };
-  ids: { aliceGrant: string; aliceToken: string; bobCredential: string; workspaceA: string };
+  ids: {
+    aliceGrant: string;
+    aliceToken: string;
+    bobCredential: string;
+    workspaceA: string;
+    alice: string;
+    aliceCredential: string;
+    instance: string;
+    owner: string;
+    admin: string;
+  };
   requests: RequestEvent[];
   toolCalls: ToolCallRecord[];
   app: ReturnType<typeof createHttpApp>;
@@ -60,7 +70,7 @@ export interface World {
 
 export async function world(
   over: Partial<HttpAppOptions> = {},
-  options: { auditStorage?: (s: Storage) => Storage } = {},
+  options: { auditStorage?: (s: Storage) => Storage; admin?: boolean } = {},
 ): Promise<World> {
   const now = { t: Date.UTC(2026, 9, 21, 12) };
   const storage = createMemoryStorage({ now: () => now.t });
@@ -108,6 +118,8 @@ export async function world(
       tools: ['whoami', 'get_assets'],
     })
   ).record;
+  const ownerUser = await svc.users.create({ email: 'owner@example.test', role: 'owner' });
+  const adminUser = await svc.users.create({ email: 'admin@example.test', role: 'admin' });
   const a = await svc.tokens.issue({ grantId: aliceGrant.id, label: 'laptop' });
   const aB = await svc.tokens.issue({ grantId: aliceGrantB.id, label: 'laptop' });
   const b = await svc.tokens.issue({ grantId: bobGrant.id, label: 'phone' });
@@ -158,6 +170,26 @@ export async function world(
       clock: { now: () => now.t },
       random: webCryptoRandom,
     },
+    ...(options.admin
+      ? {
+          admin: {
+            services: svc,
+            audit,
+            // Tests pick the actor with a header; production uses the admin token (and sessions from P4-02).
+            authenticate: async (c) => {
+              const who = c.req.header('x-test-actor');
+              const users: Record<string, Actor> = {
+                break_glass: { kind: 'break_glass' },
+                owner: { kind: 'user', userId: ownerUser.id, role: 'owner', recentAuth: true },
+                owner_stale: { kind: 'user', userId: ownerUser.id, role: 'owner', recentAuth: false },
+                admin: { kind: 'user', userId: adminUser.id, role: 'admin', recentAuth: true },
+                member: { kind: 'user', userId: alice.id, role: 'member', recentAuth: true },
+              };
+              return who === undefined ? null : (users[who] ?? null);
+            },
+          },
+        }
+      : {}),
     observer: audit.observer({ request: (e) => requests.push(e), toolCall: (e) => toolCalls.push(e) }),
     version: '0.0.0-test',
     ...over,
@@ -172,6 +204,11 @@ export async function world(
       aliceToken: a.record.id,
       bobCredential: bobCred.id,
       workspaceA: wsA.id,
+      alice: alice.id,
+      aliceCredential: aliceCred.id,
+      instance: instance.id,
+      owner: ownerUser.id,
+      admin: adminUser.id,
     },
     requests,
     toolCalls,

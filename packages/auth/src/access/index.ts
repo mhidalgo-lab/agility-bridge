@@ -1,4 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
+export {
+  type Actor,
+  ForbiddenError,
+  type GuardContext,
+  type GuardedServices,
+  guardedServices,
+} from './guards.ts';
 export { loadAccessRecords } from './load.ts';
 export {
   type AssetTypePolicy,

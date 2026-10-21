@@ -32,6 +32,14 @@ describe('main', () => {
     });
   });
 
+  it('admin-token prints one new generated token on stdout, with guidance on stderr', () => {
+    const r = run(['admin-token']);
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/^ab_admin_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}$/);
+    expect(run(['admin-token']).out).not.toBe(r.out);
+    expect(r.err).toContain('AB_ADMIN_TOKEN_FILE');
+  });
+
   it('serve without a master key exits 1 with guidance, before listening', async () => {
     const err: string[] = [];
     const code = main(['serve'], {

@@ -2,8 +2,8 @@
 // `agility-bridge serve` (P2-06, ARCHITECTURE §3 mode C): the HTTP server on Node with SQLite storage, encrypted
 // tokens and per-workspace MCP endpoints. Configuration only from the environment, never flags (L-026).
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { Keyring, verifyKeyring } from '@agility-bridge/auth';
+import { dirname, join, resolve, sep } from 'node:path';
+import { AdminTokenVerifier, accessServices, Keyring, verifyKeyring } from '@agility-bridge/auth';
 import {
   CircuitBreakers,
   CORE_TOOLS,
@@ -19,6 +19,7 @@ import {
 } from '@agility-bridge/core';
 import {
   AuditWriter,
+  adminTokenAuthenticator,
   clientAddress,
   createHttpApp,
   createRequestLimits,
@@ -28,7 +29,12 @@ import {
   type RateLimitConfig,
   scheduleAuditRetention,
 } from '@agility-bridge/http-app';
-import { openSqliteStorage, type SqliteStorage } from '@agility-bridge/storage-sqlite';
+import {
+  openSqliteStorage,
+  readSecretFile,
+  type SqliteStorage,
+  UnsafeFileError,
+} from '@agility-bridge/storage-sqlite';
 import { serve as serveNode } from '@hono/node-server';
 import pkg from '../package.json' with { type: 'json' };
 import { createNodeFetch } from './agility-fetch.ts';
@@ -214,6 +220,17 @@ export async function startServe(
     throw new ConfigError((error as Error).message);
   }
 
+  let adminVerifier: AdminTokenVerifier | undefined;
+  try {
+    const adminToken = readAdminToken(env, dirname(config.dbPath));
+    if (adminToken !== undefined) adminVerifier = await AdminTokenVerifier.create(adminToken);
+  } catch (error) {
+    await storage.close();
+    throw error instanceof ConfigError
+      ? error
+      : new ConfigError(`AB_ADMIN_TOKEN: ${(error as Error).message}`);
+  }
+  const tools = new Map(CORE_TOOLS.map((t) => [t.name, { kind: t.kind, group: t.group }]));
   const audit = new AuditWriter({ storage, logger, clock: systemClock, random: webCryptoRandom });
   const stopRetention = scheduleAuditRetention(storage, config.auditRetentionDays, systemClock, logger);
   const fetches = new Map<string, FetchLike>();
@@ -221,7 +238,7 @@ export async function startServe(
     storage,
     keyring,
     access: {
-      tools: new Map(CORE_TOOLS.map((t) => [t.name, { kind: t.kind, group: t.group }])),
+      tools,
       writesEnabled: false,
       environment: config.environment,
       limits: {
@@ -259,6 +276,15 @@ export async function startServe(
     allowedOrigins: config.allowedOrigins,
     accessCacheTtlSeconds: config.accessCacheTtlSeconds,
     limits: createRequestLimits(new MemoryRateLimiter(), config.rateLimits, logger),
+    ...(adminVerifier === undefined
+      ? {}
+      : {
+          admin: {
+            services: accessServices({ storage, keyring, tools, environment: config.environment }),
+            audit,
+            authenticate: adminTokenAuthenticator(adminVerifier),
+          },
+        }),
     clientIp: (c) =>
       clientAddress(
         (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming?.socket
@@ -299,7 +325,12 @@ export async function startServe(
   const port = typeof address === 'object' && address !== null ? address.port : config.port;
   const host = config.host.includes(':') ? `[${config.host}]` : config.host;
   const url = `http://${host}:${port}`;
-  logger.info('serving', { url, publicUrl: config.publicUrl ?? null, database: config.dbPath });
+  logger.info('serving', {
+    url,
+    publicUrl: config.publicUrl ?? null,
+    database: config.dbPath,
+    adminApi: adminVerifier !== undefined,
+  });
   return {
     url,
     app,
@@ -312,4 +343,25 @@ export async function startServe(
       await storage.close();
     },
   };
+}
+
+/** `AB_ADMIN_TOKEN` or `AB_ADMIN_TOKEN_FILE` (a 0600 file outside the data directory), or undefined: no admin API. */
+export function readAdminToken(env: Env, dataDir: string): string | undefined {
+  const value = env['AB_ADMIN_TOKEN'];
+  const file = env['AB_ADMIN_TOKEN_FILE'];
+  if (value && file) throw new ConfigError('Set AB_ADMIN_TOKEN or AB_ADMIN_TOKEN_FILE, not both.');
+  if (file) {
+    if (resolve(file).startsWith(`${resolve(dataDir)}${sep}`)) {
+      throw new ConfigError(
+        'AB_ADMIN_TOKEN_FILE is inside the data directory; keep it away from the database and its backups.',
+      );
+    }
+    try {
+      return readSecretFile(file).trim();
+    } catch (error) {
+      if (error instanceof UnsafeFileError) throw new ConfigError(`AB_ADMIN_TOKEN_FILE: ${error.message}`);
+      throw error;
+    }
+  }
+  return value || undefined;
 }

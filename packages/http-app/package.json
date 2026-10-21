@@ -26,6 +26,7 @@
     "@agility-bridge/auth": "workspace:*",
     "@agility-bridge/core": "workspace:*",
     "@agility-bridge/storage": "workspace:*",
+    "@hono/zod-openapi": "1.6.3",
     "@modelcontextprotocol/server": "2.3.1",
     "hono": "4.13.13",
     "zod": "4.6.7"
