@@ -65,6 +65,9 @@ const KNOWN_ENV = new Set([
   'AB_LOG_LEVEL',
   // Remote and Worker settings: valid names, not used by stdio.
   'AB_DATA_DIR',
+  'AB_HOST',
+  'AB_PORT',
+  'AB_ENVIRONMENT',
   'AB_DB_PATH',
   'AB_MASTER_KEY',
   'AB_MASTER_KEY_FILE',

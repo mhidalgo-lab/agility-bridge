@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import pkg from '../package.json' with { type: 'json' };
 import { ConfigError, loadConfig } from './config.ts';
+import { startServe } from './serve.ts';
 import { startStdio } from './stdio.ts';
 
 export const VERSION: string = pkg.version;
@@ -9,13 +10,15 @@ export const HELP = `agility-bridge ${VERSION}: an unofficial MCP server for Dig
 
 Usage:
   agility-bridge [stdio]      Serve MCP on stdin/stdout (the default; started by your MCP client)
+  agility-bridge serve        Serve workspaces over HTTP at /w/<slug>/mcp (a team server; needs a master key)
   agility-bridge --version    Print the version
   agility-bridge --help       Print this help
 
 Configuration comes from the environment your MCP client sets, never from flags:
   AB_AGILITY_URL, AB_AGILITY_TOKEN   the instance and the member's access token
   AB_CONFIG, AB_WORKSPACE            or a YAML file and the workspace to serve from it
-See https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/guide/configuration.md`;
+See https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/guide/configuration.md
+and, for serve, docs/guide/secrets.md and docs/guide/access-model.md.`;
 
 export interface Io {
   readonly env: Readonly<Record<string, string | undefined>>;
@@ -27,8 +30,27 @@ export interface Io {
 /** Flags that look like secrets are refused with an explanation (L-026, T23). */
 const SECRET_FLAG = /^--?(?:token|agility[-_]?token|password|secret|api[-_]?key|master[-_]?key)\b/i;
 
-/** Runs the CLI. Returns an exit code, or `serving` when the stdio server is running. */
-export function main(args: readonly string[], io: Io): number | 'serving' {
+/** Starts the HTTP server; resolves to `serving`, or an exit code when the configuration is refused. */
+async function serve(io: Io): Promise<number | 'serving'> {
+  try {
+    const server = await startServe(io.env);
+    const stop = () => {
+      server.close().finally(() => process.exit(0));
+    };
+    process.once('SIGINT', stop);
+    process.once('SIGTERM', stop);
+    return 'serving';
+  } catch (error) {
+    if (error instanceof ConfigError) {
+      io.err(`agility-bridge: ${error.message}`);
+      return 1;
+    }
+    throw error;
+  }
+}
+
+/** Runs the CLI. Returns an exit code, or `serving` when a server is running (asynchronously for `serve`). */
+export function main(args: readonly string[], io: Io): number | 'serving' | Promise<number | 'serving'> {
   const [command, ...rest] = args;
   if (command === '--version' || command === '-v') {
     io.out(`agility-bridge ${VERSION}`);
@@ -45,6 +67,7 @@ export function main(args: readonly string[], io: Io): number | 'serving' {
     );
     return 2;
   }
+  if (command === 'serve' && rest.length === 0) return serve(io);
   if ((command !== undefined && command !== 'stdio') || rest.length > 0) {
     io.err(`Unknown argument: ${(command !== 'stdio' ? command : rest[0])?.slice(0, 40)}\n\n${HELP}`);
     return 2;

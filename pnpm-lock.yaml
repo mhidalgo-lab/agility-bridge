@@ -190,9 +190,18 @@ importers:
 
   apps/cli:
     dependencies:
+      '@hono/node-server':
+        specifier: 2.1.4
+        version: 2.1.4(hono@4.13.13)
       '@modelcontextprotocol/server':
         specifier: 2.3.1
         version: 2.3.1
+      drizzle-orm:
+        specifier: 0.45.4
+        version: 0.45.4
+      hono:
+        specifier: 4.13.13
+        version: 4.13.13
       saxes:
         specifier: 6.0.0
         version: 6.0.0
@@ -212,6 +221,9 @@ importers:
       '@agility-bridge/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@agility-bridge/http-app':
+        specifier: workspace:*
+        version: link:../../packages/http-app
       '@agility-bridge/storage':
         specifier: workspace:*
         version: link:../../packages/storage
@@ -281,6 +293,15 @@ importers:
 
   packages/http-app:
     dependencies:
+      '@agility-bridge/auth':
+        specifier: workspace:*
+        version: link:../auth
+      '@agility-bridge/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agility-bridge/storage':
+        specifier: workspace:*
+        version: link:../storage
       '@modelcontextprotocol/server':
         specifier: 2.3.1
         version: 2.3.1
@@ -291,6 +312,9 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@modelcontextprotocol/client':
+        specifier: 2.3.1
+        version: 2.3.1
       tsdown:
         specifier: 0.23.1
         version: 0.23.1(typescript@7.0.2)
@@ -648,6 +672,12 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@hono/node-server@2.1.4':
+    resolution: {integrity: sha512-2g1qeHl4BduwDn6L8nkAvDrPUWPMlkQ//a5NhP/zIyaXKMjZNRV+cG9Csu+BiJFf6+68pqzjf4Hi5sJGKHuS1g==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      hono: ^4 || ^5.0.0-0
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -2167,6 +2197,10 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
+
+  '@hono/node-server@2.1.4(hono@4.13.13)':
+    dependencies:
+      hono: 4.13.13
 
   '@img/colour@1.1.0': {}
 

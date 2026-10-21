@@ -202,6 +202,13 @@ TLS trust while it has unrevoked credentials (P2-01).
 8. **Audit**: one row per tool call, refusal and admin change, written in the background (`waitUntil` on Workers);
    write tools record the intent *before* the mutation and refuse if that fails.
 
+Implemented in `packages/http-app` (`createHttpApp`, P2-06) and served on Node by `agility-bridge serve`
+(`apps/cli/src/serve.ts`): only `POST` reaches the SDK (stateless HTTP has no `GET` stream or session to `DELETE`:
+405); the body is read with the cap, parsed, refused if it is a batch, and classified from the body (`tools/call`,
+`subscriptions/listen`, notifications, lists, lifecycle, tasks) before the rate-limit hooks (P2-07) and the observer
+(audit, P2-08) see it. Every denial is the same `401` with `WWW-Authenticate: Bearer`; refusal reasons go only to the
+observer. Node also bounds sockets (`headersTimeout` 20 s, `requestTimeout` 60 s).
+
 stdio (modes A/B) runs steps 5–7 with a context built once at startup from the environment or YAML file; there is no
 storage, no audit table (write outcomes are logged to stderr) and no HTTP layer.
 
@@ -454,6 +461,8 @@ validate input + metadata (operation allowed, attributes writable, values typed)
 | `AB_WRITE_APPROVAL` | `required` | `required` \| `off` (warning at startup) |
 | `AB_LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
 | `AB_DATA_DIR` / `AB_DB_PATH` | platform data dir | `serve`: SQLite location |
+| `AB_HOST` / `AB_PORT` | `127.0.0.1` / `8787` | `serve`: listen address (loopback by default, L-082) |
+| `AB_ENVIRONMENT` | `production` | `serve`: `production` issues `ab_live_` device tokens, `test` issues `ab_test_` |
 | `AB_MASTER_KEY` / `AB_MASTER_KEY_FILE` (+ `_PREVIOUS`) | — | `serve`/Worker: encryption master key |
 | `AB_PUBLIC_URL` | — | public origin (OAuth issuer, HSTS, links) |
 | `AB_ALLOWED_HOSTS` / `AB_ALLOWED_ORIGINS` | loopback | Host/Origin allowlists |

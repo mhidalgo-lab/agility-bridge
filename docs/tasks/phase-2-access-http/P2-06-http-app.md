@@ -2,12 +2,12 @@
 id: P2-06
 title: HTTP app (Hono) with per-workspace MCP endpoints
 phase: 2
-status: todo
+status: review
 priority: high
 depends_on: [P2-05]
 adr: ["0005", "0008"]
 lessons: [L-012, L-014, L-015, L-068, L-082, L-083, L-084, L-151]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P2-06 — HTTP app (Hono) with per-workspace MCP endpoints
@@ -23,9 +23,19 @@ owner: ""
 - MCP method classification for audit and limits (L-015).
 
 ## Acceptance criteria
-- [ ] Integration tests for both protocol eras, batch refusal, oversized bodies, hostile Host/Origin, wrong workspace.
-- [ ] `subscriptions/listen` is not counted as a tool call.
-- [ ] Headers present on 401/404/503 responses too.
+- [x] Integration tests for both protocol eras, batch refusal, oversized bodies, hostile Host/Origin, wrong workspace.
+  *(`packages/http-app/test/app.test.ts` with the SDK client in both eras against a fake Agility; two workspaces and
+  two credentials concurrently; mutation-checked: batch refusal and the slug in the access-cache key.)*
+- [x] `subscriptions/listen` is not counted as a tool call. *(Classified from the body even with a forged
+  `Mcp-Method` header; the limit hooks and the observer see `listen`.)*
+- [x] Headers present on 401/404/503 responses too. *(200/401/403/404/405 in one test with HSTS from the public URL;
+  503 tested separately.)*
+
+## Notes
+- `agility-bridge serve` (`apps/cli/src/serve.ts`): SQLite storage, master key, key-check, Node socket timeouts,
+  access log on stderr; new settings `AB_HOST`, `AB_PORT`, `AB_ENVIRONMENT`. The rate-limit hooks (P2-07) and the
+  audit observer (P2-08) are interfaces here.
+- Only `POST` reaches the SDK; `GET`/`DELETE` answer 405 after authentication.
 
 ## Security notes
 THREAT_MODEL T2, T15, T19, T20, T24.
@@ -41,7 +51,7 @@ THREAT_MODEL T2, T15, T19, T20, T24.
 - L-151 — Health endpoints reveal nothing.
 
 ## Docs to update
-- docs/ARCHITECTURE.md §5
+- [x] docs/ARCHITECTURE.md §5 (and §7.1 for the new settings)
 - docs/guide/self-hosting.md (P2-16)
 
 ## Out of scope

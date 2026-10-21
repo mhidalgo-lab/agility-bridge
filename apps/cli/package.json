@@ -47,13 +47,17 @@
   "devDependencies": {
     "@agility-bridge/auth": "workspace:*",
     "@agility-bridge/core": "workspace:*",
+    "@agility-bridge/http-app": "workspace:*",
     "@agility-bridge/storage": "workspace:*",
     "@agility-bridge/storage-sqlite": "workspace:*",
     "@modelcontextprotocol/client": "2.3.1",
     "tsdown": "0.23.1"
   },
   "dependencies": {
+    "@hono/node-server": "2.1.4",
     "@modelcontextprotocol/server": "2.3.1",
+    "drizzle-orm": "0.45.4",
+    "hono": "4.13.13",
     "saxes": "6.0.0",
     "undici": "7.30.0",
     "yaml": "2.9.1",

@@ -13,6 +13,9 @@ export default defineConfig({
   alias: {
     '@agility-bridge/auth': fileURLToPath(new URL('../../packages/auth/src/index.ts', import.meta.url)),
     '@agility-bridge/core': fileURLToPath(new URL('../../packages/core/src/index.ts', import.meta.url)),
+    '@agility-bridge/http-app': fileURLToPath(
+      new URL('../../packages/http-app/src/index.ts', import.meta.url),
+    ),
     '@agility-bridge/storage': fileURLToPath(new URL('../../packages/storage/src/index.ts', import.meta.url)),
     '@agility-bridge/storage-sqlite': fileURLToPath(
       new URL('../../packages/storage-sqlite/src/index.ts', import.meta.url),
