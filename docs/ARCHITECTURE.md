@@ -127,8 +127,13 @@ credential = grant.credential (personal) ?? workspace.defaultCredential (shared;
 limits     = workspace.limits tightened by grant.limits  numbers: min · allow lists: ∩ · deny lists: ∪
 ```
 
-Resolved by a pure function in `packages/auth/src/access` (P2-04): anything missing, disabled, revoked, expired,
-unvalidated or malformed denies. Rules:
+Resolved by a pure function, `resolveAccess` in `packages/auth/src/access` (P2-04), over the stored records, the
+deployment's settings and the time: anything missing, disabled, revoked, expired, unvalidated or malformed denies, and
+the audience is checked first. Project narrowing is by exact id (a grant names a subset of the workspace's projects); an
+empty project list denies; the credential's last-validated reach only produces a warning, because Agility enforces the
+member's visibility itself. The domain services next to it (`accessServices`) are the only writers of instances,
+credentials, workspaces and grants, so the admin API, the CLI and imports share every rule (L-065). Guide:
+[access model](guide/access-model.md). Rules:
 
 - Tools a caller may not use are **not listed**; the MCP server is built per request with only the allowed tools, and
   calls to other tools are refused anyway (defence in depth).
