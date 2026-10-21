@@ -2,12 +2,12 @@
 id: P1-09
 title: "Tools: search_work_items, get_work_item, list_my_work"
 phase: 1
-status: todo
+status: review
 priority: high
 depends_on: [P1-08]
 adr: ["0015"]
 lessons: [L-033, L-042, L-043, L-142, L-150]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P1-09 — Tools: search_work_items, get_work_item, list_my_work
@@ -21,8 +21,8 @@ Friendly, cheap tools for the daily questions: find work, open one item with its
 - `list_my_work` for `me` or another member, grouped by sprint and status.
 
 ## Acceptance criteria
-- [ ] Fixture tests with `B-`/`S-`, `D-`, `TK-` and `AT-` items; children and parent shown; status names come from the instance.
-- [ ] `partial` with notes when children or links are capped.
+- [x] Fixture tests with `B-`/`S-`, `D-`, `TK-` and `AT-` items; children and parent shown; status names come from the instance.
+- [x] `partial` with notes when children or links are capped.
 
 ## Security notes
 THREAT_MODEL A1, A7.

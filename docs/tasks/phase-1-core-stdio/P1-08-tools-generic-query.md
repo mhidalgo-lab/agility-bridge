@@ -2,7 +2,7 @@
 id: P1-08
 title: "Tools: query_assets and get_assets"
 phase: 1
-status: review
+status: done
 priority: high
 depends_on: [P1-04, P1-05, P1-06, P1-12]
 adr: ["0012", "0015"]

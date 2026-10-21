@@ -244,6 +244,9 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
       describe_asset_type: { asset_type: 'Story' },
       query_assets: { asset_type: 'Defect', fields: ['Name', 'Status.Name', 'Description'], limit: 3 },
       get_assets: { assets: [defect, 'B-0', 'Story:1'] },
+      search_work_items: { member: 'me', limit: 3 },
+      get_work_item: { asset: defect },
+      list_my_work: { limit: 3 },
     };
     for (const tool of CORE_TOOLS) {
       const fresh: ToolContext = { ...ctx, metadata: new MetadataService(), budget: createBudget(60) };
@@ -252,8 +255,27 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
         name: tool.name,
         arguments: args,
       });
-      expect(result['isError'], tool.name).toBeUndefined();
+      // Only the error code is printed on failure: details can hold Agility names.
+      const code = (result['_meta'] as Record<string, { code?: string }> | undefined)?.[
+        'agility-bridge/error'
+      ]?.code;
+      expect(code, tool.name).toBeUndefined();
       expect(fresh.budget.used, tool.name).toBeLessThanOrEqual(tool.cost);
     }
+  });
+
+  it('answers current-sprint searches with items or a clean ambiguity, never an Agility error', {
+    timeout: 120_000,
+  }, async () => {
+    const tool = CORE_TOOLS.find((t) => t.name === 'search_work_items');
+    if (tool === undefined) return;
+    const fresh: ToolContext = { ...ctx, metadata: new MetadataService(), budget: createBudget(60) };
+    const result = await rpc(() => buildMcpServer({ tools: [tool], ctx: fresh }), 'tools/call', {
+      name: tool.name,
+      arguments: { sprint: 'current', limit: 3 },
+    });
+    const code = (result['_meta'] as Record<string, { code?: string }> | undefined)?.['agility-bridge/error']
+      ?.code;
+    expect([undefined, 'AB_AMBIGUOUS', 'AB_NOT_FOUND']).toContain(code);
   });
 });

@@ -422,13 +422,11 @@ export class InstanceMetadata {
 
   /** The status list of an asset type, in order, from the instance (never hard-coded, L-142). */
   async statuses(type: string): Promise<readonly StatusEntry[]> {
-    const cached = this.#cache.statuses.get(type);
-    if (this.#service.fresh(cached)) return cached.value;
     const status = (await this.assetType(type)).attributes.get('Status');
-    if (status?.kind !== 'Relation' || status.relatedType === undefined) {
-      this.#cache.statuses.set(type, { value: [], at: this.#service.now() });
-      return [];
-    }
+    if (status?.kind !== 'Relation' || status.relatedType === undefined) return [];
+    // Cached per list type: Story and Defect share StoryStatus.
+    const cached = this.#cache.statuses.get(status.relatedType);
+    if (this.#service.fresh(cached)) return cached.value;
     const list = await this.assetType(status.relatedType);
     const select = ['Name', 'Order', 'Inactive', 'Team', 'RollupState'].filter((a) => list.attributes.has(a));
     const res = await agilityClient(this.#ctx).query<unknown[][]>({
@@ -458,7 +456,7 @@ export class InstanceMetadata {
         },
       ];
     });
-    this.#cache.statuses.set(type, { value, at: this.#service.now() });
+    this.#cache.statuses.set(list.name, { value, at: this.#service.now() });
     return value;
   }
 

@@ -144,8 +144,8 @@ Status lives in each task file.
 | P1-05 | [Output shaping v1 and untrusted-data envelope](tasks/phase-1-core-stdio/P1-05-output-shaping.md) | high | P1-01 | done |
 | P1-06 | [Asset identity and name resolution](tasks/phase-1-core-stdio/P1-06-asset-identity.md) | high | P1-03, P1-04 | done |
 | P1-07 | [Tools: whoami, list_projects, list_asset_types, describe_asset_type](tasks/phase-1-core-stdio/P1-07-tools-discovery.md) | high | P1-03, P1-05, P1-12 | done |
-| P1-08 | [Tools: query_assets and get_assets](tasks/phase-1-core-stdio/P1-08-tools-generic-query.md) | high | P1-04, P1-05, P1-06, P1-12 | review |
-| P1-09 | [Tools: search_work_items, get_work_item, list_my_work](tasks/phase-1-core-stdio/P1-09-tools-work-items.md) | high | P1-08 | todo |
+| P1-08 | [Tools: query_assets and get_assets](tasks/phase-1-core-stdio/P1-08-tools-generic-query.md) | high | P1-04, P1-05, P1-06, P1-12 | done |
+| P1-09 | [Tools: search_work_items, get_work_item, list_my_work](tasks/phase-1-core-stdio/P1-09-tools-work-items.md) | high | P1-08 | review |
 | P1-10 | [Tools: list_teams, get_team, list_sprints, list_members](tasks/phase-1-core-stdio/P1-10-tools-planning-context.md) | medium | P1-06, P1-08 | todo |
 | P1-11 | [CLI with stdio mode (environment and YAML configuration)](tasks/phase-1-core-stdio/P1-11-cli-stdio.md) | high | P1-07, P1-08 | todo |
 | P1-12 | [Test harness (fixtures, contract tests, probes, live suite)](tasks/phase-1-core-stdio/P1-12-test-harness.md) | high | P1-01, P0-12 | done |

@@ -1336,6 +1336,18 @@
     "IsCanned": false,
     "IsCustom": true
    },
+   "Story.Custom_AcceptanceCriteria": {
+    "_type": "AttributeDefinition",
+    "Name": "Custom_AcceptanceCriteria",
+    "Token": "Story.Custom_AcceptanceCriteria",
+    "DisplayName": "Custom_AcceptanceCriteria",
+    "AttributeType": "LongText",
+    "IsReadOnly": false,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": false,
+    "IsCustom": true
+   },
    "Story.Custom_SyntheticRisk": {
     "_type": "AttributeDefinition",
     "Name": "Custom_SyntheticRisk",
