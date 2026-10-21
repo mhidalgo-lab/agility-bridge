@@ -118,6 +118,10 @@ described in [Output formats](../guide/output-formats.md).
   A cursor from another tool, workspace or filter set, or a malformed one, is refused with `AB_INPUT_INVALID` before any
   request; offsets are range-checked; the window of the first call is kept (`time_range` is ignored once a cursor is
   passed, and descriptions say "keeps the first window").
+- The window and the first call's "now" (for lists filtered by time, such as `list_sprints` `timing`) are part of the
+  binding (`bindFixed`), so an edited one is refused. The hash has no secret, so `decodeCursor` also re-validates them:
+  the window must be ordered UTC instants no longer than `maxTimeRangeDays`, and "now" may be at most a day old
+  (`CURSOR_MAX_AGE_MS`); after that the list starts again (L-172).
 
 ## Errors
 

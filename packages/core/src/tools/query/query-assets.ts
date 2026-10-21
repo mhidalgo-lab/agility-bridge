@@ -113,7 +113,7 @@ export const queryAssets: ToolDefinition = defineTool({
       includeClosed: input.include_closed === true,
     };
     const binding = await cursorBinding(ctx, NAME, normalized);
-    const offset = input.cursor === undefined ? 0 : decodeCursor(input.cursor, binding).offset;
+    const offset = input.cursor === undefined ? 0 : (await decodeCursor(ctx, input.cursor, binding)).offset;
     const meta = await md.assetType(type);
     const identity = IDENTITY_FIELDS.filter((f) => meta.attributes.has(f.split('.')[0] as string));
     const compiled = await compileQuery(

@@ -159,7 +159,15 @@ export {
   recheckFields,
   type SortInput,
 } from './query/compiler.ts';
-export { type CursorState, cursorBinding, decodeCursor, encodeCursor } from './query/cursor.ts';
+export {
+  bindFixed,
+  CURSOR_MAX_AGE_MS,
+  type CursorFixed,
+  type CursorState,
+  cursorBinding,
+  decodeCursor,
+  encodeCursor,
+} from './query/cursor.ts';
 export { invalid, limitError } from './query/limits.ts';
 export { parseInstant, parseTimeRange, type TimeWindow } from './query/time.ts';
 export { isSecretKeyName, REDACTED, redact, redactValue } from './redact.ts';

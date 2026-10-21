@@ -2,7 +2,7 @@
 id: P1-18
 title: Bind the cursor's time window and fix sprint timing per first page
 phase: 1
-status: todo
+status: review
 priority: low
 depends_on: [P1-16]
 adr: ["0015"]
@@ -22,8 +22,8 @@ finding).
 - `list_sprints` stores the first call's "now" in the cursor and evaluates `timing` against it on later pages.
 
 ## Acceptance criteria
-- [ ] A cursor with an edited window is refused before any request.
-- [ ] Paging `list_sprints` across a sprint boundary neither skips nor repeats a sprint.
+- [x] A cursor with an edited window is refused before any request.
+- [x] Paging `list_sprints` across a sprint boundary neither skips nor repeats a sprint.
 
 ## Security notes
 THREAT_MODEL T4 (input integrity).

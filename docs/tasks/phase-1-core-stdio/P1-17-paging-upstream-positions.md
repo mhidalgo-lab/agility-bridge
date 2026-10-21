@@ -2,7 +2,7 @@
 id: P1-17
 title: Single-type paging counts upstream positions
 phase: 1
-status: review
+status: done
 priority: low
 depends_on: [P1-16]
 adr: ["0015"]

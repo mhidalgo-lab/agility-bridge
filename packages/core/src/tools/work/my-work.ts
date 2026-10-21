@@ -57,7 +57,8 @@ export const listMyWork: ToolDefinition = defineTool({
       includeClosed: input.include_closed === true,
       types,
     });
-    const offsets = input.cursor === undefined ? {} : (decodeCursor(input.cursor, binding).offsets ?? {});
+    const offsets =
+      input.cursor === undefined ? {} : ((await decodeCursor(ctx, input.cursor, binding)).offsets ?? {});
     const identity = new Map<string, string[]>();
     const queries = [];
     for (const type of types) {

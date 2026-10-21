@@ -29,7 +29,7 @@ How to use it:
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
 | [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167 |
-| [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170 |
+| [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151 |
@@ -468,6 +468,13 @@ Merging several asset types into one page by a local comparator skips or repeats
 with the upstream collation. Take each type's rows in the order the upstream returned them (a k-way merge on the heads)
 and count offsets in upstream positions; the comparator then only decides which type comes next.
 *Applied in:* P1-16, `tools/work/multi.ts`, P1-17.
+
+**L-172 — A hash without a secret proves nothing; re-validate what a cursor carries.**
+Anyone can recompute an unkeyed binding hash, so a cursor's window, offsets and "now" are checked again on every page
+against what a fresh call could ask for (`maxTimeRangeDays`, offset range, a "now" no older than a day). The hash still
+catches accidental edits and cursors from another request. A list whose filters depend on the time keeps the first
+page's "now", or a sprint that ends mid-paging is skipped.
+*Applied in:* P1-18, `query/cursor.ts`, `tools/planning/sprints.ts`.
 
 ## G. Access model, tokens and isolation
 

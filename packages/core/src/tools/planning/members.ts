@@ -71,7 +71,7 @@ export const listMembers: ToolDefinition = defineTool({
     }
     if (input.contains !== undefined) filters.push({ field: 'Name', op: 'contains', value: input.contains });
     const binding = await cursorBinding(ctx, NAME, { contains: input.contains });
-    const offset = input.cursor === undefined ? 0 : decodeCursor(input.cursor, binding).offset;
+    const offset = input.cursor === undefined ? 0 : (await decodeCursor(ctx, input.cursor, binding)).offset;
     const emails = ctx.limits.memberEmails;
     const compiled = await compileQuery(
       ctx,

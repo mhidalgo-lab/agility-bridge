@@ -32,7 +32,7 @@ export const listTeams: ToolDefinition = defineTool({
   outputSchema: listOutput(z.looseObject({ assetType: z.string(), oid: z.string(), name: z.string() })),
   handler: async (input, ctx) => {
     const binding = await cursorBinding(ctx, LIST_TEAMS, { contains: input.contains });
-    const offset = input.cursor === undefined ? 0 : decodeCursor(input.cursor, binding).offset;
+    const offset = input.cursor === undefined ? 0 : (await decodeCursor(ctx, input.cursor, binding)).offset;
     const compiled = await compileQuery(
       ctx,
       {
