@@ -33,7 +33,7 @@ export interface FilterInput {
 
 export interface SortInput {
   readonly field: string;
-  readonly direction?: 'asc' | 'desc';
+  readonly direction?: 'asc' | 'desc' | undefined;
 }
 
 export interface QueryInput {
@@ -62,6 +62,8 @@ export interface CompileOptions {
    * identifiers across types; every returned row's concrete `AssetType` is checked afterwards. Never from caller input.
    */
   readonly allowAbstract?: boolean;
+  /** Server-owned selections (identity columns) validated like fields but exempt from the caller's field limit. */
+  readonly identityFields?: readonly string[];
 }
 
 export interface CompiledQuery {
@@ -458,11 +460,18 @@ export async function compileQuery(
     asof = new Date(t).toISOString();
   }
 
-  const recheck = restricted ? recheckFields(strategy).filter((f) => !select.includes(f)) : [];
+  const identity: string[] = [];
+  for (const f of options.identityFields ?? []) {
+    if (select.includes(f) || identity.includes(f)) continue;
+    identity.push((await md.resolvePath(type, f)).path);
+  }
+  const recheck = restricted
+    ? recheckFields(strategy).filter((f) => !select.includes(f) && !identity.includes(f))
+    : [];
   const withValues = { ...binder.with, ...serverWith };
   const body: Record<string, unknown> = {
     from: type,
-    select: [...select, ...recheck],
+    select: [...select, ...identity, ...recheck],
     ...(filterEntries.length + serverEntries.length > 0
       ? { filter: [...serverEntries, ...filterEntries] }
       : {}),

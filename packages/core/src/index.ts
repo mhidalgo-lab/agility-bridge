@@ -20,6 +20,7 @@ export {
   type Budget,
   type Clock,
   type Credential,
+  capBudget,
   closedBreaker,
   createBudget,
   DEFAULT_LIMITS,

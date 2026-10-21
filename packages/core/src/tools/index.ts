@@ -5,10 +5,14 @@ import type { ToolDefinition } from '../tool.ts';
 import { describeAssetType, listAssetTypes } from './core/asset-types.ts';
 import { listProjects } from './core/list-projects.ts';
 import { whoami } from './core/whoami.ts';
+import { getAssets } from './query/get-assets.ts';
+import { queryAssets } from './query/query-assets.ts';
 
 export const CORE_TOOLS: readonly ToolDefinition[] = Object.freeze([
   whoami,
   listProjects,
   listAssetTypes,
   describeAssetType,
+  queryAssets,
+  getAssets,
 ] as ToolDefinition[]);
