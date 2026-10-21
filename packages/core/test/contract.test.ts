@@ -81,6 +81,36 @@ describe('tools/list contract', () => {
           },
           "name": "get_assets",
         },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Search work items",
+          },
+          "name": "search_work_items",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Get a work item",
+          },
+          "name": "get_work_item",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "List my work",
+          },
+          "name": "list_my_work",
+        },
       ]
     `,
     );

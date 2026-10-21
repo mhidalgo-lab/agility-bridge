@@ -9,6 +9,8 @@ import type { TimeWindow } from './time.ts';
 
 export interface CursorState {
   readonly offset: number;
+  /** Offsets per asset type, for lists that page several types at once. */
+  readonly offsets?: Readonly<Record<string, number>>;
   /** The first call's resolved window, kept for every later page. */
   readonly window?: TimeWindow;
 }
@@ -55,6 +57,7 @@ export function encodeCursor(binding: string, state: CursorState): string {
       v: 1,
       b: binding,
       o: state.offset,
+      ...(state.offsets === undefined ? {} : { t: state.offsets }),
       ...(state.window === undefined ? {} : { w: state.window }),
     }),
   );
@@ -70,7 +73,13 @@ const refused = () =>
 export function decodeCursor(cursor: string, binding: string): CursorState {
   if (typeof cursor !== 'string' || cursor.length > 2_000 || !/^[A-Za-z0-9_-]+$/.test(cursor))
     throw refused();
-  let parsed: { v?: unknown; b?: unknown; o?: unknown; w?: { since?: unknown; until?: unknown } };
+  let parsed: {
+    v?: unknown;
+    b?: unknown;
+    o?: unknown;
+    t?: unknown;
+    w?: { since?: unknown; until?: unknown };
+  };
   try {
     parsed = JSON.parse(fromBase64Url(cursor)) as typeof parsed;
   } catch {
@@ -80,8 +89,24 @@ export function decodeCursor(cursor: string, binding: string): CursorState {
   const offset = parsed.o;
   if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0 || offset > MAX_OFFSET)
     throw refused();
+  let offsets: Record<string, number> | undefined;
+  if (parsed.t !== undefined) {
+    if (parsed.t === null || typeof parsed.t !== 'object' || Array.isArray(parsed.t)) throw refused();
+    offsets = {};
+    for (const [k, v] of Object.entries(parsed.t)) {
+      if (
+        !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(k) ||
+        typeof v !== 'number' ||
+        !Number.isInteger(v) ||
+        v < 0 ||
+        v > MAX_OFFSET
+      )
+        throw refused();
+      offsets[k] = v;
+    }
+  }
   const w = parsed.w;
-  if (w === undefined) return { offset };
+  if (w === undefined) return { offset, ...(offsets === undefined ? {} : { offsets }) };
   if (
     typeof w.since !== 'string' ||
     typeof w.until !== 'string' ||
@@ -90,5 +115,9 @@ export function decodeCursor(cursor: string, binding: string): CursorState {
   ) {
     throw refused();
   }
-  return { offset, window: { since: w.since, until: w.until } };
+  return {
+    offset,
+    ...(offsets === undefined ? {} : { offsets }),
+    window: { since: w.since, until: w.until },
+  };
 }
