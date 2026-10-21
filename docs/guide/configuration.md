@@ -102,6 +102,7 @@ follows in the self-hosting guide.
 | `AB_ENVIRONMENT` | `production` | `test` issues `ab_test_` device tokens, so test tokens are recognisable |
 | `AB_TRUSTED_PROXY_HOPS` | `0` | Reverse proxies in front whose `X-Forwarded-For` entries are trusted for the client address |
 | `AB_CALL_BUDGET`, `AB_LIMITS_MAX_RESPONSE_BYTES` | `1000`, 8 MiB | Defaults for workspaces that set no limits |
+| `AB_AUDIT_RETENTION_DAYS` | `90` | Days the [audit log](audit-log.md) keeps rows; `0` keeps them forever |
 
 ### Rate limits
 

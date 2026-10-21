@@ -18,6 +18,7 @@ import {
   webCryptoRandom,
 } from '@agility-bridge/core';
 import {
+  AuditWriter,
   clientAddress,
   createHttpApp,
   createRequestLimits,
@@ -25,6 +26,7 @@ import {
   type HttpApp,
   MemoryRateLimiter,
   type RateLimitConfig,
+  scheduleAuditRetention,
 } from '@agility-bridge/http-app';
 import { openSqliteStorage, type SqliteStorage } from '@agility-bridge/storage-sqlite';
 import { serve as serveNode } from '@hono/node-server';
@@ -50,6 +52,8 @@ export interface ServeConfig {
   readonly rateLimits: RateLimitConfig;
   /** Proxies in front whose `X-Forwarded-For` entries are trusted (default 0). */
   readonly trustedProxyHops: number;
+  /** Days audit rows are kept (default 90; 0 keeps them forever). */
+  readonly auditRetentionDays: number;
 }
 
 /** The default data directory (`$XDG_DATA_HOME` or `~/.local/share`; `%LOCALAPPDATA%` on Windows). */
@@ -168,6 +172,7 @@ export function loadServeConfig(env: Env): ServeConfig {
       ),
     },
     trustedProxyHops: integer('AB_TRUSTED_PROXY_HOPS', env['AB_TRUSTED_PROXY_HOPS'], 0, 0, 10),
+    auditRetentionDays: integer('AB_AUDIT_RETENTION_DAYS', env['AB_AUDIT_RETENTION_DAYS'], 90, 0, 36_500),
   };
 }
 
@@ -181,6 +186,7 @@ export interface RunningServer {
   readonly url: string;
   readonly app: HttpApp;
   readonly storage: SqliteStorage;
+  readonly audit: AuditWriter;
   close(): Promise<void>;
 }
 
@@ -208,6 +214,8 @@ export async function startServe(
     throw new ConfigError((error as Error).message);
   }
 
+  const audit = new AuditWriter({ storage, logger, clock: systemClock, random: webCryptoRandom });
+  const stopRetention = scheduleAuditRetention(storage, config.auditRetentionDays, systemClock, logger);
   const fetches = new Map<string, FetchLike>();
   const app = createHttpApp({
     storage,
@@ -258,7 +266,7 @@ export async function startServe(
         c.req.header('x-forwarded-for'),
         config.trustedProxyHops,
       ),
-    observer: {
+    observer: audit.observer({
       request: (e) =>
         logger.info('request', {
           requestId: e.requestId,
@@ -270,7 +278,7 @@ export async function startServe(
           durationMs: e.durationMs,
           ...(e.refusal === null ? {} : { refusal: e.refusal }),
         }),
-    },
+    }),
     version: pkg.version,
   });
 
@@ -296,8 +304,11 @@ export async function startServe(
     url,
     app,
     storage,
+    audit,
     async close() {
       await new Promise<void>((resolve) => server.close(() => resolve()));
+      stopRetention();
+      await audit.flush();
       await storage.close();
     },
   };

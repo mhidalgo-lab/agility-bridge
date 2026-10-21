@@ -6,9 +6,9 @@ import {
   CircuitBreakers,
   CORE_TOOLS,
   CredentialLimiters,
+  createLogger,
   DEFAULT_LIMITS,
   MetadataService,
-  silentLogger,
   webCryptoRandom,
 } from '@agility-bridge/core';
 import { createMemoryStorage, type Storage } from '@agility-bridge/storage';
@@ -16,6 +16,7 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 import snapshotJson from '../../../core/test/fixtures/agility/meta-snapshot.json' with { type: 'json' };
 import { FAKE_BASE_URL, FakeAgility } from '../../../core/test/harness/index.ts';
 import {
+  AuditWriter,
   createHttpApp,
   type HttpAppOptions,
   type RequestEvent,
@@ -53,9 +54,14 @@ export interface World {
   toolCalls: ToolCallRecord[];
   app: ReturnType<typeof createHttpApp>;
   now: { t: number };
+  audit: AuditWriter;
+  logs: string[];
 }
 
-export async function world(over: Partial<HttpAppOptions> = {}): Promise<World> {
+export async function world(
+  over: Partial<HttpAppOptions> = {},
+  options: { auditStorage?: (s: Storage) => Storage } = {},
+): Promise<World> {
   const now = { t: Date.UTC(2026, 9, 21, 12) };
   const storage = createMemoryStorage({ now: () => now.t });
   const keyring = await Keyring.create(generateMasterKey(1));
@@ -117,6 +123,14 @@ export async function world(over: Partial<HttpAppOptions> = {}): Promise<World> 
   });
   const requests: RequestEvent[] = [];
   const toolCalls: ToolCallRecord[] = [];
+  const logs: string[] = [];
+  const logger = createLogger({ level: 'debug', sink: (l) => logs.push(l) });
+  const audit = new AuditWriter({
+    storage: options.auditStorage?.(storage) ?? storage,
+    logger,
+    clock: { now: () => now.t },
+    random: webCryptoRandom,
+  });
   const app = createHttpApp({
     storage,
     keyring,
@@ -140,11 +154,11 @@ export async function world(over: Partial<HttpAppOptions> = {}): Promise<World> 
       limiters: new CredentialLimiters(),
       breakers: new CircuitBreakers(),
       metadata: new MetadataService(),
-      logger: silentLogger,
+      logger,
       clock: { now: () => now.t },
       random: webCryptoRandom,
     },
-    observer: { request: (e) => requests.push(e), toolCall: (e) => toolCalls.push(e) },
+    observer: audit.observer({ request: (e) => requests.push(e), toolCall: (e) => toolCalls.push(e) }),
     version: '0.0.0-test',
     ...over,
   });
@@ -163,6 +177,8 @@ export async function world(over: Partial<HttpAppOptions> = {}): Promise<World> 
     toolCalls,
     app,
     now,
+    audit,
+    logs,
   };
 }
 

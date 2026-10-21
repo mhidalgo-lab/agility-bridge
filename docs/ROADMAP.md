@@ -167,8 +167,8 @@ Status lives in each task file.
 | P2-04 | [Access model and effective-permission resolver](tasks/phase-2-access-http/P2-04-access-model.md) | high | P2-01, P2-03 | done |
 | P2-05 | [Device access tokens](tasks/phase-2-access-http/P2-05-device-tokens.md) | high | P2-04 | done |
 | P2-06 | [HTTP app (Hono) with per-workspace MCP endpoints](tasks/phase-2-access-http/P2-06-http-app.md) | high | P2-05 | done |
-| P2-07 | [Rate limiting (pluggable)](tasks/phase-2-access-http/P2-07-rate-limiting.md) | high | P2-06 | review |
-| P2-08 | [Audit log](tasks/phase-2-access-http/P2-08-audit-log.md) | high | P2-06 | todo |
+| P2-07 | [Rate limiting (pluggable)](tasks/phase-2-access-http/P2-07-rate-limiting.md) | high | P2-06 | done |
+| P2-08 | [Audit log](tasks/phase-2-access-http/P2-08-audit-log.md) | high | P2-06 | review |
 | P2-09 | [Admin REST API](tasks/phase-2-access-http/P2-09-admin-api.md) | high | P2-04, P2-05, P2-08 | todo |
 | P2-10 | [CLI management commands (local and remote)](tasks/phase-2-access-http/P2-10-cli-management.md) | medium | P2-09 | todo |
 | P2-11 | [Docker image](tasks/phase-2-access-http/P2-11-docker-image.md) | medium | P2-06 | todo |

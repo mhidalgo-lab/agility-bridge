@@ -20,6 +20,49 @@ export interface ToolCallEvent {
   readonly errorCode: string | null;
   readonly durationMs: number;
   readonly requestsUsed: number;
+  /** Asset numbers in the result (`B-01234`, at most 50): identifiers, never content (audit, P2-08). */
+  readonly assetNumbers: readonly string[];
+  /** The compiled Agility queries with every bound value masked (at most 10, each at most 2,000 characters). */
+  readonly queries: readonly string[];
+}
+
+const ASSET_NUMBER = /^[A-Za-z]{1,4}-\d{1,12}$/;
+const MAX_AUDIT_NUMBERS = 50;
+const MAX_AUDIT_QUERIES = 10;
+const MAX_QUERY_CHARS = 2_000;
+
+/** The audit facts of a tool result: asset numbers from its rows and the masked queries from its `_meta`. */
+export function auditFacts(out: ToolOutput | undefined): { assetNumbers: string[]; queries: string[] } {
+  const numbers = new Set<string>();
+  const walk = (value: unknown, depth: number): void => {
+    if (numbers.size >= MAX_AUDIT_NUMBERS || depth > 5 || value === null || typeof value !== 'object') return;
+    if (Array.isArray(value)) {
+      for (const v of value) walk(v, depth + 1);
+      return;
+    }
+    for (const [k, v] of Object.entries(value)) {
+      if (
+        k === 'number' &&
+        typeof v === 'string' &&
+        ASSET_NUMBER.test(v) &&
+        numbers.size < MAX_AUDIT_NUMBERS
+      ) {
+        numbers.add(v.toUpperCase());
+      } else {
+        walk(v, depth + 1);
+      }
+    }
+  };
+  walk(out?.structured, 0);
+  const result = out?.meta?.['agility-bridge/result'] as { query?: unknown; queries?: unknown } | undefined;
+  const raw = [result?.query, ...(Array.isArray(result?.queries) ? result.queries : [])].filter(
+    (q) => q !== undefined,
+  );
+  const queries = raw.slice(0, MAX_AUDIT_QUERIES).map((q) => {
+    const text = typeof q === 'string' ? q : JSON.stringify(q);
+    return text.length > MAX_QUERY_CHARS ? `${text.slice(0, MAX_QUERY_CHARS)}…` : text;
+  });
+  return { assetNumbers: [...numbers], queries };
 }
 
 export interface BuildServerOptions {
@@ -149,14 +192,16 @@ export function buildMcpServer({
         const ctx = freezeContext(contextFor());
         const logger = ctx.logger.child({ requestId: ctx.requestId, tool: def.name });
         const started = ctx.clock.now();
-        const observe = (status: 'ok' | 'error', errorCode: string | null): void => {
+        const observe = (status: 'ok' | 'error', errorCode: string | null, out?: ToolOutput): void => {
           try {
-            onToolCall?.({
+            if (onToolCall === undefined) return;
+            onToolCall({
               tool: def.name,
               status,
               errorCode,
               durationMs: Math.max(0, ctx.clock.now() - started),
               requestsUsed: ctx.budget.used,
+              ...auditFacts(out),
             });
           } catch {
             // An observer never changes a tool result.
@@ -165,7 +210,7 @@ export function buildMcpServer({
         try {
           const out = await def.handler(input as never, ctx);
           logger.debug('tool ok', { ms: ctx.clock.now() - started, requests: ctx.budget.used });
-          observe('ok', null);
+          observe('ok', null, out);
           return toCallToolResult(out);
         } catch (error) {
           const result = toToolErrorResult(
