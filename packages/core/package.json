@@ -17,7 +17,8 @@
   ],
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "bench": "node bench/schema-cache.ts"
   },
   "agilityBridge": {
     "runtime": "web"

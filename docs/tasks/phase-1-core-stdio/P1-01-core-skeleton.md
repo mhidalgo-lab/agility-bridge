@@ -2,12 +2,12 @@
 id: P1-01
 title: Core skeleton, tool registry and error model
 phase: 1
-status: todo
+status: review
 priority: high
 depends_on: [P0-13]
 adr: ["0004", "0005", "0015"]
-lessons: [L-013, L-016, L-019, L-020, L-042, L-070, L-114, L-117, L-154]
-owner: ""
+lessons: [L-013, L-016, L-019, L-020, L-042, L-070, L-114, L-117, L-154, L-165]
+owner: "Matias Hidalgo"
 ---
 
 # P1-01 — Core skeleton, tool registry and error model
@@ -25,12 +25,12 @@ The contracts every tool relies on: tool definitions, the registry, the per-requ
 - `buildMcpServer(context, tools)`: registers only allowed tools, prompts and resources; `listChanged: false`; cached schema conversion.
 
 ## Acceptance criteria
-- [ ] Unit tests for every registry refusal (bad name, secret-like field, missing cost, write without `allowNonRead`).
-- [ ] Annotation derivation tested for `read`, `write`, `destructive`.
-- [ ] Error mapping tests include the request id and never the original exception text.
-- [ ] Redaction corpus: `Bearer`, `Basic`, custom schemes, `ab_` tokens, URL credentials, `access_token` parameters, `x-api-key` JSON, `DB_PASSWORD`-style names, PEM blocks — plus benign words that must survive.
-- [ ] A concurrency test runs two contexts with different credentials in parallel and proves no bleed.
-- [ ] Schema-conversion cache measured (before/after numbers in the PR).
+- [x] Unit tests for every registry refusal (bad name, secret-like field, missing cost, write without `allowNonRead`).
+- [x] Annotation derivation tested for `read`, `write`, `destructive`.
+- [x] Error mapping tests include the request id and never the original exception text.
+- [x] Redaction corpus: `Bearer`, `Basic`, custom schemes, `ab_` tokens, URL credentials, `access_token` parameters, `x-api-key` JSON, `DB_PASSWORD`-style names, PEM blocks — plus benign words that must survive.
+- [x] A concurrency test runs two contexts with different credentials in parallel and proves no bleed.
+- [x] Schema-conversion cache measured (before/after numbers in the PR).
 
 ## Security notes
 THREAT_MODEL T8, T21, T23.
@@ -45,6 +45,7 @@ THREAT_MODEL T8, T21, T23.
 - L-114 — Declared costs cover the worst case.
 - L-117 — Redaction is broad and tested.
 - L-154 — Annotations are hints that most clients ignore.
+- L-165 — Each redaction case asserts its own secret.
 
 ## Docs to update
 - docs/dev/core.md (new)

@@ -2,7 +2,7 @@
 id: P0-13
 title: Spike results and go/no-go for Phase 1
 phase: 0
-status: review
+status: done
 priority: high
 depends_on: [P0-02, P0-04, P0-05, P0-06, P0-07, P0-08, P0-09, P0-10, P0-11, P0-12]
 adr: ["0005", "0006", "0007", "0008", "0009", "0010", "0011", "0014", "0015"]
