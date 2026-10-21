@@ -2,7 +2,7 @@
 id: P1-03
 title: Metadata service (meta.v1) and schema snapshot
 phase: 1
-status: review
+status: done
 priority: high
 depends_on: [P1-02]
 adr: ["0011"]

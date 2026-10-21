@@ -49,6 +49,10 @@ export interface Limits {
   readonly maxResponseBytes: number;
   /** Timeout of one Agility request, body included (ADR-0010: 20 s). */
   readonly requestTimeoutMs: number;
+  /** Oldest point in time an `as_of` read may ask for (L-060). */
+  readonly maxAsOfAgeDays: number;
+  /** Longest `time_range` window (L-060). */
+  readonly maxTimeRangeDays: number;
   /** Include member emails in output (D-06, off by default). */
   readonly memberEmails: boolean;
 }
@@ -63,6 +67,8 @@ export const DEFAULT_LIMITS: Limits = Object.freeze({
   maxAnyOfGroups: 3,
   maxResponseBytes: 512 * 1024,
   requestTimeoutMs: 20_000,
+  maxAsOfAgeDays: 365,
+  maxTimeRangeDays: 366,
   memberEmails: false,
 });
 

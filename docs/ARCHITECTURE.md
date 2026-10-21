@@ -282,23 +282,35 @@ Raw Agility bodies are never returned to the client: the messages of a 400 trave
 
 ### 6.3 Query compiler (P1-04)
 
-Turns the structured input of read tools into `query.v1` JSON ([ADR-0012](adr/0012-structured-query-no-raw-passthrough.md)):
+`compileQuery(ctx, input)` in `packages/core/src/query/` turns the structured input of read tools into `query.v1` JSON
+([ADR-0012](adr/0012-structured-query-no-raw-passthrough.md)):
 
-1. Validate `asset_type` against metadata and the effective asset-type allowlist.
-2. Validate every field path (dot paths, downcasts, allowlisted aggregations) against metadata; enforce field count,
-   nesting depth and aggregation limits.
+1. Validate `asset_type` against metadata and the workspace's allow/deny lists; refuse denied types, and global types
+   without an explicit allowance (`AB_AUTH_FORBIDDEN`).
+2. Validate every field path (dot paths, downcasts, aggregations over one relation) through the metadata service;
+   enforce `maxFields`, `maxNestingDepth` (relation hops, in selections and filters), `maxAggregations`,
+   `maxAnyOfGroups`, 20 filters and 3 sort fields (`AB_LIMIT_QUERY` names the limit and its unit).
 3. Validate every filter: operator allowlist (`eq`, `ne`, `lt`, `le`, `gt`, `ge`, `contains`, `in`, `is_set`,
-   `is_not_set`), value type per attribute type, length caps, no control characters, OID tokens for relations.
-4. Emit filter tokens that reference **`with` variables only** (`Status.Name=$v1`); values go into `with`.
-5. Add the server-owned predicates at the top level with AND: the workspace's Agility-project restriction, expressed
-   through the asset type's **scope strategy** (below; the exact idioms are confirmed in P0-06), and the default
-   exclusion of dead assets (`AssetState` filter, L-143).
-6. Always set `page {start, size}` (L-137) and `needTotal` only when a total is shown (L-144); apply filters before caps
-   (L-034); deterministic sort with a unique tiebreaker for stable paging.
-7. Bound `asof` and history windows (L-060).
-8. Produce the cursor binding (tool + workspace + Agility projects + normalised filters) for `nextCursor`.
+   `is_not_set`), value type per attribute kind (text ≤ 1,000 characters without control characters, numbers, booleans,
+   zoned ISO dates, `AssetState` codes, OID tokens for relations), ordering operators only on ordered kinds, `contains`
+   only on text, `in` with 1–50 values; **a scalar containing a comma is refused** (Agility would split it, L-162).
+4. Emit filter tokens that reference **`with` variables only** (`Status.Name=$v1`); `is_set` / `is_not_set` compare with
+   a literal `""`. The `any_of` groups become one parenthesised entry (`((A=$v1;B=$v2)|(C=$v3))`).
+5. Add the server-owned predicates as their **own top-level entries** of `filter`, over server-owned variables
+   (`$ab_scope`, `$ab_state`, `$ab_deleted`). `query.v1` ANDs the entries of `filter` and honours parentheses
+   (verified live, P1-04), so no caller OR reaches them. The Agility-project restriction follows the scope strategy
+   (with descendants: `(Scope=$ab_scope|Scope.ParentAndUp=$ab_scope)`); dead assets are always excluded
+   (`AssetState=$ab_state` with `0`, `64`, plus `128` when closed items are asked for; `IsDeleted=false` for types
+   without `AssetState`, such as `Actual`), and aggregations get a server-built bracket filter
+   (`Children[AssetState!='Dead'].@Count`, L-143).
+6. Always set `page {start, size: limit + 1}` (L-137; "more available" without totals, L-163), a deterministic sort
+   ending with `ID`, and no `needTotal`. Filters run in Agility before the page is cut (L-034).
+7. Bound `as_of` (no future, at most `maxAsOfAgeDays`) and `time_range` windows (`maxTimeRangeDays`; one time model,
+   L-061: `parseTimeRange`).
+8. Return the masked query (every `with` value replaced by `…`) for `_meta` and the audit log, and a normalised form for
+   the cursor binding (`cursorBinding`, `encodeCursor`, `decodeCursor`).
 
-The compiled query (with values masked) goes to `_meta` and the audit log.
+The live suite runs one compiled query per strategy and shape against the read-only tenant.
 
 **Scope strategy per asset type.** Not every asset type has a direct `Scope` relation, so the metadata service
 classifies each type, and the compiler enforces the class (unknown types are denied):

@@ -118,6 +118,20 @@ export {
   untrusted,
 } from './output/result.ts';
 export { cleanText, decodeEntities, htmlToText, richText, utcIso } from './output/text.ts';
+export {
+  type CompiledQuery,
+  type CompileOptions,
+  compileQuery,
+  FILTER_OPS,
+  type FilterInput,
+  type FilterOp,
+  MAX_OFFSET,
+  type QueryInput,
+  type SortInput,
+} from './query/compiler.ts';
+export { type CursorState, cursorBinding, decodeCursor, encodeCursor } from './query/cursor.ts';
+export { invalid, limitError } from './query/limits.ts';
+export { parseInstant, parseTimeRange, type TimeWindow } from './query/time.ts';
 export { isSecretKeyName, REDACTED, redact, redactValue } from './redact.ts';
 export {
   collectPropertyNames,
