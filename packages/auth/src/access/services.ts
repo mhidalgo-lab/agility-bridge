@@ -4,6 +4,7 @@
 // guards on the actor are added with the admin API (P2-09).
 import { canonicalInstanceUrl } from '@agility-bridge/core';
 import {
+  type AccessToken,
   ConflictError,
   type Credential,
   type Grant,
@@ -19,6 +20,7 @@ import {
 import type { z } from 'zod';
 import { sealCredentialToken } from '../secrets/credentials.ts';
 import type { Keyring } from '../secrets/keyring.ts';
+import { DEFAULT_TOKEN_DAYS, generateDeviceToken, type TokenEnvironment } from '../tokens/device.ts';
 import {
   assetTypePolicySchema,
   limitsPolicySchema,
@@ -36,6 +38,8 @@ export interface AccessServicesOptions {
   /** Every tool the server knows (names and kinds). */
   readonly tools: ReadonlyMap<string, ToolInfo>;
   readonly now?: () => number;
+  /** `live` on production deployments (device tokens `ab_live_…`), `test` elsewhere. Default `live`. */
+  readonly environment?: TokenEnvironment;
   /** Id generator (tests); default `<prefix>_<random>`. */
   readonly newId?: (prefix: string) => string;
 }
@@ -454,7 +458,42 @@ export function accessServices(options: AccessServicesOptions) {
     delete: (id: string) => storage.grants.delete(id),
   };
 
-  return Object.freeze({ users, instances, credentials, workspaces, grants });
+  const tokens = {
+    /**
+     * Issues a device token for a grant (one per device, L-066). The token is returned once and only its SHA-256 is
+     * stored. Default expiry 90 days; `never` is allowed with a warning.
+     */
+    async issue(input: {
+      grantId: string;
+      label: string;
+      expiresInDays?: number | 'never';
+    }): Promise<WithWarnings<AccessToken> & { token: string }> {
+      const grant = await mustGet(storage.grants.get(input.grantId), 'grant');
+      if (grant.revokedAt !== null || (grant.expiresAt !== null && grant.expiresAt <= now())) {
+        throw new ConflictError('The grant is revoked or expired.');
+      }
+      const days = input.expiresInDays ?? DEFAULT_TOKEN_DAYS;
+      if (days !== 'never' && (!Number.isInteger(days) || days < 1 || days > 3_650)) {
+        throw new InvalidInputError('expiresInDays must be 1-3650 or "never".');
+      }
+      const warnings =
+        days === 'never' ? ['The token never expires; revoke it when the device is lost or retired.'] : [];
+      const issued = await generateDeviceToken(options.environment ?? 'live');
+      const record = await storage.accessTokens.create({
+        id: newId('tok'),
+        grantId: grant.id,
+        prefix: issued.displayPrefix,
+        tokenHash: issued.tokenHash,
+        label: input.label,
+        expiresAt: days === 'never' ? null : now() + days * 86_400_000,
+      });
+      return { token: issued.token, record, warnings };
+    },
+    revoke: (id: string) => storage.accessTokens.update(id, { revokedAt: now() }),
+    list: (grantId: string) => storage.accessTokens.list({ grantId }),
+  };
+
+  return Object.freeze({ users, instances, credentials, workspaces, grants, tokens });
 }
 
 export type AccessServices = ReturnType<typeof accessServices>;

@@ -6,7 +6,7 @@ import { MIGRATIONS, migrationChecksum } from '../src/index.ts';
 // migration is frozen once a release ships it: fix mistakes with a new migration. Until v0.2.0 ships, 0001 may still
 // change, together with this value and the database fixture (packages/storage-sqlite/test/fixtures/databases).
 const FROZEN: Record<number, string> = {
-  1: 'ede0c42e2c63cb16ad261a03326c08fb81893bf31c01288b932c9ab0c76aad29',
+  1: '71637fb1bfc1f81752a7934559ddc6ba24481f9b0b15cd3c67ff700f0b86a125',
 };
 
 describe('embedded migrations', () => {

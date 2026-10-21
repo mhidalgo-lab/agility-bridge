@@ -102,7 +102,7 @@ export const migration0001: Migration = {
     `CREATE TABLE access_tokens (
   id TEXT PRIMARY KEY NOT NULL,
   grant_id TEXT NOT NULL REFERENCES grants (id) ON DELETE CASCADE,
-  prefix TEXT NOT NULL CHECK (prefix IN ('ab_live', 'ab_test')),
+  prefix TEXT NOT NULL CHECK (length(prefix) = 12 AND (prefix GLOB 'ab_live_*' OR prefix GLOB 'ab_test_*') AND substr(prefix, 9) NOT GLOB '*[^0-9A-Za-z]*'),
   token_hash TEXT NOT NULL UNIQUE CHECK (length(token_hash) = 64 AND token_hash NOT GLOB '*[^0-9a-f]*'),
   label TEXT NOT NULL,
   created_at INTEGER NOT NULL,

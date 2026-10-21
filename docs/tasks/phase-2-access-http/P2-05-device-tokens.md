@@ -2,12 +2,12 @@
 id: P2-05
 title: Device access tokens
 phase: 2
-status: todo
+status: review
 priority: high
 depends_on: [P2-04]
 adr: ["0009"]
 lessons: [L-066, L-067]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P2-05 — Device access tokens
@@ -21,8 +21,17 @@ One revocable token per device, bound to one workspace.
 - Shown once; display prefix for lists.
 
 ## Acceptance criteria
-- [ ] Format, checksum, expiry, revocation and wrong-workspace tests.
-- [ ] gitleaks rule from P0-04 detects generated tokens.
+- [x] Format, checksum, expiry, revocation and wrong-workspace tests. *(`packages/auth/test/tokens.test.ts`; a malformed
+  token causes no storage read, and the audience is checked before revocation.)*
+- [x] gitleaks rule from P0-04 detects generated tokens. *(`scripts/test/device-token-rule.test.ts` compiles the rule
+  from `.gitleaks.toml` and runs it, and the log redaction, on 100 generated tokens.)*
+
+## Notes
+- `packages/auth/src/tokens/device.ts`: `generateDeviceToken`, `isWellFormedDeviceToken` (offline format and CRC-32
+  checksum), `hashDeviceToken`, `bearerToken`, `authenticateDeviceToken` (format → hash lookup + constant-time compare →
+  `resolveAccess` → `touch` every 5 minutes). `accessServices().tokens.issue/revoke/list`.
+- The `access_tokens.prefix` column now holds the display prefix (`ab_live_Xy12`); migration 0001 is not released yet,
+  so its CHECK changed in place together with the frozen checksum and the 0.2 fixture.
 
 ## Security notes
 THREAT_MODEL T1, T2.
@@ -32,7 +41,7 @@ THREAT_MODEL T1, T2.
 - L-067 — Bind each token to one workspace.
 
 ## Docs to update
-- docs/guide/access-model.md
+- [x] docs/guide/access-model.md
 
 ## Out of scope
 - Anything not listed under Scope.
