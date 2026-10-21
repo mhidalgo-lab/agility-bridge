@@ -17,7 +17,15 @@ import {
   systemClock,
   webCryptoRandom,
 } from '@agility-bridge/core';
-import { createHttpApp, type HttpApp } from '@agility-bridge/http-app';
+import {
+  clientAddress,
+  createHttpApp,
+  createRequestLimits,
+  DEFAULT_RATE_LIMITS,
+  type HttpApp,
+  MemoryRateLimiter,
+  type RateLimitConfig,
+} from '@agility-bridge/http-app';
 import { openSqliteStorage, type SqliteStorage } from '@agility-bridge/storage-sqlite';
 import { serve as serveNode } from '@hono/node-server';
 import pkg from '../package.json' with { type: 'json' };
@@ -39,6 +47,9 @@ export interface ServeConfig {
   readonly callBudget: number;
   readonly maxResponseBytes: number;
   readonly logLevel: LogLevel;
+  readonly rateLimits: RateLimitConfig;
+  /** Proxies in front whose `X-Forwarded-For` entries are trusted (default 0). */
+  readonly trustedProxyHops: number;
 }
 
 /** The default data directory (`$XDG_DATA_HOME` or `~/.local/share`; `%LOCALAPPDATA%` on Windows). */
@@ -125,7 +136,45 @@ export function loadServeConfig(env: Env): ServeConfig {
       64 * 1024 * 1024,
     ),
     logLevel: level as LogLevel,
+    rateLimits: {
+      enabled: rateLimitSwitch(env['AB_RATE_LIMIT']),
+      ipPerMinute: integer(
+        'AB_RATE_LIMIT_IP_PER_MINUTE',
+        env['AB_RATE_LIMIT_IP_PER_MINUTE'],
+        DEFAULT_RATE_LIMITS.ipPerMinute,
+        1,
+        1_000_000,
+      ),
+      authFailuresPer5Minutes: integer(
+        'AB_RATE_LIMIT_AUTH_FAILURES',
+        env['AB_RATE_LIMIT_AUTH_FAILURES'],
+        DEFAULT_RATE_LIMITS.authFailuresPer5Minutes,
+        1,
+        10_000,
+      ),
+      tokenPerMinute: integer(
+        'AB_RATE_LIMIT_TOKEN_PER_MINUTE',
+        env['AB_RATE_LIMIT_TOKEN_PER_MINUTE'],
+        DEFAULT_RATE_LIMITS.tokenPerMinute,
+        1,
+        100_000,
+      ),
+      grantPerMinute: integer(
+        'AB_RATE_LIMIT_GRANT_PER_MINUTE',
+        env['AB_RATE_LIMIT_GRANT_PER_MINUTE'],
+        DEFAULT_RATE_LIMITS.grantPerMinute,
+        1,
+        100_000,
+      ),
+    },
+    trustedProxyHops: integer('AB_TRUSTED_PROXY_HOPS', env['AB_TRUSTED_PROXY_HOPS'], 0, 0, 10),
   };
+}
+
+function rateLimitSwitch(value: string | undefined): boolean {
+  if (value === undefined || value === '' || value === 'on') return true;
+  if (value === 'off') return false;
+  throw new ConfigError('AB_RATE_LIMIT must be on or off.');
 }
 
 export interface RunningServer {
@@ -201,9 +250,14 @@ export async function startServe(
     allowedHosts: config.allowedHosts,
     allowedOrigins: config.allowedOrigins,
     accessCacheTtlSeconds: config.accessCacheTtlSeconds,
+    limits: createRequestLimits(new MemoryRateLimiter(), config.rateLimits, logger),
     clientIp: (c) =>
-      (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming?.socket
-        ?.remoteAddress ?? 'unknown',
+      clientAddress(
+        (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming?.socket
+          ?.remoteAddress,
+        c.req.header('x-forwarded-for'),
+        config.trustedProxyHops,
+      ),
     observer: {
       request: (e) =>
         logger.info('request', {

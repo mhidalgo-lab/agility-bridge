@@ -84,6 +84,8 @@ export interface RequestLimits {
   beforeAuth?(ip: string, now: number): LimitDecision | Promise<LimitDecision>;
   /** Charged only when authentication fails (a valid token is never locked out by others' failures). */
   onAuthFailure?(ip: string, now: number): void | Promise<void>;
+  /** True when the IP has no failures left: a failed attempt then answers 429 instead of 401. */
+  failuresExhausted?(ip: string, now: number): boolean | Promise<boolean>;
   /** Per token and grant, after authentication. */
   afterAuth?(
     access: EffectiveAccess,
@@ -257,16 +259,6 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       });
       return res;
     };
-    const unauthorized = async (reason: string) => {
-      await options.limits?.onAuthFailure?.(ip, services.clock.now());
-      return finish(
-        new Response(UNAUTHORIZED, {
-          status: 401,
-          headers: { 'content-type': 'application/json', 'www-authenticate': 'Bearer' },
-        }),
-        reason,
-      );
-    };
     const tooMany = (retryAfterSeconds: number) =>
       finish(
         new Response(JSON.stringify({ error: 'rate limited' }), {
@@ -278,6 +270,20 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         }),
         'rate_limited',
       );
+    const unauthorized = async (reason: string) => {
+      const now = services.clock.now();
+      if ((await options.limits?.failuresExhausted?.(ip, now)) === true) {
+        return tooMany(300);
+      }
+      await options.limits?.onAuthFailure?.(ip, now);
+      return finish(
+        new Response(UNAUTHORIZED, {
+          status: 401,
+          headers: { 'content-type': 'application/json', 'www-authenticate': 'Bearer' },
+        }),
+        reason,
+      );
+    };
 
     const ipLimit = await options.limits?.beforeAuth?.(ip, started);
     if (ipLimit !== undefined && !ipLimit.ok) return tooMany(ipLimit.retryAfterSeconds);

@@ -66,6 +66,11 @@ const KNOWN_ENV = new Set([
   // Remote and Worker settings: valid names, not used by stdio.
   'AB_DATA_DIR',
   'AB_HOST',
+  'AB_RATE_LIMIT',
+  'AB_RATE_LIMIT_IP_PER_MINUTE',
+  'AB_RATE_LIMIT_AUTH_FAILURES',
+  'AB_RATE_LIMIT_TOKEN_PER_MINUTE',
+  'AB_RATE_LIMIT_GRANT_PER_MINUTE',
   'AB_PORT',
   'AB_ENVIRONMENT',
   'AB_DB_PATH',
@@ -85,7 +90,7 @@ const KNOWN_ENV = new Set([
   'AB_OAUTH',
   'AB_PLAN',
 ]);
-const KNOWN_PREFIXES = ['AB_RATE_LIMIT_', 'AB_LIVE_'];
+const KNOWN_PREFIXES = ['AB_LIVE_'];
 const ENV_MODE_ONLY = [
   'AB_AGILITY_URL',
   'AB_AGILITY_TOKEN',
