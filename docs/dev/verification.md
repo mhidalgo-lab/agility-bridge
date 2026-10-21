@@ -23,6 +23,16 @@ strictly read-only (D-01, THREAT_MODEL A15). That company is aware of the read-o
 - **CI:** Actions → **Live** → *Run workflow* on `main`, then approve the `live` environment. The workflow is manual only,
   never runs on pull requests or forks, and its logs are public, so the suite prints nothing from the tenant.
 
+What it checks (about 40 read requests, one at a time):
+
+- `live/inventory.live.test.ts`: the token works; the tenant inventory as size buckets (git-ignored `live/results/`).
+- `live/client.live.test.ts` (P1-12): the **production client** from `packages/core` sends every request through
+  `live/guarded-fetch.ts`, which applies the same read-only guard to each `Request` (writes are refused before they are
+  sent, tested in `scripts/test/live-guard.test.ts`). It checks authentication and budget accounting, **metadata
+  drift** (every product attribute the tools rely on, listed in `live/expected-metadata.ts`, exists; a failure names
+  only product attributes), paging by `ID` with `limit + 1`, and the output shaper on real rows (envelope present,
+  `structuredContent` rows equal to the rows shown, no `null`). Assertions are on counts and shapes only.
+
 ## Tenant inventory (2026-10-21, Agility 26.0.3.2, hosted)
 
 Recorded by `live/inventory.live.test.ts` as size buckets and published here at a coarser level (the repository is
