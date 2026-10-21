@@ -108,7 +108,11 @@ except `group`, and adds `op` (POST only). *docs*
   mapping), `filter` (list of filter-token strings, may reference `$vars`), `with` (mapping of `$var` to value, which
   "alleviates quoting issues"), `sort`, `group` (children under `_children`), `page` (`{start, size}`), `asof` (date or
   `All`), `needTotal` (otherwise `total` is `-1`). Several queries per call as a JSON array or a YAML stream. The
-  response is always an **array of arrays** (one per query). *docs*
+  response is always an **array of arrays** (one per query). *docs* — *live (P0-12, 2026-10-21, a hosted 26.0.3.2
+  tenant):* the array-of-arrays shape holds, bearer access tokens work, but **`needTotal` returned no total anywhere**
+  (body or headers), and `rest-1.v1/Data` reported only `pageSize`/`pageStart` (no `total`) in XML and JSON;
+  **`rest-1.v1` answers JSON** with `Accept: application/json` (`{_type, pageSize, pageStart, Assets}`). P0-06 checks
+  whether this depends on the version.
 - **Dates**: ISO 8601 with `Z` and up to 7 fractional digits (e.g. `2018-08-24T15:06:53.1347214Z`); date-only values are
   accepted; `ChangeDate`/`ChangeDateUTC`-style pairs exist, and the semantic difference is not documented. *docs*
 - **Binding**: `with` substitutes named constants into the same filter grammar; it is not a prepared-statement channel,
