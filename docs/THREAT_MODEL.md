@@ -82,16 +82,16 @@ All `planned` unless stated. Tasks name where the mitigation is built.
 | T12 | Token passthrough / confused deputy | E | MCP-side tokens never forwarded to Agility; Agility token only from the resolved credential; a pass-through workspace keeps every workspace control and stays read-only (P2-14) | P1-02, P2-14 |
 | T13 | Panel XSS, CSRF, clickjacking, CSV injection | T, E | Auto-escaped SSR; strict CSP; `frame-ancestors 'none'`; CSRF tokens + Origin/Fetch-Metadata; formula neutralisation | P4-03, P4-05 |
 | T14 | Admin account takeover | S, E | IdP verification (PKCE, state, nonce, issuer, audience); allowlists; hashed sessions with idle/absolute expiry; re-authentication for high-impact actions; last-owner guard | P4-01, P4-02 |
-| T15 | Revoked access still usable through caches | E | Access cache ≤ 60 s, cleared on change; checks on every refresh | P2-06, P5-05 |
+| T15 | Revoked access still usable through caches | E | Access cache ≤ 60 s and never past the token's or grant's expiry, keyed by token hash and slug, successes only, cleared on local change (P2-06, tested); checks on every refresh | P2-06, P5-05 |
 | T16 | Cross-workspace cache mixing | I | Cache keys include every scope dimension; authorize before lookup; encrypted shared cache | P8-01 |
 | T17 | Repudiation of reads or writes | R | Audit rows with user, device, grant, tool, asset numbers, approval hash; write intent recorded before mutation (see A6); audit rows cannot be updated (storage trigger, P2-01) | P2-01, P2-08, P7-01 |
 | T18 | Malicious dependency, action or artifact | T | Frozen lockfile, minimum release age, pinned actions by SHA, separate publish job, provenance, SBOM, signed image; CodeQL, `pnpm audit` and dependency review on every PR; Renovate with a 3-day release age and approval for majors; OpenSSF Scorecard | P0-03, P0-04, P1-15 |
-| T19 | Enumeration of workspaces or instances | I | Same 401 for unknown slug and bad token; authenticate before revealing existence | P2-06 |
-| T20 | Public endpoint abuse | D | Minimal unauthenticated routes; per-IP limits; body caps; minimal health output | P2-06, P2-07 |
+| T19 | Enumeration of workspaces or instances | I | Same 401 for unknown slug and bad token; authenticate before revealing existence (one body for every denial, tested; P2-06) | P2-06 |
+| T20 | Public endpoint abuse | D | Minimal unauthenticated routes (`/health`, `/version`); per-IP limits; body caps (declared and streamed, 1 MiB); batches refused; 180 s exchange deadline; socket timeouts (P2-06) | P2-06, P2-07 |
 | T21 | Credential or grant bleed through module state | I, E | Per-request immutable context; two-workspace concurrency tests | P1-01, P2-12 |
 | T22 | Raw API passthrough bypasses controls | E | No raw `query.v1`/`rest-1.v1`/`api/asset` tool (ADR-0012) | P1-04, P1-08 |
 | T23 | Secrets accepted as tool arguments | I | Registry refuses secret-like fields; credential management never as tools | P1-01 |
-| T24 | DNS rebinding against a local HTTP server | S, E | Loopback bind by default; token required on localhost; Host/Origin allowlists; `Origin: null` refused | P2-06 |
+| T24 | DNS rebinding against a local HTTP server | S, E | Loopback bind by default; token required on localhost; Host/Origin allowlists; `Origin: null` refused (implemented and tested, P2-06) | P2-06 |
 | T25 | Personal data in OAuth or storage metadata | I | Opaque ids; bounded labels; no emails in keys | P5-01 |
 | T26 | Public or share links created as a side effect | I | Only validated private links from the pinned origin | P8-02 |
 | T27 | MCP App view renders hostile content or exfiltrates | I, T | `textContent`/SVG only; CSP `connect-src 'none'`; data only from `structuredContent` | P8-03 |

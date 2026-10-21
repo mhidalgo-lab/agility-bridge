@@ -2,7 +2,14 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "types": [],
-    "lib": ["es2023", "webworker"]
+    "lib": ["es2023", "webworker"],
+    "isolatedDeclarations": false,
+    "customConditions": [],
+    "paths": {
+      "@agility-bridge/auth": ["../auth/src/index.ts"],
+      "@agility-bridge/core": ["../core/src/index.ts"],
+      "@agility-bridge/storage": ["../storage/src/index.ts"]
+    }
   },
   "include": ["src", "test"]
 }

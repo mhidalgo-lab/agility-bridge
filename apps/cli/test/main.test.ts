@@ -22,10 +22,25 @@ describe('main', () => {
       err: expect.stringContaining('never takes secrets as flags'),
     });
     expect(run(['--agility-token=x']).code).toBe(2);
-    expect(run(['serve'])).toMatchObject({
+    expect(run(['serve', 'extra'])).toMatchObject({
       code: 2,
       err: expect.stringContaining('Unknown argument: serve'),
     });
+    expect(run(['bogus'])).toMatchObject({
+      code: 2,
+      err: expect.stringContaining('Unknown argument: bogus'),
+    });
+  });
+
+  it('serve without a master key exits 1 with guidance, before listening', async () => {
+    const err: string[] = [];
+    const code = main(['serve'], {
+      env: { AB_DATA_DIR: '/nonexistent/agility-bridge-test', AB_PORT: '0' },
+      out: () => {},
+      err: (t) => err.push(t),
+    });
+    expect(await code).toBe(1);
+    expect(err.join('\n')).toContain('agility-bridge init');
   });
 
   it('exits 1 with a clear message on partial or invalid configuration', () => {
