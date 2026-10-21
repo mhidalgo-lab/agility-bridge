@@ -1,6 +1,7 @@
 # ADR-0008 — Access model: instances, credentials, workspaces, grants and device tokens
 
-- **Status:** accepted for the token policy (owner, 2026-10-16); details proposed, refined in P2-04
+- **Status:** accepted (token policy: owner, 2026-10-16; entities and effective permissions: owner, 2026-10-21, P0-13, as
+  the baseline that P2-04 refines; a refinement that contradicts it needs a new ADR)
 - **Date:** 2026-10-16
 - **Related:** [ARCHITECTURE.md](../ARCHITECTURE.md) §4, P2-04, P2-05, P2-13, P4-07, L-062 – L-070, THREAT_MODEL T3, A5,
   A6

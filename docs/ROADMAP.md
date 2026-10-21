@@ -4,7 +4,8 @@
 > (every asset type, read and opt-in write) with each member's own access token. Runs locally (stdio), self-hosted
 > (Node / Docker) or as a **Cloudflare Worker** reachable from every device.
 
-Status: **Phase 0** (2026-10-20) — the monorepo is bootstrapped (P0-01); no features yet. Architecture:
+Status: **Phase 1 next** (2026-10-21) — Phase 0 is complete and the owner gave the go for Phase 1
+([Phase 0 results](research/phase-0-results.md)). Architecture:
 [ARCHITECTURE.md](ARCHITECTURE.md) · Decisions: [adr/](adr/) · Facts & limits: [RESEARCH.md](RESEARCH.md) · Security:
 [THREAT_MODEL.md](THREAT_MODEL.md) · Lessons: [LESSONS-LEARNED.md](LESSONS-LEARNED.md) · Task rules:
 [tasks/README.md](tasks/README.md) · Open questions: [pending-decisions/phase-0.md](pending-decisions/phase-0.md)
@@ -105,6 +106,7 @@ provenance, a GitHub Release with SBOM and checksums, and (from Phase 2) a signe
 | 2026-10-21 | Agility API surface accepted with P0-06 amendments: JSON reads, no totals, comma-free scalar `with` values, `ID` sorts | ADR-0011 |
 | 2026-10-21 | Tool contract final: conventions signed off, output contract accepted | ADR-0015, [tool conventions](dev/tool-conventions.md) |
 | 2026-10-21 | Authentication accepted: device tokens first, OAuth 2.1 with workers-oauth-provider on both runtimes, refresh reuse window built in P5-05 | ADR-0009 |
+| 2026-10-21 | Storage, encryption, access-model details and platform limits accepted; **Phase 0 complete, go for Phase 1** | ADR-0006, 0007, 0008, 0010, [Phase 0 results](research/phase-0-results.md) |
 
 ## Task index
 
@@ -123,12 +125,12 @@ Status lives in each task file.
 | P0-05 | [Agent workflow and task tooling](tasks/phase-0-foundations/P0-05-agent-workflow.md) | high | P0-01 | done |
 | P0-06 | [Spike: Agility API behaviour, limits and fixtures](tasks/phase-0-foundations/P0-06-spike-agility-api.md) | high | P0-01, P0-12 | done |
 | P0-07 | [Spike: MCP SDK v2 dual-era handler with real clients](tasks/phase-0-foundations/P0-07-spike-mcp-sdk-clients.md) | high | P0-01 | done |
-| P0-08 | [Spike: OAuth 2.1 portability on Node and Workers](tasks/phase-0-foundations/P0-08-spike-oauth.md) | high | P0-07 | review |
+| P0-08 | [Spike: OAuth 2.1 portability on Node and Workers](tasks/phase-0-foundations/P0-08-spike-oauth.md) | high | P0-07 | done |
 | P0-09 | [Spike: Cloudflare Workers limits with Agility-shaped payloads](tasks/phase-0-foundations/P0-09-spike-workers-limits.md) | high | P0-01 | done |
 | P0-10 | [Prior-art review](tasks/phase-0-foundations/P0-10-prior-art-review.md) | medium | — | done |
 | P0-11 | [Tool contract and conventions](tasks/phase-0-foundations/P0-11-tool-contract.md) | high | P0-06, P0-07, P0-14 | done |
-| P0-12 | [Agility sandbox and live-verification harness](tasks/phase-0-foundations/P0-12-sandbox-live-harness.md) | high | P0-03, P0-14 | review |
-| P0-13 | [Spike results and go/no-go for Phase 1](tasks/phase-0-foundations/P0-13-spike-results-go-no-go.md) | high | P0-02, P0-04, P0-05, P0-06, P0-07, P0-08, P0-09, P0-10, P0-11, P0-12 | todo |
+| P0-12 | [Agility sandbox and live-verification harness](tasks/phase-0-foundations/P0-12-sandbox-live-harness.md) | high | P0-03, P0-14 | done |
+| P0-13 | [Spike results and go/no-go for Phase 1](tasks/phase-0-foundations/P0-13-spike-results-go-no-go.md) | high | P0-02, P0-04, P0-05, P0-06, P0-07, P0-08, P0-09, P0-10, P0-11, P0-12 | review |
 | P0-14 | [Owner decision gate for Phase 0](tasks/phase-0-foundations/P0-14-owner-decision-gate.md) | high | — | done |
 
 ### Phase 1

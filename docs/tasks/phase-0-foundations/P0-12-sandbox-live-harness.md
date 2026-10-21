@@ -2,7 +2,7 @@
 id: P0-12
 title: Agility sandbox and live-verification harness
 phase: 0
-status: review
+status: done
 priority: high
 depends_on: [P0-03, P0-14]
 adr: ["0011"]

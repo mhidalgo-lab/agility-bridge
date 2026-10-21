@@ -1,7 +1,7 @@
 # ADR-0013 — Opt-in write tools with human approval by default
 
-- **Status:** accepted (owner, 2026-10-16) for the policy; the approval-channel details are proposed until decisions
-  D-10 – D-12 are answered
+- **Status:** accepted (owner, 2026-10-16) for the policy; the approval-channel details follow the owner's answers to
+  D-10 – D-12 (2026-10-19) and are verified in Phase 7 (P7-07)
 - **Date:** 2026-10-16
 - **Related:** P7-01 – P7-09, L-025, L-051, L-105 – L-112, THREAT_MODEL T31, A2, A6
 

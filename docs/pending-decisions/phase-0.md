@@ -171,6 +171,9 @@
   before asking, the final `AB_*` list (with `AB_AGILITY_TLS`), the `tools/list` budget (≤ 40 KB default, ≤ 72 KB with
   every group), the lints, client hints that only narrow, and no deferred-tool mechanism for now.
 
+- **2026-10-21 — Phase 0 close (P0-13):** every decision above is answered; D-13 (minimum on-premises version) is
+  explicitly deferred to P9-05 by the owner. ADRs 0006, 0007, 0008 and 0010 accepted. **Go for Phase 1.**
+
 ## Owner checklist (manual actions, in order)
 
 1. ~~Reserve the npm package name~~ (done 2026-10-19, `agility-bridge@0.0.0`) and enable 2FA; later configure trusted publishing and staged publishing (P1-15).

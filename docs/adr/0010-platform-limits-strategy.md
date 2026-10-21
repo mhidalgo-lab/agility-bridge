@@ -1,6 +1,6 @@
 # ADR-0010 — Budgets, concurrency and retries
 
-- **Status:** proposed (pending spikes P0-06 and P0-09)
+- **Status:** accepted (owner, 2026-10-21, P0-13, on the P0-06 and P0-09 measurements)
 - **Date:** 2026-10-16
 - **Related:** P1-02, P3-03, P6-11, L-047 – L-049, L-079 – L-081, L-097, L-114 – L-116, THREAT_MODEL T5, A10
 
@@ -25,8 +25,8 @@ request. One agent must not be able to exhaust a customer's Agility tenant.
   above 10 s (the error then reports the wait); never retry writes,
   401/403/404/400. Repeated 429s open a short circuit breaker keyed by instance **and credential** (Agility quotas are per consumer, so
   one member's throttling must not block the others).
-- **Response caps**: responses are stream-read with a byte cap before parsing (512 KiB Free, 8 MiB Paid/Node default
-  *(re-measure)*), plus output caps (ADR-0015).
+- **Response caps**: responses are stream-read with a byte cap before parsing (512 KiB Free, 8 MiB Paid/Node default;
+  confirmed in P0-09 production), plus output caps (ADR-0015).
 - **Deadlines**: per-request upstream timeout (default 20 s), whole MCP exchange 180 s.
 - **Rate limits** at our edge: per IP, per auth failure, per token, per grant, per write (P2-07, P7-03). Authorization
   fails closed; cost quotas may fail open with a warning; write limits fail closed.
