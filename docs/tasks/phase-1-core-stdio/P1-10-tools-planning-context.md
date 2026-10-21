@@ -2,7 +2,7 @@
 id: P1-10
 title: "Tools: list_teams, get_team, list_sprints, list_members"
 phase: 1
-status: review
+status: done
 priority: medium
 depends_on: [P1-06, P1-08]
 adr: ["0015"]

@@ -2,12 +2,12 @@
 id: P1-11
 title: CLI with stdio mode (environment and YAML configuration)
 phase: 1
-status: todo
+status: review
 priority: high
 depends_on: [P1-07, P1-08]
 adr: ["0006", "0014"]
 lessons: [L-021, L-026, L-027, L-045, L-136]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P1-11 — CLI with stdio mode (environment and YAML configuration)
@@ -22,9 +22,9 @@ owner: ""
 - Deprecation registry module; `--version`, `--help`; `AB_CA_FILE` for Node; no secrets accepted as flags.
 
 ## Acceptance criteria
-- [ ] End-to-end stdio test with the MCP client SDK against the fixture upstream.
-- [ ] An unknown name in `AB_TOOLS` fails startup and lists valid names.
-- [ ] YAML validation tests; a stdout-cleanliness test (only MCP frames on stdout).
+- [x] End-to-end stdio test with the MCP client SDK against the fixture upstream.
+- [x] An unknown name in `AB_TOOLS` fails startup and lists valid names.
+- [x] YAML validation tests; a stdout-cleanliness test (only MCP frames on stdout).
 
 ## Security notes
 THREAT_MODEL T8, T23, A9.
@@ -39,6 +39,7 @@ THREAT_MODEL T8, T23, A9.
 ## Docs to update
 - docs/guide/configuration.md (new)
 - docs/reference/cli.md (new, generated later)
+- apps/cli/README.md (quick start)
 
 ## Out of scope
 - `serve` and management commands (Phase 2)

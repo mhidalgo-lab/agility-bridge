@@ -37,6 +37,7 @@ export {
   type WorkspaceInfo,
   webCryptoRandom,
 } from './context.ts';
+export { DEPRECATIONS, type Deprecation, deprecatedEnv } from './deprecations.ts';
 export {
   AbError,
   type AbErrorOptions,
@@ -185,4 +186,5 @@ export {
   type ToolKind,
   type ToolOutput,
 } from './tool.ts';
+export { CORE_TOOLS } from './tools/index.ts';
 export { VERSION } from './version.ts';

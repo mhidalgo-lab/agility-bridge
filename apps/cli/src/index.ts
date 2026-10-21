@@ -2,4 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import { main } from './main.ts';
 
-process.exitCode = main();
+const result = main(process.argv.slice(2), {
+  env: process.env,
+  out: (text) => process.stdout.write(`${text}\n`),
+  err: (text) => process.stderr.write(`${text}\n`),
+});
+if (result !== 'serving') process.exitCode = result;
