@@ -2,12 +2,12 @@
 id: P1-14
 title: "Docs: quickstart and client setup guides"
 phase: 1
-status: todo
+status: blocked
 priority: high
 depends_on: [P1-11]
 adr: ["0016"]
 lessons: [L-023, L-026, L-027, L-133]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P1-14 — Docs: quickstart and client setup guides
@@ -22,8 +22,9 @@ A first-time user goes from an Agility token to a working agent in their client 
 - Executable-docs check for commands that can run in CI.
 
 ## Acceptance criteria
-- [ ] Each snippet verified in the real client, with version and date recorded in client-compatibility.md.
-- [ ] The docs check runs in CI.
+- [ ] Each snippet verified in the real client, with version and date recorded in client-compatibility.md. *(MCP
+  Inspector CLI 2.11.0 verified 2026-10-21; VS Code, Claude Code, Copilot CLI and JetBrains: owner run pending)*
+- [x] The docs check runs in CI. *(`scripts/test/docs.test.ts` in `pnpm test`)*
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.
@@ -33,6 +34,12 @@ None beyond the shared rules in AGENTS.md.
 - L-026 — Configure stdio servers through the client, never through flags.
 - L-027 — Clients cache tool lists.
 - L-133 — Execute the documentation.
+
+## Blocker
+
+The snippets for VS Code, Claude Code, Copilot CLI and JetBrains need the owner's run in those clients (their versions
+and dates go into client-compatibility.md). Everything else is done: guides, executable docs check, Inspector run, and
+`scripts/fixture-agility.ts` to run the checks against synthetic data.
 
 ## Docs to update
 - docs/guide/*

@@ -2,7 +2,7 @@
 id: P1-13
 title: Generated tool reference, naming and description lints, tools/list budget
 phase: 1
-status: review
+status: done
 priority: medium
 depends_on: [P0-11, P1-08]
 adr: ["0015"]

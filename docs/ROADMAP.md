@@ -149,8 +149,8 @@ Status lives in each task file.
 | P1-10 | [Tools: list_teams, get_team, list_sprints, list_members](tasks/phase-1-core-stdio/P1-10-tools-planning-context.md) | medium | P1-06, P1-08 | done |
 | P1-11 | [CLI with stdio mode (environment and YAML configuration)](tasks/phase-1-core-stdio/P1-11-cli-stdio.md) | high | P1-07, P1-08 | done |
 | P1-12 | [Test harness (fixtures, contract tests, probes, live suite)](tasks/phase-1-core-stdio/P1-12-test-harness.md) | high | P1-01, P0-12 | done |
-| P1-13 | [Generated tool reference, naming and description lints, tools/list budget](tasks/phase-1-core-stdio/P1-13-tool-reference-lints.md) | medium | P0-11, P1-08 | review |
-| P1-14 | [Docs: quickstart and client setup guides](tasks/phase-1-core-stdio/P1-14-docs-quickstart-clients.md) | high | P1-11 | todo |
+| P1-13 | [Generated tool reference, naming and description lints, tools/list budget](tasks/phase-1-core-stdio/P1-13-tool-reference-lints.md) | medium | P0-11, P1-08 | done |
+| P1-14 | [Docs: quickstart and client setup guides](tasks/phase-1-core-stdio/P1-14-docs-quickstart-clients.md) | high | P1-11 | blocked |
 | P1-15 | [Release pipeline and v0.1.0](tasks/phase-1-core-stdio/P1-15-release-v0-1.md) | high | P1-09, P1-10, P1-11, P1-12, P1-13, P1-14 | todo |
 | P1-16 | [Phase 1 review and live verification](tasks/phase-1-core-stdio/P1-16-phase-1-review.md) | high | P1-15 | todo |
 
