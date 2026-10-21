@@ -99,7 +99,10 @@ unknown`), not by `null`.
 | Write outcome | `applied`, `approval`, `plan` | | `approval`: `approved` \| `not_required` \| `dry_run`; see ADR-0013. |
 
 Text output: a one-line summary, `Note:` lines, then the data block(s) in the requested `format`, each inside the
-untrusted-data envelope ([ADR-0015](../adr/0015-tool-output-contract.md)).
+untrusted-data envelope ([ADR-0015](../adr/0015-tool-output-contract.md)). Tools never format output themselves: they
+call `shapeList` (paged or bounded lists) or `shapeOutput` (several sections) from `packages/core/src/output/`, and mark
+Agility text in a summary or note with `untrusted(value)`, which moves that line inside the envelope. What agents see is
+described in [Output formats](../guide/output-formats.md).
 
 ## Paging
 

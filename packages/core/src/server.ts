@@ -2,6 +2,7 @@
 import { type CallToolResult, McpServer, type StandardSchemaWithJSON } from '@modelcontextprotocol/server';
 import { freezeContext, type ToolContext } from './context.ts';
 import { ERROR_META_KEY, type ToolErrorOptions, toToolErrorResult } from './errors.ts';
+import { envelopeRenderer, newEnvelopeId } from './output/envelope.ts';
 import { annotationsFor, type ToolDefinition, type ToolOutput } from './tool.ts';
 import { VERSION } from './version.ts';
 
@@ -36,7 +37,7 @@ export interface BuildServerOptions {
    * promise one (ADR-0005, L-016); stdio may pass true.
    */
   readonly listChanged?: boolean;
-  /** How error details that may contain Agility text are shown (the envelope from P1-05). */
+  /** How error details that may contain Agility text are shown. Default: the untrusted-data envelope (P1-05). */
   readonly errors?: ToolErrorOptions;
   /** Called after every tool call. Must not throw; a throw is swallowed. */
   readonly onToolCall?: (event: ToolCallEvent) => void;
@@ -167,7 +168,11 @@ export function buildMcpServer({
           observe('ok', null);
           return toCallToolResult(out);
         } catch (error) {
-          const result = toToolErrorResult(error, ctx.requestId, errors);
+          const result = toToolErrorResult(
+            error,
+            ctx.requestId,
+            errors ?? { renderUntrusted: envelopeRenderer(newEnvelopeId(ctx.random)) },
+          );
           const code = (result._meta?.[ERROR_META_KEY] as { code?: string } | undefined)?.code ?? null;
           logger.warn('tool error', { ms: ctx.clock.now() - started, code, error });
           observe('error', code);

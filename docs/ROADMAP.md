@@ -138,10 +138,10 @@ Status lives in each task file.
 | ID | Task | Priority | Depends on | Status |
 |---|---|---|---|---|
 | P1-01 | [Core skeleton, tool registry and error model](tasks/phase-1-core-stdio/P1-01-core-skeleton.md) | high | P0-13 | done |
-| P1-02 | [Agility HTTP client (instances, auth, retries, limiter, budget)](tasks/phase-1-core-stdio/P1-02-agility-client.md) | high | P1-01 | review |
+| P1-02 | [Agility HTTP client (instances, auth, retries, limiter, budget)](tasks/phase-1-core-stdio/P1-02-agility-client.md) | high | P1-01 | done |
 | P1-03 | [Metadata service (meta.v1) and schema snapshot](tasks/phase-1-core-stdio/P1-03-metadata-service.md) | high | P1-02 | todo |
 | P1-04 | [Query builder, safety and limits](tasks/phase-1-core-stdio/P1-04-query-compiler.md) | high | P1-03 | todo |
-| P1-05 | [Output shaping v1 and untrusted-data envelope](tasks/phase-1-core-stdio/P1-05-output-shaping.md) | high | P1-01 | todo |
+| P1-05 | [Output shaping v1 and untrusted-data envelope](tasks/phase-1-core-stdio/P1-05-output-shaping.md) | high | P1-01 | review |
 | P1-06 | [Asset identity and name resolution](tasks/phase-1-core-stdio/P1-06-asset-identity.md) | high | P1-03, P1-04 | todo |
 | P1-07 | [Tools: whoami, list_projects, list_asset_types, describe_asset_type](tasks/phase-1-core-stdio/P1-07-tools-discovery.md) | high | P1-03, P1-05, P1-12 | todo |
 | P1-08 | [Tools: query_assets and get_assets](tasks/phase-1-core-stdio/P1-08-tools-generic-query.md) | high | P1-04, P1-05, P1-06, P1-12 | todo |
