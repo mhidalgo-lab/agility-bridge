@@ -1,4 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
-// Device tokens, effective-permission resolver, identity providers and OAuth (ARCHITECTURE §2).
-// Placeholder from P0-01; the first code arrives with P2-04.
-export {};
+// Device tokens, the effective-permission resolver, identity providers and OAuth integration (ARCHITECTURE §2).
+export {
+  type KeyringCheck,
+  type KeyVersionStatus,
+  keyStatus,
+  openCredentialToken,
+  type RotationOptions,
+  type RotationResult,
+  retireKeyVersion,
+  rotateCredentialKeys,
+  sealCredentialToken,
+  tokenHint,
+  verifyKeyring,
+} from './secrets/credentials.ts';
+export {
+  generateMasterKey,
+  KeyPurpose,
+  Keyring,
+  type MasterKeyMaterial,
+  parseMasterKey,
+  type Sealed,
+  SecretsError,
+  type SecretsErrorCode,
+  timingSafeEqual,
+} from './secrets/keyring.ts';

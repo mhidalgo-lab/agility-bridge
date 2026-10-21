@@ -240,9 +240,21 @@ export interface InstanceRepository extends Repository<Instance, NewInstance, In
   list(): Promise<Instance[]>;
 }
 
+/** The encrypted token of a credential (ADR-0007). */
+export type SealedToken = Pick<Credential, 'tokenCiphertext' | 'tokenIv' | 'keyVersion'>;
+
 export interface CredentialRepository extends Repository<Credential, NewCredential, CredentialPatch> {
   /** `ownerUserId: null` lists shared credentials only. */
-  list(filter?: { instanceId?: string; ownerUserId?: string | null }): Promise<Credential[]>;
+  list(filter?: {
+    instanceId?: string;
+    ownerUserId?: string | null;
+    keyVersion?: number;
+  }): Promise<Credential[]>;
+  /**
+   * Replaces the encrypted token only while the row still holds `expected` (compare-and-swap, for key rotation and
+   * token replacement); `true` when it wrote. `updatedAt` is not changed by a re-encryption.
+   */
+  replaceSecret(id: string, expected: SealedToken, next: SealedToken): Promise<boolean>;
 }
 
 export interface WorkspaceRepository extends Repository<Workspace, NewWorkspace, WorkspacePatch> {

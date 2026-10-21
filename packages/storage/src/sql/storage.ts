@@ -7,6 +7,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy';
 import { InvalidInputError, NotFoundError } from '../errors.ts';
 import {
   checkId,
+  checkSealedToken,
   checkSettingValue,
   clampLimit,
   prepareCreate,
@@ -176,7 +177,29 @@ export function createSqlStorage(driver: SqlDriver, options: SqlStorageOptions =
       if (filter.instanceId !== undefined) where.push(eq(c.instanceId, filter.instanceId));
       if (filter.ownerUserId === null) where.push(isNull(c.ownerUserId));
       else if (filter.ownerUserId !== undefined) where.push(eq(c.ownerUserId, filter.ownerUserId));
+      if (filter.keyVersion !== undefined) where.push(eq(c.keyVersion, filter.keyVersion));
       return credentialRepo.list(and(...where));
+    },
+    async replaceSecret(id, expected, next) {
+      checkId('credentials', id);
+      checkSealedToken(expected);
+      checkSealedToken(next);
+      const c = schema.credentials;
+      const rows = await guard('credentials', 'write', () =>
+        db
+          .update(c)
+          .set({ tokenCiphertext: next.tokenCiphertext, tokenIv: next.tokenIv, keyVersion: next.keyVersion })
+          .where(
+            and(
+              eq(c.id, id),
+              eq(c.keyVersion, expected.keyVersion),
+              eq(c.tokenCiphertext, expected.tokenCiphertext),
+              eq(c.tokenIv, expected.tokenIv),
+            ),
+          )
+          .returning({ id: c.id }),
+      );
+      return rows.length > 0;
     },
   };
 

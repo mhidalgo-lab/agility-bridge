@@ -366,3 +366,13 @@ export function clampLimit(limit: number | undefined, fallback: number, max: num
     throw new InvalidInputError('limit must be a positive integer.');
   return Math.min(limit, max);
 }
+
+/** A sealed token handed to `credentials.replaceSecret`. */
+export function checkSealedToken(value: unknown): void {
+  const v = value as Record<string, unknown> | null;
+  if (typeof v !== 'object' || v === null) throw new InvalidInputError('A sealed token is required.');
+  const fields = FIELDS.credentials;
+  for (const column of ['tokenCiphertext', 'tokenIv', 'keyVersion'] as const) {
+    checkValue('credentials', column, fields[column] as Field, v[column]);
+  }
+}

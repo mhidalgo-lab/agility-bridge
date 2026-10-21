@@ -275,6 +275,39 @@ export function storageContract(name: string, factory: StorageFactory): void {
         expect(v).toMatchObject({ validationStatus: 'valid', reachableScopeIds: ['Scope:1001'] });
       });
 
+      it('replaces a sealed token only while the row still holds the expected one (rotation CAS)', async () => {
+        await seed(s);
+        clock.advance(10);
+        const before = (await s.credentials.get('c-alice')) as NonNullable<
+          Awaited<ReturnType<typeof s.credentials.get>>
+        >;
+        const expected = { tokenCiphertext: before.tokenCiphertext, tokenIv: before.tokenIv, keyVersion: 1 };
+        const next = { tokenCiphertext: 'bmV3', tokenIv: 'bmV3aXY', keyVersion: 2 };
+        expect(await s.credentials.replaceSecret('c-alice', expected, next)).toBe(true);
+        const after = await s.credentials.get('c-alice');
+        expect(after).toMatchObject({ ...next, updatedAt: before.updatedAt, label: before.label });
+        // The old ciphertext is gone: a second rotation from it, a stale IV or version, or a missing row do nothing.
+        expect(await s.credentials.replaceSecret('c-alice', expected, next)).toBe(false);
+        expect(await s.credentials.replaceSecret('c-alice', { ...next, tokenIv: 'other' }, expected)).toBe(
+          false,
+        );
+        expect(await s.credentials.replaceSecret('c-alice', { ...next, keyVersion: 3 }, expected)).toBe(
+          false,
+        );
+        expect(await s.credentials.replaceSecret('c-404', expected, next)).toBe(false);
+        await expect(
+          s.credentials.replaceSecret('c-alice', next, { ...next, keyVersion: 0 }),
+        ).rejects.toThrow(InvalidInputError);
+        expect((await s.credentials.list({ keyVersion: 2 })).map((c) => c.id)).toEqual(['c-alice']);
+        expect(await s.credentials.list({ keyVersion: 1 })).toHaveLength(3);
+        const racers = await Promise.all(
+          ['a', 'b', 'c'].map((n) =>
+            s.credentials.replaceSecret('c-alice', next, { tokenCiphertext: n, tokenIv: n, keyVersion: 3 }),
+          ),
+        );
+        expect(racers.filter(Boolean)).toHaveLength(1);
+      });
+
       it('lists credentials by instance and owner, null meaning shared', async () => {
         await seed(s);
         const ids = async (f: Parameters<Storage['credentials']['list']>[0]) =>
@@ -720,6 +753,12 @@ export function storageContract(name: string, factory: StorageFactory): void {
           () => ro.users.update('u-alice', { role: 'owner' }),
           () => ro.workspaces.delete('w-1'),
           () => ro.credentials.update('c-alice', { label: 'x' }),
+          () =>
+            ro.credentials.replaceSecret(
+              'c-alice',
+              { tokenCiphertext: 'a', tokenIv: 'b', keyVersion: 1 },
+              { tokenCiphertext: 'c', tokenIv: 'd', keyVersion: 2 },
+            ),
           () => ro.grants.create({ id: 'g', workspaceId: 'w-1', label: 'x' }),
           () => ro.accessTokens.touch('t', 0),
           () => ro.audit.append({ id: 'a', ts: 1, kind: 'admin', action: 'x', status: 'ok' }),

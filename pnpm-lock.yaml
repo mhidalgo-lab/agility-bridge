@@ -206,9 +206,18 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@agility-bridge/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@agility-bridge/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@agility-bridge/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
+      '@agility-bridge/storage-sqlite':
+        specifier: workspace:*
+        version: link:../../packages/storage-sqlite
       '@modelcontextprotocol/client':
         specifier: 2.3.1
         version: 2.3.1
@@ -233,6 +242,10 @@ importers:
         version: 0.23.1(typescript@7.0.2)
 
   packages/auth:
+    dependencies:
+      '@agility-bridge/storage':
+        specifier: workspace:*
+        version: link:../storage
     devDependencies:
       tsdown:
         specifier: 0.23.1
