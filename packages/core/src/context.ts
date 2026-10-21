@@ -94,6 +94,41 @@ export interface Budget {
   spend(n?: number, what?: string): void;
 }
 
+/**
+ * A budget for one tool that spends from the call's budget but never more than `max` (its declared cost). A tool whose
+ * work depends on cold metadata stops at its declared cost; the metadata it loaded stays cached for the retry.
+ */
+export function capBudget(parent: Budget, max: number): Budget {
+  const start = parent.used;
+  const usedHere = () => parent.used - start;
+  return {
+    get limit() {
+      return Math.min(parent.limit, start + max);
+    },
+    get used() {
+      return parent.used;
+    },
+    get remaining() {
+      return Math.max(0, Math.min(parent.remaining, max - usedHere()));
+    },
+    canSpend: (n = 1) => usedHere() + n <= max && parent.canSpend(n),
+    spend(n = 1, what = 'an Agility request') {
+      if (usedHere() + n > max) {
+        throw new AbError(
+          ErrorCode.BudgetExhausted,
+          `This call reached its limit of ${max} Agility requests before ${what}.`,
+          {
+            hint: 'Repeat the call: the metadata it loaded is cached, so the next call needs fewer requests. Or ask for fewer fields or types.',
+            details: { limitRequests: max, usedRequests: usedHere() },
+            localDetails: true,
+          },
+        );
+      }
+      parent.spend(n, what);
+    },
+  };
+}
+
 /** Bounds concurrent Agility calls for one credential (ADR-0010: per-credential semaphore). */
 export interface Limiter {
   run<T>(task: () => Promise<T>): Promise<T>;

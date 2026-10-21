@@ -2,7 +2,7 @@
 id: P1-07
 title: "Tools: whoami, list_projects, list_asset_types, describe_asset_type"
 phase: 1
-status: review
+status: done
 priority: high
 depends_on: [P1-03, P1-05, P1-12]
 adr: ["0015"]

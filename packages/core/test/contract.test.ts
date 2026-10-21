@@ -61,6 +61,26 @@ describe('tools/list contract', () => {
           },
           "name": "describe_asset_type",
         },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Query assets",
+          },
+          "name": "query_assets",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Get assets",
+          },
+          "name": "get_assets",
+        },
       ]
     `,
     );

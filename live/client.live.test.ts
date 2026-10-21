@@ -233,9 +233,21 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
   it('runs every catalogue tool on the tenant without an error (counts only)', {
     timeout: 180_000,
   }, async () => {
+    const sample = await agilityClient(ctx).query<Rows>({
+      from: 'Defect',
+      select: ['Number'],
+      sort: ['ID'],
+      page: { start: 0, size: 1 },
+    });
+    const defect = String(sample.data[0]?.[0]?.['Number'] ?? 'D-00000');
+    const argsFor: Record<string, Record<string, unknown>> = {
+      describe_asset_type: { asset_type: 'Story' },
+      query_assets: { asset_type: 'Defect', fields: ['Name', 'Status.Name', 'Description'], limit: 3 },
+      get_assets: { assets: [defect, 'B-0', 'Story:1'] },
+    };
     for (const tool of CORE_TOOLS) {
       const fresh: ToolContext = { ...ctx, metadata: new MetadataService(), budget: createBudget(60) };
-      const args = tool.name === 'describe_asset_type' ? { asset_type: 'Story' } : {};
+      const args = argsFor[tool.name] ?? {};
       const result = await rpc(() => buildMcpServer({ tools: [tool], ctx: fresh }), 'tools/call', {
         name: tool.name,
         arguments: args,
