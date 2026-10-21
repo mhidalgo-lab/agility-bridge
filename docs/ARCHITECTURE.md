@@ -146,9 +146,10 @@ unvalidated or malformed denies. Rules:
 
 ### Data model (SQLite / D1)
 
-Source of truth will be `packages/storage/src/schema.ts` (Drizzle, SQLite dialect) with migrations in
-`packages/storage/migrations`. Times are epoch milliseconds, ids are caller-generated text, lists and objects are JSON
-text.
+`packages/storage/src/schema.ts` (Drizzle, SQLite dialect) with hand-written, embedded migrations in
+`packages/storage/src/migrations/` (STRICT tables, CHECK constraints, triggers for the cross-row rules); a test keeps the
+two identical. Times are epoch milliseconds, ids are caller-generated text, lists and objects are JSON text. Repository
+semantics, rules and migrations: [dev/storage.md](dev/storage.md).
 
 | Table | Key columns |
 |---|---|
@@ -163,8 +164,11 @@ text.
 | `kv` | key, value, expires_at — OAuth provider records (`oauth:`; codes and tokens stored hash-only, grant properties encrypted), single-use markers taken atomically, sign-in transactions, setup links, write approvals and replay ledger, cached client metadata documents, task records |
 | `schema_migrations` | version, name, checksum, applied_at |
 
-Deleting a workspace removes its grants and their tokens; deleting a grant removes its tokens; a credential or instance
-still referenced cannot be deleted (revoke or disable it instead). Audit rows are never deleted except by retention.
+Deleting a workspace removes its grants and their tokens; deleting a grant removes its tokens; a credential, instance
+or user still referenced cannot be deleted (revoke or disable it instead). Audit rows are never updated, and deleted
+only by retention. Storage itself refuses a workspace default that is not a shared credential of the workspace's
+instance, a grant credential that is neither shared nor the grant user's own, and a change of an instance's origin or
+TLS trust while it has unrevoked credentials (P2-01).
 
 ## 5. Request flow (remote MCP call)
 

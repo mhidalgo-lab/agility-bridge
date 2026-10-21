@@ -21,6 +21,7 @@
     "tasks": "node scripts/tasks.ts",
     "test:live": "vitest run --config vitest.live.config.ts",
     "metadata:drift": "node scripts/metadata-drift.ts",
+    "storage:fixture": "node --conditions=source scripts/storage-fixture.ts",
     "docs:tools": "node scripts/tool-reference.ts",
     "version-packages": "changeset version && node scripts/release.ts sync-version",
     "check:package": "node scripts/check-package.ts"
