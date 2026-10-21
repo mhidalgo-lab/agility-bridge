@@ -124,6 +124,9 @@ except `group`, and adds `op` (POST only). *docs*
   shapes accepted by 26.0.3.2: `(Scope=$s|Scope.ParentAndUp=$s)` with a list, `Asset:Workitem.Scope=$s`,
   `Schedule.ScheduledScopes=$s` on `Timebox`, `Parent:Story.Number` in `select`, `Children[AssetState!='Dead'].@Count`,
   `Actuals[IsDeleted='false'].Value.@Sum`, `IsDeleted=$v` on `Actual`, `Name~=$v` and `asof` with a timestamp. — *live*
+- **Predicate cost (live, P1-06, 2026-10-21):** `(Scope=$s|Scope.ParentAndUp=$s)` with one project took about 5.1 s on
+  `Story` and 1.9 s on `Task`; `Scope=$list` with the project's `ChildrenMeAndDown` took 0.22–0.43 s, and the tree query
+  itself about 0.2 s. `IsSelf` exists on `Member` (also on the public example instance). — *live*
 - **Dates**: ISO 8601 with `Z` and up to 7 fractional digits (e.g. `2018-08-24T15:06:53.1347214Z`); date-only values are
   accepted; `ChangeDate`/`ChangeDateUTC`-style pairs exist, and the semantic difference is not documented. *docs*
 - **Binding**: `with` substitutes named constants into the same filter grammar; it is not a prepared-statement channel,

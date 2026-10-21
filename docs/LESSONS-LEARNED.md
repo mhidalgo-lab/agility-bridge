@@ -29,7 +29,7 @@ How to use it:
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
 | [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167 |
-| [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062 |
+| [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151 |
@@ -440,6 +440,13 @@ periods; a date-only end includes the whole day. Test the boundaries.
 **L-062 — Limits live on the workspace and can only be tightened by a grant.**
 Numbers take the minimum, allow lists intersect, deny lists union.
 *Applied in:* [ADR-0008](adr/0008-access-model.md), P2-04.
+
+**L-168 — Expand project trees once instead of filtering by ancestors.**
+On the read-only tenant (P1-06), `(Scope=$s|Scope.ParentAndUp=$s)` cost about 5 s on `Story` and 1.9 s on `Task`,
+against about 0.27 s for a plain `Scope=$list`. The compiler now asks for the allowed projects' `ChildrenMeAndDown`
+once (cached for 10 minutes) and filters and rechecks with the expanded list. Measure predicates on the live instance,
+not only their correctness.
+*Applied in:* P1-06, [ARCHITECTURE §6.3](ARCHITECTURE.md#63-query-compiler-p1-04).
 
 ## G. Access model, tokens and isolation
 

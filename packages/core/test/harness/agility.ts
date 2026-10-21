@@ -53,38 +53,112 @@ function boundValues(value: unknown): string[] {
   return String(value).split(',');
 }
 
-const FILTER_RE = /^([A-Za-z][A-Za-z0-9_.]*)(=|!=)(?:\$([A-Za-z][A-Za-z0-9_]*)|'([^']*)')$/;
+const TERM_RE =
+  /^([A-Za-z][A-Za-z0-9_.:]*)(<=|>=|!=|~=|=|<|>)(?:\$([A-Za-z][A-Za-z0-9_]*)|'([^']*)'|"([^"]*)")$/;
+
+function relationValue(actual: unknown): string {
+  if (actual === null || actual === undefined) return '';
+  if (typeof actual === 'object') return String((actual as { _oid?: unknown })._oid ?? '');
+  return String(actual);
+}
+
+function compareValues(actual: unknown, op: string, expected: string): boolean {
+  const a = relationValue(actual);
+  switch (op) {
+    case '=':
+      return a === expected;
+    case '!=':
+      return a !== expected;
+    case '~=':
+      return a.toLowerCase().includes(expected.toLowerCase());
+    default: {
+      const x = Number(a);
+      const y = Number(expected);
+      const [l, r] =
+        a !== '' && Number.isFinite(x) && Number.isFinite(y) ? [x, y] : [Date.parse(a), Date.parse(expected)];
+      if (Number.isNaN(l) || Number.isNaN(r)) return false;
+      return op === '<' ? l < r : op === '<=' ? l <= r : op === '>' ? l > r : l >= r;
+    }
+  }
+}
+
+function term(row: Row, q: Query, text: string): boolean {
+  const m = TERM_RE.exec(text.trim());
+  if (m === null) throw new FakeAgilityError(`The fake does not understand the filter term "${text}".`);
+  const [, attr = '', op = '=', variable, single, double] = m;
+  let values: string[];
+  if (variable !== undefined) {
+    const bound = q.with?.[`$${variable}`];
+    if (bound === undefined) throw new FakeAgilityError(`Unbound variable $${variable}.`);
+    values = boundValues(bound);
+  } else values = [single ?? double ?? ''];
+  // `ID` is the asset itself.
+  const actual = attr === 'ID' ? row['_oid'] : row[attr];
+  const actuals: unknown[] = Array.isArray(actual) ? (actual.length === 0 ? [''] : actual) : [actual];
+  if (op === '!=') return values.every((v) => actuals.every((x) => compareValues(x, '!=', v)));
+  return values.some((v) => actuals.some((x) => compareValues(x, op, v)));
+}
+
+/** A tiny evaluator for the filter grammar tools emit: terms joined by `;` (AND) and `|` (OR), with parentheses. */
+function evaluate(row: Row, q: Query, text: string): boolean {
+  let i = 0;
+  const atom = (): boolean => {
+    if (text[i] === '(') {
+      i++;
+      const value = expr();
+      if (text[i] !== ')') throw new FakeAgilityError(`Unbalanced parentheses in "${text}".`);
+      i++;
+      return value;
+    }
+    const start = i;
+    let quote: string | undefined;
+    while (i < text.length) {
+      const c = text[i] as string;
+      if (quote !== undefined) {
+        if (c === quote) quote = undefined;
+      } else if (c === "'" || c === '"') quote = c;
+      else if (c === ';' || c === '|' || c === ')') break;
+      i++;
+    }
+    return term(row, q, text.slice(start, i));
+  };
+  const and = (): boolean => {
+    let value = atom();
+    while (text[i] === ';') {
+      i++;
+      const right = atom();
+      value = value && right;
+    }
+    return value;
+  };
+  const expr = (): boolean => {
+    let value = and();
+    while (text[i] === '|') {
+      i++;
+      const right = and();
+      value = value || right;
+    }
+    return value;
+  };
+  const value = expr();
+  if (i !== text.length) throw new FakeAgilityError(`Unexpected "${text.slice(i)}" in "${text}".`);
+  return value;
+}
 
 function matches(row: Row, q: Query): boolean {
   for (const [k, v] of Object.entries(q.where ?? {})) {
     if (!boundValues(v).includes(String(row[k]))) return false;
   }
-  for (const clause of q.filter ?? []) {
-    for (const term of clause.split(';')) {
-      const m = FILTER_RE.exec(term.trim());
-      if (m === null) throw new FakeAgilityError(`The fake does not understand the filter term "${term}".`);
-      const [, attr = '', op, variable, literal] = m;
-      let values: string[];
-      if (variable !== undefined) {
-        const bound = q.with?.[`$${variable}`];
-        if (bound === undefined) throw new FakeAgilityError(`Unbound variable $${variable}.`);
-        values = boundValues(bound);
-      } else values = [literal ?? ''];
-      const actual = row[attr];
-      const actualValues = Array.isArray(actual) ? actual.map(String) : [String(actual ?? '')];
-      const hit = actualValues.some((a) => values.includes(a));
-      if ((op === '=') !== hit) return false;
-    }
-  }
-  return true;
+  return (q.filter ?? []).every((entry) => evaluate(row, q, entry));
 }
 
 function project(row: Row, select: readonly unknown[] | undefined): Row {
   const out: Record<string, unknown> = { _oid: row['_oid'] };
   for (const s of select ?? []) {
     if (typeof s === 'string') {
-      if (Object.hasOwn(row, s)) out[s] = row[s];
-      else out[s] = null;
+      // Server-built bracket filters (`Children[AssetState!='Dead'].@Count`) read the plain path's value.
+      const plain = s.replace(/\[[^\]]*\]/g, '');
+      out[s] = Object.hasOwn(row, s) ? row[s] : Object.hasOwn(row, plain) ? row[plain] : null;
     } else if (s !== null && typeof s === 'object') {
       const nested = s as { from?: string; select?: unknown[] };
       const from = nested.from ?? '';

@@ -2,7 +2,7 @@
 id: P1-04
 title: Query builder, safety and limits
 phase: 1
-status: review
+status: done
 priority: high
 depends_on: [P1-03]
 adr: ["0010", "0012"]

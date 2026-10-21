@@ -5259,6 +5259,18 @@
     "IsCanned": true,
     "IsCustom": false
    },
+   "Member.IsSelf": {
+    "_type": "AttributeDefinition",
+    "Name": "IsSelf",
+    "Token": "Member.IsSelf",
+    "DisplayName": "IsSelf",
+    "AttributeType": "Boolean",
+    "IsReadOnly": false,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": true,
+    "IsCustom": false
+   },
    "Member.OwnedWorkitems": {
     "_type": "AttributeDefinition",
     "Name": "OwnedWorkitems",

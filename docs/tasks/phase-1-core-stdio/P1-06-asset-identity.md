@@ -2,12 +2,12 @@
 id: P1-06
 title: Asset identity and name resolution
 phase: 1
-status: todo
+status: review
 priority: high
 depends_on: [P1-03, P1-04]
 adr: ["0012"]
-lessons: [L-035, L-036, L-064, L-140, L-141, L-145]
-owner: ""
+lessons: [L-035, L-036, L-064, L-140, L-141, L-145, L-168]
+owner: "Matias Hidalgo"
 ---
 
 # P1-06 — Asset identity and name resolution
@@ -23,9 +23,9 @@ Accept the identifiers people actually use — numbers, OID tokens, names, `me`,
 - `AB_NOT_FOUND` worded as "not found or not visible" — the same for out-of-scope assets.
 
 ## Acceptance criteria
-- [ ] Tests for every identifier form and cross-type number resolution.
-- [ ] An asset outside the workspace's projects yields the same `AB_NOT_FOUND` as a missing one.
-- [ ] Ambiguous names return candidates; `me` resolves to the token's member; sprint helpers handle no current sprint and overlapping sprints.
+- [x] Tests for every identifier form and cross-type number resolution.
+- [x] An asset outside the workspace's projects yields the same `AB_NOT_FOUND` as a missing one.
+- [x] Ambiguous names return candidates; `me` resolves to the token's member; sprint helpers handle no current sprint and overlapping sprints.
 
 ## Security notes
 THREAT_MODEL T3, A4.
@@ -37,9 +37,10 @@ THREAT_MODEL T3, A4.
 - L-140 — A 404 means "not found or not visible".
 - L-141 — Number prefixes vary per instance.
 - L-145 — Single-asset URLs ignore `where`.
+- L-168 — Expand project trees once instead of filtering by ancestors.
 
 ## Docs to update
-- docs/ARCHITECTURE.md §6.4
+- docs/ARCHITECTURE.md §6.4 (and §6.3: project-tree predicates)
 
 ## Out of scope
 - Anything not listed under Scope.
