@@ -60,6 +60,7 @@ export {
 } from './identity/match.ts';
 export { type AssetRef, parseAssetRef } from './identity/refs.ts';
 export {
+  type Page,
   type ResolvedAsset,
   resolveAsset,
   resolveByName,
@@ -68,6 +69,7 @@ export {
   resolveSprint,
   resolveStatus,
   resolveTeam,
+  runPage,
   runQuery,
   type SprintOptions,
 } from './identity/resolve.ts';

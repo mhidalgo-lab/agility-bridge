@@ -53,6 +53,44 @@ export async function runQuery(
   return { rows: kept, hidden: rows.length - kept.length, hiddenValues };
 }
 
+export interface Page {
+  /** The kept rows of this page (at most `limit`), rechecked and sanitized. */
+  readonly rows: Row[];
+  /** Whether more rows exist upstream after this page. */
+  readonly hasMore: boolean;
+  readonly hidden: number;
+  /** The offset after the first `shown` rows, in upstream positions (P1-17, L-170). */
+  next(shown: number): number;
+}
+
+/**
+ * One page of a single-type list. A row the recheck drops still counts as an upstream position, so it never shifts the
+ * cursor: the next page starts right after the last row shown, or after the whole window when every kept row was shown.
+ */
+export async function runPage(ctx: ToolContext, compiled: CompiledQuery): Promise<Page> {
+  const res = await agilityClient(ctx).query<unknown[]>(compiled.body);
+  const set = Array.isArray(res.data) ? res.data[0] : undefined;
+  const raw = Array.isArray(set)
+    ? set.filter((r): r is Row => r !== null && typeof r === 'object' && !Array.isArray(r))
+    : [];
+  const window = raw.slice(0, compiled.limit);
+  const rows: Row[] = [];
+  const positions: number[] = [];
+  for (const [i, r] of window.entries()) {
+    if (!inScope(ctx, compiled, r)) continue;
+    sanitizeRow(ctx, compiled, r);
+    rows.push(r);
+    positions.push(i);
+  }
+  return {
+    rows,
+    hasMore: raw.length > compiled.limit,
+    hidden: window.length - rows.length,
+    next: (shown) =>
+      compiled.offset + (shown >= rows.length ? window.length : (positions[shown - 1] ?? -1) + 1),
+  };
+}
+
 /** A concrete type returned by a cross-type query must itself be readable in this workspace. */
 async function readableType(ctx: ToolContext, type: string): Promise<boolean> {
   if (ctx.assetTypes.deny.includes(type)) return false;

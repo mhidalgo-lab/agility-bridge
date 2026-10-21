@@ -2,7 +2,7 @@
 id: P1-16
 title: Phase 1 review and live verification
 phase: 1
-status: review
+status: done
 priority: high
 depends_on: [P1-15]
 adr: []

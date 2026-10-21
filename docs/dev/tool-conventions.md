@@ -110,7 +110,8 @@ described in [Output formats](../guide/output-formats.md).
 - Every list takes `limit` (default 25, maximum the workspace limit) and either pages or says why it is bounded.
 - Agility paging is offset-based (`page {start, size}`); the tool always sends an explicit size (L-137) and a
   deterministic sort ending with `ID` as the unique tiebreaker (pages measured disjoint and repeatable, P0-06), and
-  notes that concurrent edits can move items between pages. "More available" comes from fetching `limit + 1` rows:
+  notes that concurrent edits can move items between pages. Offsets count **upstream positions**: a row the scope recheck drops still
+  advances the cursor, and a multi-type page merges each type's rows in upstream order (`runPage`, `multiPage`; L-170). "More available" comes from fetching `limit + 1` rows:
   Agility does not report totals (P0-06).
 - A cursor is client input, so it is never trusted for scope: `base64url(JSON)` carrying the offset, the first call's
   resolved window and a **binding** hash of tool + workspace + Agility projects + asset type + normalised filters + sort.

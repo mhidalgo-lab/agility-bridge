@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from 'zod';
-import { runQuery } from '../../identity/resolve.ts';
+import { runPage } from '../../identity/resolve.ts';
 import { assetState, shapeList } from '../../output/result.ts';
 import { compileQuery } from '../../query/compiler.ts';
 import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
@@ -52,8 +52,9 @@ export const listProjects: ToolDefinition = defineTool({
       offset,
       ...(input.limit === undefined ? {} : { limit: input.limit }),
     });
-    const { rows, hidden } = await runQuery(ctx, compiled);
-    const page = rows.slice(0, compiled.limit);
+    const result = await runPage(ctx, compiled);
+    const { rows, hidden } = result;
+    const page = rows;
     const items = page.map((r) => {
       const parent = ref(r, 'Parent');
       const schedule = ref(r, 'Schedule');
@@ -71,8 +72,8 @@ export const listProjects: ToolDefinition = defineTool({
       source: 'Agility projects',
       rows: items,
       columns: ['assetType', 'oid', 'state', 'name', 'parent', 'schedule'],
-      hasMore: rows.length > compiled.limit,
-      cursorFor: (shown) => encodeCursor(binding, { offset: offset + shown }),
+      hasMore: result.hasMore,
+      cursorFor: (shown) => encodeCursor(binding, { offset: result.next(shown) }),
       hiddenOutsideScope: hidden > 0,
       ...(input.format === undefined ? {} : { format: input.format }),
       meta: { query: compiled.masked },

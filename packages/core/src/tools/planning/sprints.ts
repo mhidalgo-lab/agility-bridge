@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from 'zod';
 import { capBudget } from '../../context.ts';
-import { resolveProject, resolveTeam, runQuery } from '../../identity/resolve.ts';
+import { resolveProject, resolveTeam, runPage } from '../../identity/resolve.ts';
 import { oidsOf } from '../../identity/scope.ts';
 import { assetState, shapeList } from '../../output/result.ts';
 import { utcIso } from '../../output/text.ts';
@@ -80,8 +80,9 @@ export const listSprints: ToolDefinition = defineTool({
       offset,
       ...(input.limit === undefined ? {} : { limit: input.limit }),
     });
-    const { rows, hidden } = await runQuery(ctx, compiled);
-    const items = rows.slice(0, compiled.limit).map((r) => {
+    const result = await runPage(ctx, compiled);
+    const { rows, hidden } = result;
+    const items = rows.map((r) => {
       const begin =
         typeof r['BeginDate'] === 'string' ? (utcIso(r['BeginDate']) ?? r['BeginDate']) : undefined;
       const end = typeof r['EndDate'] === 'string' ? (utcIso(r['EndDate']) ?? r['EndDate']) : undefined;
@@ -121,8 +122,8 @@ export const listSprints: ToolDefinition = defineTool({
       source: 'sprints',
       rows: items,
       columns: ['assetType', 'oid', 'state', 'name', 'timing', 'beginDate', 'endDate', 'schedule'],
-      hasMore: rows.length > compiled.limit,
-      cursorFor: (shown) => encodeCursor(binding, { offset: offset + shown }),
+      hasMore: result.hasMore,
+      cursorFor: (shown) => encodeCursor(binding, { offset: result.next(shown) }),
       hiddenOutsideScope: hidden > 0,
       ...(input.format === undefined ? {} : { format: input.format }),
     });
