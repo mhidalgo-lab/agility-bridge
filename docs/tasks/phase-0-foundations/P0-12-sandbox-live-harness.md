@@ -2,7 +2,7 @@
 id: P0-12
 title: Agility sandbox and live-verification harness
 phase: 0
-status: in-progress
+status: review
 priority: high
 depends_on: [P0-03, P0-14]
 adr: ["0011"]
@@ -40,7 +40,7 @@ A safe Agility sandbox, a protected way to run live tests and a template for evi
 - [x] The token is validated against the tenant with a read-only probe. *(`query.v1` with a bearer token, 2026-10-21: HTTP 200, one `IsSelf` member)*
 - [x] Inventory documented (asset types and counts, no content or names from the tenant). *(docs/dev/verification.md, as coarse levels because the repository is public)*
 - [x] The read-only guard refuses a non-`GET` request and a write endpoint (tests). *(scripts/test/live-guard.test.ts)*
-- [ ] The live workflow runs a trivial read-only probe from `main`. *(`.github/workflows/live.yml`; to run from `main` after merge)*
+- [x] The live workflow runs a trivial read-only probe from `main`. *(run 39539313348, 2026-10-21: 2 tests passed after the owner approved the `live` environment)*
 - [x] Template and checklist committed. *(docs/dev/verification.md)*
 
 ## Security notes

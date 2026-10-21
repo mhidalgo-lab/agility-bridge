@@ -1,7 +1,7 @@
 # P0-08 results: OAuth 2.1 on Workers and Node with one protected resource per workspace
 
-Date: 2026-10-21. Status: **local results done (workerd and Node); production deploy and real clients pending** (the
-462 KB bundle needs `wrangler` logged in to the owner's Cloudflare account; see *Deploy* below).
+Date: 2026-10-21. Status: **done.** Local results on workerd and Node, then a throwaway deployment on the owner's
+Workers Free account (deleted afterwards) with the automated checks and three real clients. ADR-0009 accepted.
 
 Versions: `@cloudflare/workers-oauth-provider` **1.2.3** (latest, 13 days old), `@modelcontextprotocol/server` 2.3.1,
 wrangler 4.149.0 (local workerd), Node 24.16.0. This spike starts from relic-bridge's P0-08 spike (same maintainer, same
@@ -65,7 +65,33 @@ refresh 2 get + 2 put), the Workers Free KV write budget (1,000 per day: refresh
 at connect time), and the per-request construction of the authorization and resource servers. Same library version
 line; not re-measured.
 
-## Deploy (pending the owner)
+## 4. Production (Workers Free, 2026-10-21)
+
+Deployed with wrangler as `agility-bridge-spike-oauth` (917 KB / 188 KB gzip upload) with a KV namespace, Workers Logs
+and a random `SPIKE_ADMIN` secret; the account's other Workers were not touched; the Worker, the KV namespace and the
+local deploy config were deleted after the run.
+
+- `scripts/e2e.ts`: **all checks pass in production**, including the storage test (a workspace added at runtime works on
+  30 of 30 later requests across isolates, where relic-bridge's in-memory list failed) and the same parallel-refresh
+  result as locally (5/5 succeed, 1/5 new refresh tokens stay usable).
+- `scripts/cimd.ts`: **all checks pass** with Claude Code's real metadata document.
+- Time budgets (client wall time from Buenos Aires, 5 calls each): 401 challenge 0.20–0.25 s, protected resource metadata
+  0.14–0.20 s, authorization server metadata 0.18–0.21 s, DCR registration 0.70–0.78 s, far inside the about 10 s that
+  Claude's hosted clients allow for discovery, registration and token calls.
+
+## 5. Real clients
+
+| Client | Version | Registration | Redirect | Scopes requested | Result |
+|---|---|---|---|---|---|
+| Claude Code | 2.1.304 | **CIMD** `https://claude.ai/oauth/claude-code-client-metadata` | loopback | `mcp:read offline_access`, `resource` sent | ✅ owner: `/mcp` → Authenticate, then `whoami` returned workspace `team` |
+| GitHub Copilot in VS Code | VS Code 1.142.0 | **CIMD** `https://vscode.dev/oauth/client-metadata.json` | — | `mcp:read offline_access`, `resource` sent | ✅ owner: sign-in offered on the server without headers, then `whoami` returned workspace `team` |
+| MCP Inspector CLI | 2.11.0 | **DCR** (client name "MCP Inspector") | `http://127.0.0.1:6276/oauth/callback` | `mcp:read offline_access`, `resource` sent | ✅ agent: interactive flow under a pseudo-terminal (the CLI refuses OAuth without a TTY); `iss` in the callback; `whoami` returned workspace `team`; a keychain warning on WSL (no secret service) did not matter |
+
+Registration types come from the spike's grant and client records in KV (Workers Logs were not readable with the
+available tokens). Not observed: a refresh by a real client (access tokens last an hour; the e2e covers refresh),
+claude.ai web and Claude mobile (custom connectors), JetBrains, Cursor, Windsurf.
+
+## Deploy
 
 The Worker bundle is 462 KB minified (124 KB gzip). Uploading it through the Cloudflare API tool is not practical, so the
 deploy uses wrangler:
@@ -80,9 +106,10 @@ SPIKE_ADMIN=… node scripts/e2e.ts https://agility-bridge-spike-oauth.<subdomai
 node scripts/cimd.ts https://agility-bridge-spike-oauth.<subdomain>.workers.dev
 ```
 
-Then the real clients (owner): Claude Code (`claude mcp add --transport http …/w/team/mcp`, then `/mcp` → authenticate),
-VS Code (`"type": "http"` without headers), MCP Inspector CLI (OAuth flags). claude.ai web and Claude mobile need custom
-connectors on the account (not available on relic-bridge's run). Teardown: delete the Worker and the KV namespace.
+Then the real clients: Claude Code (`claude mcp add --transport http …/w/team/mcp`, then `/mcp` → authenticate),
+VS Code (`"type": "http"` without headers), MCP Inspector CLI (run under `script` for a TTY). Teardown:
+`pnpm exec wrangler delete -c wrangler.deploy.jsonc --force` and
+`pnpm exec wrangler kv namespace delete --namespace-id <id> --skip-confirmation`.
 
 ## Reproduce locally
 

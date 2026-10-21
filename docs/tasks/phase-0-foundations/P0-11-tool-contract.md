@@ -2,7 +2,7 @@
 id: P0-11
 title: Tool contract and conventions
 phase: 0
-status: review
+status: done
 priority: high
 depends_on: [P0-06, P0-07, P0-14]
 adr: ["0012", "0015"]

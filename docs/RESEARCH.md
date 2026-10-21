@@ -359,6 +359,9 @@ Summary only; the per-client matrix, configuration formats and verification stat
   workerd and Node, 2026-10-21):* per-path protected resource metadata, audience binding with refresh that cannot
   retarget, CIMD with Claude Code's real document, PKCE S256 only, RFC 9207 `iss`, DCR and revocation all confirmed;
   **five parallel refreshes all succeed but only the last new refresh token stays usable** (no reuse interval, L-164).
+  The same holds in production on Workers Free, where endpoints answer in about 0.2 s; Claude Code 2.1.304 and VS Code
+  1.142.0 register through CIMD (`https://claude.ai/oauth/claude-code-client-metadata`,
+  `https://vscode.dev/oauth/client-metadata.json`), MCP Inspector CLI 2.11.0 through DCR. *live*
 
 ## 5. Cloudflare Workers platform
 

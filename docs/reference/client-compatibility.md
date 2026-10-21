@@ -39,6 +39,11 @@ ChatGPT connectors, Gemini CLI.
 | Claude Code | 2.1.304 | 2026-10-20 | **V** stdio and HTTP with a static `Authorization` header; 2026-07-28 on both; per-workspace tool lists; server-side schema errors shown; **write approval prompt shown; approve and decline work on both transports** (`input_required`) | P0-07, owner run (relic-bridge also saw 2.1.287 send `Mcp-Method`/`Mcp-Name` and a long-lived `subscriptions/listen`) |
 | GitHub Copilot (desktop) | 2026-10 | 2026-10-02 | listed and called over HTTP | relic-bridge P0-07 (same SDK; not yet re-run against agility-bridge) |
 
+OAuth 2.1 (P0-08, production on Workers, 2026-10-21): **Claude Code 2.1.304** and **VS Code 1.142.0** sign in through
+**CIMD** (`https://claude.ai/oauth/claude-code-client-metadata`, `https://vscode.dev/oauth/client-metadata.json`), **MCP
+Inspector CLI 2.11.0** through **DCR** (it needs a TTY for interactive OAuth); all three send `resource` and request
+`offline_access`, and their tokens are bound to one workspace (**V**).
+
 Measured server-side (P0-07): elicitation can approve a write on **stdio** (either era) and on **2026-07-28 HTTP**, never
 on 2025-era HTTP. The rest of the matrix is the owner's checklist in
 [`spikes/mcp-sdk-v2/client-checklist.md`](../../spikes/mcp-sdk-v2/client-checklist.md).

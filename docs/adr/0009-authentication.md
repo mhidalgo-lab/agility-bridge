@@ -1,6 +1,6 @@
 # ADR-0009 — Authentication: device tokens first, OAuth 2.1 next; admin sign-in providers
 
-- **Status:** proposed (pending spike P0-08)
+- **Status:** accepted (owner, 2026-10-21, on the P0-08 evidence below)
 - **Date:** 2026-10-16
 - **Related:** P2-05, P4-01, P4-02, P5-01 – P5-09, L-024, L-029, L-066, L-067, L-086 – L-094
 
@@ -45,7 +45,7 @@ in to a panel without the project managing passwords.
 - The project carries an OAuth server: higher security-review cost, mitigated by the spike (P0-08) and a dedicated
   review (P5-10).
 
-## Evidence (P0-08, 2026-10-21, local workerd and Node; production deploy pending)
+## Evidence (P0-08, 2026-10-21, local workerd and Node, then production on Workers Free)
 
 From [spikes/oauth/RESULTS.md](../../spikes/oauth/RESULTS.md), `@cloudflare/workers-oauth-provider` 1.2.3:
 
@@ -57,6 +57,9 @@ From [spikes/oauth/RESULTS.md](../../spikes/oauth/RESULTS.md), `@cloudflare/work
 - An unknown workspace answers with the same 401 challenge as a missing token (T19).
 - **Gap:** the promised refresh reuse interval does not exist in the library: parallel refreshes leave only the last
   refresh token usable (L-164). P5-05 implements the reuse interval in our storage.
+- Production: every automated check passes on Workers (storage across isolates included); endpoints answer in about
+  0.2 s (registration 0.75 s). Real clients: Claude Code 2.1.304 and VS Code 1.142.0 sign in through **CIMD**, MCP
+  Inspector CLI 2.11.0 through **DCR**; all three get workspace-bound tokens with `resource` and `offline_access`.
 
 ## Alternatives considered
 

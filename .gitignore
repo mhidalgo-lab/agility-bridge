@@ -17,3 +17,7 @@ spikes/**/results/
 # Spikes are self-contained experiments (results in RESULTS.md); their lockfiles are not committed.
 spikes/**/pnpm-lock.yaml
 live/results/
+spikes/**/wrangler.deploy*.jsonc
+# Local IDE and MCP client configuration (machine-specific paths and test settings), never committed.
+.idea/
+.vscode/
