@@ -1,7 +1,7 @@
 # Tool catalogue (planned)
 
-> Status: **plan** (2026-10-16). Names, arguments and outputs follow the [tool conventions](../dev/tool-conventions.md)
-> and are frozen per tool when its task lands; P1-13 replaces this page's tables with the generated reference
+> Status: **groups and counts final** (P0-11, 2026-10-21); per-tool names, arguments and outputs follow the final
+> [tool conventions](../dev/tool-conventions.md) and are frozen per tool when its task lands; P1-13 replaces this page's tables with the generated reference
 > (`docs/reference/tools.md`). Costs are worst-case Agility requests per call *(estimates, finalised by the cost test)*.
 
 ## Design rules for the catalogue

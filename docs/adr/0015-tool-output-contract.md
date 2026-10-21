@@ -1,6 +1,6 @@
 # ADR-0015 — Tool output contract and untrusted-data envelope
 
-- **Status:** proposed (finalised in P0-11)
+- **Status:** accepted (owner, 2026-10-21, with the final tool conventions, P0-11)
 - **Date:** 2026-10-16
 - **Related:** [tool conventions](../dev/tool-conventions.md), P0-11, P1-05, L-017, L-018, L-030 – L-045, THREAT_MODEL
   T6, A1, A7
@@ -29,8 +29,10 @@ Rules:
   and bidirectional-override characters are stripped.
 - Caps (defaults / hard maximums): rows 100 / 1,000; value length 300 / 4,000 characters; data block 24,000 / 100,000
   characters; columns 50 / 200. Cuts end with a notice that says how to get the rest.
-- Paging: `nextCursor: string | null`; `truncated` only for deliberately bounded lists; `total` from `needTotal` or
-  `null` when unknown (never `-1`, never a guess).
+- Paging: `nextCursor` present only when more rows exist (the tool fetches `limit + 1`); `truncated` only for
+  deliberately bounded lists; `total` only when actually computed (Agility returns no totals for lists, P0-06), never
+  `-1`, never a guess.
+- Schemas: absent values are omitted, never `null`; no `type` arrays (P0-07 finding 8).
 - Completeness: `partial: true` with `notes[]` whenever pagination, permissions, limits, budget or a failed section
   prevent a complete answer; no plausible zeros.
 - Identity on every row: `number`, `assetType`, `oid`, `state`, `project`, and timestamps where relevant.

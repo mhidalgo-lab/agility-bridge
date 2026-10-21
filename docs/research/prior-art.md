@@ -108,6 +108,18 @@ names:
 - Add a **negative fixture** to the ADR-0012 tests using the Quantiser-style `where` strings and WIQL / JQL-like inputs (all must be rejected): affects P1-08.
 - Record in RESEARCH §1 that **SDK pages do not mention `query.v1`** and the Python SDK is idle since 2022; keep open question 2 (`with` binding behaviour) as the only evidence source: affects P0 spike for `with`.
 
+### Decisions (P0-11, 2026-10-21)
+
+| # | Follow-up | Decision |
+|---|---|---|
+| 1 | Deferred-tool or tool-search fallback | **Not now.** The catalogue stays at 20 tools by default and 35 at most, with a `tools/list` size budget (tool conventions); revisit if it approaches 40. |
+| 2 | Tool aliases on rename | **Adopted** in the Deprecations section (aliases for one minor release and six months from 1.0). |
+| 3 | Read-only connection variant | **Not needed:** writes already need the grant's write flag, the workspace switch and, with OAuth, the `mcp:write` scope (ADR-0013); a read-only device token or OAuth consent without `mcp:write` is the read-only connection. |
+| 4 | Operator caps that clients cannot loosen | **Adopted** as "Client hints and operator limits" in the tool conventions. |
+| 5 | Lint additions | **Adopted:** raw-filter argument names (`where`, `query`, `oql`, `raw`, …) refused by the naming lint; secrets refused by the secret-field lint. Access tokens are already the only Agility credential (D-18). |
+| 6 | Negative query fixtures | **Adopted** in the tool conventions' Lints section, with the P0-06 `with` cases (P1-04, P1-08). |
+| 7 | RESEARCH note on the SDKs | **Done** in P0-10; the `with` question was answered by P0-06 (L-162). |
+
 ## Sources
 
 All accessed 2026-10-20.
