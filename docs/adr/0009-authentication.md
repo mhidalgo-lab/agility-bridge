@@ -45,6 +45,19 @@ in to a panel without the project managing passwords.
 - The project carries an OAuth server: higher security-review cost, mitigated by the spike (P0-08) and a dedicated
   review (P5-10).
 
+## Evidence (P0-08, 2026-10-21, local workerd and Node; production deploy pending)
+
+From [spikes/oauth/RESULTS.md](../../spikes/oauth/RESULTS.md), `@cloudflare/workers-oauth-provider` 1.2.3:
+
+- One authorization server plus one protected resource per workspace (`/w/{slug}/mcp`) works on both runtimes; the
+  workspace list must come from storage on every request (relic-bridge's in-memory list failed across isolates; here a
+  runtime-added workspace worked on 30 of 30 later requests).
+- RFC 9728 per-workspace metadata, RFC 8707 audience binding (cross-workspace token rejected, refresh cannot retarget),
+  PKCE S256 only, RFC 9207 `iss`, CIMD (Claude Code's real document) and capped DCR are native.
+- An unknown workspace answers with the same 401 challenge as a missing token (T19).
+- **Gap:** the promised refresh reuse interval does not exist in the library: parallel refreshes leave only the last
+  refresh token usable (L-164). P5-05 implements the reuse interval in our storage.
+
 ## Alternatives considered
 
 - **Delegating MCP OAuth to Agility's own OAuth2 grants:** rejected for 1.0; Agility OAuth2 grants are configured per

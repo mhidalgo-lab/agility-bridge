@@ -1,0 +1,11 @@
+// P0-08 spike Worker. Local: `pnpm dev:worker` (local KV). Deployment: see RESULTS.md (throwaway, deleted after).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agility-bridge-spike-oauth",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-26",
+  // Required for CIMD: outbound fetches go only to public addresses (SSRF protection, L-088).
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "spike-local-oauth-kv" }],
+  "send_metrics": false
+}

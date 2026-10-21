@@ -355,7 +355,10 @@ Summary only; the per-client matrix, configuration formats and verification stat
   loopback callback, so the callback origin must be allowed (IPv6 literals need the `http:` scheme source).
 - **Cloudflare `workers-oauth-provider`** (1.2.x) implements DCR, CIMD, PKCE S256, RFC 9207, refresh rotation and
   revocation, accepts only form-encoded token requests, and its code exchange is not atomic on KV (add a single-use
-  marker). — [workers-oauth-provider](https://github.com/cloudflare/workers-oauth-provider) *(re-verify in P0-08)*
+  marker). — [workers-oauth-provider](https://github.com/cloudflare/workers-oauth-provider) — *live (P0-08, 1.2.3, local
+  workerd and Node, 2026-10-21):* per-path protected resource metadata, audience binding with refresh that cannot
+  retarget, CIMD with Claude Code's real document, PKCE S256 only, RFC 9207 `iss`, DCR and revocation all confirmed;
+  **five parallel refreshes all succeed but only the last new refresh token stays usable** (no reuse interval, L-164).
 
 ## 5. Cloudflare Workers platform
 
