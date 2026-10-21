@@ -16,7 +16,12 @@ owner: ""
 Operators manage a deployment from the terminal with the same validation and audit as the API.
 
 ## Scope
-- `init`, `admin-token`, `user|instance|credential|workspace|grant|token` commands, `audit tail`.
+- `init` (writes a new master key to the user configuration directory, P2-03), `admin-token` (done in P2-09),
+  `user|instance|credential|workspace|grant|token` commands, `audit tail`.
+- `keys status|rotate|retire` (local only: they need the database and the master keys), as documented in
+  docs/guide/secrets.md (P2-03).
+- Local mode by default (the database of `AB_DB_PATH`/`AB_DATA_DIR`, acting as break-glass owner); remote mode when
+  `AB_ADMIN_URL` is set (the admin API with `AB_ADMIN_TOKEN(_FILE)`). Output is JSON on stdout; messages on stderr.
 - Remote client (HTTPS only, no redirects) and an in-process local client over SQLite sharing the admin API.
 - Secrets only from a hidden prompt, stdin, a file or an environment variable — never flags.
 
@@ -32,6 +37,7 @@ THREAT_MODEL T8, T23.
 - L-065 — Every alternate writer is an authorization boundary.
 
 ## Docs to update
+- docs/guide/cli.md (new)
 - docs/reference/cli.md (generated)
 
 ## Out of scope
