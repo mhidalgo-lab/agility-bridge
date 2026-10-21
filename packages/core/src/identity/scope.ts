@@ -17,6 +17,27 @@ export function oidsOf(value: unknown): string[] {
   return [];
 }
 
+/**
+ * Removes values that came through a related asset outside the workspace (Phase 1 review H2): a guarded key keeps its
+ * value only when every OID of its guard selections is in the compiled project set. Returns how many were removed.
+ */
+export function sanitizeRow(
+  ctx: ToolContext,
+  compiled: Pick<CompiledQuery, 'guards' | 'scopes'>,
+  row: Record<string, unknown>,
+): number {
+  if (ctx.projects.allowed.length === 0) return 0;
+  let removed = 0;
+  for (const { key, guards } of compiled.guards) {
+    const outside = guards.some((g) => oidsOf(row[g]).some((o) => !compiled.scopes.includes(o)));
+    if (outside && row[key] !== undefined && row[key] !== null) {
+      delete row[key];
+      removed++;
+    }
+  }
+  return removed;
+}
+
 /** Whether a returned row is inside the workspace's Agility projects (the compiled query's project set). */
 export function inScope(
   ctx: ToolContext,

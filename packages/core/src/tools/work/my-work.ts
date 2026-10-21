@@ -13,7 +13,7 @@ import { idOf, multiPage, offsetsAfter, type TypedRow } from './multi.ts';
 import { readableWorkTypes } from './search.ts';
 
 const NAME = 'list_my_work';
-const COST = 16;
+const COST = 20;
 
 const key = (r: TypedRow, field: string) => String(r.row[field] ?? '￿');
 const bySprintAndStatus = (a: TypedRow, b: TypedRow) =>
@@ -25,7 +25,7 @@ export const listMyWork: ToolDefinition = defineTool({
   name: NAME,
   title: 'List my work',
   description:
-    'List the open backlog items, defects, tasks and tests owned by the token’s member (or another member) within the workspace, ordered and grouped by sprint and status. Paged: pass nextCursor back as cursor. A cold call can make up to 16 Agility requests.',
+    'List the open backlog items, defects, tasks and tests owned by the token’s member (or another member) within the workspace, ordered and grouped by sprint and status. Paged: pass nextCursor back as cursor. A cold call can make up to 20 Agility requests.',
   kind: 'read',
   group: 'work',
   // Capped at run time: member resolution, metadata for the four types and their relations, one page.

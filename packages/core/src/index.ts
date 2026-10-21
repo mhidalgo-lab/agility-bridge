@@ -71,7 +71,7 @@ export {
   runQuery,
   type SprintOptions,
 } from './identity/resolve.ts';
-export { inScope, oidsOf } from './identity/scope.ts';
+export { inScope, oidsOf, sanitizeRow } from './identity/scope.ts';
 export {
   createLogger,
   type Logger,

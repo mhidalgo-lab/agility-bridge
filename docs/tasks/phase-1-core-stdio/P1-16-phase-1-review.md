@@ -2,12 +2,12 @@
 id: P1-16
 title: Phase 1 review and live verification
 phase: 1
-status: todo
+status: review
 priority: high
 depends_on: [P1-15]
 adr: []
-lessons: [L-003, L-004, L-010, L-023]
-owner: ""
+lessons: [L-003, L-004, L-010, L-023, L-169, L-170, L-171]
+owner: "Matias Hidalgo"
 ---
 
 # P1-16 — Phase 1 review and live verification
@@ -21,8 +21,9 @@ Find what Phase 1 got wrong before building on it.
 - Threat-model statuses updated with evidence; findings become new Phase 1 tasks.
 
 ## Acceptance criteria
-- [ ] `docs/reviews/phase-1-review.md` written.
-- [ ] Client matrix updated; follow-up tasks created; go recorded for Phase 2.
+- [x] `docs/reviews/phase-1-review.md` written.
+- [x] Client matrix updated; follow-up tasks created; go recorded for Phase 2. *(Inspector verified; owner client runs
+  pending; P1-17 and P1-18 created; go recommended and recorded as D-21 for the owner)*
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.

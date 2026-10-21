@@ -134,7 +134,7 @@ export const getAssets: ToolDefinition = defineTool({
       for (const f of info.richText) richText.add(f);
       for (const f of compiled.fields) columns.add(f);
       for (const r of (await runQuery(ctx, compiled)).rows)
-        items.push(toItem(r, type, compiled.fields, info));
+        items.push(toItem(r, type, compiled.fields, info, compiled.keys));
     }
     const found = new Set(
       items.flatMap((i) => [i['oid'], i['number']].filter((x): x is string => typeof x === 'string')),

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { type Breaker, type Clock, systemClock } from '../context.ts';
 
+const MAX_OPEN_MS = 3_600_000;
+
 interface State {
   consecutive: number;
   openUntil: number;
@@ -50,7 +52,8 @@ export class CircuitBreakers {
         const s = state();
         s.consecutive++;
         if (s.consecutive >= this.#threshold) {
-          s.openUntil = this.#clock.now() + Math.max(this.#openMs, retryAfterMs ?? 0);
+          // An absurd Retry-After never keeps the breaker open for more than an hour (review L).
+          s.openUntil = this.#clock.now() + Math.min(MAX_OPEN_MS, Math.max(this.#openMs, retryAfterMs ?? 0));
           s.consecutive = 0;
         }
       },

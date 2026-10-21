@@ -4,7 +4,7 @@ import { agilityClient } from '../../agility/client.ts';
 import { capBudget } from '../../context.ts';
 import { AbError } from '../../errors.ts';
 import { resolveSprint, resolveTeam, runQuery } from '../../identity/resolve.ts';
-import { inScope, oidsOf } from '../../identity/scope.ts';
+import { inScope, oidsOf, sanitizeRow } from '../../identity/scope.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { shapeList, shapeOutput, untrusted } from '../../output/result.ts';
 import { compileQuery } from '../../query/compiler.ts';
@@ -111,6 +111,7 @@ export const getTeam: ToolDefinition = defineTool({
     const res = await agilityClient(ctx).query<unknown[]>([compiled.body]);
     const set = Array.isArray(res.data?.[0]) ? (res.data[0] as Array<Record<string, unknown>>) : [];
     const rows = set.filter((r) => inScope(ctx, compiled, r));
+    for (const r of rows) sanitizeRow(ctx, compiled, r);
     const members = new Map<string, { oid: string; name?: string; openItems: number }>();
     for (const r of rows.slice(0, MAX_ASSIGNMENTS)) {
       const oids = oidsOf(r['Owners']);

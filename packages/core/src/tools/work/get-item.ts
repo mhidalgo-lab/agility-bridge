@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { agilityClient } from '../../agility/client.ts';
 import { capBudget } from '../../context.ts';
 import { resolveAsset } from '../../identity/resolve.ts';
-import { inScope, oidsOf } from '../../identity/scope.ts';
+import { inScope, oidsOf, sanitizeRow } from '../../identity/scope.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { shapeOutput, untrusted } from '../../output/result.ts';
 import { type CompiledQuery, compileQuery } from '../../query/compiler.ts';
@@ -66,8 +66,17 @@ export const getWorkItem: ToolDefinition = defineTool({
       ...(acceptance === undefined ? [] : [acceptance]),
     ];
     const queries: Array<{ key: string; compiled: CompiledQuery }> = [];
+    const skipped: string[] = [];
     const add = async (key: string, type: string, f: string[], filter: string, limit: number) => {
       if ((await md.findAssetType(type)) === undefined) return;
+      // A section the workspace does not allow is left out with a note, never fails the item (review M4).
+      const denied =
+        ctx.assetTypes.deny.includes(type) ||
+        (ctx.assetTypes.allow !== undefined && !ctx.assetTypes.allow.includes(type));
+      if (key !== 'item' && denied) {
+        skipped.push(type);
+        return;
+      }
       queries.push({
         key,
         compiled: await compileQuery(
@@ -100,6 +109,7 @@ export const getWorkItem: ToolDefinition = defineTool({
         (r): r is Row => r !== null && typeof r === 'object' && !Array.isArray(r),
       );
       const kept = rows.filter((r) => inScope(ctx, q.compiled, r));
+      for (const r of kept) sanitizeRow(ctx, q.compiled, r);
       results.set(q.key, { rows: kept.slice(0, q.compiled.limit), more: kept.length > q.compiled.limit });
     }
     const row = results.get('item')?.rows[0];
@@ -147,6 +157,7 @@ export const getWorkItem: ToolDefinition = defineTool({
     if (comments?.more) notes.push(`More than ${MAX_COMMENTS} comments.`);
     if (acceptance === undefined)
       notes.push('This instance has no acceptance-criteria attribute on this type.');
+    if (skipped.length > 0) notes.push(`Not shown, not allowed in this workspace: ${skipped.join(', ')}.`);
     if (input.minimal_output === true)
       notes.push('Children, links and comments were skipped (minimal_output).');
     const commentCount = comments === undefined ? undefined : comments.rows.length;

@@ -45,7 +45,9 @@ export function parseInstant(text: string, end = false): number {
   }
   if (DATETIME_RE.test(s)) {
     const t = Date.parse(s.replace(/(\.\d{3})\d+/, '$1'));
-    if (!Number.isNaN(t)) return t;
+    // The calendar date must exist: Date.parse rolls 2026-02-31 into March (review L).
+    const day = s.slice(0, 10);
+    if (!Number.isNaN(t) && new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) === day) return t;
   }
   throw invalid(
     `"${s}" is not a date (YYYY-MM-DD) or an ISO 8601 timestamp with a zone.`,

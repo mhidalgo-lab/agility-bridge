@@ -132,8 +132,21 @@ function list(name: string, value: string | undefined, pattern: RegExp, what: st
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s !== '');
+  if (items.length === 0) return undefined;
   for (const item of items) {
     if (!pattern.test(item)) throw new ConfigError(`${name} has an invalid ${what}: "${item.slice(0, 40)}".`);
+  }
+  return items;
+}
+
+/** `AB_PROJECTS`: unset means every project; set but empty (`" "`, `",,"`) is refused rather than read as "all". */
+function projectList(value: string | undefined): string[] {
+  if (value === undefined) return [];
+  const items = list('AB_PROJECTS', value, SCOPE_OID, 'Agility project (use Scope:1234)');
+  if (items === undefined) {
+    throw new ConfigError(
+      'AB_PROJECTS is set but empty: unset it to allow every project, or list Scope:<id> tokens.',
+    );
   }
   return items;
 }
@@ -193,39 +206,38 @@ export const osKeychain: KeychainReader = (service, account) => {
 
 const REF = /\$\{([^}]{1,200})\}/g;
 
-/** Replaces `${NAME}` and `${keychain:service/account}` in one string value. */
+/** Replaces `${NAME}` and `${keychain:service/account}` in one string value; `$${` stands for a literal `${`. */
 function substitute(
   value: string,
   env: Readonly<Record<string, string | undefined>>,
   keychain: KeychainReader,
   path: string,
 ): string {
-  return value.replace(REF, (_m, ref: string) => {
-    const k = /^keychain:([^/]{1,100})\/(.{1,100})$/.exec(ref);
-    if (k !== null) return keychain(k[1] as string, k[2] as string);
-    if (!/^[A-Z_][A-Z0-9_]{0,99}$/.test(ref))
-      throw new ConfigError(`${path}: "\${${ref}}" is not an environment variable or keychain reference.`);
-    const v = env[ref];
-    if (v === undefined || v === '')
-      throw new ConfigError(`${path}: environment variable ${ref} is not set.`);
-    return v;
-  });
+  const parts = value.split('$${');
+  return parts
+    .map((part) =>
+      part.replace(REF, (_m, ref: string) => {
+        const k = /^keychain:([^/]{1,100})\/(.{1,100})$/.exec(ref);
+        if (k !== null) return keychain(k[1] as string, k[2] as string);
+        if (!/^[A-Z_][A-Z0-9_]{0,99}$/.test(ref))
+          throw new ConfigError(
+            `${path}: "\${${ref}}" is not an environment variable or keychain reference.`,
+          );
+        const v = env[ref];
+        if (v === undefined || v === '')
+          throw new ConfigError(`${path}: environment variable ${ref} is not set.`);
+        return v;
+      }),
+    )
+    .join('${');
 }
 
-function substituteAll(
-  node: unknown,
-  env: Readonly<Record<string, string | undefined>>,
-  keychain: KeychainReader,
-  path = '$',
-): unknown {
-  if (typeof node === 'string') return substitute(node, env, keychain, path);
-  if (Array.isArray(node)) return node.map((v, i) => substituteAll(v, env, keychain, `${path}[${i}]`));
-  if (node !== null && typeof node === 'object') {
-    return Object.fromEntries(
-      Object.entries(node).map(([k, v]) => [k, substituteAll(v, env, keychain, `${path}.${k}`)]),
-    );
-  }
-  return node;
+/** True when a string anywhere in `node` holds a reference (an escaped `$${` is not one). */
+function hasReference(node: unknown): boolean {
+  if (typeof node === 'string') return node.split('$${').some((p) => p.includes('${'));
+  if (Array.isArray(node)) return node.some(hasReference);
+  if (node !== null && typeof node === 'object') return Object.values(node).some(hasReference);
+  return false;
 }
 
 const workspaceSchema = z.strictObject({
@@ -343,10 +355,20 @@ function fromYaml(env: Readonly<Record<string, string | undefined>>, options: Lo
   const ws = shape.data.workspaces[id];
   if (ws === undefined)
     throw new ConfigError(`AB_WORKSPACE "${id}" is not in AB_CONFIG (workspaces: ${names.join(', ')}).`);
-  // Secrets and paths are substituted only now, and only in the chosen workspace.
-  const resolved = workspaceSchema.parse(
-    substituteAll(ws, env, options.keychain ?? osKeychain, `workspaces.${id}`),
-  );
+  // References only in the token (review M3): a file cannot pull other secrets into the URL, a name or a path, where
+  // they could reach another host or be shown to the agent. The file still decides where the token goes: trust it.
+  const { token: rawToken, ...instanceRest } = ws.instance;
+  if (hasReference({ ...ws, instance: instanceRest })) {
+    throw new ConfigError(`workspaces.${id}: \${…} references are allowed only in instance.token.`);
+  }
+  const token = substitute(rawToken, env, options.keychain ?? osKeychain, `workspaces.${id}.instance.token`);
+  if (token === '') throw new ConfigError(`workspaces.${id}.instance.token is empty.`);
+  const resolved = { ...ws, instance: { ...ws.instance, token } };
+  if (resolved.projects !== undefined && resolved.projects.length === 0) {
+    throw new ConfigError(
+      `workspaces.${id}.projects is empty: omit it to allow every project, or list Scope:<id> tokens.`,
+    );
+  }
   return {
     kind: 'configured',
     source: 'yaml',
@@ -403,7 +425,7 @@ export function loadConfig(
     instanceUrl: instanceUrl(url, 'AB_AGILITY_URL'),
     token: new Secret(token),
     ...(env['AB_CA_FILE'] ? { caFile: env['AB_CA_FILE'] } : {}),
-    projects: list('AB_PROJECTS', env['AB_PROJECTS'], SCOPE_OID, 'Agility project (use Scope:1234)') ?? [],
+    projects: projectList(env['AB_PROJECTS']),
     includeChildProjects: bool('AB_INCLUDE_CHILD_PROJECTS', env['AB_INCLUDE_CHILD_PROJECTS'], true),
     ...(list('AB_TOOLS', env['AB_TOOLS'], TOOL_NAME, 'tool name') === undefined
       ? {}

@@ -88,7 +88,7 @@ describe('whoami', () => {
     const r = await call(whoami, ctx());
     expect(r['isError']).toBeUndefined();
     expect(r['structuredContent']).toMatchObject({
-      member: { oid: 'Member:20', name: 'Ann Example', username: 'ann' },
+      member: { oid: 'Member:20', name: 'Ann Example' },
       instance: { id: 'env', version: '26.0.3.2' },
       workspace: { id: 'default', groups: expect.arrayContaining(['core']) },
       projects: { allowed: ['Scope:1001'], includeChildProjects: true },
@@ -97,6 +97,8 @@ describe('whoami', () => {
       writes: { enabled: false, approval: 'unavailable' },
     });
     expect(text(r)).toContain('do not expire');
+    // Usernames are often email addresses: shown only when the workspace enables member emails (review M5).
+    expect(JSON.stringify(r['structuredContent'])).not.toContain('"username"');
   });
 });
 

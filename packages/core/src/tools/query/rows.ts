@@ -18,6 +18,15 @@ function value(raw: unknown, kind: AttributeKind | undefined): unknown {
     return Array.isArray(raw) ? oids : oids[0];
   }
   if (kind === 'Date' && typeof raw === 'string') return utcIso(raw) ?? raw;
+  // Agility answers numbers, aggregations included, as strings in query.v1 JSON (live, P1-16).
+  if (
+    (kind === 'Numeric' || kind === 'LongInt' || kind === 'Rank') &&
+    typeof raw === 'string' &&
+    raw.trim() !== '' &&
+    Number.isFinite(Number(raw))
+  ) {
+    return Number(raw);
+  }
   if (Array.isArray(raw)) return raw.map((v) => value(v, kind)).filter((v) => v !== undefined);
   return raw;
 }
@@ -46,6 +55,8 @@ export function toItem(
   type: string,
   fields: readonly string[],
   info: FieldInfo,
+  /** The response key of each field (aggregations are keyed by their bracket-filtered select, live P1-16). */
+  keys: Readonly<Record<string, string>> = {},
 ): Record<string, unknown> {
   const project = oidsOf(row['Scope'])[0];
   const projectName = row['Scope.Name'];
@@ -59,7 +70,7 @@ export function toItem(
       : { project: { oid: project, ...(typeof projectName === 'string' ? { name: projectName } : {}) } }),
   };
   for (const f of fields) {
-    const v = value(row[f], info.kinds.get(f));
+    const v = value(row[keys[f] ?? f], info.kinds.get(f));
     if (v !== undefined) item[f] = v;
   }
   return item;

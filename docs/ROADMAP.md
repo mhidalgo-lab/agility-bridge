@@ -152,7 +152,9 @@ Status lives in each task file.
 | P1-13 | [Generated tool reference, naming and description lints, tools/list budget](tasks/phase-1-core-stdio/P1-13-tool-reference-lints.md) | medium | P0-11, P1-08 | done |
 | P1-14 | [Docs: quickstart and client setup guides](tasks/phase-1-core-stdio/P1-14-docs-quickstart-clients.md) | high | P1-11 | blocked |
 | P1-15 | [Release pipeline and v0.1.0](tasks/phase-1-core-stdio/P1-15-release-v0-1.md) | high | P1-09, P1-10, P1-11, P1-12, P1-13, P1-14 | blocked |
-| P1-16 | [Phase 1 review and live verification](tasks/phase-1-core-stdio/P1-16-phase-1-review.md) | high | P1-15 | todo |
+| P1-16 | [Phase 1 review and live verification](tasks/phase-1-core-stdio/P1-16-phase-1-review.md) | high | P1-15 | review |
+| P1-17 | [Single-type paging counts upstream positions](tasks/phase-1-core-stdio/P1-17-paging-upstream-positions.md) | low | P1-16 | todo |
+| P1-18 | [Bind the cursor's time window and fix sprint timing per first page](tasks/phase-1-core-stdio/P1-18-cursor-window-binding.md) | low | P1-16 | todo |
 
 ### Phase 2
 

@@ -62,7 +62,12 @@ export const listMembers: ToolDefinition = defineTool({
           rows: [],
         });
       }
-      filters.push({ field: 'ID', op: 'in', value: [...members].sort().slice(0, MAX_PROJECT_MEMBERS) });
+      filters.push({
+        field: 'ID',
+        op: 'in',
+        value: [...members].sort().slice(0, MAX_PROJECT_MEMBERS),
+        trusted: true,
+      });
     }
     if (input.contains !== undefined) filters.push({ field: 'Name', op: 'contains', value: input.contains });
     const binding = await cursorBinding(ctx, NAME, { contains: input.contains });

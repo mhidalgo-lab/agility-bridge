@@ -159,6 +159,26 @@ All `planned` unless stated. Tasks name where the mitigation is built.
 - Data returned to the client leaves our control (LLM provider retention).
 - A process holding the master key can decrypt every stored token.
 
+## 8a. Status after Phase 1 (2026-10-21)
+
+From the [Phase 1 review](reviews/phase-1-review.md). *Implemented* = code and tests; *verified* = reviewed
+adversarially and, where it touches Agility, checked against the read-only tenant.
+
+| Id | Status | Evidence |
+|---|---|---|
+| T3 | verified (stdio) | Server-owned project predicate per scope strategy, project trees expanded server-side, row recheck (`inScope`), related-asset guards (`pathGuards`, `sanitizeRow`, review H2); negative tests: out-of-scope = not found, hostile upstream rows dropped; live shapes accepted. Grants and workspaces arrive in Phase 2 (P2-04). |
+| T4 | verified | Values only in `with`, property tests, P0-06 cases, OR-injection and multi-query tests; live: `filter` entries ANDed, guarded filters accepted. |
+| T5 | implemented | Per-call budgets with `capBudget` at each tool's declared cost, byte caps while streaming, timeouts, unknown-type lookups bounded (review M6), linear HTML conversion (review H1). Edge rate limits: Phase 2. |
+| T6 | verified | Envelope with a random id, look-alikes neutralised, fuzz test, poisoned-string probe on every tool, error details cleaned. |
+| T8 | verified | Redaction corpus, `Secret`, token never logged (tests with debug logging and echoed tokens), package check scans the tarball. |
+| T12 | implemented | One credential per call; the token only from the configured credential. |
+| T21 | verified | Per-call frozen context, no module-level request state (review), concurrency test with two credentials. |
+| T23 | verified | Secret-like tool arguments refused at registration; secrets as CLI flags refused; YAML references only in the token (review M3). |
+| A1 / A7 | implemented | HTML to text without scripts or attributes; member emails and usernames only with `AB_MEMBER_EMAILS` (review M5). |
+| A9 | verified | HTTPS-only canonical instance URL, redirects refused, private-CA integration test, TLS failures mapped. |
+| A10 | implemented | Validation before sending, ID sorts, budgets, per-credential limiter and breaker, bounded unknown-type lookups. |
+| A12 | verified | Metadata parser keeps identifiers only; `tools/list` identical before and after loading an instance's metadata (contract test); description lint refuses instance words. |
+
 ## 9. Maintenance
 
 - Update this file in the same PR as any security-relevant change (AGENTS.md).

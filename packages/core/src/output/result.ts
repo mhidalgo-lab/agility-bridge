@@ -67,7 +67,8 @@ function lineText(line: Line): string {
     .join('');
 }
 
-const EMAIL_KEY_RE = /^(?:e-?mail|email_?address)$/i;
+/** Member contact data: emails, and usernames (often an email address), matched on the last path segment (D-06). */
+const EMAIL_KEY_RE = /(?:^|\.)(?:e-?mail|email_?address|username)$/i;
 
 /** Drops email fields at any depth unless the workspace enables them (D-06, ADR-0015). */
 export function minimiseEmails<T>(value: T, depth = 0): T {
