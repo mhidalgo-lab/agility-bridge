@@ -55,6 +55,45 @@ export {
   silentLogger,
   stderrSink,
 } from './logger.ts';
+export {
+  envelope,
+  envelopeRenderer,
+  neutralise,
+  newEnvelopeId,
+  UNTRUSTED_NOTICE,
+} from './output/envelope.ts';
+export {
+  DEFAULT_OUTPUT_CAPS,
+  type FormatRowsOptions,
+  type FormattedRows,
+  formatRows,
+  IDENTITY_COLUMNS,
+  MAX_OUTPUT_CAPS,
+  OUTPUT_FORMATS,
+  type OutputCaps,
+  type OutputFormat,
+  type RenderedFormat,
+  resolveCaps,
+  safeText,
+  TABLE_MAX_COLUMNS,
+  truncateText,
+} from './output/format.ts';
+export {
+  type AssetState,
+  assetState,
+  type Block,
+  type Line,
+  type ListSpec,
+  minimiseEmails,
+  type OutputSpec,
+  RESULT_META_KEY,
+  type ShapedOutput,
+  shapeList,
+  shapeOutput,
+  type Untrusted,
+  untrusted,
+} from './output/result.ts';
+export { cleanText, decodeEntities, htmlToText, richText, utcIso } from './output/text.ts';
 export { isSecretKeyName, REDACTED, redact, redactValue } from './redact.ts';
 export {
   collectPropertyNames,

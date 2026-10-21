@@ -40,7 +40,7 @@ How to use it:
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163 |
@@ -802,6 +802,13 @@ loop ends: the P0-07 benchmark ran out of memory and looked like an SDK leak. On
 a real server, keeps the heap flat. Before blaming a library for a leak, read the heap snapshot's retainer path.
 *Applied in:* [spikes/mcp-sdk-v2](../spikes/mcp-sdk-v2/RESULTS.md), P0-09, P3-10, P9-03.
 
+**L-166 — Build invisible characters from code points in tests.**
+Biome's formatter rewrote `\u202E`-style escapes in string literals into the raw characters, so a test of bidi
+stripping silently put Trojan Source characters into the repository (regex literals kept their escapes). Tests take
+such characters from `String.fromCodePoint` constants (`packages/core/test/helpers/chars.ts`), and a review greps for
+raw invisible characters.
+*Applied in:* P1-05.
+
 ## R. CI, release and supply chain
 
 **L-127 — Separate building from publishing.**
@@ -907,7 +914,9 @@ aggregate and to default lists.
 *Applied in:* P1-04.
 
 **L-144 — `total = -1` means "not computed".**
-Without `needTotal`, `query.v1` returns `-1`; report `null`, never zero, and request totals only when shown.
+Without `needTotal`, `query.v1` returns `-1`; never report it as zero, and request totals only when shown. ADR-0015
+settled the shape: an uncomputed total is omitted (no `null` in schemas), and on 26.0.3.2 lists return no totals at all
+(L-163).
 *Applied in:* P1-05.
 
 **L-145 — Single-asset URLs ignore `where`.**
