@@ -240,6 +240,13 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
       page: { start: 0, size: 1 },
     });
     const defect = String(sample.data[0]?.[0]?.['Number'] ?? 'D-00000');
+    const teams = await agilityClient(ctx).query<Rows>({
+      from: 'Team',
+      select: ['ID'],
+      sort: ['ID'],
+      page: { start: 0, size: 1 },
+    });
+    const team = String(teams.data[0]?.[0]?.['_oid'] ?? 'Team:0');
     const argsFor: Record<string, Record<string, unknown>> = {
       describe_asset_type: { asset_type: 'Story' },
       query_assets: { asset_type: 'Defect', fields: ['Name', 'Status.Name', 'Description'], limit: 3 },
@@ -247,6 +254,10 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
       search_work_items: { member: 'me', limit: 3 },
       get_work_item: { asset: defect },
       list_my_work: { limit: 3 },
+      list_teams: { limit: 3 },
+      get_team: { team },
+      list_sprints: { timing: 'past', limit: 3 },
+      list_members: { limit: 3 },
     };
     for (const tool of CORE_TOOLS) {
       const fresh: ToolContext = { ...ctx, metadata: new MetadataService(), budget: createBudget(60) };
@@ -260,6 +271,7 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
         'agility-bridge/error'
       ]?.code;
       expect(code, tool.name).toBeUndefined();
+      expect(result['isError'], `${tool.name} returned an error`).toBeUndefined();
       expect(fresh.budget.used, tool.name).toBeLessThanOrEqual(tool.cost);
     }
   });

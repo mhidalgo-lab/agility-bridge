@@ -5,6 +5,9 @@ import type { ToolDefinition } from '../tool.ts';
 import { describeAssetType, listAssetTypes } from './core/asset-types.ts';
 import { listProjects } from './core/list-projects.ts';
 import { whoami } from './core/whoami.ts';
+import { listMembers } from './planning/members.ts';
+import { listSprints } from './planning/sprints.ts';
+import { getTeam, listTeams } from './planning/teams.ts';
 import { getAssets } from './query/get-assets.ts';
 import { queryAssets } from './query/query-assets.ts';
 import { getWorkItem } from './work/get-item.ts';
@@ -21,4 +24,8 @@ export const CORE_TOOLS: readonly ToolDefinition[] = Object.freeze([
   searchWorkItems,
   getWorkItem,
   listMyWork,
+  listTeams,
+  getTeam,
+  listSprints,
+  listMembers,
 ] as ToolDefinition[]);

@@ -2,12 +2,12 @@
 id: P1-10
 title: "Tools: list_teams, get_team, list_sprints, list_members"
 phase: 1
-status: todo
+status: review
 priority: medium
 depends_on: [P1-06, P1-08]
 adr: ["0015"]
 lessons: [L-036, L-038, L-061]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P1-10 — Tools: list_teams, get_team, list_sprints, list_members
@@ -20,8 +20,8 @@ Give agents the planning context — teams, people and sprints — without expos
 - Member emails only when the workspace enables them; no avatars.
 
 ## Acceptance criteria
-- [ ] Fixture tests for teams with their own workflows and for sprint resolution.
-- [ ] Emails absent by default and present only with the workspace switch.
+- [x] Fixture tests for teams with their own workflows and for sprint resolution.
+- [x] Emails absent by default and present only with the workspace switch.
 
 ## Security notes
 THREAT_MODEL A7.

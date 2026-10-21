@@ -111,6 +111,46 @@ describe('tools/list contract', () => {
           },
           "name": "list_my_work",
         },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "List teams",
+          },
+          "name": "list_teams",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Get a team",
+          },
+          "name": "get_team",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "List sprints",
+          },
+          "name": "list_sprints",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "List members",
+          },
+          "name": "list_members",
+        },
       ]
     `,
     );
