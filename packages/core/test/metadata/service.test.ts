@@ -63,7 +63,7 @@ describe('parseAssetType', () => {
   it('keeps only identifiers: display names and invalid names are dropped (A12)', () => {
     const story = parseAssetType(SNAPSHOT['Story']);
     expect(JSON.stringify([...story.attributes.values()])).not.toMatch(
-      /Ignore previous|<script>|Synthetic display/,
+      /Ignore previous|<script|Synthetic display/i,
     );
     expect(story.attributes.has('Bad name<script>')).toBe(false);
   });
