@@ -2,12 +2,12 @@
 id: P2-02
 title: SQLite adapter for Node
 phase: 2
-status: todo
+status: review
 priority: high
 depends_on: [P2-01]
 adr: ["0006"]
 lessons: [L-076, L-102, L-104]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P2-02 — SQLite adapter for Node
@@ -21,8 +21,10 @@ Durable, safe storage for `agility-bridge serve` on `node:sqlite`.
 - Consistent `0600` backups.
 
 ## Acceptance criteria
-- [ ] Contract suite passes on SQLite on Linux, macOS and Windows.
-- [ ] Symlink and permission tests; backup and restore test.
+- [x] Contract suite passes on SQLite on Linux, macOS and Windows. *(`:memory:` and a real WAL file; the
+  `SQLite and CLI` CI jobs run it on macOS and Windows.)*
+- [x] Symlink and permission tests; backup and restore test. *(POSIX-only where modes and links apply; mutation-checked:
+  dropping `O_NOFOLLOW` or the `fchmod` fails them.)*
 
 ## Security notes
 THREAT_MODEL T7, T35.
@@ -33,7 +35,7 @@ THREAT_MODEL T7, T35.
 - L-104 — Test SQLite on Windows too.
 
 ## Docs to update
-- docs/dev/storage.md
+- [x] docs/dev/storage.md
 
 ## Out of scope
 - Anything not listed under Scope.
