@@ -6,7 +6,7 @@ import { oidsOf } from '../../identity/scope.ts';
 import { assetState, shapeList } from '../../output/result.ts';
 import { utcIso } from '../../output/text.ts';
 import { compileQuery, type FilterInput } from '../../query/compiler.ts';
-import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
+import { bindFixed, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import { cursorArg, formatArg, limitArg, listOutput, rowOid } from '../common.ts';
 
@@ -46,7 +46,16 @@ export const listSprints: ToolDefinition = defineTool({
   outputSchema: listOutput(z.looseObject({ assetType: z.string(), oid: z.string(), name: z.string() })),
   handler: async (input, outer) => {
     const ctx = { ...outer, budget: capBudget(outer.budget, COST) };
-    const now = new Date(ctx.clock.now()).toISOString();
+    // Timing is evaluated against the first page's "now", kept in the cursor, so a sprint that ends while the caller
+    // pages neither moves between pages nor is skipped (P1-18).
+    const binding = await cursorBinding(ctx, NAME, {
+      team: input.team,
+      project: input.project,
+      timing: input.timing ?? 'all',
+    });
+    const state = input.cursor === undefined ? undefined : await decodeCursor(ctx, input.cursor, binding);
+    const now = state?.now ?? new Date(ctx.clock.now()).toISOString();
+    const sealed = await bindFixed(binding, { now });
     const filters: FilterInput[] = [];
     const resolved: Record<string, string> = {};
     if (input.team !== undefined) {
@@ -67,9 +76,6 @@ export const listSprints: ToolDefinition = defineTool({
       filters.push({ field: 'BeginDate', op: 'le', value: now }, { field: 'EndDate', op: 'gt', value: now });
     if (timing === 'past') filters.push({ field: 'EndDate', op: 'le', value: now });
     if (timing === 'future') filters.push({ field: 'BeginDate', op: 'gt', value: now });
-    // The window is fixed by the first call, so later pages do not shift when time passes (tool conventions).
-    const binding = await cursorBinding(ctx, NAME, { resolved, timing });
-    const state = input.cursor === undefined ? undefined : decodeCursor(input.cursor, binding);
     const offset = state?.offset ?? 0;
     const compiled = await compileQuery(ctx, {
       assetType: 'Timebox',
@@ -123,7 +129,7 @@ export const listSprints: ToolDefinition = defineTool({
       rows: items,
       columns: ['assetType', 'oid', 'state', 'name', 'timing', 'beginDate', 'endDate', 'schedule'],
       hasMore: result.hasMore,
-      cursorFor: (shown) => encodeCursor(binding, { offset: result.next(shown) }),
+      cursorFor: (shown) => encodeCursor(sealed, { offset: result.next(shown), now }),
       hiddenOutsideScope: hidden > 0,
       ...(input.format === undefined ? {} : { format: input.format }),
     });

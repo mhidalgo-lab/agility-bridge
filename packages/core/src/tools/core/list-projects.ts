@@ -42,7 +42,7 @@ export const listProjects: ToolDefinition = defineTool({
       contains: input.contains,
       includeClosed: input.include_closed === true,
     });
-    const offset = input.cursor === undefined ? 0 : decodeCursor(input.cursor, binding).offset;
+    const offset = input.cursor === undefined ? 0 : (await decodeCursor(ctx, input.cursor, binding)).offset;
     const compiled = await compileQuery(ctx, {
       assetType: 'Scope',
       fields: ['Name', 'AssetState', 'Parent', 'Parent.Name', 'Schedule', 'Schedule.Name'],

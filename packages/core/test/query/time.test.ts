@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
-import { cursorBinding, decodeCursor, encodeCursor, parseTimeRange } from '../../src/index.ts';
+import { bindFixed, cursorBinding, decodeCursor, encodeCursor, parseTimeRange } from '../../src/index.ts';
 import { makeContext } from '../harness/index.ts';
 
 // Wednesday 2026-10-21 12:00 UTC.
@@ -64,23 +64,74 @@ describe('parseTimeRange (L-061)', () => {
 });
 
 describe('cursors', () => {
+  const refusedAsync = /does not belong/;
+  const clocked = (over: Parameters<typeof makeContext>[0] = {}) =>
+    makeContext({
+      clock: { now: () => NOW },
+      projects: { allowed: ['Scope:1'], includeChildren: true },
+      ...over,
+    });
+  const window = { since: '2026-10-01T00:00:00.000Z', until: '2026-10-21T00:00:00.000Z' };
+
   it('round-trips the offset and window, and refuses another binding or tampering', async () => {
-    const ctx = makeContext({ projects: { allowed: ['Scope:1'], includeChildren: true } });
+    const ctx = clocked();
     const b = await cursorBinding(ctx, 'list_defects', { status: ['Open'] });
-    const window = { since: '2026-10-01T00:00:00.000Z', until: '2026-10-21T00:00:00.000Z' };
-    const c = encodeCursor(b, { offset: 25, window });
-    expect(decodeCursor(c, b)).toEqual({ offset: 25, window });
+    const c = encodeCursor(await bindFixed(b, { window }), { offset: 25, window });
+    expect(await decodeCursor(ctx, c, b)).toEqual({ offset: 25, window });
     const other = await cursorBinding(ctx, 'list_defects', { status: ['Done'] });
-    expect(() => decodeCursor(c, other)).toThrow(/does not belong/);
+    await expect(decodeCursor(ctx, c, other)).rejects.toThrow(refusedAsync);
     const otherProjects = await cursorBinding(
       makeContext({ projects: { allowed: ['Scope:2'], includeChildren: true } }),
       'list_defects',
       { status: ['Open'] },
     );
     expect(otherProjects).not.toBe(b);
-    for (const bad of ['', '!!!', `${c}x`, encodeCursor(b, { offset: 999_999 }), 'eyJ2IjoxfQ']) {
-      expect(() => decodeCursor(bad, b)).toThrow(/does not belong/);
+    for (const bad of ['', '!!!', `${c}x`, encodeCursor(b, { offset: 999_999 }), 'eyJ2IjoxfQ', 'bnVsbA']) {
+      await expect(decodeCursor(ctx, bad, b)).rejects.toThrow(refusedAsync);
     }
+  });
+
+  it('refuses an edited window or "now" (P1-18)', async () => {
+    const ctx = clocked();
+    const b = await cursorBinding(ctx, 'list_defects', {});
+    const sealed = await bindFixed(b, { window });
+    const wider = { since: '2026-01-01T00:00:00.000Z', until: window.until };
+    // The window edited, the binding kept.
+    await expect(decodeCursor(ctx, encodeCursor(sealed, { offset: 0, window: wider }), b)).rejects.toThrow(
+      refusedAsync,
+    );
+    // A window added to a cursor that had none.
+    await expect(decodeCursor(ctx, encodeCursor(b, { offset: 0, window }), b)).rejects.toThrow(refusedAsync);
+    // Re-hashed by hand: still refused above maxTimeRangeDays, and for impossible or non-UTC instants.
+    const small = clocked({ limits: { ...makeContext().limits, maxTimeRangeDays: 30 } });
+    const forged = encodeCursor(await bindFixed(b, { window: wider }), { offset: 0, window: wider });
+    await expect(decodeCursor(small, forged, b)).rejects.toThrow(refusedAsync);
+    for (const w of [
+      { since: window.until, until: window.since },
+      { since: '2026-10-01', until: window.until },
+      { since: '2026-10-01T00:00:00+02:00', until: window.until },
+    ]) {
+      const c = encodeCursor(await bindFixed(b, { window: w }), { offset: 0, window: w });
+      await expect(decodeCursor(ctx, c, b)).rejects.toThrow(refusedAsync);
+    }
+    // "now": kept when recent, refused in the future or older than a day.
+    const recent = '2026-10-21T11:00:00.000Z';
+    expect(
+      await decodeCursor(
+        ctx,
+        encodeCursor(await bindFixed(b, { now: recent }), { offset: 3, now: recent }),
+        b,
+      ),
+    ).toEqual({ offset: 3, now: recent });
+    for (const now of ['2026-10-21T13:00:00.000Z', '2026-10-19T12:00:00.000Z']) {
+      const c = encodeCursor(await bindFixed(b, { now }), { offset: 3, now });
+      await expect(decodeCursor(ctx, c, b)).rejects.toThrow(refusedAsync);
+    }
+    const c = encodeCursor(await bindFixed(b, { now: recent }), {
+      offset: 3,
+      now: '2026-10-21T11:30:00.000Z',
+    });
+    await expect(decodeCursor(ctx, c, b)).rejects.toThrow(refusedAsync);
   });
 
   it('binds key order independently', async () => {

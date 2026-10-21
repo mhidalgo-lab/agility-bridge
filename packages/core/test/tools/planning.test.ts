@@ -211,6 +211,33 @@ describe('list_sprints', () => {
     const { ctx } = setup();
     expect(s(await call(listSprints, ctx(), args)).items.map((i) => i['name'])).toEqual(names);
   });
+
+  it('keeps the first page’s "now" while paging across a sprint boundary (P1-18)', async () => {
+    const { ctx } = setup();
+    // Sprints 42 and 43 are future on the first page; Sprint 42 starts before the second.
+    let now = Date.parse('2026-10-14T20:00:00Z');
+    const clock = { now: () => now };
+    const first = s(await call(listSprints, ctx({ clock }), { timing: 'future', limit: 1 }));
+    expect(first.items.map((i) => i['name'])).toEqual(['Sprint 43']);
+    now = Date.parse('2026-10-15T06:00:00Z');
+    const raw = await call(listSprints, ctx({ clock }), {
+      timing: 'future',
+      limit: 1,
+      cursor: first['nextCursor'],
+    });
+    expect(raw['isError'], text(raw)).toBeUndefined();
+    const second = s(raw);
+    expect(second.items.map((i) => [i['name'], i['timing']])).toEqual([['Sprint 42', 'future']]);
+    expect(second['nextCursor']).toBeUndefined();
+    // A day later the cursor is stale: start again.
+    now = Date.parse('2026-10-15T21:00:00Z');
+    const stale = await call(listSprints, ctx({ clock }), {
+      timing: 'future',
+      limit: 1,
+      cursor: first['nextCursor'],
+    });
+    expect(stale['isError']).toBe(true);
+  });
 });
 
 describe('list_members', () => {
