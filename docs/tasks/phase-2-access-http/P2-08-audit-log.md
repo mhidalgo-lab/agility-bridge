@@ -2,12 +2,12 @@
 id: P2-08
 title: Audit log
 phase: 2
-status: todo
+status: review
 priority: high
 depends_on: [P2-06]
 adr: ["0008"]
 lessons: [L-015, L-101, L-109, L-117]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P2-08 — Audit log
@@ -22,8 +22,20 @@ Who did what, through which grant and device, against which assets — without s
 - A synchronous intent-write API reserved for write tools (P7-01).
 
 ## Acceptance criteria
-- [ ] No token, credential, request body or Agility content in any row (scan test).
-- [ ] Retention purge tested; refusal flood capped.
+- [x] No token, credential, request body or Agility content in any row (scan test). *(After tool calls with a
+  filter value, refusals with a request body and an admin row: device tokens, Agility tokens, the filter value, project,
+  member and story names and `Bearer` are absent.)*
+- [x] Retention purge tested; refusal flood capped. *(Batches of 1,000; `0` keeps everything; 60 refusal rows a
+  minute and a summary row.)*
+
+## Notes
+- `packages/http-app/src/audit.ts`: `AuditWriter` (background queue, bounded; `toolCall`, `request` (refusals 401/429),
+  `admin`, `writeIntent` (synchronous, throws), `flush`, `observer()`), `purgeAudit`, `scheduleAuditRetention`.
+- Core's `ToolCallEvent` gained `assetNumbers` and `queries`, taken by `auditFacts` from the tool's own result (row
+  `number` fields; `_meta["agility-bridge/result"].query(ies)`, already masked by the compiler).
+- `serve` writes audit rows, purges at start and hourly (`AB_AUDIT_RETENTION_DAYS`) and flushes on shutdown. Admin
+  changes are recorded by the admin API and CLI (P2-09, P2-10) through `AuditWriter.admin`.
+- A refused request's body is never read, so refusal rows carry no MCP method.
 
 ## Security notes
 THREAT_MODEL T8, T17.
@@ -35,7 +47,7 @@ THREAT_MODEL T8, T17.
 - L-117 — Redaction is broad and tested.
 
 ## Docs to update
-- docs/guide/audit-log.md (new)
+- [x] docs/guide/audit-log.md (new)
 - docs/security/logging.md (P2-15)
 
 ## Out of scope

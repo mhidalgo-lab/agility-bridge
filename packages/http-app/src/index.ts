@@ -15,6 +15,13 @@ export {
   type RequestLimits,
   type ToolCallRecord,
 } from './app.ts';
+export {
+  type AdminChange,
+  type AuditOptions,
+  AuditWriter,
+  purgeAudit,
+  scheduleAuditRetention,
+} from './audit.ts';
 export { createEdge, type Edge, type EdgeOptions } from './edge.ts';
 export {
   type ClassifiedRequest,

@@ -180,6 +180,7 @@ export {
 } from './registry.ts';
 export { Secret } from './secret.ts';
 export {
+  auditFacts,
   type BuildServerOptions,
   buildMcpServer,
   DEFAULT_SERVER_INFO,
