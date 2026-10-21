@@ -94,6 +94,13 @@ jobs:
           echo "${TRIVY_SHA256}  $file" | sha256sum -c --strict -
           tar xzf "$file" trivy
           ./trivy image --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 agility-bridge:ci
+      # The self-hosting guides, executed in a fresh container from the packed package (P2-16, L-133).
+      - name: Self-hosting walkthrough
+        run: |
+          pnpm --filter agility-bridge build
+          mkdir -p "$RUNNER_TEMP/pkg"
+          (cd apps/cli && npm pack --pack-destination "$RUNNER_TEMP/pkg")
+          node --conditions=source scripts/walkthrough.ts "$RUNNER_TEMP"/pkg/agility-bridge-*.tgz
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build for linux/amd64 and linux/arm64 (no push)
         run: docker buildx build --platform linux/amd64,linux/arm64 -f docker/Dockerfile .

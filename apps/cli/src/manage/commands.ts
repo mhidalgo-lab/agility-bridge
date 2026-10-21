@@ -3,6 +3,7 @@
 // Every change goes through the admin API — remotely, or in process over the local database — so validation, guards
 // and audit are the same on every path (L-065). Output is JSON on stdout; messages go to stderr.
 import { generateAdminToken, keyStatus, retireKeyVersion, rotateCredentialKeys } from '@agility-bridge/auth';
+import { restoreSqliteBackup } from '@agility-bridge/storage-sqlite';
 import { ConfigError } from '../config.ts';
 import { createMasterKeyFile, defaultMasterKeyFile } from '../master-key.ts';
 import type { AdminClient } from './client.ts';
@@ -447,6 +448,31 @@ export const COMMANDS: readonly CommandSpec[] = [
         }) as Record<string, string>,
       );
       return { method: 'GET', path: `/audit?${q}` };
+    },
+  },
+  {
+    words: ['backup'],
+    summary: 'Write a consistent copy of the database to a new 0600 file while the server runs (local)',
+    args: [id('file', 'The new backup file (never overwritten)')],
+    local: async ({ storage }, p) => {
+      await storage.backup(p.args[0] as string);
+      return { backup: p.args[0] };
+    },
+  },
+  {
+    words: ['restore'],
+    summary: 'Check a backup and copy it to a new database file (stop the server first)',
+    args: [
+      id('backup', 'A file written by `backup`'),
+      id('target', 'The new database file (never overwritten)'),
+    ],
+    async run(r, p) {
+      await restoreSqliteBackup(p.args[0] as string, p.args[1] as string);
+      r.out(JSON.stringify({ restored: p.args[1] }));
+      r.err(
+        'agility-bridge: restored. Point AB_DB_PATH at the new file and start the server; it migrates on start.',
+      );
+      return 0;
     },
   },
   {
