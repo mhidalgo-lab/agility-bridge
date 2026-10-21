@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // P0-12 (D-01, THREAT_MODEL A15): every request the live harness sends to the third-party tenant goes through this
-// guard. Only reads reach Agility: GET on meta.v1 and rest-1.v1 Data/Hist, POST on query.v1 (read-only by design).
+// guard. Only reads reach Agility: GET on meta.v1 and rest-1.v1 Data/Hist, POST on query.v1 and query.legacy.v1
+// (read-only by design).
 // Anything else (another endpoint, method, host, an `op=` operation, a redirect) is refused before or instead of sending.
 
 export class ReadOnlyViolation extends Error {
@@ -32,7 +33,7 @@ export function assertReadOnly(base: URL, url: URL, method: string): void {
   if (url.searchParams.has('op')) throw new ReadOnlyViolation('operations (op=) are writes');
   const rel = url.pathname.slice(base.pathname.length);
   if (method === 'GET' && READ_GET.test(rel)) return;
-  if (method === 'POST' && rel === 'query.v1') return;
+  if (method === 'POST' && (rel === 'query.v1' || rel === 'query.legacy.v1')) return;
   throw new ReadOnlyViolation(`${method} ${rel || '/'} is not an allowed read`);
 }
 

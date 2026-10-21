@@ -1,0 +1,25 @@
+{
+  "_type": "History",
+  "pageSize": 2147483647,
+  "pageStart": 0,
+  "Assets": [
+    {
+      "_type": "Asset",
+      "href": "/SyntheticInstance/rest-1.v1/Data/Story/900001/910001",
+      "id": "Story:900001:910001",
+      "Attributes": {
+        "Status.Name": { "_type": "Attribute", "name": "Status.Name", "value": null },
+        "ChangeDate": { "_type": "Attribute", "name": "ChangeDate", "value": "2026-09-01T10:00:00.000Z" }
+      }
+    },
+    {
+      "_type": "Asset",
+      "href": "/SyntheticInstance/rest-1.v1/Data/Story/900001/910002",
+      "id": "Story:900001:910002",
+      "Attributes": {
+        "Status.Name": { "_type": "Attribute", "name": "Status.Name", "value": "In Progress" },
+        "ChangeDate": { "_type": "Attribute", "name": "ChangeDate", "value": "2026-09-03T15:30:00.000Z" }
+      }
+    }
+  ]
+}

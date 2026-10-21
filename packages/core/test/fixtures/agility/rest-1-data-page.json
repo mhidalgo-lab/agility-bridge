@@ -1,0 +1,13 @@
+{
+  "_type": "Assets",
+  "pageSize": 2,
+  "pageStart": 0,
+  "Assets": [
+    {
+      "_type": "Asset",
+      "href": "/SyntheticInstance/rest-1.v1/Data/Story/900001",
+      "id": "Story:900001",
+      "Attributes": { "Number": { "_type": "Attribute", "name": "Number", "value": "B-90001" } }
+    }
+  ]
+}

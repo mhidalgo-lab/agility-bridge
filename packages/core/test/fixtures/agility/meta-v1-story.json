@@ -1,0 +1,21 @@
+{
+  "_type": "AssetType",
+  "Name": "Story",
+  "Token": "Story",
+  "Version": "26.0.3.2",
+  "Abstract": false,
+  "Base": { "nameref": "PrimaryWorkitem", "href": "/SyntheticInstance/meta.v1/PrimaryWorkitem" },
+  "Attributes": {
+    "Story.Number": { "_type": "AttributeDefinition", "Name": "Number", "Token": "Story.Number", "AttributeType": "Text", "IsMultivalue": false },
+    "Story.Name": { "_type": "AttributeDefinition", "Name": "Name", "Token": "Story.Name", "AttributeType": "Text", "IsMultivalue": false },
+    "Story.Scope": { "_type": "AttributeDefinition", "Name": "Scope", "Token": "Story.Scope", "AttributeType": "Relation", "IsMultivalue": false, "RelatedAsset": { "nameref": "Scope" } },
+    "Story.Super": { "_type": "AttributeDefinition", "Name": "Super", "Token": "Story.Super", "AttributeType": "Relation", "IsMultivalue": false, "RelatedAsset": { "nameref": "Epic" } },
+    "Story.Owners": { "_type": "AttributeDefinition", "Name": "Owners", "Token": "Story.Owners", "AttributeType": "Relation", "IsMultivalue": true, "RelatedAsset": { "nameref": "Member" } },
+    "Story.Status": { "_type": "AttributeDefinition", "Name": "Status", "Token": "Story.Status", "AttributeType": "Relation", "IsMultivalue": false, "RelatedAsset": { "nameref": "StoryStatus" } },
+    "Story.Custom_SyntheticNote": { "_type": "AttributeDefinition", "Name": "Custom_SyntheticNote", "Token": "Story.Custom_SyntheticNote", "AttributeType": "LongText", "IsMultivalue": false }
+  },
+  "Operations": {
+    "Story.QuickClose": { "_type": "OperationDefinition", "Name": "QuickClose" },
+    "Story.Reactivate": { "_type": "OperationDefinition", "Name": "Reactivate" }
+  }
+}

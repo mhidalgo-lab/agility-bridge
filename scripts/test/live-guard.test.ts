@@ -22,6 +22,7 @@ describe('readOnlyFetch', () => {
     ['GET', 'rest-1.v1/Data/Story?sel=Name&page=1,0'],
     ['GET', 'rest-1.v1/Hist/Story/1001'],
     ['POST', 'query.v1'],
+    ['POST', 'query.legacy.v1'],
   ] as const)('allows %s %s and sends the bearer token', async (method, path) => {
     const { live, fetchImpl } = guarded();
     await live(path, { method, body: { from: 'Story' } });

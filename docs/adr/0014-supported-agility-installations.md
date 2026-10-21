@@ -34,6 +34,14 @@ authentication, Windows Integrated Authentication (on-premises) and OAuth2 grant
 - One code path for every instance; on-premises specifics are configuration, not forks.
 - Instances requiring Basic or NTLM only are out of scope.
 
+## Evidence (added 2026-10-21; the decision above is unchanged)
+
+- Hosted: the owner's tenant on `v1host.com` runs **26.0.3.2**; bearer access tokens work on `query.v1` and
+  `query.legacy.v1` (P0-06). The public example instance runs 26.2.6.29.
+- Workers and private CAs (P0-09): a deployed Worker gets HTTP 526 for an untrusted certificate, local workerd throws an
+  opaque error; on-premises instances with a private CA need the Node or Docker deployment, as decided (L-160).
+- The minimum on-premises version is still open: no on-premises instance was available (D-13, P9-05).
+
 ## Alternatives considered
 
 - **Hosted only:** rejected by the owner.

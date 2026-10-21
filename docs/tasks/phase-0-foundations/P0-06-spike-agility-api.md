@@ -2,12 +2,12 @@
 id: P0-06
 title: "Spike: Agility API behaviour, limits and fixtures"
 phase: 0
-status: todo
+status: in-progress
 priority: high
 depends_on: [P0-01, P0-12]
 adr: ["0010", "0011", "0012", "0014"]
-lessons: [L-001, L-002, L-046, L-048, L-052, L-137, L-138, L-139, L-140, L-141, L-144, L-147, L-148, L-149]
-owner: ""
+lessons: [L-001, L-002, L-046, L-048, L-052, L-137, L-138, L-139, L-140, L-141, L-144, L-147, L-148, L-149, L-162, L-163]
+owner: "Matias Hidalgo"
 ---
 
 # P0-06 — Spike: Agility API behaviour, limits and fixtures
@@ -38,12 +38,12 @@ Measure how Agility really behaves for everything the core will depend on, answe
 - On-premises instance if available: version, TLS with a private CA, base-URL shapes.
 
 ## Acceptance criteria
-- [ ] `spikes/agility-api/RESULTS.md` with exact measurements, instance versions and dates, and an explicit "not verified" list.
-- [ ] Every fact in RESEARCH §1 is marked `live`, `docs` or corrected.
-- [ ] Synthetic fixtures written by hand to match the measured shapes; nothing from the third-party tenant is committed (D-01), not even sanitised responses; gitleaks clean; the synthetic-fixture checklist signed in the PR.
-- [ ] Every probe ran through the P0-12 read-only guard.
-- [ ] ADR-0011 accepted or superseded with evidence; ADR-0010 and ADR-0014 numbers updated.
-- [ ] Every surprise becomes a lesson in LESSONS-LEARNED.md.
+- [x] `spikes/agility-api/RESULTS.md` with exact measurements, instance versions and dates, and an explicit "not verified" list.
+- [x] Every fact in RESEARCH §1 is marked `live`, `docs` or corrected.
+- [x] Synthetic fixtures written by hand to match the measured shapes; nothing from the third-party tenant is committed (D-01), not even sanitised responses; gitleaks clean; the synthetic-fixture checklist signed in the PR. *(packages/core/test/fixtures/agility/, checklist signed in the PR)*
+- [x] Every probe ran through the P0-12 read-only guard.
+- [ ] ADR-0011 accepted or superseded with evidence; ADR-0010 and ADR-0014 numbers updated. *(evidence and numbers added; acceptance of ADR-0011 is the owner's)*
+- [x] Every surprise becomes a lesson in LESSONS-LEARNED.md. *(L-162, L-163)*
 
 ## Security notes
 Sandbox only, least-privilege members, synthetic data. Raw captures are git-ignored and deleted after sanitisation (THREAT_MODEL T8). Do not trip quotas on shared or production instances (A10).

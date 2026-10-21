@@ -30,7 +30,8 @@ Abbreviation: **DL** = `https://docs.digital.ai/agility/docs/developerlibrary/` 
   deprecation notices across the rebrands. *docs*
 - Latest release at the time of writing: **26.2** (July 2026; public example instances report build `26.2.6.29`);
   **26.3** is planned for late October 2026. Releases are quarterly (`xx.0` … `xx.3`) with bi-weekly point releases.
-  The 26.0 – 26.2 release notes show no API deprecations. *docs, unverified for point releases*
+  The 26.0 – 26.2 release notes show no API deprecations. *docs, unverified for point releases* — *live (P0-06,
+  2026-10-21):* the owner's hosted tenant runs **26.0.3.2**.
 - UI vocabulary depends on the methodology template; the API names are fixed. *docs* —
   [DL assets](https://docs.digital.ai/agility/docs/developerlibrary/assets)
 
@@ -47,11 +48,11 @@ Abbreviation: **DL** = `https://docs.digital.ai/agility/docs/developerlibrary/` 
 
 | Family | URL pattern | Methods / format | Purpose | Source |
 |---|---|---|---|---|
-| `rest-1.v1/Data` | `/rest-1.v1/Data/<AssetType>[/<id>]` | GET/POST, XML (JSON on request: *unverified*) | Read; create/update one asset; operations via `?op=` | [DL rest-1-v1-endpoints](https://docs.digital.ai/agility/docs/developerlibrary/rest-1-v1-endpoints) |
-| `rest-1.v1/Hist` | `/rest-1.v1/Hist/<AssetType>` | GET, XML | History: one row per version (moment) of an asset | [DL history queries](https://docs.digital.ai/agility/docs/developerlibrary/learn-by-example-history-queries) |
+| `rest-1.v1/Data` | `/rest-1.v1/Data/<AssetType>[/<id>]` | GET/POST, XML or **JSON** (`Accept: application/json`, *live* P0-06) | Read; create/update one asset; operations via `?op=` | [DL rest-1-v1-endpoints](https://docs.digital.ai/agility/docs/developerlibrary/rest-1-v1-endpoints) |
+| `rest-1.v1/Hist` | `/rest-1.v1/Hist/<AssetType>` | GET, XML or **JSON** (*live* P0-06) | History: one row per version (moment) of an asset | [DL history queries](https://docs.digital.ai/agility/docs/developerlibrary/learn-by-example-history-queries) |
 | `rest-1.v1/New` | `/rest-1.v1/New/<AssetType>?ctx=<OID>` | GET, XML | Template for a new asset (defaults, context copy) | DL rest-1-v1-endpoints |
-| `query.v1` | `/query.v1` | POST (GET), JSON or YAML in, JSON out | Read-only, nested selections, several queries per call | [DL tour of query.v1](https://docs.digital.ai/agility/docs/developerlibrary/tour-query-v-1) |
-| `query.legacy.v1` | `/query.legacy.v1` | as above | Same, accepting Basic auth or the browser session cookie | DL tour of query.v1 |
+| `query.v1` | `/query.v1` | POST (GET), JSON or YAML in, JSON out | Read-only, nested selections, several queries per call (*live* P0-06) | [DL tour of query.v1](https://docs.digital.ai/agility/docs/developerlibrary/tour-query-v-1) |
+| `query.legacy.v1` | `/query.legacy.v1` | as above | Same, accepting Basic auth or the browser session cookie; bearer access tokens also work (*live* P0-06) | DL tour of query.v1 |
 | `meta.v1` | `/meta.v1[/<AssetType>[/<Attribute or Operation>]]` | GET, XML or **JSON** (`Accept: application/json`, *live* 2026-10-20), **no authentication** | Schema: asset types, attributes, types, inheritance, operations, validators | [DL meta API](https://docs.digital.ai/agility/docs/developerlibrary/meta-api) |
 | `api/asset` (Bulk API) | `/api/asset[?previewOnly=true]` | POST, JSON (object or array) | Create, update, add/remove relations, execute operations; deferred execution with `previewOnly` | [Bulk API](https://docs.digital.ai/agility/docs/agility-bulk-api), [quickstart](https://docs.digital.ai/agility/docs/bulk-api-quickstart), [advanced topics](https://docs.digital.ai/agility/docs/advanced-bulk-topics) |
 | `api/ActivityStream` | `/api/ActivityStream/<OID>` | GET, JSON | Activity feed; "may not contain every change" | [DL activity stream](https://docs.digital.ai/agility/docs/developerlibrary/activity-stream) |
@@ -73,6 +74,9 @@ There is no `config.v1` endpoint. *docs*
   The grant "allows an application to operate on the member's behalf with the same Roles and Project Memberships that
   are assigned to that member" — **there are no scopes**. They work whatever the instance's login method (Basic, NTLM,
   SAML SSO). *docs* — [DL access tokens](https://docs.digital.ai/agility/docs/developerlibrary/access-token-authentication)
+  — *live (P0-06):* `Bearer` works on `query.v1` and `query.legacy.v1`; an invalid or missing token gets **401**
+  `application/json` (24-byte body) with **no `WWW-Authenticate`** header and no redirect; responses carry `V1-MemberID`,
+  `V1-AuthType` and `V1-SurrogateID`.
 - **OAuth2 grants**: a different grant type on the same page, with expiring tokens and refresh. *docs* —
   [authorizing external application access](https://docs.digital.ai/agility/docs/agility/authorizing-external-application-access)
 - **Basic authentication** (username/password) is supported and documented as less secure; **Windows Integrated
@@ -84,7 +88,9 @@ There is no `config.v1` endpoint. *docs*
   `query-api-1.0` concerns the interactive API console; `query.legacy.v1` accepts Basic auth or the session cookie.)
   *docs* — [DL API authentication](https://docs.digital.ai/agility/docs/developerlibrary/api-authentication)
 - **Visibility**: every read and write is filtered to what the token's member can see (roles and project memberships).
-  A 404 is returned both for missing assets and for assets the member cannot see. *docs* —
+  A 404 is returned both for missing assets and for assets the member cannot see. *docs* (404 not probed on the
+  read-only tenant) — read errors (unknown type or attribute, malformed filter) are **400** `application/json`
+  `{error, exceptions: [{type, message}]}` (*live* P0-06) —
   [DL HTTP error codes](https://docs.digital.ai/agility/docs/developerlibrary/http-error-codes)
 - **Attribution**: writes are recorded under the token's member; there is no "on behalf of" header. *inferred*
 
@@ -116,7 +122,15 @@ except `group`, and adds `op` (POST only). *docs*
 - **Dates**: ISO 8601 with `Z` and up to 7 fractional digits (e.g. `2018-08-24T15:06:53.1347214Z`); date-only values are
   accepted; `ChangeDate`/`ChangeDateUTC`-style pairs exist, and the semantic difference is not documented. *docs*
 - **Binding**: `with` substitutes named constants into the same filter grammar; it is not a prepared-statement channel,
-  and no escaping rule is documented for values containing `,`, `|` or quotes on the `rest-1.v1` side. *docs*
+  and no escaping rule is documented for values containing `,`, `|` or quotes on the `rest-1.v1` side. *docs* —
+  **corrected (live, P0-06):** on `query.v1`, quotes, `|`, `;`, parentheses, brackets, `$`, newlines, Unicode and
+  10,000-character values stay one literal value, but **a comma splits a scalar value into a value list**
+  (`"zz,B-01234"` matched `B-01234`); arrays are value lists by design. Scalars with commas must be refused or split
+  deliberately (L-162, P1-04). Interpolating the same text into `filter` is injectable (a contrast query matched every
+  row).
+- **Cost and limits (live, P0-06):** page sizes up to 2,000 work (696 ms, about 100 bytes per `ID` row); a typical row
+  with status, owners, sprint and project is about 430–460 bytes; **sorting by `ChangeDate` costs about 1.1 s per call**
+  against about 0.23 s by `ID` (L-163); sorting by `ID` gives disjoint, repeatable pages.
 
 ### 1.5 Writing data
 
@@ -135,7 +149,9 @@ except `group`, and adds `op` (POST only). *docs*
   [update](https://docs.digital.ai/agility/docs/asset-updation-examples),
   [operations](https://docs.digital.ai/agility/docs/asset-operation-examples), advanced topics
 - **Comments, effort, links**: comments are `Conversation`/`Expression` assets, effort is `Actual`, external links are
-  `Link`. Exact attributes for creating them are **unverified** (read them from `meta.v1` in P0-06).
+  `Link`. *live (P0-06, metadata):* `Expression` has `BelongsTo` → `Conversation` and `Mentions` → `BaseAsset[]`;
+  `Link` and `Attachment` have `Asset` → `BaseAsset`; `Actual` has `Scope`, `Team`, `Timebox`. The attributes needed to
+  create them stay **unverified** until the writable sandbox (P7-07).
 - **Attachments**: create an `Attachment` asset, then upload the content; documented size limit 4 MB. *docs*
 - **Idempotency**: no idempotency keys; each `rest-1.v1` POST is atomic for one asset. *docs / inferred*
 
@@ -146,11 +162,16 @@ except `group`, and adds `op` (POST only). *docs*
   `RegressionTest`, `RegressionPlan`, `RegressionSuite`, `Goal`, `Request`, `Issue`, `ChangeSet`, `BuildRun`, `Milestone`,
   `Retrospective`, `Schedule` derive from `BaseAsset`; `ScopeLabel` derives from `Label`; `TeamRoom` from `Room`.
   `Attachment`, `Link`, `Conversation`, `Actual`, `Expression`, `Capacity`, `Environment` stand alone. A `Note` type no
-  longer exists (`Conversation` replaced it). *docs (public meta.v1 example instance), partially unverified*
+  longer exists (`Conversation` replaced it). *docs (public meta.v1 example instance), partially unverified* — *live
+  (P0-06):* `Story`, `Defect`, `TestSet` → `PrimaryWorkitem`; `Task`, `Test`, `Epic` → `Workitem`; `Issue`, `Request`,
+  `RegressionTest`, `Timebox`, `Team`, `Member`, `Scope` → `BaseAsset`; `Expression`, `Attachment`, `Link`, `Actual`
+  report no base. The tenant lists **192** asset types (175 on the 26.2 example instance).
 - **Numbers**: work items carry a `Number` with a type prefix. Documentation examples show stories as `S-01054`; other
   instances use `B-` for stories (backlog items). Commonly seen: `E-` (Epic), `D-` (Defect), `TK-` (Task), `AT-` (Test),
   `I-` (Issue), `R-` (Request), `RP-` (RegressionPlan), `RS-` (RegressionSuite), `TS-` (TestSet). Prefixes for
-  `RegressionTest`, `Goal` and `Environment` are unverified. `meta.v1` does not expose prefixes. *docs + unverified*
+  `RegressionTest`, `Goal` and `Environment` are unverified. `meta.v1` does not expose prefixes. *docs + unverified* —
+  *live (P0-06):* `B-`, `D-`, `TK-`, `AT-`, `E-`, `I-`, **`FG-` (Theme)**, **`G-` (Goal)**; a number resolves across
+  types in one query with `from: "Workitem"` (or `PrimaryWorkitem`), which returns `AssetType`; `BaseAsset` is refused.
 - **Status vs AssetState vs rollup category**: `Status` is an admin-configurable list per type; `AssetState` is the
   shared lifecycle integer: 0 Future, 64 Active, 128 Closed, 200 Template (dead), 208 Broken down (dead), 255 Deleted
   (dead), 209 Guest collaborator (members only); the rollup category (Not Started / In Progress / Completed) is for
@@ -158,8 +179,14 @@ except `group`, and adds `op` (POST only). *docs*
 - **Common attributes**: `Name`, `Number`, `Description` (long text, HTML), `Status`, `Owners` (multi-relation to
   `Member`), `Team`, `Scope`, `Timebox`, `Super`/`Subs` (portfolio tree), `Estimate`, `ChangeDate`, `CreateDate`,
   `ClosedDate`-style dates with `…UTC` variants. `DetailEstimate`, `ToDo`, `Priority`, `Source`, the task/test parent
-  relation and `Children` are well known from VersionOne usage but **unverified** against current metadata.
-- **Custom attributes** use the `Custom_` prefix and carry `iscustom="True"` in `meta.v1`. *docs / unverified rule*
+  relation and `Children` are well known from VersionOne usage but **unverified** against current metadata. — *live
+  (P0-06):* `Task.Parent` → `PrimaryWorkitem`, `Test.Parent` → `Workitem`, `Story.Parent` → **`Theme`** (the epic is
+  `Super`), `Children`/`Subs` → `Workitem[]`, `Scope.ChildrenMeAndDown` (a project and its descendants), `Timebox`
+  reaches projects through `Schedule`, and `Team` has **no member roster** relation.
+- **Custom attributes** use the `Custom_` prefix and carry `iscustom="True"` in `meta.v1`. *docs / unverified rule* —
+  *live (P0-06):* the `Custom_` prefix holds; custom types seen: `Text`, `LongText`, `Date`, `Relation`.
+- **Metadata fingerprint (live, P0-06):** `meta.v1` sends `ETag: "<version>.<schema stamp>"` and
+  `Cache-Control: public, max-age≈2,600 s`; no `Last-Modified`. The whole schema is 5.1 MB of JSON (5.1 s).
 
 ### 1.7 Limits and behaviour
 
