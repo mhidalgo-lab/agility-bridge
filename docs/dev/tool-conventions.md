@@ -168,7 +168,8 @@ Annotations are derived from `kind` by the registry, never written by hand. Non-
 ## Costs
 
 - Each tool declares `cost`: the worst-case number of Agility requests in one call, including retries, paging and
-  resolution (L-114). The registry hides a tool whose cost exceeds the deployment's per-call budget (L-115).
+  resolution (L-114). The registry hides a tool whose cost exceeds the deployment's per-call budget (`select({ maxCost })`, L-115; see
+  [core contracts](core.md)).
 - A cost test forces the worst case for every tool and asserts requests ≤ declared cost.
 - Descriptions state the cost when it can reach 8 or more requests, and what happens when the budget runs out.
 

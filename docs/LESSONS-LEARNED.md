@@ -39,7 +39,7 @@ How to use it:
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
-| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120 |
+| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136 |
@@ -755,6 +755,14 @@ Never export arguments, asset content, URIs, file paths, emails or tokens.
 **L-120 — Keep security inventories from the first storage task.**
 Cryptography, logging and data-protection inventories are living documents, not a pre-launch retrofit.
 *Applied in:* P2-15.
+
+**L-165 — Each redaction case asserts its own secret.**
+P1-01's first corpus checked every input against one shared list of secret fragments, and one case's fragment was
+missing from the list, so a Digest `Proxy-Authorization` header passed while it leaked the `response` value (the
+pattern stopped at the first quote). Each case now carries the exact secret it must remove, and fakes are assembled at
+run time so gitleaks needs no allowlist for them. Header credentials are redacted to the end of the line, because
+schemes such as Digest hold quotes and commas.
+*Applied in:* `packages/core/test/redact.test.ts`, `packages/core/src/redact.ts`, P1-01.
 
 ## Q. Testing, evals and live verification
 

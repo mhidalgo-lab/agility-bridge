@@ -130,14 +130,14 @@ Status lives in each task file.
 | P0-10 | [Prior-art review](tasks/phase-0-foundations/P0-10-prior-art-review.md) | medium | — | done |
 | P0-11 | [Tool contract and conventions](tasks/phase-0-foundations/P0-11-tool-contract.md) | high | P0-06, P0-07, P0-14 | done |
 | P0-12 | [Agility sandbox and live-verification harness](tasks/phase-0-foundations/P0-12-sandbox-live-harness.md) | high | P0-03, P0-14 | done |
-| P0-13 | [Spike results and go/no-go for Phase 1](tasks/phase-0-foundations/P0-13-spike-results-go-no-go.md) | high | P0-02, P0-04, P0-05, P0-06, P0-07, P0-08, P0-09, P0-10, P0-11, P0-12 | review |
+| P0-13 | [Spike results and go/no-go for Phase 1](tasks/phase-0-foundations/P0-13-spike-results-go-no-go.md) | high | P0-02, P0-04, P0-05, P0-06, P0-07, P0-08, P0-09, P0-10, P0-11, P0-12 | done |
 | P0-14 | [Owner decision gate for Phase 0](tasks/phase-0-foundations/P0-14-owner-decision-gate.md) | high | — | done |
 
 ### Phase 1
 
 | ID | Task | Priority | Depends on | Status |
 |---|---|---|---|---|
-| P1-01 | [Core skeleton, tool registry and error model](tasks/phase-1-core-stdio/P1-01-core-skeleton.md) | high | P0-13 | todo |
+| P1-01 | [Core skeleton, tool registry and error model](tasks/phase-1-core-stdio/P1-01-core-skeleton.md) | high | P0-13 | review |
 | P1-02 | [Agility HTTP client (instances, auth, retries, limiter, budget)](tasks/phase-1-core-stdio/P1-02-agility-client.md) | high | P1-01 | todo |
 | P1-03 | [Metadata service (meta.v1) and schema snapshot](tasks/phase-1-core-stdio/P1-03-metadata-service.md) | high | P1-02 | todo |
 | P1-04 | [Query builder, safety and limits](tasks/phase-1-core-stdio/P1-04-query-compiler.md) | high | P1-03 | todo |
