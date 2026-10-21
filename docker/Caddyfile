@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+# TLS termination for agility-bridge (docker/compose.yaml). Replace the host name.
+mcp.example.com {
+	reverse_proxy agility-bridge:8787 {
+		# MCP responses can stream for up to the server's 180 s deadline: pass them through at once.
+		flush_interval -1
+	}
+}

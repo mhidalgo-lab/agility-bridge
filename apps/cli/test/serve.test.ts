@@ -185,7 +185,10 @@ describe('revalidation after repeated Agility refusals', () => {
     let t = 1_000_000;
     const services = {
       credentials: {
-        validate: async (id: string) => (validated.push(id), { id, validationStatus: 'invalid' }),
+        validate: async (id: string) => {
+          validated.push(id);
+          return { id, validationStatus: 'invalid' };
+        },
       },
     };
     const trigger = revalidateOnAuthErrors(

@@ -2,7 +2,7 @@
 id: P2-13
 title: Agility credential validation
 phase: 2
-status: review
+status: done
 priority: medium
 depends_on: [P2-03, P2-04]
 adr: ["0008", "0014"]

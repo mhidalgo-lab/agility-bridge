@@ -1,0 +1,15 @@
+# Build context of the Docker image (P2-11): sources and the lockfile only.
+**/node_modules
+**/dist
+**/coverage
+**/.wrangler
+.git
+.github
+.idea
+live/results
+spikes
+docs
+*.db
+*.sqlite
+.env
+.env.*

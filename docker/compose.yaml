@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: Apache-2.0
+# agility-bridge behind Caddy (automatic HTTPS) — docs/guide/self-hosting.md.
+#   1. Put your host name in Caddyfile and in AB_PUBLIC_URL below.
+#   2. agility-bridge init --key-file ./secrets/master.key
+#      agility-bridge admin-token > ./secrets/admin.token
+#      sudo chown 65532:65532 ./secrets/* && chmod 600 ./secrets/*   (the image runs as uid 65532)
+#   3. docker compose up -d
+# The image is built from this repository until a published image exists (P2-18).
+services:
+  agility-bridge:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: agility-bridge:local
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      AB_PUBLIC_URL: https://mcp.example.com
+      AB_TRUSTED_PROXY_HOPS: '1'
+      AB_MASTER_KEY_FILE: /run/secrets/master.key
+      AB_ADMIN_TOKEN_FILE: /run/secrets/admin.token
+    volumes:
+      - agility-bridge-data:/data
+      # Secrets outside the data volume (L-074): a backup of the volume never holds the key.
+      - ./secrets/master.key:/run/secrets/master.key:ro
+      - ./secrets/admin.token:/run/secrets/admin.token:ro
+    expose:
+      - '8787'
+
+  caddy:
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    restart: unless-stopped
+    ports:
+      - '443:443'
+      - '80:80'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - agility-bridge
+
+volumes:
+  agility-bridge-data:
+  caddy-data:

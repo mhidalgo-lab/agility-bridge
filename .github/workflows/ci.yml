@@ -62,6 +62,42 @@ jobs:
       - run: pnpm --filter agility-bridge build
       - run: node apps/cli/dist/index.mjs
 
+  # The self-hosting image (P2-11): build, smoke test against the synthetic Agility, vulnerability scan, and a
+  # multi-architecture build. Nothing is pushed: publishing the image is a release step that needs the owner.
+  docker:
+    name: Docker image (build, smoke test, scan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # renovate: datasource=github-releases depName=aquasecurity/trivy
+      TRIVY_VERSION: 0.75.0
+      # sha256 of the Linux-64bit tarball, pinned here so a tampered release cannot also replace its checksums file.
+      TRIVY_SHA256: c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f
+    steps:
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - run: pnpm install --frozen-lockfile
+      - run: docker build -f docker/Dockerfile --build-arg "REVISION=${GITHUB_SHA}" -t agility-bridge:ci .
+      - run: node --conditions=source scripts/docker-smoke.ts agility-bridge:ci
+      - name: Scan the image (no fixable high or critical findings)
+        run: |
+          file="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSLO "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$file"
+          echo "${TRIVY_SHA256}  $file" | sha256sum -c --strict -
+          tar xzf "$file" trivy
+          ./trivy image --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 agility-bridge:ci
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build for linux/amd64 and linux/arm64 (no push)
+        run: docker buildx build --platform linux/amd64,linux/arm64 -f docker/Dockerfile .
+
   actionlint:
     name: Workflow lint
     runs-on: ubuntu-latest

@@ -11,7 +11,7 @@ import {
   type RateLimitConfig,
   type RateLimiter,
 } from '../src/index.ts';
-import { post, type World, world } from './helpers/world.ts';
+import { post, world } from './helpers/world.ts';
 
 const LIST = { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} };
 const LISTEN = { jsonrpc: '2.0', id: 2, method: 'subscriptions/listen', params: {} };
@@ -21,12 +21,10 @@ async function limited(
   limiter: RateLimiter = new MemoryRateLimiter(),
 ) {
   const cfg = { ...DEFAULT_RATE_LIMITS, ...config };
-  let w: World | undefined;
-  w = await world({
+  return world({
     limits: createRequestLimits(limiter, cfg, silentLogger),
     clientIp: (c) => c.req.header('x-test-ip') ?? 'unknown',
   });
-  return w;
 }
 
 const from = (ip: string) => ({ 'x-test-ip': ip });
