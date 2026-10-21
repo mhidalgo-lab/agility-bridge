@@ -200,37 +200,53 @@ storage, no audit table (write outcomes are logged to stderr) and no HTTP layer.
 
 ### 6.1 Agility HTTP client (P1-02)
 
-- One client per call, created from the `ToolContext`: canonical instance base URL, the resolved credential, the budget
-  and the limiter. Tools never build URLs or headers themselves (L-152: one identity per call).
-- Headers: `Authorization: Bearer <access token>`, `Accept: application/json` where the endpoint supports it, a
-  descriptive `User-Agent` (`agility-bridge/<version>`), `Content-Type` per endpoint.
-- **Redirects are never followed with credentials**; a redirect to another origin is reported as a likely
-  instance-URL mistake (`AB_AGILITY_WRONG_INSTANCE`).
-- Timeouts: 20 s per request (configurable), within the 180 s exchange deadline.
-- **Retries** (ADR-0010): reads only, on 429/502/503/504 and network errors, ≤ 3 attempts, full-jitter backoff,
-  honouring `Retry-After` or the 429 body's `RetryAfter`, refusing waits above 10 s; each attempt spends budget. A
-  circuit breaker keyed by instance **and credential** opens after repeated 429s (Agility quotas are per consumer, so one
-  member's throttling must not block the others).
-- **Concurrency**: per-credential semaphore (default 5; ≤ 6 on Workers).
-- **Response caps**: bodies are stream-read with a byte cap before parsing; JSON parsed natively; XML (`meta.v1`,
-  `Hist`, `rest-1.v1` writes) parsed by a pure-JavaScript parser with entity expansion disabled (no `DOMParser` on
-  Workers).
-- **TLS**: verification always on. On Node, an instance may reference a CA bundle; the Node app injects a dispatcher
-  (undici `Agent` with `connect.ca`) into the core's `fetch` (ADR-0014).
+`packages/core/src/agility/`. Tools get it with `agilityClient(ctx)`; it has no other entry point.
+
+- One client per call, created from the `ToolContext`: canonical instance base URL, the resolved credential, the budget,
+  the limiter, the breaker and the `fetch` the host pinned with the instance. Tools never build URLs or headers
+  (L-152: one identity per call). Endpoints are fixed (`query.v1`, `query.legacy.v1`, `meta.v1/<type>`,
+  `rest-1.v1/Data|Hist/<type>/<id>`, `rest-1.v1/Data` POST and `api/asset` for writes); asset types, ids, attribute
+  selections and operation names are validated before they reach a path or `sel`.
+- Instance URLs are canonicalised at configuration time (`canonicalInstanceUrl`): HTTPS only (HTTP for loopback
+  tests), no user info, query or fragment, path kept, no trailing slash.
+- Headers: `Authorization: Bearer <access token>`, `Accept: application/json` (every read endpoint answers JSON, P0-06),
+  `User-Agent: agility-bridge/<version>`, `Content-Type` per endpoint.
+- **Redirects are never followed** (`redirect: 'manual'`); any redirect is reported as a likely instance-URL mistake
+  (`AB_AGILITY_WRONG_INSTANCE`), and so is an HTML page or a body that is not JSON.
+- Timeouts: 20 s per request, body included (`limits.requestTimeoutMs`), within the 180 s exchange deadline. A timeout
+  is not retried.
+- **Retries** (ADR-0010): reads only, on 429/502/503/504 and network errors, ≤ 3 attempts, full-jitter backoff from
+  500 ms, honouring `Retry-After` (seconds or a date) or the 429 body's `RetryAfter`, refusing waits above 10 s (the
+  error reports `retryAfterSeconds`); each attempt spends budget, so a budget that runs out mid-retry ends with
+  `AB_BUDGET_EXHAUSTED`. Writes are sent once.
+- **Circuit breaker** (`CircuitBreakers`, owned by the host per process): keyed by instance **and credential**; three
+  consecutive 429s open it for at least 30 s (or the longer `Retry-After`); while open, calls fail fast with
+  `AB_AGILITY_RATE_LIMITED` without spending budget or reaching Agility. One member's throttling never blocks another.
+- **Concurrency**: per-credential semaphore (`CredentialLimiters`, default 5; ≤ 6 on Workers), owned by the host.
+- **Response caps**: bodies are stream-read with a byte cap before parsing (`limits.maxResponseBytes`; a larger
+  `Content-Length` is refused before reading) and the stream is cancelled at the cap; error bodies are read up to
+  64 KiB. JSON is parsed natively; XML (`rest-1.v1` write answers) by saxes with document types refused, so no entity
+  is ever declared or expanded (no `DOMParser` on Workers).
+- **TLS**: verification always on. On Node, `AB_CA_FILE` adds a private CA bundle to the public roots through an undici
+  dispatcher (`apps/cli/src/agility-fetch.ts`, ADR-0014). A Worker gets HTTP 526 for an untrusted certificate and local
+  workerd an opaque `internal error`; both, and Node's certificate error codes, map to `AB_AGILITY_TLS` (L-160).
 - **Error mapping**:
 
 | Agility response | Error code | Message hint |
 |---|---|---|
-| 401 | `AB_AGILITY_AUTH` | token invalid or revoked; recreate it from the Agility Applications page |
-| 404 | `AB_NOT_FOUND` | not found **or not visible to this member** (L-140) |
-| 400 / 405 | `AB_AGILITY_ERROR` (or `AB_INPUT_INVALID` when our validation should have caught it, logged as a bug) | |
-| 429 | `AB_AGILITY_RATE_LIMITED` with `retryAfterSeconds` | tenant quota; narrow the request or wait |
-| 5xx, network | `AB_AGILITY_UNAVAILABLE` | |
-| timeout | `AB_AGILITY_TIMEOUT` | |
-| redirect / HTML login page / non-Agility body | `AB_AGILITY_WRONG_INSTANCE` | check the instance URL (L-054) |
-| HTTP 526 (Workers) or a TLS failure | `AB_AGILITY_TLS` | the certificate is not trusted; private CAs need `AB_CA_FILE` on the Node/Docker deployment (L-160) |
+| 401 (24-byte JSON, no `WWW-Authenticate`) | `AB_AGILITY_AUTH` | token invalid or revoked, or for another instance; recreate it from the Agility Applications page |
+| 403 | `AB_AGILITY_AUTH` | the token works but its member lacks the permission |
+| 404 | `AB_NOT_FOUND` | "Not found or not visible with this token" (L-140) |
+| 400 / 405 / other 4xx (`{error, exceptions[]}`) | `AB_AGILITY_ERROR`, Agility's messages as untrusted details | check attribute names and values against the metadata |
+| 429 | `AB_AGILITY_RATE_LIMITED` with `retryAfterSeconds` | tenant quota; wait, narrow the request |
+| 500, 502/503/504 after retries, network | `AB_AGILITY_UNAVAILABLE` | |
+| timeout | `AB_AGILITY_TIMEOUT` | narrow the request |
+| redirect / HTML page / non-JSON body | `AB_AGILITY_WRONG_INSTANCE` | check the instance URL (L-054) |
+| HTTP 526 (Workers), workerd `internal error`, Node certificate errors | `AB_AGILITY_TLS` | the certificate is not trusted; private CAs need `AB_CA_FILE` on the Node/Docker deployment (L-160) |
+| response over the cap | `AB_LIMIT_RESPONSE_TOO_LARGE` | fewer rows or fields |
 
-Raw Agility bodies are never returned to the client; they are logged redacted and truncated at debug level only.
+Raw Agility bodies are never returned to the client: the messages of a 400 travel only as untrusted error details
+(shown through the untrusted-data envelope, P1-05), and bodies are logged redacted and truncated at debug level only.
 
 ### 6.2 Metadata service (P1-03)
 

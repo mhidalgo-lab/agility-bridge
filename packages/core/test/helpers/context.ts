@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
+  closedBreaker,
   createBudget,
   DEFAULT_LIMITS,
   type Logger,
@@ -25,6 +26,8 @@ export function makeContext(
     limits: DEFAULT_LIMITS,
     budget: createBudget(10),
     limiter: unboundedLimiter,
+    breaker: closedBreaker,
+    fetch: () => Promise.reject(new Error('no fetch in this test')),
     logger,
     clock: systemClock,
     random: webCryptoRandom,
