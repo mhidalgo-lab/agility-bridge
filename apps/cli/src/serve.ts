@@ -2,7 +2,7 @@
 // `agility-bridge serve` (P2-06, ARCHITECTURE §3 mode C): the HTTP server on Node with SQLite storage, encrypted
 // tokens and per-workspace MCP endpoints. Configuration only from the environment, never flags (L-026).
 import { homedir } from 'node:os';
-import { dirname, join, resolve, sep } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
   type AccessServices,
   AdminTokenVerifier,
