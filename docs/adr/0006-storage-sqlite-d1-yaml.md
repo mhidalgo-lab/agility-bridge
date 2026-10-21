@@ -1,6 +1,6 @@
 # ADR-0006 — Storage: one SQLite schema for Node and D1, YAML for stdio
 
-- **Status:** proposed
+- **Status:** accepted (owner, 2026-10-21, P0-13, with the P0-09 amendment on conditional writes)
 - **Date:** 2026-10-16
 - **Related:** P2-01, P2-02, P3-02, L-071, L-072, L-073, L-076, L-102
 
@@ -21,8 +21,9 @@ database at all.
   `d1` (Workers). Every adapter passes the same contract suite.
 - A generic `kv` table (key, value, expires_at) holds short-lived state on every runtime: OAuth provider records,
   single-use markers (taken atomically), sign-in transactions, setup links, approval records, cached client metadata.
-- Conditional writes are single statements (`ON CONFLICT`, `WHERE`, `RETURNING`, affected-row counts) or one D1
-  `batch()`; never read-decide-write in application code.
+- Conditional writes are single statements (`ON CONFLICT`, `WHERE`, `RETURNING`) or one D1 `batch()`; never
+  read-decide-write in application code. Outcomes are read from `RETURNING` rows, not affected-row counts, which differ
+  between D1 and `node:sqlite` after cascades (amended 2026-10-21, P0-09, L-161).
 - SQLite files are created `0600` with WAL, `busy_timeout` and foreign keys on; backups are consistent and `0600`.
 - **stdio mode** reads configuration from environment variables or a YAML file (secrets only as `${ENV}` or keychain
   references) and keeps no database.

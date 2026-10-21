@@ -17,12 +17,14 @@ One client that every tool uses to talk to Agility safely: canonical instance UR
 
 ## Scope
 - Canonical instance URL: HTTPS only (HTTP for loopback tests), no user info, query or fragment, path preserved, no trailing slash.
-- Request builders for `query.v1` (POST JSON), `meta.v1` (GET), `rest-1.v1` (GET/POST XML) and `api/asset` (POST JSON).
+- Request builders for `query.v1` (POST JSON), `meta.v1` (GET JSON), `rest-1.v1` (GET JSON; POST for writes) and `api/asset` (POST JSON); `Accept: application/json` everywhere it is served (P0-06).
 - Headers: `Authorization: Bearer`, `Accept`, `User-Agent: agility-bridge/<version>`.
 - Redirects handled manually and refused (`AB_AGILITY_WRONG_INSTANCE`); HTML login pages detected.
 - Timeouts; retries per ADR-0010 for reads only, honouring `Retry-After` and the 429 body's `RetryAfter`; circuit breaker keyed by instance and credential.
 - Per-credential semaphore; budget charged per attempt.
-- Byte-capped streaming reader; JSON parsing; XML parsing with the parser chosen in P0-09 (entities disabled).
+- Byte-capped streaming reader; JSON parsing; saxes for any remaining XML (P0-09, entities refused).
+- TLS failures map to `AB_AGILITY_TLS`: on Workers an untrusted certificate is an HTTP 526 response (never read as an Agility answer), locally an opaque `internal error` (L-160).
+- Agility 401 is a 24-byte JSON body with no `WWW-Authenticate`; 400 bodies are `{error, exceptions[]}` and never returned raw (P0-06).
 - Error mapping table of ARCHITECTURE §6.1; injectable `fetch` and (Node) dispatcher for custom CA bundles.
 
 ## Acceptance criteria
@@ -30,6 +32,7 @@ One client that every tool uses to talk to Agility safely: canonical instance UR
 - [ ] Retry tests: header and body `RetryAfter`, waits above 10 s refused, no retry on POST, budget exhaustion during retries → `AB_BUDGET_EXHAUSTED`.
 - [ ] Redirect refusal, byte cap, concurrency limit and circuit breaker tested (one credential's 429s never block another).
 - [ ] A 404 message says "not found or not visible with this token".
+- [ ] HTTP 526 and an opaque fetch failure both map to `AB_AGILITY_TLS` (tests with the P0-09 shapes).
 - [ ] The Node app wires a CA bundle into the dispatcher (integration test with a local TLS server and a private CA).
 - [ ] No log line contains the token (redaction test on debug output).
 

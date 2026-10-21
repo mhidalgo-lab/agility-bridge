@@ -19,6 +19,7 @@ Tokens rotate safely even when clients refresh in parallel.
 
 ## Scope
 - Access 1 h, refresh 30 d (configurable); rotation with a reuse window (default 30 s, 0–120); reuse outside the window revokes the device; device caps; revocation checks on every refresh.
+- The reuse window is ours to build: `workers-oauth-provider` 1.2.3 keeps only the last refresh token after parallel refreshes (L-164), so a per-grant refresh family in storage answers repeats within the window with the same successor.
 
 ## Acceptance criteria
 - [ ] Parallel-refresh test (several concurrent refreshes from one client) keeps the device; replay after the window revokes it.

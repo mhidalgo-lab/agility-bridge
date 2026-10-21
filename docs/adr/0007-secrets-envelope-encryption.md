@@ -1,6 +1,6 @@
 # ADR-0007 — Envelope encryption of Agility access tokens
 
-- **Status:** proposed
+- **Status:** accepted (owner, 2026-10-21, P0-13, on the P0-09 round trip)
 - **Date:** 2026-10-16
 - **Related:** P2-03, P3-08, L-074, L-075, L-076, THREAT_MODEL T7
 

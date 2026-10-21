@@ -2,7 +2,7 @@
 id: P0-08
 title: "Spike: OAuth 2.1 portability on Node and Workers"
 phase: 0
-status: review
+status: done
 priority: high
 depends_on: [P0-07]
 adr: ["0009"]
