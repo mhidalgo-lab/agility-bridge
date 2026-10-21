@@ -46,6 +46,31 @@ export function crc32(text: string): number {
 
 const checksum = (prefix: string, body: string) => base62(BigInt(crc32(`${prefix}_${body}`)), CHECKSUM_CHARS);
 
+/** `<prefix>_<43 base62 from 256 random bits>_<6 base62 CRC-32 of the rest>`. */
+export function randomTypedToken(prefix: string): { token: string; body: string } {
+  let n = 0n;
+  for (const b of crypto.getRandomValues(new Uint8Array(32))) n = (n << 8n) | BigInt(b);
+  const body = base62(n, BODY_CHARS);
+  return { token: `${prefix}_${body}_${checksum(prefix, body)}`, body };
+}
+
+/** Whether `text` is `<prefix>_<43 base62>_<6 base62>` with a matching checksum. */
+export function isTypedToken(text: unknown, prefix: string): boolean {
+  if (typeof text !== 'string' || text.length !== prefix.length + 1 + BODY_CHARS + 1 + CHECKSUM_CHARS)
+    return false;
+  if (!text.startsWith(`${prefix}_`)) return false;
+  const body = text.slice(prefix.length + 1, prefix.length + 1 + BODY_CHARS);
+  const sum = text.slice(-CHECKSUM_CHARS);
+  if (
+    !/^[0-9A-Za-z]+$/.test(body) ||
+    !/^[0-9A-Za-z]+$/.test(sum) ||
+    text[prefix.length + 1 + BODY_CHARS] !== '_'
+  ) {
+    return false;
+  }
+  return timingSafeEqual(sum, checksum(prefix, body));
+}
+
 /** SHA-256 (lower-case hex) of a device token: what storage keeps. */
 export async function hashDeviceToken(token: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
@@ -63,10 +88,7 @@ export interface NewDeviceToken {
 /** A new random device token. */
 export async function generateDeviceToken(environment: TokenEnvironment): Promise<NewDeviceToken> {
   const prefix = `ab_${environment}`;
-  let n = 0n;
-  for (const b of crypto.getRandomValues(new Uint8Array(32))) n = (n << 8n) | BigInt(b);
-  const body = base62(n, BODY_CHARS);
-  const token = `${prefix}_${body}_${checksum(prefix, body)}`;
+  const { token, body } = randomTypedToken(prefix);
   return { token, displayPrefix: `${prefix}_${body.slice(0, 4)}`, tokenHash: await hashDeviceToken(token) };
 }
 
