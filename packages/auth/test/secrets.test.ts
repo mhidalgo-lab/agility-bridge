@@ -89,7 +89,7 @@ describe('sealing (AES-256-GCM)', () => {
     const ivs = new Set<string>();
     for (let i = 0; i < 50; i++) ivs.add((await ring.seal(KeyPurpose.Credentials, 'c', 'x')).iv);
     expect(ivs.size).toBe(50);
-    const unicode = 'tökén-🔑-' + 'x'.repeat(20);
+    const unicode = `tökén-🔑-${'x'.repeat(20)}`;
     expect(
       await ring.open(KeyPurpose.Credentials, 'c', await ring.seal(KeyPurpose.Credentials, 'c', unicode)),
     ).toBe(unicode);

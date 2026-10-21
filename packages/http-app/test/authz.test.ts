@@ -70,7 +70,7 @@ const DENIALS: Denial[] = [
   {
     name: 'well-formed unknown token',
     reason: 'token_unknown',
-    prepare: async (w) => {
+    prepare: async (_w) => {
       const { generateDeviceToken } = await import('@agility-bridge/auth');
       return { slug: 'team-a', token: (await generateDeviceToken('live')).token };
     },
