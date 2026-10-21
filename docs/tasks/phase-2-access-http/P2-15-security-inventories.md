@@ -2,12 +2,12 @@
 id: P2-15
 title: Security inventories (cryptography, logging, data protection)
 phase: 2
-status: todo
+status: review
 priority: medium
 depends_on: [P2-03, P2-08]
 adr: ["0007"]
 lessons: [L-120, L-010]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P2-15 — Security inventories (cryptography, logging, data protection)
@@ -21,7 +21,11 @@ Living inventories that reviewers and auditors can check against the code.
 - `docs/security/data-protection.md`: personal data stored, retention, deletion, export, what goes to the LLM.
 
 ## Acceptance criteria
-- [ ] Each inventory entry links to the code and test that implement it; every key and algorithm from P2-03 and every sink and field from P2-08 is covered.
+- [x] Each inventory entry links to the code and test that implement it; every key and algorithm from P2-03 and every sink and field from P2-08 is covered. *(`scripts/test/security-inventories.test.ts` fails when a key purpose, a fixed log message of the code, an audit column or a column of `users`/`credentials`/`access_tokens` is missing, or a relative link breaks.)*
+
+## Notes
+- `docs/security/cryptography.md` (extended from P2-03 with bearer values and code/test links), `logging.md` and
+  `data-protection.md` (new).
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.
@@ -31,7 +35,7 @@ None beyond the shared rules in AGENTS.md.
 - L-010 — Every security claim needs evidence.
 
 ## Docs to update
-- docs/security/*.md (new)
+- [x] docs/security/*.md (new)
 
 ## Out of scope
 - Anything not listed under Scope.
