@@ -1,9 +1,8 @@
 # agility-bridge
 
-> **Status: Phase 0 (pre-alpha).** No features yet. This repository holds the plan (architecture, decisions,
-> research, threat model, lessons learned and a task-by-task roadmap) and the bootstrapped monorepo; Phase 0
-> (foundations and risk spikes) is under way — see the [roadmap](docs/ROADMAP.md). The npm package `agility-bridge` is
-> only a name placeholder until v0.1.
+> **Status: Phase 1 (pre-release).** The local stdio server works: 13 read-only tools for every asset type, with
+> bound queries, workspace scope and untrusted-data handling. v0.1 is the first npm release; remote modes, writes and
+> reports follow in later phases ([roadmap](docs/ROADMAP.md)). Start with the [quickstart](docs/guide/quickstart-local.md).
 
 An open-source [Model Context Protocol](https://modelcontextprotocol.io) server that lets AI agents — GitHub Copilot
 (VS Code, JetBrains, CLI), Claude (Code, Desktop, claude.ai, mobile), Cursor, Windsurf and others — work with
@@ -52,18 +51,10 @@ MCP server for Digital.ai Agility exists ([research](docs/RESEARCH.md#7-prior-ar
   default**, enabled per workspace and grant, applied to one item at a time, and **approved by a person** for every
   change (in the client, or on an approval page when the client cannot ask).
 
-## How it will look (planned)
+## Quick start
 
-```sh
-# Not published yet — this is the intended local setup.
-claude mcp add agility --scope user \
-  --env AB_AGILITY_URL=https://www7.v1host.com/YourInstance \
-  --env AB_AGILITY_TOKEN="$AB_AGILITY_TOKEN" \
-  -- npx -y agility-bridge
-```
-
-Setup for every supported client (including password prompts in VS Code instead of plain-text tokens) is drafted in
-[client compatibility](docs/reference/client-compatibility.md).
+See the [quickstart](docs/guide/quickstart-local.md) and the [client setup guide](docs/guide/clients.md); the tools are
+listed in the [tool reference](docs/reference/tools.md).
 
 ## Documentation
 

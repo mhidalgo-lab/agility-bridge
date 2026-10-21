@@ -37,6 +37,7 @@ ChatGPT connectors, Gemini CLI.
 | GitHub Copilot in JetBrains | plugin 1.19.2 | 2026-10-20 | **V** HTTP with a static header (IDE on Windows, server in WSL); **2025 era**; per-workspace tool lists (tools shown prefixed with the server name); server-side schema errors shown; **no approval prompt: writes refused with `AB_APPROVAL_UNAVAILABLE`**, so remote writes need the approval page; stdio not tested | P0-07, owner run |
 | MCP Inspector CLI | 2.11.0 | 2026-10-20 | **V** stdio and HTTP (Node, workerd); **2025 era by default, 2026-07-28 with `--protocol-era modern`**; raw results show `structuredContent`, `isError` and annotations as sent; static `Authorization` header; no elicitation in the CLI (2025 era: `AB_APPROVAL_UNAVAILABLE`; 2026-07-28: an SDK error, see the spike's finding 7); `-e` reaches a stdio server; `--strict` flags `type` arrays as unportable | P0-07 spike |
 | Claude Code | 2.1.304 | 2026-10-20 | **V** stdio and HTTP with a static `Authorization` header; 2026-07-28 on both; per-workspace tool lists; server-side schema errors shown; **write approval prompt shown; approve and decline work on both transports** (`input_required`) | P0-07, owner run (relic-bridge also saw 2.1.287 send `Mcp-Method`/`Mcp-Name` and a long-lived `subscriptions/listen`) |
+| MCP Inspector CLI | 2.11.0 | 2026-10-21 | **V** the v0.1 stdio CLI (built from `main`, before publishing) against the synthetic fixture upstream (`scripts/fixture-agility.ts`): `tools/list` (13 tools) in the 2025 era, `list_my_work` and `get_work_item` in both eras with `structuredContent` and enveloped text; `-e` passes `AB_AGILITY_URL`/`AB_AGILITY_TOKEN` | P1-14 |
 | GitHub Copilot (desktop) | 2026-10 | 2026-10-02 | listed and called over HTTP | relic-bridge P0-07 (same SDK; not yet re-run against agility-bridge) |
 
 OAuth 2.1 (P0-08, production on Workers, 2026-10-21): **Claude Code 2.1.304** and **VS Code 1.142.0** sign in through
@@ -47,6 +48,13 @@ Inspector CLI 2.11.0** through **DCR** (it needs a TTY for interactive OAuth); a
 Measured server-side (P0-07): elicitation can approve a write on **stdio** (either era) and on **2026-07-28 HTTP**, never
 on 2025-era HTTP. The rest of the matrix is the owner's checklist in
 [`spikes/mcp-sdk-v2/client-checklist.md`](../../spikes/mcp-sdk-v2/client-checklist.md).
+
+## v0.1 client snippets (P1-14)
+
+The snippets in the [client setup guide](../guide/clients.md) for VS Code, Claude Code, Copilot CLI and JetBrains are
+verified by the owner against v0.1 (version and date recorded above when done); Cursor, Windsurf and Claude Desktop are
+documented only. To try a client without a real instance, run `node scripts/fixture-agility.ts` and point
+`AB_AGILITY_URL` at the URL it prints.
 
 ## How agility-bridge features map to each client
 
