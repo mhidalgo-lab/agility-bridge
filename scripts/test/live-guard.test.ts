@@ -5,8 +5,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { readPrivateEnvFile } from '../../live/env.ts';
+import { guardedFetch } from '../../live/guarded-fetch.ts';
 import { ReadOnlyViolation, readOnlyFetch } from '../../live/readonly-fetch.ts';
 import { shape } from '../../live/shape.ts';
+import {
+  agilityClient,
+  closedBreaker,
+  createBudget,
+  DEFAULT_LIMITS,
+  Secret,
+  silentLogger,
+  systemClock,
+  unboundedLimiter,
+  webCryptoRandom,
+} from '../../packages/core/src/index.ts';
 
 const TARGET = { baseUrl: 'https://agility.example.com/Inst', token: 'FAKE-token' };
 
@@ -120,5 +132,61 @@ describe('readPrivateEnvFile', () => {
 
   it('returns undefined when the file does not exist', () => {
     expect(readPrivateEnvFile(join(dir, 'missing.env'))).toBeUndefined();
+  });
+});
+
+describe('guardedFetch (P1-12: the production client behind the guard)', () => {
+  const setup = () => {
+    const fetchImpl = vi.fn(
+      async () => new Response('[[]]', { status: 200, headers: { 'content-type': 'application/json' } }),
+    );
+    const ctx = {
+      requestId: 'r',
+      instance: { id: 'live', baseUrl: TARGET.baseUrl },
+      credential: { id: 'live', kind: 'personal' as const, token: new Secret(TARGET.token) },
+      projects: { allowed: [], includeChildren: true },
+      assetTypes: { deny: [] },
+      limits: DEFAULT_LIMITS,
+      budget: createBudget(10),
+      limiter: unboundedLimiter,
+      breaker: closedBreaker,
+      fetch: guardedFetch(TARGET, fetchImpl as unknown as typeof fetch),
+      logger: silentLogger,
+      clock: systemClock,
+      random: webCryptoRandom,
+    };
+    return { client: agilityClient(ctx, { sleep: async () => {} }), fetchImpl };
+  };
+
+  it('lets the client read', async () => {
+    const { client, fetchImpl } = setup();
+    await client.query({ from: 'Story', select: ['ID'] });
+    await client.meta('Story');
+    await client.data('Story', 1001);
+    await client.hist('Story', 1001);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+  });
+
+  it.each([
+    ['restWrite', (c: ReturnType<typeof setup>['client']) => c.restWrite('Story', 1001, '<Asset/>')],
+    [
+      'restWrite with an operation',
+      (c: ReturnType<typeof setup>['client']) => c.restWrite('Story', 1001, '<Asset/>', 'QuickClose'),
+    ],
+    ['assetCommand', (c: ReturnType<typeof setup>['client']) => c.assetCommand({ from: 'Story' })],
+  ])('refuses %s before anything is sent', async (_name, call) => {
+    const { client, fetchImpl } = setup();
+    await expect(call(client)).rejects.toThrow();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('refuses another host and plain HTTP', () => {
+    const f = guardedFetch(TARGET, vi.fn() as unknown as typeof fetch);
+    expect(() =>
+      f(new Request('https://evil.example/Inst/query.v1', { method: 'POST', redirect: 'manual' })),
+    ).toThrow(ReadOnlyViolation);
+    expect(() => guardedFetch({ ...TARGET, baseUrl: 'http://agility.example.com/Inst' })).toThrow(
+      ReadOnlyViolation,
+    );
   });
 });

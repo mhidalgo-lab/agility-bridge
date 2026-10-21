@@ -2,7 +2,7 @@
 id: P1-05
 title: Output shaping v1 and untrusted-data envelope
 phase: 1
-status: review
+status: done
 priority: high
 depends_on: [P1-01]
 adr: ["0015"]
