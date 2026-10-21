@@ -1,8 +1,9 @@
 # Tool conventions
 
 > Status: **final** (P0-11, 2026-10-21, owner sign-off in [pending decisions](../pending-decisions/phase-0.md)), with
-> the facts the Phase 0 spikes measured. Enforced from P1-13 by the naming, description, secret-field and schema lints
-> and the `tools/list` size test (see [Lints](#lints)) in `pnpm test`. A tool that breaks a rule fails the build: fix the
+> the facts the Phase 0 spikes measured. Enforced by the naming, description, secret-field and schema lints
+> (`packages/core/test/harness/lint.ts`, `lint.test.ts`) and the `tools/list` size and A12 tests (`contract.test.ts`)
+> in `pnpm test`; the [tool reference](../reference/tools.md) is generated from the registry (`pnpm docs:tools`). A tool that breaks a rule fails the build: fix the
 > tool, do not add an exception (L-030). Changes after this point follow [Deprecations](#deprecations).
 
 One name per concept in every tool, so an agent that learned `asset` and `cursor` on one tool can call the next one

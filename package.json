@@ -20,7 +20,8 @@
     "prepare": "lefthook install || true",
     "tasks": "node scripts/tasks.ts",
     "test:live": "vitest run --config vitest.live.config.ts",
-    "metadata:drift": "node scripts/metadata-drift.ts"
+    "metadata:drift": "node scripts/metadata-drift.ts",
+    "docs:tools": "node scripts/tool-reference.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

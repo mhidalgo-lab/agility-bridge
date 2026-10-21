@@ -37,8 +37,8 @@ export const listSprints: ToolDefinition = defineTool({
       .describe('Only sprints of this Agility project’s schedule.'),
     timing: z
       .enum(['current', 'past', 'future', 'all'])
-      .optional()
-      .describe('By dates relative to now (default all).'),
+      .default('all')
+      .describe('By dates relative to now (UTC).'),
     limit: limitArg,
     cursor: cursorArg,
     format: formatArg,

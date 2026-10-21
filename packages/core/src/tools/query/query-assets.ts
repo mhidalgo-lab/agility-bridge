@@ -16,11 +16,7 @@ const COST = 12;
 
 const scalar = z.union([z.string().max(1_000), z.number(), z.boolean()]);
 export const filterSchema: z.ZodType<FilterInput> = z.object({
-  field: z
-    .string()
-    .min(1)
-    .max(200)
-    .describe('Attribute path, e.g. Status.Name, Owners.Name, Custom_Severity.'),
+  field: z.string().min(1).max(200).describe('Attribute path, e.g. Status.Name, Owners.Name, Estimate.'),
   op: z.enum(FILTER_OPS as unknown as [FilterInput['op'], ...FilterInput['op'][]]),
   value: z
     .union([scalar, z.array(z.union([z.string().max(1_000), z.number()])).max(50)])
@@ -54,7 +50,7 @@ export const queryAssets: ToolDefinition = defineTool({
       .array(z.string().min(1).max(200))
       .max(30)
       .optional()
-      .describe('Attribute paths to return; default the type’s default tier.'),
+      .describe('Attribute paths to return; the type’s default tier when omitted.'),
     filters: z.array(filterSchema).max(20).optional().describe('ANDed filters: { field, op, value }.'),
     any_of: z
       .array(z.array(filterSchema).min(1).max(10))
@@ -70,13 +66,13 @@ export const queryAssets: ToolDefinition = defineTool({
     include_child_projects: z
       .boolean()
       .optional()
-      .describe('With project: include its sub-projects (default: the workspace setting).'),
+      .describe('With project: include its sub-projects (the workspace setting when omitted).'),
     include_closed: includeClosedArg,
     sort: z
       .array(z.object({ field: z.string().min(1).max(200), direction: z.enum(['asc', 'desc']).optional() }))
       .max(3)
       .optional()
-      .describe('Default ID; ID is always the last tiebreaker.'),
+      .describe('Sort fields; ID is the order when omitted and always the last tiebreaker.'),
     as_of: z.string().max(40).optional().describe('ISO 8601 UTC point in time (bounded by the workspace).'),
     minimal_output: z.boolean().optional().describe('Only the minimal fields (identity and name).'),
     limit: limitArg,

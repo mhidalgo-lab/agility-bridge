@@ -9,7 +9,7 @@ export const limitArg: z.ZodOptional<z.ZodNumber> = z
   .min(1)
   .max(1_000)
   .optional()
-  .describe('Most rows to return (default 25; capped by the workspace).');
+  .describe('Most rows to return; when omitted, the workspace page size. Capped by the workspace.');
 export const cursorArg: z.ZodOptional<z.ZodString> = z
   .string()
   .max(2_000)
@@ -17,18 +17,18 @@ export const cursorArg: z.ZodOptional<z.ZodString> = z
   .describe('nextCursor from the previous call with the same arguments.');
 export const containsArg = (what: string): z.ZodOptional<z.ZodString> =>
   z.string().min(1).max(100).optional().describe(`Only ${what} whose name contains this text.`);
-export const includeClosedArg: z.ZodOptional<z.ZodBoolean> = z
+export const includeClosedArg: z.ZodDefault<z.ZodBoolean> = z
   .boolean()
-  .optional()
-  .describe('Include closed items (default false).');
+  .default(false)
+  .describe('Include closed items.');
 const FORMATS: z.ZodEnum<{ auto: 'auto'; table: 'table'; csv: 'csv'; json: 'json' }> = z.enum([
   'auto',
   'table',
   'csv',
   'json',
 ]);
-export const formatArg: z.ZodOptional<typeof FORMATS> = FORMATS.optional().describe(
-  'Output format: auto (default), table, csv or json.',
+export const formatArg: z.ZodDefault<typeof FORMATS> = FORMATS.default('auto').describe(
+  'Output format: auto (a table up to 8 columns, CSV above), table, csv or json.',
 );
 
 /** A relation value as `{ oid, name }` when the row has both, else undefined. */

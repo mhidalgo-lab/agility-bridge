@@ -47,6 +47,7 @@ export const listAssetTypes: ToolDefinition = defineTool({
   cost: 24,
   inputSchema: z.object({ contains: containsArg('asset types'), format: formatArg }),
   outputSchema: z.looseObject({
+    truncated: z.boolean().optional(),
     items: z.array(
       z.looseObject({
         assetType: z.string(),

@@ -1,5 +1,8 @@
 # Tool catalogue (planned)
 
+> The shipped tools, with their exact arguments, defaults and costs, are in the generated
+> [tool reference](tools.md); this page is the plan for every phase.
+
 > Status: **groups and counts final** (P0-11, 2026-10-21); per-tool names, arguments and outputs follow the final
 > [tool conventions](../dev/tool-conventions.md) and are frozen per tool when its task lands; P1-13 replaces this page's tables with the generated reference
 > (`docs/reference/tools.md`). Costs are worst-case Agility requests per call *(estimates, finalised by the cost test)*.
