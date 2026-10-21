@@ -1,0 +1,85 @@
+# Logging inventory
+
+> Every place agility-bridge writes records about what happens, what each record holds, how it is redacted, how long
+> it stays and who reads it (L-120, THREAT_MODEL T8, T17). `scripts/test/security-inventories.test.ts` fails when a log
+> message or an audit column is missing here or a link breaks.
+
+## Sinks
+
+| Sink | Where | Format | Retention | Readers | Code · tests |
+|---|---|---|---|---|---|
+| Process log | **stderr** only (stdout is the stdio MCP channel); Workers Logs on Cloudflare later | One JSON object per line: `ts`, `level`, `msg`, fields | The operator's log collector (journald, Docker, …) | The operator | [logger.ts](../../packages/core/src/logger.ts) · [logger.test.ts](../../packages/core/test/logger.test.ts) |
+| Audit log | Table `audit_log` of the server database (not in stdio mode) | Rows, append-only (a trigger refuses updates) | `AB_AUDIT_RETENTION_DAYS` (default 90; 0 = forever), purged at start and hourly | Owners and admins (`GET /api/admin/v1/audit`, `agility-bridge audit tail`) | [audit.ts](../../packages/http-app/src/audit.ts) · [audit.test.ts](../../packages/http-app/test/audit.test.ts) |
+| CLI output | stdout (JSON results) and stderr (messages) of management commands | — | The terminal | The operator | [commands.ts](../../apps/cli/src/manage/commands.ts) · [manage.test.ts](../../apps/cli/test/manage.test.ts) |
+
+No telemetry leaves the process (OpenTelemetry is P8-07, off by default).
+
+## Redaction (every log line, error message and audit record)
+
+[redact.ts](../../packages/core/src/redact.ts) · [redact.test.ts](../../packages/core/test/redact.test.ts):
+
+- agility-bridge tokens (`ab_live_`, `ab_test_`, `ab_admin_`), `Bearer` credentials, `Authorization` headers of any
+  scheme, key/value assignments whose name looks secret (`AB_MASTER_KEY=…`, `token=…`, `password=…`, …).
+- JWTs, AWS keys, GitHub/Slack/Stripe/OpenAI-style tokens, master keys (`v<N>:<base64>`), credentials in URLs, PEM
+  private keys.
+- Object keys that are always secret (`authorization`, `token`, `password`, `secret`, `master_key`, `cookie`, …).
+- Errors are reduced to their class and a redacted message; the Agility token is a `Secret` that never prints.
+- Log fields can never forge `ts`, `level` or `msg`.
+
+## Process log messages
+
+Fields are listed per message; every message also carries `mode` (`stdio`, `serve`, `cli`) and request-scoped messages
+carry `requestId`.
+
+| Level | Message | Fields | Code |
+|---|---|---|---|
+| info | `serving` | `url`, `publicUrl`, `database`, `adminApi` (serve); `tools`, `source`, `workspace`, `projects` (stdio) | [serve.ts](../../apps/cli/src/serve.ts), [stdio.ts](../../apps/cli/src/stdio.ts) |
+| info | `request` | `requestId`, `workspace` (slug), `status`, `method`, `kind`, `tool`, `durationMs`, `refusal` | [serve.ts](../../apps/cli/src/serve.ts) |
+| debug | `tool ok` | `tool`, `ms`, `requests` | [server.ts](../../packages/core/src/server.ts) |
+| warn | `tool error` | `tool`, `ms`, `code`, `error` (class, redacted message) | [server.ts](../../packages/core/src/server.ts) |
+| debug | `agility request` | `endpoint`, `method`, `attempt`, `status`, `ms`, `bytes` (no body, no token) | [client.ts](../../packages/core/src/agility/client.ts) |
+| debug | `agility error body` | `status`, the first 500 characters of the error body (redacted by the logger) | [client.ts](../../packages/core/src/agility/client.ts) |
+| error | `access resolution failed` | `requestId`, `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
+| error | `credential could not be decrypted` | `requestId`, `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
+| warn | `response stream hit the deadline` | `requestId` | [app.ts](../../packages/http-app/src/app.ts) |
+| warn | `observer failed` | `kind`, `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
+| error | `unhandled error` | `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
+| error | `admin API error` | `path` (route template), `error` (class) | [api.ts](../../packages/http-app/src/admin/api.ts) |
+| warn | `rate limiter failed; allowing the request` | `limit`, `error` (class) | [rate-limit.ts](../../packages/http-app/src/rate-limit.ts) |
+| error | `audit write failed` | `action`, `error` (class) | [audit.ts](../../packages/http-app/src/audit.ts) |
+| error | `audit queue full; rows dropped` | `dropped` | [audit.ts](../../packages/http-app/src/audit.ts) |
+| info | `audit retention` | `deleted`, `retentionDays` | [audit.ts](../../packages/http-app/src/audit.ts) |
+| error | `audit retention failed` | `error` (class) | [audit.ts](../../packages/http-app/src/audit.ts) |
+| warn | `credential validation failed` | `error` (class) | [validate.ts](../../packages/auth/src/access/validate.ts) |
+| info | `credentials revalidated` | `count` | [serve.ts](../../apps/cli/src/serve.ts) |
+| warn | `credential revalidated after Agility refused it` | `credential` (id), `status` | [serve.ts](../../apps/cli/src/serve.ts) |
+| error | `credential revalidation failed` | `error` (class) | [serve.ts](../../apps/cli/src/serve.ts) |
+| warn | `AB_WRITE_TOOLS is on, but this version has no write tools.` | — | [serve.ts](../../apps/cli/src/serve.ts) |
+| warn | `Not configured: tools are listed, and every call explains how to set AB_AGILITY_URL and AB_AGILITY_TOKEN.` | — | [stdio.ts](../../apps/cli/src/stdio.ts) |
+| warn | configuration and key warnings | the text only (data directory permissions, stranded or retired key versions, deprecated settings, `AB_RATE_LIMIT` off) | [serve.ts](../../apps/cli/src/serve.ts), [credentials.ts](../../packages/auth/src/secrets/credentials.ts) |
+
+Never logged: tokens of any kind, the master key, request or response bodies, tool arguments, Agility content (outside
+the redacted, debug-level error body), client IP addresses (they go to the audit log only).
+
+## Audit log columns
+
+| Column | Content | Notes |
+|---|---|---|
+| `id`, `ts` | Random id, epoch ms | |
+| `kind` | `tool_call`, `auth`, `admin`, `write` | |
+| `action` | Tool name, `mcp.unauthenticated`, `mcp.rate_limited`, `audit.refusals_suppressed`, `<resource>.<verb>`, `credential.rekey`, `crypto.retire_key` | |
+| `status` | `ok`, `error`, `denied` | |
+| `requestId` | The request's id | Joins the process log |
+| `userId`, `grantId`, `tokenId` | Who, through which grant and device | Ids only |
+| `clientId` | OAuth client (Phase 5) | |
+| `workspaceId`, `instanceId` | Where | |
+| `assetNumbers` | Asset numbers in the result, at most 50 | Identifiers, never titles |
+| `query` | The compiled Agility queries with every bound value masked (`…`) | Attribute names, never values |
+| `durationMs`, `agilityRequests` | Cost of the call | Counted in the record, not headers (L-101) |
+| `errorCode` | Stable error code | Never a message |
+| `targetType`, `targetId` | What an admin change touched | |
+| `details` | Refusals: `reason`, `slug`, `ip`; admin rows: `actor` role, `via` (`api`/`cli`), changed field names; rotation: versions and reason | Field names, never values |
+
+Proven by a scan test that runs tool calls with filter values, refusals with request bodies and an admin change, then
+checks that no token, filter value, project, member or story name, or `Bearer` appears in any row
+([audit.test.ts](../../packages/http-app/test/audit.test.ts)).

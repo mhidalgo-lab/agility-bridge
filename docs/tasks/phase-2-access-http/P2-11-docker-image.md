@@ -2,7 +2,7 @@
 id: P2-11
 title: Docker image
 phase: 2
-status: review
+status: done
 priority: medium
 depends_on: [P2-06]
 adr: ["0006"]
