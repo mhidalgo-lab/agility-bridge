@@ -1,0 +1,52 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.mhidalgo-lab/agility-bridge",
+  "title": "agility-bridge",
+  "description": "Unofficial MCP server for Digital.ai Agility: read every asset type with your own access token.",
+  "version": "0.0.0",
+  "websiteUrl": "https://github.com/mhidalgo-lab/agility-bridge#readme",
+  "repository": {
+    "url": "https://github.com/mhidalgo-lab/agility-bridge",
+    "source": "github",
+    "subfolder": "apps/cli"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "agility-bridge",
+      "version": "0.0.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "AB_AGILITY_URL",
+          "description": "The Agility instance URL, e.g. https://www7.v1host.com/YourInstance. Without it the server only lists its tools.",
+          "isRequired": true,
+          "format": "string"
+        },
+        {
+          "name": "AB_AGILITY_TOKEN",
+          "description": "Your Agility access token (Applications page). It acts fully as you; revoke it when no longer needed.",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "AB_PROJECTS",
+          "description": "Allowed Agility projects as OID tokens, comma-separated (Scope:1234). Every visible project when unset.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "AB_TOOLS",
+          "description": "Tool allowlist, comma-separated tool names. Every read tool when unset.",
+          "isRequired": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

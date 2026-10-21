@@ -28,7 +28,16 @@ interface Workflow {
 }
 
 /** Scopes a job may request with `write` (each needs a reason in the workflow). */
-const JOB_WRITE_ALLOWLIST = new Set(['id-token', 'contents', 'pull-requests', 'security-events', 'packages']);
+// `attestations` and `artifact-metadata`: the release publish job attests provenance and the SBOM (P1-15).
+const JOB_WRITE_ALLOWLIST = new Set([
+  'id-token',
+  'contents',
+  'pull-requests',
+  'security-events',
+  'packages',
+  'attestations',
+  'artifact-metadata',
+]);
 const PINNED_USES = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_./-]+@[0-9a-f]{40}$/;
 
 export function checkWorkflow(file: string, source: string): string[] {
