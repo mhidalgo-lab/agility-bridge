@@ -48,9 +48,15 @@ function raisedMessage(error: unknown, marker: string): string {
   for (let e: unknown = error, depth = 0; e instanceof Error && depth < 5; e = e.cause, depth++) {
     const at = e.message.indexOf(marker);
     if (at >= 0) {
-      const text = e.message.slice(at + marker.length).trim();
-      const end = text.search(/[:\n]\s*SQLITE_|$/);
-      return `${text.slice(0, end).trim().replace(/\.$/, '')}.`;
+      // Linear cuts, no regular expression: the first line, without D1's ": SQLITE_CONSTRAINT" suffix.
+      let text = e.message.slice(at + marker.length);
+      const newline = text.indexOf('\n');
+      if (newline >= 0) text = text.slice(0, newline);
+      const suffix = text.indexOf(': SQLITE_');
+      if (suffix >= 0) text = text.slice(0, suffix);
+      text = text.trim();
+      if (text.endsWith('.')) text = text.slice(0, -1);
+      return `${text.slice(0, 300)}.`;
     }
   }
   return 'A storage rule was violated.';
