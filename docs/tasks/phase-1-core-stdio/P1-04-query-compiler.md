@@ -20,13 +20,14 @@ Compile structured read requests into safe `query.v1` JSON: bound values, valida
 - `with`-variable emission for every value; filter tokens built only from validated attribute paths and allowlisted operators.
 - Server-owned predicates at the top level: the workspace's Agility projects through the asset type's scope strategy, and the default dead-asset exclusion.
 - Generic ordering as `sort: [{ field, direction }]` and point-in-time reads as `as_of` (compiled to `asof`).
-- Explicit `page`, deterministic sort with a unique tiebreaker, optional `needTotal`.
+- Explicit `page`, deterministic sort ending with `ID` as the tiebreaker and `ID` as the default (sorting by `ChangeDate` costs about 1.1 s per call, L-163); no `needTotal` (Agility returns no totals): "more available" from `limit + 1`.
+- Scalar values containing a comma are refused (Agility splits them into a list, L-162); `in` takes arrays.
 - Limits: fields, nesting depth, aggregations, `any_of` groups, `as_of` age, history window, `limit`.
 - Time model: `time_range` parser (UTC, rolling vs calendar periods, Monday weeks, inclusive date-only ends).
 - Cursor binding helper; masked rendering of the compiled query for `_meta` and audit.
 
 ## Acceptance criteria
-- [ ] Property tests: no caller-supplied string ever appears in `filter` tokens; hostile values (quotes, pipes, brackets, Unicode, control characters) only reach `with` or are refused.
+- [ ] Property tests: no caller-supplied string ever appears in `filter` tokens; hostile values (quotes, pipes, brackets, Unicode, control characters) only reach `with` or are refused; a comma in a scalar value is refused with `AB_INPUT_INVALID` (the P0-06 `with` cases are fixtures).
 - [ ] OR-injection and multi-query attempts cannot escape the scope predicate (tests).
 - [ ] Each scope-strategy class has compile tests; global types need an explicit workspace allowance; denied and unclassified types are refused.
 - [ ] Limit violations return `AB_LIMIT_QUERY` with the limit's name and unit.

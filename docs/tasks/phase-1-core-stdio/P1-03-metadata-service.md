@@ -16,8 +16,8 @@ owner: ""
 Know each instance's asset types, attributes, operations, statuses and number prefixes, so every request can be validated before it is sent.
 
 ## Scope
-- Fetch and parse `meta.v1` (lazily per type where possible); model asset types (name, base, abstract), attributes (type, relation target, multi-value, custom, read-only, required) and operations.
-- Per-instance cache with a TTL (default 1 hour) and a fingerprint.
+- Fetch and parse `meta.v1` as JSON (one asset type at a time on Workers: the whole schema is 5.1 MB, P0-06); model asset types (name, base, abstract), attributes (type, relation target, multi-value, custom, read-only, required) and operations.
+- Per-instance cache with a TTL (default 1 hour) keyed by the `ETag` (`"<version>.<schema stamp>"`, P0-06).
 - Number-prefix discovery (sampling per numbered type) with configuration overrides.
 - Status lists per asset type (and team workflow where the instance has one).
 - Field tiers per asset type (`minimal`, `default`, `full`) computed from metadata plus overrides.

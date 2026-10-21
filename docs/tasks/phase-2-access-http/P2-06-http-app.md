@@ -17,7 +17,7 @@ owner: ""
 
 ## Scope
 - Request id, security headers on every response (HSTS from `AB_PUBLIC_URL`, also on errors), Host/Origin allowlists, `Origin: null` refused, CORS only when configured.
-- Body caps (declared and streamed, 1 MiB), JSON-RPC batch refusal, 180 s exchange deadline covering streamed bodies, Node header/request timeouts.
+- Body caps (declared and streamed, 1 MiB), JSON-RPC batch refusal in the app (SDK 2.3.1 answers batches on the 2025-era path, P0-07), 180 s exchange deadline covering streamed bodies, Node header/request timeouts.
 - Authentication → access resolution (cached ≤ 60 s, cleared on admin changes) → rate-limit hooks → per-request MCP server via `createMcpHandler(factory, { legacy: 'stateless' })`.
 - Uniform 401 for every denial; 503 on storage errors; minimal `/health` and `/version`.
 - MCP method classification for audit and limits (L-015).

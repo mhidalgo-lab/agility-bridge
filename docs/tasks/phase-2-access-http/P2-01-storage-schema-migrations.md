@@ -20,6 +20,7 @@ A runtime-neutral storage layer with one schema and one migration history for No
 - Drizzle schema for `users`, `instances`, `credentials`, `workspaces`, `grants`, `access_tokens`, `audit_log`, `settings`, `kv`, `schema_migrations` (ARCHITECTURE §4).
 - Forward-only, checksummed, embedded migrations; refuse a database newer than the binary.
 - `kv` with TTL and an atomic `take` for single-use records; `setIfAbsent`; atomic counters.
+- Conditional writes decide on `RETURNING` rows, never on driver change counts (D1 counts cascaded rows, `node:sqlite` does not, L-161); `PRAGMA foreign_keys = ON` per `node:sqlite` connection; STRICT tables (P0-09).
 - `memory` adapter and the shared contract suite; one database fixture per released minor (starting now).
 
 ## Acceptance criteria
