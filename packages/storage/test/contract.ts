@@ -432,7 +432,7 @@ export function storageContract(name: string, factory: StorageFactory): void {
         const t = await s.accessTokens.create({
           id: 't1',
           grantId: 'g',
-          prefix: 'ab_live',
+          prefix: 'ab_live_Ab12',
           tokenHash: HASH_A,
           label: 'laptop',
         });
@@ -444,7 +444,7 @@ export function storageContract(name: string, factory: StorageFactory): void {
         });
         expect(await s.accessTokens.getByHash(HASH_A)).toEqual(t);
         expect(await s.accessTokens.getByHash(HASH_B)).toBeNull();
-        const base = { grantId: 'g', prefix: 'ab_live', label: 'x' };
+        const base = { grantId: 'g', prefix: 'ab_live_Ab12', label: 'x' };
         await expect(s.accessTokens.create({ ...base, id: 't2', tokenHash: HASH_A })).rejects.toThrow(
           ConflictError,
         );
@@ -475,7 +475,7 @@ export function storageContract(name: string, factory: StorageFactory): void {
         await s.accessTokens.create({
           id: 't1',
           grantId: 'g',
-          prefix: 'ab_test',
+          prefix: 'ab_test_Ab12',
           tokenHash: HASH_A,
           label: 'x',
         });
@@ -497,14 +497,14 @@ export function storageContract(name: string, factory: StorageFactory): void {
         await s.accessTokens.create({
           id: 't-a',
           grantId: 'g-a',
-          prefix: 'ab_live',
+          prefix: 'ab_live_Ab12',
           tokenHash: HASH_A,
           label: 'a',
         });
         await s.accessTokens.create({
           id: 't-b',
           grantId: 'g-b',
-          prefix: 'ab_live',
+          prefix: 'ab_live_Ab12',
           tokenHash: HASH_B,
           label: 'b',
         });
@@ -719,7 +719,7 @@ export function storageContract(name: string, factory: StorageFactory): void {
         await s.accessTokens.create({
           id: 't',
           grantId: 'g',
-          prefix: 'ab_live',
+          prefix: 'ab_live_Ab12',
           tokenHash: HASH_A,
           label: 'x',
         });

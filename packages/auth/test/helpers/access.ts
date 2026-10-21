@@ -121,7 +121,7 @@ export function token(over: Partial<AccessToken> = {}): AccessToken {
   return {
     id: 't-1',
     grantId: 'g-alice',
-    prefix: 'ab_live',
+    prefix: 'ab_live_Ab12',
     tokenHash: 'a'.repeat(64),
     label: 'laptop',
     createdAt: NOW - 1_000,

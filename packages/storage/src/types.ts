@@ -108,7 +108,7 @@ export interface Grant {
 export interface AccessToken {
   id: string;
   grantId: string;
-  /** `ab_live` or `ab_test`. */
+  /** Display prefix: `ab_live_` or `ab_test_` and the first 4 characters of the token (P2-05). */
   prefix: string;
   /** SHA-256 of the token, lower-case hex, unique. */
   tokenHash: string;

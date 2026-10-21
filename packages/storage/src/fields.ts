@@ -174,7 +174,7 @@ export const LIMITS = Object.freeze({
 
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const HASH = /^[0-9a-f]{64}$/;
-const PREFIX = /^ab_(?:live|test)$/;
+const PREFIX = /^ab_(?:live|test)_[0-9A-Za-z]{4}$/;
 // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what this refuses
 const CONTROL = /[\u0000-\u001f\u007f]/;
 
@@ -228,7 +228,7 @@ function checkValue(table: TableName, column: string, field: Field, value: unkno
       return;
     case 'prefix':
       if (typeof value !== 'string' || !PREFIX.test(value))
-        throw bad(table, column, 'must be ab_live or ab_test');
+        throw bad(table, column, 'must be ab_live_ or ab_test_ and 4 letters or digits');
       return;
     case 'hint':
       if (typeof value !== 'string' || value.length > 4 || CONTROL.test(value)) {

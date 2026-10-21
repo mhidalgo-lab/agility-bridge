@@ -46,3 +46,18 @@ anything else is looked at.
 Saving a grant that asks for more than it can get is accepted with warnings, because the workspace may change later:
 tools the workspace does not enable, limits looser than the workspace's (the workspace's apply), switches the workspace
 has off. Projects outside the workspace are refused. At request time the same mismatches are logged for the operator.
+
+## Device tokens
+
+Each device gets its own token, so losing a laptop means revoking one entry:
+
+- Format `ab_live_<43 letters and digits>_<6-character checksum>` (`ab_test_…` on test deployments): 256 random bits; the
+  checksum lets secret scanners (GitHub, gitleaks) recognise a leaked token and lets the server reject typos without a
+  database lookup. It is not a security control.
+- Shown **once** when issued. The server stores only its SHA-256 and a display prefix (`ab_live_` and the first four
+  characters) for lists.
+- Expires after **90 days** by default; tokens that never expire are possible, with a warning.
+- Bound to one workspace: used at another workspace's address it is refused before anything else is checked.
+- Revoking the token, its grant, its credential or its workspace stops it at the next request (or within the access
+  cache's lifetime, at most 60 seconds, on other server processes).
+- Its last use is recorded at most every five minutes.

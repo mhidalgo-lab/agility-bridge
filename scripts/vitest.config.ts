@@ -7,6 +7,7 @@ export default defineProject({
   resolve: {
     alias: {
       '@agility-bridge/core': fileURLToPath(new URL('../packages/core/src/index.ts', import.meta.url)),
+      '@agility-bridge/storage': fileURLToPath(new URL('../packages/storage/src/index.ts', import.meta.url)),
     },
   },
   test: { name: 'scripts' },

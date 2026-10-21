@@ -76,7 +76,7 @@ async function seed(s: Storage): Promise<void> {
   await s.accessTokens.create({
     id: 't-laptop',
     grantId: 'g-member',
-    prefix: 'ab_live',
+    prefix: 'ab_live_Ab12',
     tokenHash: '0'.repeat(64),
     label: 'laptop',
     expiresAt: T + 86_400_000,

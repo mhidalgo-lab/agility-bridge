@@ -87,7 +87,7 @@ CREATE TABLE grants (
 CREATE TABLE access_tokens (
   id TEXT PRIMARY KEY NOT NULL,
   grant_id TEXT NOT NULL REFERENCES grants (id) ON DELETE CASCADE,
-  prefix TEXT NOT NULL CHECK (prefix IN ('ab_live', 'ab_test')),
+  prefix TEXT NOT NULL CHECK (length(prefix) = 12 AND (prefix GLOB 'ab_live_*' OR prefix GLOB 'ab_test_*') AND substr(prefix, 9) NOT GLOB '*[^0-9A-Za-z]*'),
   token_hash TEXT NOT NULL UNIQUE CHECK (length(token_hash) = 64 AND token_hash NOT GLOB '*[^0-9a-f]*'),
   label TEXT NOT NULL,
   created_at INTEGER NOT NULL,
@@ -127,7 +127,7 @@ CREATE TABLE kv (
   value TEXT NOT NULL,
   expires_at INTEGER
 ) STRICT;
-INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (1, 'init', 'ede0c42e2c63cb16ad261a03326c08fb81893bf31c01288b932c9ab0c76aad29', 1792540800000);
+INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (1, 'init', '71637fb1bfc1f81752a7934559ddc6ba24481f9b0b15cd3c67ff700f0b86a125', 1792540800000);
 INSERT INTO users (id, email, display_name, idp, idp_subject, role, created_at, updated_at, disabled_at) VALUES ('u-owner', 'owner@example.test', 'Owner', NULL, NULL, 'owner', 1792540800000, 1792540800000, NULL);
 INSERT INTO users (id, email, display_name, idp, idp_subject, role, created_at, updated_at, disabled_at) VALUES ('u-member', 'member@example.test', NULL, 'github', '1001', 'member', 1792540800000, 1792540800000, NULL);
 INSERT INTO instances (id, label, base_url, tls, number_prefixes, meta_fingerprint, created_at, updated_at, disabled_at) VALUES ('i-main', 'Main', 'https://agility.example.test/Main', NULL, '{"Story":"S"}', '"1.0"', 1792540800000, 1792540800000, NULL);
@@ -136,7 +136,7 @@ INSERT INTO credentials (id, instance_id, owner_user_id, label, token_ciphertext
 INSERT INTO workspaces (id, slug, name, instance_id, allowed_scope_ids, include_child_scopes, asset_types, enabled_tools, limits, default_credential_id, write_policy, created_at, updated_at, disabled_at) VALUES ('w-team', 'team', 'Team', 'i-main', '["Scope:1001"]', 1, '{"deny":["Request"]}', '["whoami","query_assets"]', '{"maxLimit":50}', 'c-shared', '{}', 1792540800000, 1792540800000, NULL);
 INSERT INTO grants (id, workspace_id, user_id, label, credential_id, tools, scope_ids, asset_types, limits, rate_limit, created_at, updated_at, expires_at, revoked_at) VALUES ('g-member', 'w-team', 'u-member', NULL, 'c-member', NULL, NULL, NULL, '{}', NULL, 1792540800000, 1792540800000, NULL, NULL);
 INSERT INTO grants (id, workspace_id, user_id, label, credential_id, tools, scope_ids, asset_types, limits, rate_limit, created_at, updated_at, expires_at, revoked_at) VALUES ('g-bot', 'w-team', NULL, 'CI bot', NULL, '["whoami"]', NULL, NULL, '{}', NULL, 1792540800000, 1792540800000, 1792540800001, NULL);
-INSERT INTO access_tokens (id, grant_id, prefix, token_hash, label, created_at, expires_at, last_used_at, revoked_at) VALUES ('t-laptop', 'g-member', 'ab_live', '0000000000000000000000000000000000000000000000000000000000000000', 'laptop', 1792540800000, 1792627200000, NULL, NULL);
+INSERT INTO access_tokens (id, grant_id, prefix, token_hash, label, created_at, expires_at, last_used_at, revoked_at) VALUES ('t-laptop', 'g-member', 'ab_live_Ab12', '0000000000000000000000000000000000000000000000000000000000000000', 'laptop', 1792540800000, 1792627200000, NULL, NULL);
 INSERT INTO audit_log (id, ts, kind, action, status, request_id, user_id, grant_id, token_id, client_id, workspace_id, instance_id, asset_numbers, query, duration_ms, agility_requests, error_code, target_type, target_id, details) VALUES ('a-1', 1792540800000, 'tool_call', 'query_assets', 'ok', NULL, NULL, 'g-member', NULL, NULL, 'w-team', NULL, '["S-01001"]', '{"from":"Story","where":"…"}', 120, 1, NULL, NULL, NULL, NULL);
 INSERT INTO settings (key, value, updated_at) VALUES ('fixture', '{"version":1}', 1792540800000);
 INSERT INTO kv (key, value, expires_at) VALUES ('marker:fixture', 'v', 1792540860000);
