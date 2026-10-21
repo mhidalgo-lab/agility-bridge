@@ -7,4 +7,6 @@ export default defineConfig({
   platform: 'node',
   dts: false,
   clean: true,
+  // The workspace packages are private: bundle them. Third-party packages stay dependencies of the published package.
+  deps: { alwaysBundle: [/^@agility-bridge\//] },
 });
