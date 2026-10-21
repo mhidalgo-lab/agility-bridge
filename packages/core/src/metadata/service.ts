@@ -53,6 +53,15 @@ export interface ResolvedPath {
   /** Whether the path can select several values (a multi-value relation on the way). */
   readonly multi: boolean;
   readonly aggregation?: Aggregation;
+  /** Every relation the path follows: the path up to and including it, and the asset type it reaches. */
+  readonly hops: readonly PathHop[];
+}
+
+export interface PathHop {
+  /** The path up to this relation, e.g. `Super` or `Scope.Parent` (with any downcast). */
+  readonly prefix: string;
+  readonly target: string;
+  readonly multi: boolean;
 }
 
 export type Aggregation = '@Count' | '@Sum' | '@Min' | '@Max' | '@Avg';
@@ -92,6 +101,45 @@ export const DERIVED_SCOPE_PATHS: Readonly<Record<string, string>> = Object.free
 });
 
 const PROJECT_TREE_TTL_MS = 600_000;
+const MAX_ABSENT_PER_CALL = 3;
+const MAX_ABSENT_CACHED = 500;
+/** Product types that are never counted as guesses (ARCHITECTURE §6.3, the snapshot's types). */
+const KNOWN_TYPES = new Set([
+  'BaseAsset',
+  'Workitem',
+  'PrimaryWorkitem',
+  'Story',
+  'Defect',
+  'Task',
+  'Test',
+  'TestSet',
+  'Theme',
+  'Epic',
+  'Issue',
+  'Request',
+  'Goal',
+  'RegressionTest',
+  'RegressionPlan',
+  'RegressionSuite',
+  'Scope',
+  'Timebox',
+  'Schedule',
+  'Member',
+  'Team',
+  'Actual',
+  'Attachment',
+  'Link',
+  'Conversation',
+  'Expression',
+  'List',
+  'Status',
+  'StoryStatus',
+  'TaskStatus',
+  'TestStatus',
+  'EpicStatus',
+  'EpicCategory',
+  'WorkitemPriority',
+]);
 const MAX_PROJECT_TREE = 2_000;
 
 /** Global types tools may read through dedicated tools only (members, teams; list types are found by their base). */
@@ -208,6 +256,8 @@ export class InstanceMetadata {
   readonly #service: MetadataService;
   readonly #ctx: ToolContext;
   readonly #cache: InstanceCache;
+  /** Asset types this call asked for that the instance does not have (each one a meta.v1 404, review M6). */
+  #absentInCall = 0;
 
   constructor(service: MetadataService, ctx: ToolContext) {
     this.#service = service;
@@ -227,12 +277,16 @@ export class InstanceMetadata {
     if (!ASSET_TYPE_NAME_RE.test(name)) return undefined;
     const cached = this.#cache.types.get(name);
     if (this.#service.fresh(cached)) return cached.value ?? undefined;
+    // Unknown names cost a 404 each, which the tenant's error quota counts (A10): a few per call, then no more.
+    if (this.#absentInCall >= MAX_ABSENT_PER_CALL && !KNOWN_TYPES.has(name)) return undefined;
     let pending = this.#cache.inflight.get(name);
     if (pending === undefined) {
       pending = this.#load(name).finally(() => this.#cache.inflight.delete(name));
       this.#cache.inflight.set(name, pending);
     }
-    return (await pending) ?? undefined;
+    const meta = await pending;
+    if (meta === null) this.#absentInCall++;
+    return meta ?? undefined;
   }
 
   async #load(name: string): Promise<AssetTypeMeta | null> {
@@ -255,6 +309,11 @@ export class InstanceMetadata {
       delete this.#cache.prefixes;
     }
     if (etag !== undefined) this.#cache.fingerprint = etag;
+    if (meta === null) {
+      // A bounded negative cache: the oldest absent names go first.
+      const absent = [...this.#cache.types].filter(([, v]) => v.value === null);
+      if (absent.length >= MAX_ABSENT_CACHED) this.#cache.types.delete(absent[0]?.[0] ?? '');
+    }
     this.#cache.types.set(name, { value: meta, at: this.#service.now() });
     return meta;
   }
@@ -287,6 +346,7 @@ export class InstanceMetadata {
     let current = (await this.assetType(type)).name;
     let multi = false;
     let attribute: AttributeMeta | undefined;
+    const hops: PathHop[] = [];
     for (const [i, segment] of segments.entries()) {
       const last = i === segments.length - 1;
       // The attribute before an aggregation is the one aggregated, not a relation to follow.
@@ -301,7 +361,7 @@ export class InstanceMetadata {
         }
         if (aggregation === '@Count' && attribute?.kind !== 'Relation')
           throw badPath(type, path, '@Count follows a relation');
-        return { path, kind: 'Numeric', multi: false, aggregation };
+        return { path, kind: 'Numeric', multi: false, aggregation, hops };
       }
       const [name = '', downcast, extra] = segment.split(':');
       if (
@@ -326,11 +386,12 @@ export class InstanceMetadata {
           }
           next = downcast;
         }
+        hops.push({ prefix: segments.slice(0, i + 1).join('.'), target: next, multi: attribute.multi });
         current = next;
       }
     }
     if (attribute === undefined) throw badPath(type, path, 'empty');
-    return { path, attribute, kind: attribute.kind, multi };
+    return { path, attribute, kind: attribute.kind, multi, hops };
   }
 
   /**
@@ -383,7 +444,8 @@ export class InstanceMetadata {
    * large types (live, P1-06). The tree is instance data, not request data; the call that loads it pays for it.
    */
   async projectTree(allowed: readonly string[]): Promise<readonly string[]> {
-    const key = [...allowed].sort().join(',');
+    // Per credential: what a project tree shows depends on the member (review L).
+    const key = `${this.#ctx.credential.id}\u0000${[...allowed].sort().join(',')}`;
     const cached = this.#cache.projectTrees.get(key);
     if (this.#service.freshFor(cached, PROJECT_TREE_TTL_MS)) return cached.value;
     const res = await agilityClient(this.#ctx).query<unknown[][]>({

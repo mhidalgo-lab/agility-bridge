@@ -9,7 +9,7 @@ import { metadataFor, type StatusEntry } from '../metadata/service.ts';
 import { type CompiledQuery, compileQuery, type FilterInput, type QueryInput } from '../query/compiler.ts';
 import { matchName, type Named, noSingleMatch } from './match.ts';
 import { parseAssetRef } from './refs.ts';
-import { inScope, oidsOf } from './scope.ts';
+import { inScope, oidsOf, sanitizeRow } from './scope.ts';
 
 export interface ResolvedAsset {
   readonly oid: string;
@@ -41,14 +41,16 @@ const stripMoment = (oid: unknown): string =>
 export async function runQuery(
   ctx: ToolContext,
   compiled: CompiledQuery,
-): Promise<{ rows: Row[]; hidden: number }> {
+): Promise<{ rows: Row[]; hidden: number; hiddenValues: number }> {
   const res = await agilityClient(ctx).query<unknown[]>(compiled.body);
   const set = Array.isArray(res.data) ? res.data[0] : undefined;
   const rows = Array.isArray(set)
     ? set.filter((r): r is Row => r !== null && typeof r === 'object' && !Array.isArray(r))
     : [];
   const kept = rows.filter((r) => inScope(ctx, compiled, r));
-  return { rows: kept, hidden: rows.length - kept.length };
+  let hiddenValues = 0;
+  for (const r of kept) hiddenValues += sanitizeRow(ctx, compiled, r);
+  return { rows: kept, hidden: rows.length - kept.length, hiddenValues };
 }
 
 /** A concrete type returned by a cross-type query must itself be readable in this workspace. */
@@ -249,10 +251,10 @@ export async function resolveSprint(
   const filters: FilterInput[] = [
     ...(options.team === undefined
       ? []
-      : [{ field: 'Workitems.Team', op: 'eq' as const, value: options.team }]),
+      : [{ field: 'Workitems.Team', op: 'eq' as const, value: options.team, trusted: true }]),
     ...(options.project === undefined
       ? []
-      : [{ field: 'Schedule.ScheduledScopes', op: 'eq' as const, value: options.project }]),
+      : [{ field: 'Schedule.ScheduledScopes', op: 'eq' as const, value: options.project, trusted: true }]),
   ];
   const fields = ['Name', 'BeginDate', 'EndDate', 'Schedule'];
   if (t !== 'current' && t !== 'previous' && t !== 'next') {

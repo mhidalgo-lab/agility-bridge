@@ -99,7 +99,7 @@ export const queryAssets: ToolDefinition = defineTool({
       const project = await resolveProject(ctx, input.project);
       const children = input.include_child_projects ?? ctx.projects.includeChildren;
       const tree = children ? await md.projectTree([project.oid]) : [project.oid];
-      filters.push({ field: path, op: 'in', value: [...tree] });
+      filters.push({ field: path, op: 'in', value: [...tree], trusted: true });
       projectNote = `Agility project ${project.oid}${children ? ' and its sub-projects' : ''}.`;
     }
     const fields = input.minimal_output === true ? (await md.fieldTiers(type)).minimal : input.fields;
@@ -133,7 +133,9 @@ export const queryAssets: ToolDefinition = defineTool({
     );
     const info = await fieldInfo(ctx, type, compiled.fields);
     const { rows, hidden } = await runQuery(ctx, compiled);
-    const items = rows.slice(0, compiled.limit).map((r) => toItem(r, type, compiled.fields, info));
+    const items = rows
+      .slice(0, compiled.limit)
+      .map((r) => toItem(r, type, compiled.fields, info, compiled.keys));
     return shapeList(ctx, {
       summary: `${items.length} ${type} row${items.length === 1 ? '' : 's'}${offset > 0 ? ` from row ${offset + 1}` : ''}, sorted by ${(compiled.body['sort'] as string[]).join(', ')}.`,
       notes: projectNote === undefined ? [] : [`Only ${projectNote}`],

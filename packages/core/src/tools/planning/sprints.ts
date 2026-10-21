@@ -51,11 +51,16 @@ export const listSprints: ToolDefinition = defineTool({
     const resolved: Record<string, string> = {};
     if (input.team !== undefined) {
       resolved['team'] = (await resolveTeam(ctx, input.team)).oid;
-      filters.push({ field: 'Workitems.Team', op: 'eq', value: resolved['team'] });
+      filters.push({ field: 'Workitems.Team', op: 'eq', value: resolved['team'], trusted: true });
     }
     if (input.project !== undefined) {
       resolved['project'] = (await resolveProject(ctx, input.project)).oid;
-      filters.push({ field: 'Schedule.ScheduledScopes', op: 'eq', value: resolved['project'] });
+      filters.push({
+        field: 'Schedule.ScheduledScopes',
+        op: 'eq',
+        value: resolved['project'],
+        trusted: true,
+      });
     }
     const timing = input.timing ?? 'all';
     if (timing === 'current')

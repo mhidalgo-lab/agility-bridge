@@ -29,6 +29,11 @@ export interface FilterInput {
   readonly field: string;
   readonly op: FilterOp;
   readonly value?: unknown;
+  /**
+   * Built by a tool from server data (project trees, resolved OIDs), never from caller input: such filters may take up
+   * to 2,000 `in` values and may follow multi-value relations to project-bound assets. Tool schemas never expose it.
+   */
+  readonly trusted?: boolean;
 }
 
 export interface SortInput {
@@ -79,6 +84,13 @@ export interface CompiledQuery {
   readonly recheck: readonly string[];
   /** The Agility projects rows may belong to (the allowed ones and, when enabled, their descendants); empty = all. */
   readonly scopes: readonly string[];
+  /**
+   * Values reached through a relation to a project-bound asset are shown only when that asset is in the workspace
+   * (Phase 1 review H2): for each selected key, the guard selections whose OIDs must all be in `scopes`.
+   */
+  readonly guards: ReadonlyArray<{ readonly key: string; readonly guards: readonly string[] }>;
+  /** The response key of each requested field (aggregations are keyed by their bracket-filtered select). */
+  readonly keys: Readonly<Record<string, string>>;
   /** The body with every bound value masked, for `_meta` and audit. */
   readonly masked: Readonly<Record<string, unknown>>;
   /** Canonical description of what the caller asked for, for the cursor binding. */
@@ -115,6 +127,10 @@ const SCOPE_OID_RE = /^Scope:\d{1,12}$/;
 const STATE_CODES = new Set([0, 64, 128, 200, 208, 255]);
 const MAX_TEXT_VALUE = 1_000;
 const MAX_IN_VALUES = 50;
+const MAX_TRUSTED_IN_VALUES = 2_000;
+/** Member attributes any path may read; `Username` and `Email` only when the workspace enables emails (D-06). */
+const MEMBER_PUBLIC = new Set(['Name', 'AssetState', 'ID']);
+const MEMBER_PERSONAL = new Set(['Username', 'Email']);
 const MAX_FILTERS = 20;
 const MAX_SORT = 3;
 export const MAX_OFFSET = 100_000;
@@ -186,8 +202,108 @@ function scalarValue(field: string, kind: AttributeKind, value: unknown, op: Fil
   }
 }
 
+function guardFor(prefix: string, strategy: ScopeStrategy): string | undefined {
+  switch (strategy.kind) {
+    case 'direct':
+    case 'derived':
+      return `${prefix}.${strategy.path}`;
+    case 'workspace_bounded':
+      return strategy.via === 'self' ? prefix : `${prefix}.Schedule.ScheduledScopes`;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Checks every relation a path follows (Phase 1 review H2, T3) and returns the guard selections its value depends on:
+ * a related project-bound asset (an epic, a parent, a sprint, another project) counts only when it is itself in the
+ * workspace. Types the workspace denies are unreachable; members expose their name, and username or email only when
+ * the workspace enables emails; multi-value relations to project-bound assets are refused unless aggregated or built
+ * by a tool. Without a project restriction nothing needs guarding, but the type and member rules still apply.
+ */
+async function pathGuards(
+  ctx: ToolContext,
+  root: ScopeStrategy,
+  resolved: ResolvedPath,
+  trusted: boolean,
+  restricted: boolean,
+): Promise<string[]> {
+  const md = metadataFor(ctx);
+  const guards: string[] = [];
+  const rootPath = root.kind === 'direct' || root.kind === 'derived' ? root.path : undefined;
+  for (const [i, hop] of resolved.hops.entries()) {
+    const last = i === resolved.hops.length - 1;
+    if (ctx.assetTypes.deny.includes(hop.target)) {
+      throw forbidden(`${resolved.path} reaches ${hop.target}, which this workspace does not allow.`);
+    }
+    // Paths a tool builds from server data (sprints of a team, a project's schedule) keep only the deny-list rule.
+    if (trusted) continue;
+    const meta = await md.assetType(hop.target);
+    let strategy = await md.scopeStrategy(hop.target);
+    if (
+      strategy.kind === 'denied' &&
+      meta.abstract &&
+      meta.attributes.get('Scope')?.relatedType === 'Scope'
+    ) {
+      strategy = { kind: 'direct', path: 'Scope' };
+    }
+    const tail = resolved.path.slice(hop.prefix.length + 1);
+    if (strategy.kind === 'global') {
+      if (last && (await md.isA(hop.target, 'Member'))) {
+        const attribute = tail.split('.')[0] ?? '';
+        const allowed =
+          MEMBER_PUBLIC.has(attribute) || (ctx.limits.memberEmails && MEMBER_PERSONAL.has(attribute));
+        if (!allowed && resolved.aggregation === undefined) {
+          throw forbidden(
+            `${resolved.path}: only member names${ctx.limits.memberEmails ? ', usernames and emails' : ''} can be read here.`,
+          );
+        }
+      }
+      continue;
+    }
+    if (strategy.kind === 'denied') {
+      // Schedules and roles: their name only.
+      if (!(last && tail === 'Name'))
+        throw forbidden(`${resolved.path} reaches ${hop.target}: only its Name can be read.`);
+      continue;
+    }
+    // The allow list says which types can be queried; values of related assets follow the deny list and the guard.
+    if (!restricted) continue;
+    if (hop.multi) {
+      if (resolved.aggregation !== undefined) continue;
+      throw forbidden(
+        `${resolved.path} follows a list of ${hop.target} assets that may be outside the workspace.`,
+        `Aggregate it (${hop.prefix}.@Count) or query ${hop.target} directly.`,
+      );
+    }
+    if (i === 0 && hop.prefix === rootPath) continue;
+    const guard = guardFor(hop.prefix, strategy);
+    if (guard !== undefined) guards.push(guard);
+  }
+  return guards;
+}
+
 /** One filter as a token over a bound variable. */
 async function compileFilter(
+  ctx: ToolContext,
+  type: string,
+  f: FilterInput,
+  binder: Binder,
+  root: ScopeStrategy,
+  restricted: boolean,
+): Promise<{ token: string; normalized: Record<string, unknown> }> {
+  const compiled = await compileFilterToken(ctx, type, f, binder);
+  const resolved = await metadataFor(ctx).resolvePath(type, f.field);
+  const guards = await pathGuards(ctx, root, resolved, f.trusted === true, restricted);
+  // A filter through a related asset only sees related assets inside the workspace (no out-of-scope oracle).
+  const token =
+    guards.length === 0
+      ? compiled.token
+      : `(${[compiled.token, ...guards.map((g) => `${g}=${SCOPE_VAR}`)].join(';')})`;
+  return { token, normalized: compiled.normalized };
+}
+
+async function compileFilterToken(
   ctx: ToolContext,
   type: string,
   f: FilterInput,
@@ -220,8 +336,9 @@ async function compileFilter(
     throw invalid(`${f.field} is not text: contains needs a text attribute.`);
   let value: unknown;
   if (f.op === 'in') {
-    if (!Array.isArray(f.value) || f.value.length === 0 || f.value.length > MAX_IN_VALUES) {
-      throw invalid(`Filter "in" on ${f.field} needs an array of 1 to ${MAX_IN_VALUES} values.`);
+    const max = f.trusted === true ? MAX_TRUSTED_IN_VALUES : MAX_IN_VALUES;
+    if (!Array.isArray(f.value) || f.value.length === 0 || f.value.length > max) {
+      throw invalid(`Filter "in" on ${f.field} needs an array of 1 to ${max} values.`);
     }
     value = f.value.map((v) => scalarValue(f.field, kind, v, f.op));
   } else {
@@ -286,10 +403,11 @@ export function recheckFields(strategy: ScopeStrategy): string[] {
   }
 }
 
-function forbidden(message: string): AbError {
-  return new AbError(ErrorCode.AuthForbidden, message, {
-    hint: 'Ask the workspace administrator to allow this asset type, or use a dedicated tool.',
-  });
+function forbidden(
+  message: string,
+  hint = 'Ask the workspace administrator to allow this asset type, or use a dedicated tool.',
+): AbError {
+  return new AbError(ErrorCode.AuthForbidden, message, { hint });
 }
 
 /** Compiles one read. Every metadata lookup is charged to this call's budget. */
@@ -322,70 +440,7 @@ export async function compileQuery(
     );
   }
 
-  // Fields (L-058: every part of the query counts against the limits).
-  const requestedFields = input.fields ?? (await md.fieldTiers(type)).default;
-  const fields = [...new Set(requestedFields)];
-  if (fields.length === 0) throw invalid('Select at least one field.');
-  if (fields.length > limits.maxFields)
-    throw limitError('maxFields', limits.maxFields, 'fields', fields.length);
-  const select: string[] = [];
-  let aggregations = 0;
-  for (const field of fields) {
-    const resolved = await md.resolvePath(type, field);
-    if (hops(resolved.path) > limits.maxNestingDepth) {
-      throw limitError('maxNestingDepth', limits.maxNestingDepth, 'relation hops', hops(resolved.path));
-    }
-    if (resolved.aggregation !== undefined) aggregations++;
-    select.push(await sentPath(ctx, type, resolved));
-  }
-  const filters = input.filters ?? [];
-  const groups = input.anyOf ?? [];
-  if (filters.length + groups.reduce((n, g) => n + g.length, 0) > MAX_FILTERS) {
-    throw limitError(
-      'maxFilters',
-      MAX_FILTERS,
-      'filters',
-      filters.length + groups.reduce((n, g) => n + g.length, 0),
-    );
-  }
-  if (groups.length > limits.maxAnyOfGroups)
-    throw limitError('maxAnyOfGroups', limits.maxAnyOfGroups, 'groups', groups.length);
-
-  // Caller filters: one entry each (ANDed), and the any_of groups together in one parenthesised entry.
-  const binder = new Binder();
-  const filterEntries: string[] = [];
-  const normalizedFilters: Record<string, unknown>[] = [];
-  for (const f of filters) {
-    const c = await compileFilter(ctx, type, f, binder);
-    if (c.token.includes('.@')) aggregations++;
-    filterEntries.push(c.token);
-    normalizedFilters.push(c.normalized);
-  }
-  const normalizedGroups: Record<string, unknown>[][] = [];
-  if (groups.length > 0) {
-    const parts: string[] = [];
-    for (const group of groups) {
-      if (!Array.isArray(group) || group.length === 0)
-        throw invalid('Each any_of group needs at least one filter.');
-      const tokens: string[] = [];
-      const normalized: Record<string, unknown>[] = [];
-      for (const f of group) {
-        const c = await compileFilter(ctx, type, f, binder);
-        if (c.token.includes('.@')) aggregations++;
-        tokens.push(c.token);
-        normalized.push(c.normalized);
-      }
-      parts.push(`(${tokens.join(';')})`);
-      normalizedGroups.push(normalized);
-    }
-    filterEntries.push(`(${parts.join('|')})`);
-  }
-  if (aggregations > limits.maxAggregations)
-    throw limitError('maxAggregations', limits.maxAggregations, 'aggregations', aggregations);
-
-  // Server-owned predicates, each its own top-level entry (ANDed by query.v1).
-  const serverEntries: string[] = [];
-  const serverWith: Record<string, unknown> = {};
+  // The Agility-project restriction, known before any path is checked (paths through related assets are guarded).
   const allowed = ctx.projects.allowed;
   for (const s of allowed) {
     if (!SCOPE_OID_RE.test(s))
@@ -406,6 +461,77 @@ export async function compileQuery(
       },
     );
   }
+
+  // Fields (L-058: every part of the query counts against the limits).
+  const requestedFields = input.fields ?? (await md.fieldTiers(type)).default;
+  const fields = [...new Set(requestedFields)];
+  if (fields.length === 0) throw invalid('Select at least one field.');
+  if (fields.length > limits.maxFields)
+    throw limitError('maxFields', limits.maxFields, 'fields', fields.length);
+  const select: string[] = [];
+  const keys: Record<string, string> = {};
+  const guards: Array<{ key: string; guards: string[] }> = [];
+  let aggregations = 0;
+  for (const field of fields) {
+    const resolved = await md.resolvePath(type, field);
+    if (hops(resolved.path) > limits.maxNestingDepth) {
+      throw limitError('maxNestingDepth', limits.maxNestingDepth, 'relation hops', hops(resolved.path));
+    }
+    if (resolved.aggregation !== undefined) aggregations++;
+    const sent = await sentPath(ctx, type, resolved);
+    select.push(sent);
+    keys[field] = sent;
+    const g = await pathGuards(ctx, strategy, resolved, false, restricted);
+    if (g.length > 0) guards.push({ key: sent, guards: g });
+  }
+  const filters = input.filters ?? [];
+  const groups = input.anyOf ?? [];
+  if (filters.length + groups.reduce((n, g) => n + g.length, 0) > MAX_FILTERS) {
+    throw limitError(
+      'maxFilters',
+      MAX_FILTERS,
+      'filters',
+      filters.length + groups.reduce((n, g) => n + g.length, 0),
+    );
+  }
+  if (groups.length > limits.maxAnyOfGroups)
+    throw limitError('maxAnyOfGroups', limits.maxAnyOfGroups, 'groups', groups.length);
+
+  // Caller filters: one entry each (ANDed), and the any_of groups together in one parenthesised entry.
+  const binder = new Binder();
+  const filterEntries: string[] = [];
+  const normalizedFilters: Record<string, unknown>[] = [];
+  for (const f of filters) {
+    const c = await compileFilter(ctx, type, f, binder, strategy, restricted);
+    if (c.token.includes('.@')) aggregations++;
+    filterEntries.push(c.token);
+    normalizedFilters.push(c.normalized);
+  }
+  const normalizedGroups: Record<string, unknown>[][] = [];
+  if (groups.length > 0) {
+    const parts: string[] = [];
+    for (const group of groups) {
+      if (!Array.isArray(group) || group.length === 0)
+        throw invalid('Each any_of group needs at least one filter.');
+      const tokens: string[] = [];
+      const normalized: Record<string, unknown>[] = [];
+      for (const f of group) {
+        const c = await compileFilter(ctx, type, f, binder, strategy, restricted);
+        if (c.token.includes('.@')) aggregations++;
+        tokens.push(c.token);
+        normalized.push(c.normalized);
+      }
+      parts.push(`(${tokens.join(';')})`);
+      normalizedGroups.push(normalized);
+    }
+    filterEntries.push(`(${parts.join('|')})`);
+  }
+  if (aggregations > limits.maxAggregations)
+    throw limitError('maxAggregations', limits.maxAggregations, 'aggregations', aggregations);
+
+  // Server-owned predicates, each its own top-level entry (ANDed by query.v1).
+  const serverEntries: string[] = [];
+  const serverWith: Record<string, unknown> = {};
   if (restricted) {
     const token = scopeToken(strategy);
     if (token !== undefined) {
@@ -429,6 +555,8 @@ export async function compileQuery(
   const sort: string[] = [];
   for (const s of sortInput) {
     const resolved = await md.resolvePath(type, s.field);
+    // Sorting through a relation follows the same type and member rules (its order cannot be guarded per row).
+    await pathGuards(ctx, strategy, resolved, false, restricted);
     if (resolved.multi || resolved.aggregation !== undefined || !SORTABLE_KINDS.has(resolved.kind)) {
       throw invalid(
         `Cannot sort by ${s.field}.`,
@@ -468,10 +596,13 @@ export async function compileQuery(
   const recheck = restricted
     ? recheckFields(strategy).filter((f) => !select.includes(f) && !identity.includes(f))
     : [];
+  const guardSelects = [...new Set(guards.flatMap((g) => g.guards))].filter(
+    (g) => !select.includes(g) && !identity.includes(g) && !recheck.includes(g),
+  );
   const withValues = { ...binder.with, ...serverWith };
   const body: Record<string, unknown> = {
     from: type,
-    select: [...select, ...identity, ...recheck],
+    select: [...select, ...identity, ...recheck, ...guardSelects],
     ...(filterEntries.length + serverEntries.length > 0
       ? { filter: [...serverEntries, ...filterEntries] }
       : {}),
@@ -495,5 +626,18 @@ export async function compileQuery(
     includeClosed: input.includeClosed === true,
     ...(asof === undefined ? {} : { asOf: asof }),
   };
-  return { body, assetType: type, strategy, limit, offset, fields, recheck, scopes, masked, normalized };
+  return {
+    body,
+    assetType: type,
+    strategy,
+    limit,
+    offset,
+    fields,
+    recheck,
+    scopes,
+    guards,
+    keys,
+    masked,
+    normalized,
+  };
 }

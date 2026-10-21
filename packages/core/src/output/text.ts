@@ -171,7 +171,13 @@ interface List {
  * italics, code, `[text](url)` for http(s) and mailto links only, `[image: alt]`. Scripts, styles, embedded objects,
  * comments, event attributes and every other attribute are dropped. Linear in the input.
  */
-export function htmlToText(html: string): string {
+/** Longest rich text converted; the shaper cuts values far below this anyway (Phase 1 review H1). */
+export const MAX_HTML_CHARS = 65_536;
+/** Deepest list indentation rendered; deeper lists render at this depth. */
+const MAX_LIST_INDENT = 8;
+
+export function htmlToText(input: string): string {
+  const html = input.length > MAX_HTML_CHARS ? input.slice(0, MAX_HTML_CHARS) : input;
   const lower = html.toLowerCase();
   const out: string[] = [];
   const lists: List[] = [];
@@ -252,7 +258,7 @@ export function htmlToText(html: string): string {
       case 'li': {
         if (closing) break;
         const list = lists.at(-1);
-        const indent = '  '.repeat(Math.max(0, lists.length - 1));
+        const indent = '  '.repeat(Math.min(MAX_LIST_INDENT, Math.max(0, lists.length - 1)));
         if (list === undefined) out.push(`\n- `);
         else out.push(`\n${indent}${list.ordered ? `${++list.n}.` : '-'} `);
         break;
@@ -284,6 +290,8 @@ export function htmlToText(html: string): string {
       }
       case 'a': {
         if (!closing) {
+          // A link inside a link keeps only its text: one open link at a time keeps the work linear (review H1).
+          if (links.length > 0) break;
           const href = cleanText(decodeEntities(tag.attrs.get('href') ?? '')).trim();
           links.push({ ...(SAFE_LINK_RE.test(href) ? { href } : {}), at: out.length });
           break;

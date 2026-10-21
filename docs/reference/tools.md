@@ -8,14 +8,14 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 | Tool | Group | Cost | Title |
 |---|---|---|---|
 | [`whoami`](#whoami) | core | 2 | Who am I |
-| [`list_projects`](#list_projects) | core | 4 | List Agility projects |
+| [`list_projects`](#list_projects) | core | 5 | List Agility projects |
 | [`list_asset_types`](#list_asset_types) | core | 24 | List asset types |
 | [`describe_asset_type`](#describe_asset_type) | core | 5 | Describe an asset type |
 | [`query_assets`](#query_assets) | query | 12 | Query assets |
 | [`get_assets`](#get_assets) | query | 16 | Get assets |
 | [`search_work_items`](#search_work_items) | work | 24 | Search work items |
 | [`get_work_item`](#get_work_item) | work | 24 | Get a work item |
-| [`list_my_work`](#list_my_work) | work | 16 | List my work |
+| [`list_my_work`](#list_my_work) | work | 20 | List my work |
 | [`list_teams`](#list_teams) | planning | 2 | List teams |
 | [`get_team`](#get_team) | planning | 20 | Get a team |
 | [`list_sprints`](#list_sprints) | planning | 10 | List sprints |
@@ -35,7 +35,7 @@ No arguments.
 
 ## `list_projects`
 
-**List Agility projects** · group `core` · read · cost 4 Agility requests at most
+**List Agility projects** · group `core` · read · cost 5 Agility requests at most
 
 List the Agility projects (Scope) this workspace allows, including sub-projects when the workspace includes them, with parent, state and schedule. Paged: pass nextCursor back as cursor.
 
@@ -169,9 +169,9 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 ## `list_my_work`
 
-**List my work** · group `work` · read · cost 16 Agility requests at most
+**List my work** · group `work` · read · cost 20 Agility requests at most
 
-List the open backlog items, defects, tasks and tests owned by the token’s member (or another member) within the workspace, ordered and grouped by sprint and status. Paged: pass nextCursor back as cursor. A cold call can make up to 16 Agility requests.
+List the open backlog items, defects, tasks and tests owned by the token’s member (or another member) within the workspace, ordered and grouped by sprint and status. Paged: pass nextCursor back as cursor. A cold call can make up to 20 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 

@@ -27,9 +27,9 @@ How to use it:
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
-| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153 |
+| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167 |
-| [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 |
+| [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151 |
@@ -332,6 +332,13 @@ One canonical list drives registration, `resources/list` and access checks, and 
 mixed-case names) makes listed resources unreadable.
 *Applied in:* P6-08, P6-09.
 
+**L-171 — Bound every transformation of hostile text.**
+A linear-looking HTML-to-text scanner was still quadratic: nested lists repeated their indentation per item and nested
+links re-joined the tail at each close, so 16 KB of crafted markup produced 8 MB in 25 s. Cap the input before
+converting it, cap depth-dependent output, and keep at most one open span that must be re-read; test with nesting, not
+only with length.
+*Applied in:* P1-16, `output/text.ts`.
+
 ## E. The Agility API client
 
 **L-046 — Classify errors precisely.**
@@ -447,6 +454,20 @@ against about 0.27 s for a plain `Scope=$list`. The compiler now asks for the al
 once (cached for 10 minutes) and filters and rechecks with the expanded list. Measure predicates on the live instance,
 not only their correctness.
 *Applied in:* P1-06, [ARCHITECTURE §6.3](ARCHITECTURE.md#63-query-compiler-p1-04).
+
+**L-169 — Scope applies to every value, not only to the row.**
+The Phase 1 review found that a row inside the workspace could still carry values of related assets outside it
+(`Super.Description` of another project's epic, `Owners.Email`), and that filters on such paths were an oracle. Every
+relation a caller path follows is checked: denied types are unreachable, members show only their name, a related
+project-bound asset counts only when it is in the workspace (values dropped per row, filters guarded in the same entry),
+and multi-value relations to project-bound assets are only aggregated.
+*Applied in:* P1-16, `query/compiler.ts` `pathGuards`, `identity/scope.ts` `sanitizeRow`.
+
+**L-170 — Merge pages by upstream position.**
+Merging several asset types into one page by a local comparator skips or repeats rows whenever the comparator disagrees
+with the upstream collation. Take each type's rows in the order the upstream returned them (a k-way merge on the heads)
+and count offsets in upstream positions; the comparator then only decides which type comes next.
+*Applied in:* P1-16, `tools/work/multi.ts`, P1-17.
 
 ## G. Access model, tokens and isolation
 

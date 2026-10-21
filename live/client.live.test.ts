@@ -182,6 +182,14 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
       { assetType: 'Scope', fields: ['Name'] },
       { assetType: 'Timebox', fields: ['Name', 'BeginDate'] },
       { assetType: 'Actual', fields: ['Value'] },
+      // Related-asset guards (Phase 1 review H2): guarded selections and a guarded filter.
+      { assetType: 'Story', fields: ['Name', 'Super.Name', 'Timebox.Name', 'Scope.Parent.Name'] },
+      {
+        assetType: 'Story',
+        fields: ['Name'],
+        filters: [{ field: 'Super.Name', op: 'contains' as const, value: 'a' }],
+      },
+      { assetType: 'Task', fields: ['Name', 'Parent.Name'] },
       { assetType: 'Story', fields: ['Number'], asOf: new Date(Date.now() - 7 * 86_400_000).toISOString() },
     ];
     for (const input of cases) {

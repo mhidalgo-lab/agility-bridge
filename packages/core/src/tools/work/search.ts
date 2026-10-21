@@ -27,9 +27,10 @@ const SORTS = {
       String(a.row['Name'] ?? '').localeCompare(String(b.row['Name'] ?? '')) || idOf(a.row) - idOf(b.row),
   },
   recently_changed: {
-    fields: [{ field: 'ChangeDate', direction: 'desc' as const }],
+    // The same attribute the rows select (workItemFields), so the comparator sees the sort key (review M2).
+    fields: [{ field: 'ChangeDateUTC', direction: 'desc' as const }],
     compare: (a: TypedRow, b: TypedRow) =>
-      String(b.row['ChangeDate'] ?? '').localeCompare(String(a.row['ChangeDate'] ?? '')) ||
+      String(b.row['ChangeDateUTC'] ?? '').localeCompare(String(a.row['ChangeDateUTC'] ?? '')) ||
       idOf(a.row) - idOf(b.row),
   },
 };
@@ -67,7 +68,7 @@ export async function workFilters(
     const project = await resolveProject(ctx, f.project);
     projectOid = project.oid;
     const tree = ctx.projects.includeChildren ? await md.projectTree([project.oid]) : [project.oid];
-    common.push({ field: 'Scope', op: 'in', value: [...tree] });
+    common.push({ field: 'Scope', op: 'in', value: [...tree], trusted: true });
     resolved['project'] = project.oid;
   }
   let teamOid: string | undefined;

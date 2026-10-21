@@ -143,3 +143,42 @@ workspaces:
     expect(() => loadConfig({ AB_CONFIG: '/missing.yaml' }, { files: files('') })).toThrow(/does not exist/);
   });
 });
+
+describe('Phase 1 review (M3 and lows)', () => {
+  const ws = (body: string) => `version: 1\nworkspaces:\n  a:\n${body}`;
+  it.each([
+    [
+      'the instance URL',
+      `    instance: { url: "https://\${AWS_SECRET_ACCESS_KEY}.evil.example", token: x }\n`,
+    ],
+    ['the name', `    name: "\${keychain:other/secret}"\n    instance: { url: ${URL}, token: x }\n`],
+    ['the CA file', `    instance: { url: ${URL}, token: x, ca_file: "/tmp/\${HOME}" }\n`],
+  ])('refuses references outside the token (%s)', (_where, body) => {
+    expect(() =>
+      loadConfig(
+        { AB_CONFIG: '/cfg.yaml', AWS_SECRET_ACCESS_KEY: 'FAKE', HOME: '/h' },
+        { files: files(ws(body)), keychain: () => 'FAKE' },
+      ),
+    ).toThrow(/allowed only in instance.token/);
+  });
+
+  it('keeps an escaped $${ literal in the token', () => {
+    const c = loadConfig(
+      { AB_CONFIG: '/cfg.yaml' },
+      { files: files(ws(`    instance: { url: ${URL}, token: "FAKE-$\${NOT_A_REF}" }\n`)) },
+    );
+    expect(c.kind === 'configured' && c.token.reveal()).toBe(`FAKE-\${NOT_A_REF}`);
+  });
+
+  it('refuses an explicitly empty project list instead of reading it as every project', () => {
+    expect(() => loadConfig({ AB_AGILITY_URL: URL, AB_AGILITY_TOKEN: 'x', AB_PROJECTS: ' , ' })).toThrow(
+      /AB_PROJECTS is set but empty/,
+    );
+    expect(() =>
+      loadConfig(
+        { AB_CONFIG: '/cfg.yaml' },
+        { files: files(ws(`    instance: { url: ${URL}, token: x }\n    projects: []\n`)) },
+      ),
+    ).toThrow(/projects is empty/);
+  });
+});
