@@ -31,7 +31,7 @@ export const TOOL_INFO: ReadonlyMap<string, ToolInfo> = new Map(
   CORE_TOOLS.map((t) => [t.name, { kind: t.kind, group: t.group }]),
 );
 
-const ASSETS = {
+export const ASSETS: Record<string, Record<string, unknown>[]> = {
   Scope: [
     { _oid: 'Scope:1001', Name: 'Mobile App', AssetState: 64, ChildrenMeAndDown: ['Scope:1001'] },
     { _oid: 'Scope:2001', Name: 'Platform', AssetState: 64, ChildrenMeAndDown: ['Scope:2001'] },
@@ -70,7 +70,16 @@ export interface World {
 
 export async function world(
   over: Partial<HttpAppOptions> = {},
-  options: { auditStorage?: (s: Storage) => Storage; admin?: boolean } = {},
+  options: {
+    auditStorage?: (s: Storage) => Storage;
+    admin?: boolean;
+    /** Agility rows by asset type (default: a small world in Scope:1001 and Scope:2001). */
+    assets?: Record<string, Record<string, unknown>[]>;
+    /** `ignore-filters`: a hostile upstream that returns rows outside the scope (L-064). */
+    filters?: 'evaluate' | 'ignore-filters';
+    /** Workspace B's projects (default Scope:2001). */
+    projectsB?: string[];
+  } = {},
 ): Promise<World> {
   const now = { t: Date.UTC(2026, 9, 21, 12) };
   const storage = createMemoryStorage({ now: () => now.t });
@@ -102,7 +111,7 @@ export async function world(
     slug: 'team-b',
     name: 'Team B',
     instanceId: instance.id,
-    allowedScopeIds: ['Scope:2001'],
+    allowedScopeIds: options.projectsB ?? ['Scope:2001'],
   });
   const aliceGrant = (
     await svc.grants.create({ workspaceId: wsA.id, userId: alice.id, credentialId: aliceCred.id })
@@ -127,7 +136,8 @@ export async function world(
   const agilityTokens: string[] = [];
   const fake = new FakeAgility({
     meta: snapshotJson as unknown as Record<string, unknown>,
-    assets: ASSETS,
+    assets: (options.assets ?? ASSETS) as never,
+    filters: options.filters ?? 'evaluate',
     override: (req) => {
       agilityTokens.push(req.headers.get('authorization')?.replace(/^Bearer /, '') ?? '');
       return undefined;

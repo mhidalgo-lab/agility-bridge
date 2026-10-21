@@ -35,6 +35,22 @@ literals, which the formatter turns into raw characters (L-166).
 `test/harness.test.ts` proves the probe works: three deliberately broken tools (raw text, a project name in a plain
 note, raw rows in `structuredContent`) must each be caught.
 
+## Server tests (`packages/http-app/test`, Phase 2)
+
+`test/helpers/world.ts` builds a complete server in process: memory storage, a master key, two workspaces (`team-a`,
+`team-b`) on one fake Agility instance, personal credentials for two users, device tokens, an audit writer, and a
+recorder of every Agility token that reaches the fake. `connect(world, slug, token, era)` returns an SDK client for
+either protocol era; `post(...)` sends raw JSON-RPC. Options: `assets`, `filters: 'ignore-filters'` (a hostile upstream),
+`admin: true` (the admin API with a test actor chosen by the `x-test-actor` header).
+
+| Suite | Proves |
+|---|---|
+| `authz.test.ts` (P2-12) | Route × principal × method/tool: no token, malformed, unknown, another workspace's token, unknown workspace, revoked or expired token or grant, disabled workspace, user or instance, revoked or unvalidated credential — each answers the same `401` for `initialize`, `tools/list` and every tool, leaves its audit reason, makes **zero Agility requests** and **zero mutations**. Tools outside the grant are neither listed nor callable. Each scope-strategy class (direct, derived, workspace-bounded, global, denied) through `query_assets`/`get_assets`, with an honest and a hostile upstream; guessed numbers and OIDs of another project are not found and never substituted. Two workspaces and credentials in 24 interleaved calls. |
+| `admin.test.ts` (P2-09) | Every admin route unauthenticated (401) and as a member (403/404) with a snapshot proving nothing changed; owner-only actions as an admin; secrets never returned. |
+| `app.test.ts`, `rate-limit.test.ts`, `audit.test.ts` | Request hygiene, limits, audit rows. |
+
+Every regression test must fail when its fix is reverted (L-121): check it once by reverting the fix locally.
+
 ## Fixtures
 
 Synthetic Agility responses live in `packages/core/test/fixtures/agility/` (see its README); `meta-snapshot.json` is the
