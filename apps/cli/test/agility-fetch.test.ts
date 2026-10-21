@@ -92,6 +92,12 @@ describe.skipIf(!hasOpenssl)('createNodeFetch with a private CA', () => {
     agilityClient({
       requestId: 'r',
       instance: { id: 'onprem', baseUrl },
+      workspace: {
+        id: 'live',
+        name: 'Live',
+        groups: ['core'],
+        writes: { enabled: false, approval: 'unavailable' },
+      },
       credential: { id: 'c', kind: 'personal', token: new Secret('FAKE-token') },
       projects: { allowed: [], includeChildren: true },
       assetTypes: { deny: [] },
