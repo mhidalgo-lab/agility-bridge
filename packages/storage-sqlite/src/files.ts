@@ -132,3 +132,36 @@ export function copyPrivateFile(source: string, target: string): void {
     closeSync(input);
   }
 }
+
+/**
+ * Reads a small secret file (a master key, an admin token): a regular file, not a symbolic link and, on POSIX, not
+ * readable or writable by group or others; the error says how to fix it and never contains the content.
+ */
+export function readSecretFile(path: string, maxBytes = 4_096): string {
+  let fd: number;
+  try {
+    fd = openSync(path, constants.O_RDONLY | NOFOLLOW);
+  } catch (error) {
+    if (code(error) === 'ELOOP') throw new UnsafeFileError(`${path} is a symbolic link; use the real path.`);
+    if (code(error) === 'ENOENT') throw new UnsafeFileError(`${path} does not exist.`);
+    throw error;
+  }
+  try {
+    const stats = fstatSync(fd);
+    if (!stats.isFile()) throw new UnsafeFileError(`${path} is not a regular file.`);
+    if (POSIX && (stats.mode & 0o077) !== 0) {
+      throw new UnsafeFileError(`${path} is readable by other users; run chmod 600 ${path}.`);
+    }
+    if (stats.size > maxBytes) throw new UnsafeFileError(`${path} is larger than ${maxBytes} bytes.`);
+    const buffer = new Uint8Array(maxBytes + 1);
+    let length = 0;
+    for (let n = readSync(fd, buffer, 0, buffer.length, null); n > 0 && length <= maxBytes; ) {
+      length += n;
+      n = readSync(fd, buffer, length, buffer.length - length, null);
+    }
+    if (length > maxBytes) throw new UnsafeFileError(`${path} is larger than ${maxBytes} bytes.`);
+    return new TextDecoder().decode(buffer.subarray(0, length));
+  } finally {
+    closeSync(fd);
+  }
+}

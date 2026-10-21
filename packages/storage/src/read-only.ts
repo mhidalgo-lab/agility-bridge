@@ -5,7 +5,7 @@ import type { Storage } from './types.ts';
 const WRITES: Readonly<Record<string, readonly string[]>> = {
   users: ['create', 'update', 'delete'],
   instances: ['create', 'update', 'delete'],
-  credentials: ['create', 'update', 'delete'],
+  credentials: ['create', 'update', 'delete', 'replaceSecret'],
   workspaces: ['create', 'update', 'delete'],
   grants: ['create', 'update', 'delete'],
   accessTokens: ['create', 'update', 'delete', 'touch'],

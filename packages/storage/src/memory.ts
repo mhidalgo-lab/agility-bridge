@@ -6,6 +6,7 @@ import { ConflictError, InvalidInputError, NotFoundError } from './errors.ts';
 import {
   checkId,
   checkRow,
+  checkSealedToken,
   checkSettingValue,
   clampLimit,
   prepareCreate,
@@ -229,8 +230,27 @@ export function createMemoryStorage(options: MemoryStorageOptions = {}): Storage
       credentialRepo.list(
         (c) =>
           (f.instanceId === undefined || c.instanceId === f.instanceId) &&
-          (f.ownerUserId === undefined || c.ownerUserId === f.ownerUserId),
+          (f.ownerUserId === undefined || c.ownerUserId === f.ownerUserId) &&
+          (f.keyVersion === undefined || c.keyVersion === f.keyVersion),
       ),
+    async replaceSecret(id, expected, next) {
+      checkId('credentials', id);
+      checkSealedToken(expected);
+      checkSealedToken(next);
+      const row = tables.credentials.get(id);
+      if (
+        row === undefined ||
+        row.keyVersion !== expected.keyVersion ||
+        row.tokenCiphertext !== expected.tokenCiphertext ||
+        row.tokenIv !== expected.tokenIv
+      ) {
+        return false;
+      }
+      row.tokenCiphertext = next.tokenCiphertext;
+      row.tokenIv = next.tokenIv;
+      row.keyVersion = next.keyVersion;
+      return true;
+    },
   };
 
   const workspaceRepo = repository<Workspace>('workspaces');

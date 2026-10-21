@@ -8,6 +8,7 @@
   "sideEffects": false,
   "exports": {
     ".": {
+      "source": "./src/index.ts",
       "types": "./dist/index.d.mts",
       "default": "./dist/index.mjs"
     }
@@ -21,6 +22,9 @@
   },
   "agilityBridge": {
     "runtime": "web"
+  },
+  "dependencies": {
+    "@agility-bridge/storage": "workspace:*"
   },
   "devDependencies": {
     "tsdown": "0.23.1"

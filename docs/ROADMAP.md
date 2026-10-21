@@ -162,8 +162,8 @@ Status lives in each task file.
 | ID | Task | Priority | Depends on | Status |
 |---|---|---|---|---|
 | P2-01 | [Storage interface, schema and migrations](tasks/phase-2-access-http/P2-01-storage-schema-migrations.md) | high | P1-16 | done |
-| P2-02 | [SQLite adapter for Node](tasks/phase-2-access-http/P2-02-sqlite-adapter.md) | high | P2-01 | review |
-| P2-03 | [Secrets encryption and master-key rotation](tasks/phase-2-access-http/P2-03-secrets-encryption.md) | high | P2-01 | todo |
+| P2-02 | [SQLite adapter for Node](tasks/phase-2-access-http/P2-02-sqlite-adapter.md) | high | P2-01 | done |
+| P2-03 | [Secrets encryption and master-key rotation](tasks/phase-2-access-http/P2-03-secrets-encryption.md) | high | P2-01 | review |
 | P2-04 | [Access model and effective-permission resolver](tasks/phase-2-access-http/P2-04-access-model.md) | high | P2-01, P2-03 | todo |
 | P2-05 | [Device access tokens](tasks/phase-2-access-http/P2-05-device-tokens.md) | high | P2-04 | todo |
 | P2-06 | [HTTP app (Hono) with per-workspace MCP endpoints](tasks/phase-2-access-http/P2-06-http-app.md) | high | P2-05 | todo |
