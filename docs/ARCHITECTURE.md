@@ -470,7 +470,7 @@ validate input + metadata (operation allowed, attributes writable, values typed)
 | `AB_ACCESS_CACHE_TTL` | `30` | seconds (0–60) |
 | `AB_ADMIN_TOKEN` / `AB_ADMIN_TOKEN_FILE` | unset | break-glass admin bearer |
 | `AB_AUDIT_RETENTION_DAYS` | `90` | `0` keeps forever |
-| `AB_RATE_LIMIT_*` | see P2-07 | edge rate limits |
+| `AB_RATE_LIMIT`, `AB_RATE_LIMIT_IP_PER_MINUTE`, `…_AUTH_FAILURES`, `…_TOKEN_PER_MINUTE`, `…_GRANT_PER_MINUTE` | `on`, 600, 10 per 5 min, 120, 300 | edge rate limits (P2-07, [configuration](guide/configuration.md#rate-limits)) |
 | `AB_PASSTHROUGH` | `off` | enable mode E |
 | `AB_OAUTH` | `off` | enable OAuth 2.1 (Phase 5) |
 | `AB_PLAN` | `free` | Workers presets: `free` \| `paid` |

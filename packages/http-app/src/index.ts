@@ -22,3 +22,12 @@ export {
   type McpMethodClass,
   readMcpBody,
 } from './mcp-request.ts';
+export {
+  clientAddress,
+  createRequestLimits,
+  DEFAULT_RATE_LIMITS,
+  MemoryRateLimiter,
+  type Rate,
+  type RateLimitConfig,
+  type RateLimiter,
+} from './rate-limit.ts';

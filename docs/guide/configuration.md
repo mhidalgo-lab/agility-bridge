@@ -84,7 +84,35 @@ workspaces:
 MCP clients cache the tool list. After upgrading agility-bridge, reconnect or restart the server in your client before
 new tools, arguments or output fields work (L-027).
 
-## Remote mode
+## Server mode (`agility-bridge serve`)
 
-`agility-bridge serve` (shared HTTP server, workspaces, device tokens and OAuth) arrives with Phase 2; its settings are
-listed in [ARCHITECTURE §7.1](../ARCHITECTURE.md#71-planned-configuration-initial-list).
+A team server that exposes each workspace at `/w/<slug>/mcp` to per-device tokens
+([access model](access-model.md)). It also reads only `AB_` environment variables, never flags. A full walkthrough
+follows in the self-hosting guide.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `AB_MASTER_KEY_FILE` or `AB_MASTER_KEY` | — (required) | The master key that encrypts stored Agility tokens ([secrets](secrets.md)); `AB_MASTER_KEY_FILE_PREVIOUS` / `AB_MASTER_KEY_PREVIOUS` during a rotation |
+| `AB_DATA_DIR` / `AB_DB_PATH` | `~/.local/share/agility-bridge` / `<data dir>/agility-bridge.db` | Where the SQLite database lives (created `0700`/`0600`) |
+| `AB_HOST` / `AB_PORT` | `127.0.0.1` / `8787` | Listen address; loopback unless you expose it on purpose |
+| `AB_PUBLIC_URL` | unset | The origin clients use, e.g. `https://mcp.example.com`; HTTPS turns on HSTS and allows that host |
+| `AB_ALLOWED_HOSTS` | loopback names | Extra `Host` values to accept (comma-separated); anything else is refused (DNS rebinding) |
+| `AB_ALLOWED_ORIGINS` | none | Browser origins allowed to call the server, with CORS headers |
+| `AB_ACCESS_CACHE_TTL` | `30` | Seconds (0–60) a resolved access is reused; a revocation takes effect within this time |
+| `AB_ENVIRONMENT` | `production` | `test` issues `ab_test_` device tokens, so test tokens are recognisable |
+| `AB_TRUSTED_PROXY_HOPS` | `0` | Reverse proxies in front whose `X-Forwarded-For` entries are trusted for the client address |
+| `AB_CALL_BUDGET`, `AB_LIMITS_MAX_RESPONSE_BYTES` | `1000`, 8 MiB | Defaults for workspaces that set no limits |
+
+### Rate limits
+
+| Setting | Default | Limit |
+|---|---|---|
+| `AB_RATE_LIMIT_IP_PER_MINUTE` | `600` | Requests per client address, before authentication |
+| `AB_RATE_LIMIT_AUTH_FAILURES` | `10` | Failed authentications per client address per 5 minutes; after that, failed attempts get `429` while valid tokens keep working |
+| `AB_RATE_LIMIT_TOKEN_PER_MINUTE` | `120` | Requests per device token (a `subscriptions/listen` stream does not count) |
+| `AB_RATE_LIMIT_GRANT_PER_MINUTE` | `300` | Requests per grant, all its devices together; a grant's own rate limit can lower it |
+| `AB_RATE_LIMIT` | `on` | `off` turns every limit off (logged as a warning) |
+
+A limited request gets `429` with `Retry-After`. The counters live in each server process: several replicas each
+count on their own. If the limiter itself fails, requests are allowed and the failure is logged (authorization never
+fails open).
