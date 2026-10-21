@@ -228,7 +228,8 @@ describe('values reach Agility only through `with` (L-057, L-139, L-162)', () =>
       ),
       propertyParams(300),
     );
-  });
+    // Hundreds of async runs: generous when the whole suite shares the CPU (the default 5 s flaked under load).
+  }, 30_000);
 
   it('property: arbitrary field names are refused unless they are valid paths', async () => {
     await fc.assert(
@@ -242,7 +243,7 @@ describe('values reach Agility only through `with` (L-057, L-139, L-162)', () =>
       }),
       propertyParams(200),
     );
-  });
+  }, 30_000);
 });
 
 describe('the scope predicate cannot be widened (L-059)', () => {

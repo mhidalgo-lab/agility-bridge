@@ -1,0 +1,66 @@
+# Managing a server from the command line
+
+> For `agility-bridge serve` (v0.2). Every command and option: [CLI reference](../reference/cli.md).
+
+The management commands change the same things as the [admin API](../reference/admin-api.md) — users, Agility
+instances, credentials, workspaces, grants, device tokens — with the same validation, the same owner/admin rules and
+the same [audit log](audit-log.md). They print JSON on stdout (pipe it to `jq`) and messages on stderr.
+
+## Local or remote
+
+- **Local** (default): the commands open the server's database directly (`AB_DATA_DIR` or `AB_DB_PATH`, and the master
+  key `AB_MASTER_KEY_FILE`), run the admin API in process and act as the break-glass owner. Run them on the server
+  host, as the user that runs the server. Audit rows say `via: cli`.
+- **Remote**: set `AB_ADMIN_URL=https://mcp.example.com` and the admin token (`AB_ADMIN_TOKEN_FILE`, or you are
+  prompted for it). The commands call the server's admin API over HTTPS and never follow redirects. Audit rows say
+  `via: api`.
+
+Secrets are never command-line arguments: they would show in process listings and shell history. An Agility token
+comes from `--from-file <path>` (a `0600` file), `AB_AGILITY_TOKEN`, standard input, or a hidden prompt. Any option that
+looks like a secret (`--token`, `--password`, …) is refused.
+
+## First setup
+
+```sh
+agility-bridge init
+agility-bridge admin-token > ~/.config/agility-bridge/admin.token && chmod 600 ~/.config/agility-bridge/admin.token
+export AB_MASTER_KEY_FILE=~/.config/agility-bridge/master.key
+agility-bridge instance add "Main" https://www7.v1host.com/YourInstance
+agility-bridge credential add --instance <instance-id> --label "Service member" --from-file ./service.token
+agility-bridge user add ann@example.com --name "Ann"
+agility-bridge workspace add team-mobile --name "Mobile team" --instance <instance-id> --project Scope:1001 --children --default-credential <credential-id>
+agility-bridge grant add --workspace <workspace-id> --user <user-id> --tools whoami,search_work_items,get_work_item
+agility-bridge token issue <grant-id> --label "Ann's laptop"
+```
+
+`init` writes the master key to `~/.config/agility-bridge/master.key` (never over an existing file); keep it away from
+the data directory and back it up separately ([secrets](secrets.md)). `token issue` prints the device token once: put
+it into the MCP client of that device ([client setup](clients.md)) at `https://<server>/w/team-mobile/mcp`.
+
+Credentials added here are **shared** (a service member's token, used read-only). A member's own token is personal:
+only they can store it (the admin panel, Phase 4); nobody can store it for them.
+
+## Everyday commands
+
+| What | Command |
+|---|---|
+| List users, instances, credentials, workspaces, grants | `agility-bridge user list`, `agility-bridge instance list`, `agility-bridge credential list`, `agility-bridge workspace list`, `agility-bridge grant list --workspace <id>` |
+| Show one workspace | `agility-bridge workspace show <workspace-id>` |
+| Change a workspace | `agility-bridge workspace set <workspace-id> --name "New name" --max-rows 50` |
+| Give someone a role | `agility-bridge user set-role <user-id> admin` (owners only) |
+| Disable a user | `agility-bridge user disable <user-id>` |
+| Lost device | `agility-bridge token list <grant-id>`, then `agility-bridge token revoke <token-id>` |
+| Someone leaves | `agility-bridge grant revoke <grant-id>` (all their devices stop) |
+| Replace a service token | `agility-bridge credential replace <credential-id> --from-file ./new.token` |
+| Retire a credential | `agility-bridge credential revoke <credential-id>`, later `agility-bridge credential delete <credential-id>` |
+| Remove a workspace | `agility-bridge workspace disable <workspace-id>` or `agility-bridge workspace delete <workspace-id>` |
+| Remove an instance | `agility-bridge instance delete <instance-id>` (only when unused) |
+| Move an instance to a new address | `agility-bridge instance retarget <instance-id> https://new.example.com/Instance` (owners; revokes its credentials and grants) |
+| Remove a grant | `agility-bridge grant delete <grant-id>` |
+| Read the audit log | `agility-bridge audit tail --limit 50 --kind auth` |
+| Master-key rotation (local only) | `agility-bridge keys status`, `agility-bridge keys rotate --reason "yearly"`, `agility-bridge keys retire 1 --reason "rotation done"` |
+
+Changes take effect for new requests at once on the server that made them, and within the access cache (at most 60 s,
+`AB_ACCESS_CACHE_TTL`) on other server processes.
+
+Exit codes: `0` done, `1` refused or failed (the reason is on stderr), `2` wrong usage. Each command has `--help`.
