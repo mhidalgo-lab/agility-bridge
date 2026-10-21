@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // The admin API error envelope `{ error: { code, message, field?, detail? } }` and the status mapping of P2-09.
-import { ForbiddenError, SecretsError } from '@agility-bridge/auth';
+import { ForbiddenError, SecretsError, UpstreamCheckError } from '@agility-bridge/auth';
 import { StorageError } from '@agility-bridge/storage';
 
 export type AdminErrorCode =
@@ -79,6 +79,9 @@ export function toAdminError(error: unknown): { status: number; body: AdminError
       if (m?.[1] !== undefined) field = m[1];
     }
     if (code === 'unavailable') message = 'Storage is unavailable.';
+  } else if (error instanceof UpstreamCheckError) {
+    code = 'upstream';
+    message = error.message;
   } else if (error instanceof SecretsError) {
     code = 'unavailable';
     message = 'The server cannot use its master key for this.';

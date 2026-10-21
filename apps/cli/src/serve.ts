@@ -3,7 +3,14 @@
 // tokens and per-workspace MCP endpoints. Configuration only from the environment, never flags (L-026).
 import { homedir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
-import { AdminTokenVerifier, accessServices, Keyring, verifyKeyring } from '@agility-bridge/auth';
+import {
+  type AccessServices,
+  AdminTokenVerifier,
+  accessServices,
+  credentialValidator,
+  Keyring,
+  verifyKeyring,
+} from '@agility-bridge/auth';
 import {
   CircuitBreakers,
   CORE_TOOLS,
@@ -11,6 +18,7 @@ import {
   createLogger,
   DEFAULT_LIMITS,
   type FetchLike,
+  type Logger,
   type LogLevel,
   MetadataService,
   stderrSink,
@@ -60,6 +68,8 @@ export interface ServeConfig {
   readonly trustedProxyHops: number;
   /** Days audit rows are kept (default 90; 0 keeps them forever). */
   readonly auditRetentionDays: number;
+  /** Hours between credential revalidations (default 24; 0 = never). */
+  readonly revalidationHours: number;
 }
 
 /** The default data directory (`$XDG_DATA_HOME` or `~/.local/share`; `%LOCALAPPDATA%` on Windows). */
@@ -179,6 +189,13 @@ export function loadServeConfig(env: Env): ServeConfig {
     },
     trustedProxyHops: integer('AB_TRUSTED_PROXY_HOPS', env['AB_TRUSTED_PROXY_HOPS'], 0, 0, 10),
     auditRetentionDays: integer('AB_AUDIT_RETENTION_DAYS', env['AB_AUDIT_RETENTION_DAYS'], 90, 0, 36_500),
+    revalidationHours: integer(
+      'AB_CREDENTIAL_REVALIDATION_HOURS',
+      env['AB_CREDENTIAL_REVALIDATION_HOURS'],
+      24,
+      0,
+      8_760,
+    ),
   };
 }
 
@@ -233,7 +250,16 @@ export async function startServe(
   const tools = new Map(CORE_TOOLS.map((t) => [t.name, { kind: t.kind, group: t.group }]));
   const audit = new AuditWriter({ storage, logger, clock: systemClock, random: webCryptoRandom });
   const stopRetention = scheduleAuditRetention(storage, config.auditRetentionDays, systemClock, logger);
-  const fetches = new Map<string, FetchLike>();
+  const hostServices = nodeHostServices(logger);
+  const services = accessServices({
+    storage,
+    keyring,
+    tools,
+    environment: config.environment,
+    validator: credentialValidator(hostServices),
+  });
+  const stopRevalidation = scheduleRevalidation(services, config.revalidationHours, logger);
+  const authErrors = revalidateOnAuthErrors(services, logger);
   const app = createHttpApp({
     storage,
     keyring,
@@ -252,25 +278,7 @@ export async function startServe(
       },
     },
     tools: CORE_TOOLS,
-    services: {
-      fetchFor(instance) {
-        const caFile =
-          typeof instance.tls?.['caFile'] === 'string' ? (instance.tls['caFile'] as string) : undefined;
-        const key = `${instance.id}|${caFile ?? ''}`;
-        let f = fetches.get(key);
-        if (f === undefined) {
-          f = createNodeFetch(caFile === undefined ? {} : { caFile });
-          fetches.set(key, f);
-        }
-        return f;
-      },
-      limiters: new CredentialLimiters({ concurrency: 5 }),
-      breakers: new CircuitBreakers(),
-      metadata: new MetadataService(),
-      logger,
-      clock: systemClock,
-      random: webCryptoRandom,
-    },
+    services: hostServices,
     ...(config.publicUrl === undefined ? {} : { publicUrl: config.publicUrl }),
     allowedHosts: config.allowedHosts,
     allowedOrigins: config.allowedOrigins,
@@ -280,7 +288,7 @@ export async function startServe(
       ? {}
       : {
           admin: {
-            services: accessServices({ storage, keyring, tools, environment: config.environment }),
+            services,
             audit,
             authenticate: adminTokenAuthenticator(adminVerifier),
           },
@@ -293,6 +301,7 @@ export async function startServe(
         config.trustedProxyHops,
       ),
     observer: audit.observer({
+      toolCall: (e) => authErrors(e.access.credential.id, e.errorCode),
       request: (e) =>
         logger.info('request', {
           requestId: e.requestId,
@@ -339,6 +348,7 @@ export async function startServe(
     async close() {
       await new Promise<void>((resolve) => server.close(() => resolve()));
       stopRetention();
+      stopRevalidation();
       await audit.flush();
       await storage.close();
     },
@@ -364,4 +374,86 @@ export function readAdminToken(env: Env, dataDir?: string): string | undefined {
     }
   }
   return value || undefined;
+}
+
+/** Per-process services for Agility calls: the `fetch` pinned to an instance's TLS (custom CA), limiters, breakers. */
+export function nodeHostServices(logger: Logger) {
+  const fetches = new Map<string, FetchLike>();
+  return {
+    fetchFor(instance: { id: string; tls: Record<string, unknown> | null }): FetchLike {
+      const caFile =
+        typeof instance.tls?.['caFile'] === 'string' ? (instance.tls['caFile'] as string) : undefined;
+      const key = `${instance.id}|${caFile ?? ''}`;
+      let f = fetches.get(key);
+      if (f === undefined) {
+        f = createNodeFetch(caFile === undefined ? {} : { caFile });
+        fetches.set(key, f);
+      }
+      return f;
+    },
+    limiters: new CredentialLimiters({ concurrency: 5 }),
+    breakers: new CircuitBreakers(),
+    metadata: new MetadataService(),
+    logger,
+    clock: systemClock,
+    random: webCryptoRandom,
+  };
+}
+
+/** Revalidates credentials not checked for `hours` (P2-13); returns a stop function. */
+function scheduleRevalidation(services: AccessServices, hours: number, logger: Logger): () => void {
+  if (hours <= 0) return () => {};
+  const everyMs = hours * 3_600_000;
+  const run = () =>
+    services.credentials
+      .revalidate(Date.now() - everyMs)
+      .then((n) => {
+        if (n > 0) logger.info('credentials revalidated', { count: n });
+      })
+      .catch((error: unknown) =>
+        logger.error('credential revalidation failed', { error: (error as Error).name }),
+      );
+  const first = setTimeout(run, 60_000);
+  const timer = setInterval(run, Math.min(everyMs, 3_600_000));
+  first.unref();
+  timer.unref();
+  return () => {
+    clearTimeout(first);
+    clearInterval(timer);
+  };
+}
+
+/**
+ * Revalidates a credential after 3 consecutive `AB_AGILITY_AUTH` errors (a revoked token), at most once per 10 minutes
+ * per credential, so a dead token is marked invalid instead of failing every call (P2-13, A10).
+ */
+export function revalidateOnAuthErrors(
+  services: AccessServices,
+  logger: Logger,
+  now: () => number = Date.now,
+): (credentialId: string, errorCode: string | null) => void {
+  const streaks = new Map<string, number>();
+  const last = new Map<string, number>();
+  return (credentialId, errorCode) => {
+    if (errorCode !== 'AB_AGILITY_AUTH') {
+      streaks.delete(credentialId);
+      return;
+    }
+    const n = (streaks.get(credentialId) ?? 0) + 1;
+    streaks.set(credentialId, n);
+    if (n < 3 || now() - (last.get(credentialId) ?? 0) < 600_000) return;
+    last.set(credentialId, now());
+    streaks.delete(credentialId);
+    services.credentials
+      .validate(credentialId)
+      .then((c) =>
+        logger.warn('credential revalidated after Agility refused it', {
+          credential: c.id,
+          status: c.validationStatus,
+        }),
+      )
+      .catch((error: unknown) =>
+        logger.error('credential revalidation failed', { error: (error as Error).name }),
+      );
+  };
 }

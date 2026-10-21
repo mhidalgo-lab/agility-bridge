@@ -169,6 +169,11 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
       if (!mineCredential(c) && !isManager(actor)) throw new NotFoundError('No credential with this id.');
       return services.credentials.update(id, patch);
     },
+    async validate(id: string): Promise<Credential> {
+      const c = await load(storage.credentials.get(id), 'credential');
+      if (!mineCredential(c) && !isManager(actor)) throw new NotFoundError('No credential with this id.');
+      return services.credentials.validate(id);
+    },
     async revoke(id: string): Promise<Credential> {
       const c = await load(storage.credentials.get(id), 'credential');
       if (!mineCredential(c)) {

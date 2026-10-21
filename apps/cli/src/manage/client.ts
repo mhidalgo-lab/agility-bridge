@@ -3,13 +3,13 @@
 // no redirects, the admin token), or the same admin API in process over the local SQLite database (local, acting as
 // the break-glass owner, audit rows `via: cli`). Both speak the same requests, so results and audit rows match.
 import { dirname } from 'node:path';
-import { accessServices, Keyring, verifyKeyring } from '@agility-bridge/auth';
+import { accessServices, credentialValidator, Keyring, verifyKeyring } from '@agility-bridge/auth';
 import { CORE_TOOLS, type Logger, systemClock, webCryptoRandom } from '@agility-bridge/core';
 import { ADMIN_BASE, AuditWriter, createAdminApi } from '@agility-bridge/http-app';
 import { openSqliteStorage, type SqliteStorage } from '@agility-bridge/storage-sqlite';
 import { ConfigError } from '../config.ts';
 import { readMasterKeys } from '../master-key.ts';
-import { loadServeConfig } from '../serve.ts';
+import { loadServeConfig, nodeHostServices } from '../serve.ts';
 
 export interface ApiResponse {
   readonly status: number;
@@ -42,7 +42,13 @@ export async function localClient(
   const tools = new Map(CORE_TOOLS.map((t) => [t.name, { kind: t.kind, group: t.group }]));
   const audit = new AuditWriter({ storage, logger, clock: systemClock, random: webCryptoRandom });
   const api = createAdminApi({
-    services: accessServices({ storage, keyring, tools, environment: config.environment }),
+    services: accessServices({
+      storage,
+      keyring,
+      tools,
+      environment: config.environment,
+      validator: credentialValidator(nodeHostServices(logger)),
+    }),
     storage,
     tools,
     audit,

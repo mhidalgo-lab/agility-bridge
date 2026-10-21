@@ -3,7 +3,8 @@
   "compilerOptions": {
     "types": [],
     "lib": ["es2023", "webworker"],
-    "isolatedDeclarations": false
+    "isolatedDeclarations": false,
+    "resolveJsonModule": true
   },
   "include": ["src", "test"]
 }

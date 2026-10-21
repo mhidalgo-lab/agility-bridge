@@ -6,13 +6,19 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generateAdminToken, generateMasterKey } from '@agility-bridge/auth';
 import { openSqliteStorage } from '@agility-bridge/storage-sqlite';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { type FixtureAgility, startFixtureAgility } from '../../../scripts/fixture-agility.ts';
 import { main } from '../src/main.ts';
 import { COMMANDS, usage } from '../src/manage/commands.ts';
 import { type RunningServer, startServe } from '../src/serve.ts';
 
 const AGILITY_TOKEN = '1.ServiceTokenNotRealAbCdEfGhIjKlMn4242';
 let dir: string;
+let agility: FixtureAgility;
+beforeAll(async () => {
+  agility = await startFixtureAgility();
+});
+afterAll(() => agility.close());
 let server: RunningServer | undefined;
 
 beforeEach(() => {
@@ -62,11 +68,12 @@ async function script(env: Record<string, string>) {
     expect(r.code, `${args.join(' ')}: ${r.err}`).toBe(0);
     return r.json as Record<string, unknown>;
   };
-  const inst = await run(['instance', 'add', 'Main', 'https://agility.example.test/Main']);
+  const inst = await run(['instance', 'add', 'Main', agility.url]);
   const cred = await run(
     ['credential', 'add', '--instance', String(inst['id']), '--label', 'Service member'],
     AGILITY_TOKEN,
   );
+  expect(cred).toMatchObject({ validationStatus: 'valid', tokenHint: '4242', memberOid: 'Member:20' });
   const user = await run(['user', 'add', 'ann@example.test', '--name', 'Ann']);
   const ws = await run([
     'workspace',
@@ -176,7 +183,7 @@ describe('local and remote management', () => {
 
   it('keys status, rotate and retire work on the local database only', async () => {
     const env = { AB_DATA_DIR: join(dir, 'd'), AB_MASTER_KEY_FILE: keyFile('k.key') };
-    const inst = (await cli(['instance', 'add', 'M', 'https://agility.example.test/M'], env)).json as {
+    const inst = (await cli(['instance', 'add', 'M', agility.url], env)).json as {
       id: string;
     };
     expect(

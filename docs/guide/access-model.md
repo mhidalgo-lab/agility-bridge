@@ -61,3 +61,23 @@ Each device gets its own token, so losing a laptop means revoking one entry:
 - Revoking the token, its grant, its credential or its workspace stops it at the next request (or within the access
   cache's lifetime, at most 60 seconds, on other server processes).
 - Its last use is recorded at most every five minutes.
+
+## Credential validation
+
+A credential is used only once Agility has confirmed it (status `valid`):
+
+- **On save** (and when its token is replaced), the server asks Agility who the token belongs to and which Agility
+  projects it can see, and records the member and those projects. The list is a hint for operators (a warning when a
+  workspace names a project the member could not see); Agility still decides what each request returns.
+- **On demand**: `agility-bridge credential validate <id>` or `POST /api/admin/v1/credentials/{id}/validate`.
+- **Periodically**: every `AB_CREDENTIAL_REVALIDATION_HOURS` (default 24; `0` = never).
+- **After repeated refusals**: three `AB_AGILITY_AUTH` errors in a row on one credential trigger a revalidation (at most
+  every 10 minutes), so a revoked token is marked `invalid` instead of failing every call.
+
+Results: `valid`; `invalid` with `AB_AGILITY_AUTH` (the token is revoked, mistyped or for another instance: create a new
+one on the Agility *Applications* page), `AB_AGILITY_WRONG_INSTANCE` (the address answers with a redirect or a web
+page: check the address you open Agility at) or `AB_AGILITY_TLS`; an outage or rate limit keeps the previous status and
+records the code.
+
+**New or changed instance addresses** are probed first with an unauthenticated `meta.v1` request: no token is ever sent
+to an address that does not answer like Agility, and the change is refused (`502`) otherwise.
