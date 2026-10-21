@@ -2,7 +2,7 @@
 id: P1-18
 title: Bind the cursor's time window and fix sprint timing per first page
 phase: 1
-status: review
+status: done
 priority: low
 depends_on: [P1-16]
 adr: ["0015"]

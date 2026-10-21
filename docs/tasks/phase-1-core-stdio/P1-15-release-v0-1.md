@@ -2,7 +2,7 @@
 id: P1-15
 title: Release pipeline and v0.1.0
 phase: 1
-status: blocked
+status: done
 priority: high
 depends_on: [P1-09, P1-10, P1-11, P1-12, P1-13, P1-14]
 adr: ["0003"]
@@ -27,15 +27,10 @@ Ship verifiable releases from day one, with build and publish separated.
   synced `VERSION`/`server.json`; build; `check-package.ts` packs, checks and installs the tarball and runs it; release
   notes; CycloneDX SBOM; `SHA256SUMS`; `npm publish --dry-run`. On GitHub the workflow's build and publish jobs stay
   skipped until `AB_RELEASE_ENABLED` is set.)*
-- [ ] v0.1.0 published if the owner chose per-phase releases (pending decision D-03). *(D-03: per-phase releases.
-  Needs the owner's one-time set-up in docs/dev/releasing.md and the two approvals.)*
+- [x] v0.1.0 published if the owner chose per-phase releases (pending decision D-03). *(D-03: per-phase releases.
+  Published 2026-10-21: `agility-bridge@0.1.0` on npm and the GitHub Release `v0.1.0` with tarball, SBOM, provenance
+  and `SHA256SUMS`.)*
 - [x] `docs/guide/verify-release.md` explains how to verify provenance and checksums.
-
-## Blocker
-
-Publishing is the owner's: the npm trusted publisher (stage publish only), the `release` environment with the owner as
-reviewer, `AB_RELEASE_ENABLED=true`, then the environment approval and the 2FA approval on npmjs.com
-(docs/dev/releasing.md). Everything that can run without them is done.
 
 ## Security notes
 THREAT_MODEL T18.
