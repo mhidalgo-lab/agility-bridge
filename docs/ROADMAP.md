@@ -4,11 +4,11 @@
 > (every asset type, read and opt-in write) with each member's own access token. Runs locally (stdio), self-hosted
 > (Node / Docker) or as a **Cloudflare Worker** reachable from every device.
 
-Status: **Phase 1 next** (2026-10-21) — Phase 0 is complete and the owner gave the go for Phase 1
-([Phase 0 results](research/phase-0-results.md)). Architecture:
+Status: **Phase 2 in progress** (2026-10-21) — v0.1.0 is published and the owner gave the go for Phase 2
+([Phase 1 review](reviews/phase-1-review.md)). Architecture:
 [ARCHITECTURE.md](ARCHITECTURE.md) · Decisions: [adr/](adr/) · Facts & limits: [RESEARCH.md](RESEARCH.md) · Security:
 [THREAT_MODEL.md](THREAT_MODEL.md) · Lessons: [LESSONS-LEARNED.md](LESSONS-LEARNED.md) · Task rules:
-[tasks/README.md](tasks/README.md) · Open questions: [pending-decisions/phase-0.md](pending-decisions/phase-0.md)
+[tasks/README.md](tasks/README.md) · Open questions: [pending-decisions/phase-1.md](pending-decisions/phase-1.md)
 
 ## Guiding principles
 
@@ -107,6 +107,7 @@ provenance, a GitHub Release with SBOM and checksums, and (from Phase 2) a signe
 | 2026-10-21 | Tool contract final: conventions signed off, output contract accepted | ADR-0015, [tool conventions](dev/tool-conventions.md) |
 | 2026-10-21 | Authentication accepted: device tokens first, OAuth 2.1 with workers-oauth-provider on both runtimes, refresh reuse window built in P5-05 | ADR-0009 |
 | 2026-10-21 | Storage, encryption, access-model details and platform limits accepted; **Phase 0 complete, go for Phase 1** | ADR-0006, 0007, 0008, 0010, [Phase 0 results](research/phase-0-results.md) |
+| 2026-10-21 | v0.1.0 published; live suite stays on demand (D-20); **go for Phase 2** (D-21) | [pending-decisions/phase-1.md](pending-decisions/phase-1.md) |
 
 ## Task index
 
@@ -151,10 +152,10 @@ Status lives in each task file.
 | P1-12 | [Test harness (fixtures, contract tests, probes, live suite)](tasks/phase-1-core-stdio/P1-12-test-harness.md) | high | P1-01, P0-12 | done |
 | P1-13 | [Generated tool reference, naming and description lints, tools/list budget](tasks/phase-1-core-stdio/P1-13-tool-reference-lints.md) | medium | P0-11, P1-08 | done |
 | P1-14 | [Docs: quickstart and client setup guides](tasks/phase-1-core-stdio/P1-14-docs-quickstart-clients.md) | high | P1-11 | blocked |
-| P1-15 | [Release pipeline and v0.1.0](tasks/phase-1-core-stdio/P1-15-release-v0-1.md) | high | P1-09, P1-10, P1-11, P1-12, P1-13, P1-14 | blocked |
+| P1-15 | [Release pipeline and v0.1.0](tasks/phase-1-core-stdio/P1-15-release-v0-1.md) | high | P1-09, P1-10, P1-11, P1-12, P1-13, P1-14 | done |
 | P1-16 | [Phase 1 review and live verification](tasks/phase-1-core-stdio/P1-16-phase-1-review.md) | high | P1-15 | done |
 | P1-17 | [Single-type paging counts upstream positions](tasks/phase-1-core-stdio/P1-17-paging-upstream-positions.md) | low | P1-16 | done |
-| P1-18 | [Bind the cursor's time window and fix sprint timing per first page](tasks/phase-1-core-stdio/P1-18-cursor-window-binding.md) | low | P1-16 | review |
+| P1-18 | [Bind the cursor's time window and fix sprint timing per first page](tasks/phase-1-core-stdio/P1-18-cursor-window-binding.md) | low | P1-16 | done |
 
 ### Phase 2
 
