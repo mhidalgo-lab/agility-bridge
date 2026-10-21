@@ -33,6 +33,7 @@ export {
   type EffectiveAccess,
   type Principal,
   resolveAccess,
+  resolvePassthroughAccess,
   type ToolInfo,
 } from './resolve.ts';
 export {

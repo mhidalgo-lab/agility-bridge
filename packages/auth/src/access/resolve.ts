@@ -71,7 +71,8 @@ export type DenyReason =
   | 'credential_mismatch'
   | 'malformed_policy'
   | 'no_projects'
-  | 'no_tools';
+  | 'no_tools'
+  | 'not_passthrough';
 
 export interface EffectiveAccess {
   readonly workspace: { readonly id: string; readonly slug: string; readonly name: string };
@@ -82,7 +83,8 @@ export interface EffectiveAccess {
   readonly credential: {
     readonly id: string;
     readonly kind: 'personal' | 'shared';
-    readonly sealed: Pick<Credential, 'tokenCiphertext' | 'tokenIv' | 'keyVersion'>;
+    /** The stored token, sealed; `null` on a pass-through workspace, where the caller sent its own (P2-14). */
+    readonly sealed: Pick<Credential, 'tokenCiphertext' | 'tokenIv' | 'keyVersion'> | null;
   };
   /** Tool names the caller may list and call. */
   readonly tools: readonly string[];
@@ -274,6 +276,55 @@ export function resolveAccess(
       rateLimit: gp.rateLimit,
       expiresAt: ends.length === 0 ? null : Math.min(...ends),
       warnings: Object.freeze(warnings),
+    }),
+  };
+}
+
+/**
+ * Access on a pass-through workspace (P2-14, D-04): the caller authenticated with its own Agility token, already
+ * validated against the workspace's instance and known here only by its HMAC fingerprint. Every workspace control
+ * applies unchanged (projects, asset types, tools, limits); there is no grant, so nothing can widen or narrow them, and
+ * write tools are never granted (read-only in 1.0).
+ */
+export function resolvePassthroughAccess(
+  slug: string,
+  records: Pick<AccessRecords, 'workspace' | 'instance'>,
+  fingerprint: string,
+  settings: AccessSettings,
+): AccessDecision {
+  const { workspace, instance } = records;
+  if (workspace === null || workspace.slug !== slug) return deny('wrong_workspace');
+  if (workspace.credentialSource !== 'passthrough') return deny('not_passthrough');
+  if (workspace.disabledAt !== null) return deny('workspace_disabled');
+  if (instance === null || instance.id !== workspace.instanceId) return deny('instance_missing');
+  if (instance.disabledAt !== null) return deny('instance_disabled');
+  const ws = parseWorkspace(workspace);
+  if (ws === null) return deny('malformed_policy');
+  const { limits } = effectiveLimits(settings.limits, ws.limits, {});
+  const known = settings.tools;
+  const candidates = ws.enabledTools ?? [...known.keys()];
+  const tools = candidates.filter((name) => {
+    const info = known.get(name);
+    return info !== undefined && info.kind === 'read' && (limits.genericQuery || info.group !== 'query');
+  });
+  if (tools.length === 0) return deny('no_tools');
+  const id = fingerprint.slice(0, 32);
+  return {
+    ok: true,
+    access: Object.freeze({
+      workspace: { id: workspace.id, slug: workspace.slug, name: workspace.name },
+      instance: { id: instance.id, baseUrl: instance.baseUrl, tls: instance.tls },
+      grant: { id: `passthrough:${id}`, userId: null, label: 'pass-through' },
+      tokenId: `pt:${id}`,
+      credential: { id: `pt:${id}`, kind: 'personal' as const, sealed: null },
+      tools: Object.freeze(tools),
+      writeTools: Object.freeze([]),
+      projects: { allowed: Object.freeze([...ws.allowedScopeIds]), includeChildren: ws.includeChildScopes },
+      assetTypes: effectiveAssetTypes(ws.assetTypes as AssetTypePolicy | null, null),
+      limits,
+      rateLimit: null,
+      expiresAt: null,
+      warnings: Object.freeze([]),
     }),
   };
 }

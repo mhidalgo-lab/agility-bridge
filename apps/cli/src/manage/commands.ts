@@ -111,6 +111,7 @@ function workspaceBody(p: Parsed): Record<string, unknown> {
     allowedScopeIds: p.opts['project'],
     includeChildScopes: p.opts['children'] === true ? true : undefined,
     defaultCredentialId: p.opts['default-credential'],
+    credentialSource: p.opts['credential-source'],
     enabledTools: list(p.opts['tools']),
     assetTypes: allow === undefined && deny === undefined ? undefined : defined({ allow, deny }),
     limits,
@@ -313,6 +314,11 @@ export const COMMANDS: readonly CommandSpec[] = [
       { name: 'asset-types-allow', kind: 'list', help: 'Only these asset types' },
       { name: 'asset-types-deny', kind: 'list', help: 'Never these asset types' },
       { name: 'max-rows', kind: 'int', help: 'Most rows per call' },
+      {
+        name: 'credential-source',
+        kind: 'string',
+        help: '`stored` (default) or `passthrough`: callers send their own Agility token (owner; needs AB_PASSTHROUGH=on)',
+      },
     ],
     api: async (_r, p) => ({
       method: 'POST',
@@ -330,6 +336,11 @@ export const COMMANDS: readonly CommandSpec[] = [
       { name: 'default-credential', kind: 'string', help: 'Shared default credential' },
       { name: 'tools', kind: 'list', help: 'Enabled tools' },
       { name: 'max-rows', kind: 'int', help: 'Most rows per call' },
+      {
+        name: 'credential-source',
+        kind: 'string',
+        help: '`stored` (default) or `passthrough`: callers send their own Agility token (owner; needs AB_PASSTHROUGH=on)',
+      },
     ],
     api: async (_r, p) => ({
       method: 'PATCH',

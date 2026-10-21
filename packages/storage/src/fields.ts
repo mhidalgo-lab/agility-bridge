@@ -16,6 +16,7 @@ type Kind =
   | 'hint'
   | 'role'
   | 'validation'
+  | 'credentialSource'
   | 'auditKind'
   | 'auditStatus'
   | 'time'
@@ -106,6 +107,7 @@ export const FIELDS: Readonly<Record<TableName, Readonly<Record<string, Field>>>
     limits: def('object', {}),
     defaultCredentialId: opt('id'),
     writePolicy: def('object', {}),
+    credentialSource: def('credentialSource', 'stored'),
     createdAt: stamp,
     updatedAt: stamp,
     disabledAt: opt('time'),
@@ -244,6 +246,10 @@ function checkValue(table: TableName, column: string, field: Field, value: unkno
       if (value !== 'unvalidated' && value !== 'valid' && value !== 'invalid') {
         throw bad(table, column, 'must be unvalidated, valid or invalid');
       }
+      return;
+    case 'credentialSource':
+      if (value !== 'stored' && value !== 'passthrough')
+        throw bad(table, column, 'must be stored or passthrough');
       return;
     case 'auditKind':
       if (value !== 'tool_call' && value !== 'write' && value !== 'auth' && value !== 'admin') {

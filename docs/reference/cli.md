@@ -268,7 +268,7 @@ Local or remote.
 Create a workspace at /w/<slug>/mcp.
 
 ```text
-agility-bridge workspace add <slug> --name <value> --instance <value> --project <value> [--children] [--default-credential <value>] [--tools a,b] [--asset-types-allow a,b] [--asset-types-deny a,b] [--max-rows <n>]
+agility-bridge workspace add <slug> --name <value> --instance <value> --project <value> [--children] [--default-credential <value>] [--tools a,b] [--asset-types-allow a,b] [--asset-types-deny a,b] [--max-rows <n>] [--credential-source <value>]
 ```
 
 | Name | Kind | Meaning |
@@ -283,6 +283,7 @@ agility-bridge workspace add <slug> --name <value> --instance <value> --project 
 | `--asset-types-allow` | list | Only these asset types |
 | `--asset-types-deny` | list | Never these asset types |
 | `--max-rows` | int | Most rows per call |
+| `--credential-source` | string | `stored` (default) or `passthrough`: callers send their own Agility token (owner; needs AB_PASSTHROUGH=on) |
 
 Local or remote.
 
@@ -291,7 +292,7 @@ Local or remote.
 Change a workspace (only the options given).
 
 ```text
-agility-bridge workspace set <workspace-id> [--name <value>] [--project <value>] [--default-credential <value>] [--tools a,b] [--max-rows <n>]
+agility-bridge workspace set <workspace-id> [--name <value>] [--project <value>] [--default-credential <value>] [--tools a,b] [--max-rows <n>] [--credential-source <value>]
 ```
 
 | Name | Kind | Meaning |
@@ -302,6 +303,7 @@ agility-bridge workspace set <workspace-id> [--name <value>] [--project <value>]
 | `--default-credential` | string | Shared default credential |
 | `--tools` | list | Enabled tools |
 | `--max-rows` | int | Most rows per call |
+| `--credential-source` | string | `stored` (default) or `passthrough`: callers send their own Agility token (owner; needs AB_PASSTHROUGH=on) |
 
 Local or remote.
 

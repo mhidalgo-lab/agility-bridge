@@ -328,9 +328,16 @@ export function storageContract(name: string, factory: StorageFactory): void {
           enabledTools: null,
           limits: {},
           writePolicy: {},
+          credentialSource: 'stored',
           disabledAt: null,
         });
         expect(await s.workspaces.getBySlug('team-a')).toEqual(ws);
+        expect((await s.workspaces.update('w-1', { credentialSource: 'passthrough' })).credentialSource).toBe(
+          'passthrough',
+        );
+        await expect(s.workspaces.update('w-1', { credentialSource: 'shared' as never })).rejects.toThrow(
+          InvalidInputError,
+        );
         expect(await s.workspaces.getBySlug('team-b')).toBeNull();
         const base = { name: 'X', instanceId: 'i-1' };
         for (const slug of ['Team', 'a_b', '-a', 'a-', '', 'a'.repeat(64), 'ä']) {

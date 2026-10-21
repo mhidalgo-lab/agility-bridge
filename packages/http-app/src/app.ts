@@ -5,11 +5,14 @@ import {
   type AccessSettings,
   authenticateDeviceToken,
   bearerToken,
+  type CredentialValidator,
   type EffectiveAccess,
   hashDeviceToken,
   isWellFormedDeviceToken,
+  KeyPurpose,
   type Keyring,
   openCredentialToken,
+  resolvePassthroughAccess,
   type TokenEnvironment,
 } from '@agility-bridge/auth';
 import {
@@ -123,6 +126,17 @@ export interface HttpAppOptions extends EdgeOptions {
   readonly version: string;
   readonly maxBodyBytes?: number;
   readonly deadlineMs?: number;
+  /**
+   * Pass-through workspaces (`AB_PASSTHROUGH=on`, P2-14): callers of a workspace whose `credentialSource` is
+   * `passthrough` send their own Agility token in `X-Agility-Token`. Absent = such requests are refused.
+   */
+  readonly passthrough?: {
+    readonly validator: CredentialValidator;
+    /** Whether this request reached the server over HTTPS (directly, or through a trusted proxy). */
+    readonly secure: (c: Context) => boolean;
+    /** Seconds a validated token's identity is reused (default 300). */
+    readonly identityTtlSeconds?: number;
+  };
   /** The admin API at `/api/admin/v1` (P2-09); absent = the whole API answers 404. */
   readonly admin?: Pick<AdminApiOptions, 'services' | 'audit' | 'authenticate'>;
 }
@@ -186,6 +200,8 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
   const maxBody = options.maxBodyBytes ?? MAX_BODY_BYTES;
   const deadlineMs = options.deadlineMs ?? EXCHANGE_DEADLINE_MS;
   const cache = new AccessCache((options.accessCacheTtlSeconds ?? 30) * 1000);
+  /** Pass-through identities validated recently: HMAC fingerprint → valid until (P2-14). */
+  const identities = new Map<string, number>();
   const { services } = options;
   const registry = new ToolRegistry();
   for (const tool of options.tools) registry.register(tool);
@@ -309,27 +325,77 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
 
     // Authenticate: the same 401 for an unknown workspace, a bad token or any denial (T19).
     const presented = bearerToken(c.req.header('authorization'));
-    if (presented === null || !isWellFormedDeviceToken(presented, options.access.environment)) {
-      return unauthorized(presented === null ? 'no_token' : 'token_malformed');
-    }
-    try {
-      const hash = await hashDeviceToken(presented);
-      access = cache.get(hash, slug, started) ?? null;
-      if (access === null) {
-        const decision = await authenticateDeviceToken(
-          options.storage,
-          presented,
-          slug,
-          options.access,
-          started,
-        );
-        if (!decision.ok) return unauthorized(decision.reason);
-        access = decision.access;
-        cache.set(hash, slug, access, started);
+    const agilityToken = c.req.header('x-agility-token');
+    /** The caller's own Agility token on a pass-through workspace (P2-14); never stored, never logged. */
+    let passthroughToken: string | null = null;
+    if (presented === null && agilityToken !== undefined) {
+      const pt = options.passthrough;
+      if (pt === undefined) return unauthorized('passthrough_disabled');
+      if (!pt.secure(c)) return unauthorized('passthrough_insecure');
+      if (agilityToken.length === 0 || agilityToken.length > 4_000 || /[\s\p{Cc}]/u.test(agilityToken)) {
+        return unauthorized('token_malformed');
       }
-    } catch (error) {
-      services.logger.error('access resolution failed', { requestId, error: (error as Error).name });
-      return finish(c.json({ error: 'temporarily unavailable' }, 503, { 'retry-after': '5' }), 'unavailable');
+      try {
+        const workspace = await options.storage.workspaces.getBySlug(slug);
+        const instance =
+          workspace === null ? null : await options.storage.instances.get(workspace.instanceId);
+        const fingerprint =
+          instance === null
+            ? ''
+            : await options.keyring.mac(KeyPurpose.AuditIdentity, `${instance.id}|${agilityToken}`);
+        const decision = resolvePassthroughAccess(slug, { workspace, instance }, fingerprint, options.access);
+        if (!decision.ok || instance === null)
+          return unauthorized(decision.ok ? 'instance_missing' : decision.reason);
+        // The token must work on this workspace's instance: validated once, then trusted for a short while by
+        // fingerprint (the identity cache holds no token).
+        const key = `${fingerprint}|${instance.id}`;
+        if ((identities.get(key) ?? 0) <= started) {
+          const result = await pt.validator.validate(instance, decision.access.credential.id, agilityToken);
+          if (result.status === 'unavailable') {
+            return finish(
+              c.json({ error: 'temporarily unavailable' }, 503, { 'retry-after': '5' }),
+              'unavailable',
+            );
+          }
+          if (result.status !== 'valid') return unauthorized('passthrough_invalid');
+          if (identities.size >= 10_000) identities.clear();
+          identities.set(key, started + (pt.identityTtlSeconds ?? 300) * 1000);
+        }
+        access = decision.access;
+        passthroughToken = agilityToken;
+      } catch (error) {
+        services.logger.error('access resolution failed', { requestId, error: (error as Error).name });
+        return finish(
+          c.json({ error: 'temporarily unavailable' }, 503, { 'retry-after': '5' }),
+          'unavailable',
+        );
+      }
+    } else {
+      if (presented === null || !isWellFormedDeviceToken(presented, options.access.environment)) {
+        return unauthorized(presented === null ? 'no_token' : 'token_malformed');
+      }
+      try {
+        const hash = await hashDeviceToken(presented);
+        access = cache.get(hash, slug, started) ?? null;
+        if (access === null) {
+          const decision = await authenticateDeviceToken(
+            options.storage,
+            presented,
+            slug,
+            options.access,
+            started,
+          );
+          if (!decision.ok) return unauthorized(decision.reason);
+          access = decision.access;
+          cache.set(hash, slug, access, started);
+        }
+      } catch (error) {
+        services.logger.error('access resolution failed', { requestId, error: (error as Error).name });
+        return finish(
+          c.json({ error: 'temporarily unavailable' }, 503, { 'retry-after': '5' }),
+          'unavailable',
+        );
+      }
     }
 
     if (c.req.method !== 'POST') {
@@ -352,10 +418,11 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
 
     let token: string;
     try {
-      token = await openCredentialToken(options.keyring, {
-        id: access.credential.id,
-        ...access.credential.sealed,
-      });
+      const sealed = access.credential.sealed;
+      token =
+        sealed === null
+          ? (passthroughToken as string)
+          : await openCredentialToken(options.keyring, { id: access.credential.id, ...sealed });
     } catch (error) {
       services.logger.error('credential could not be decrypted', { requestId, error: (error as Error).name });
       return finish(c.json({ error: 'temporarily unavailable' }, 503, { 'retry-after': '5' }), 'unavailable');

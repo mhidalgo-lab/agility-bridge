@@ -2,7 +2,14 @@
 // Drizzle schema (SQLite dialect) shared by node:sqlite and D1 (ADR-0006). The DDL itself lives in the migrations
 // (`src/migrations/`): STRICT tables, CHECK constraints and triggers that Drizzle cannot express. A test compares both.
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import type { AuditKind, AuditStatus, JsonObject, Role, ValidationStatus } from './types.ts';
+import type {
+  AuditKind,
+  AuditStatus,
+  CredentialSource,
+  JsonObject,
+  Role,
+  ValidationStatus,
+} from './types.ts';
 
 const createdAt = () => integer('created_at').notNull();
 const updatedAt = () => integer('updated_at').notNull();
@@ -80,6 +87,7 @@ export const workspaces = sqliteTable(
       onDelete: 'restrict',
     }),
     writePolicy: text('write_policy', { mode: 'json' }).$type<JsonObject>().notNull(),
+    credentialSource: text('credential_source').$type<CredentialSource>().notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     disabledAt: integer('disabled_at'),

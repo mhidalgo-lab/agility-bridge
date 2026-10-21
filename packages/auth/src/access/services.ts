@@ -93,6 +93,8 @@ export interface NewWorkspaceInput {
   limits?: JsonObject;
   defaultCredentialId?: string | null;
   writePolicy?: JsonObject;
+  /** `passthrough`: callers send their own Agility token (P2-14, needs `AB_PASSTHROUGH=on`). */
+  credentialSource?: 'stored' | 'passthrough';
 }
 
 export interface NewGrantInput {
@@ -439,6 +441,7 @@ export function accessServices(options: AccessServicesOptions) {
         limits,
         defaultCredentialId: input.defaultCredentialId ?? null,
         writePolicy,
+        credentialSource: input.credentialSource ?? 'stored',
       });
     },
     async update(id: string, patch: WorkspacePatchInput): Promise<Workspace> {
