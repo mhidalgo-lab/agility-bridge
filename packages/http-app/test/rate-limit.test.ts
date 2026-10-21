@@ -4,6 +4,7 @@
 import { silentLogger } from '@agility-bridge/core';
 import { describe, expect, it } from 'vitest';
 import {
+  addressKey,
   clientAddress,
   createRequestLimits,
   DEFAULT_RATE_LIMITS,
@@ -133,5 +134,31 @@ describe('clientAddress (trusted proxy hops)', () => {
     expect(clientAddress('10.0.0.9', 'not an ip!', 1)).toBe('10.0.0.9');
     expect(clientAddress(undefined, undefined, 0)).toBe('unknown');
     expect(clientAddress('::1', '2001:db8::1', 1)).toBe('2001:db8::1');
+  });
+});
+
+describe('addressKey (P2-17 review L4)', () => {
+  it('limits IPv6 clients by their /64, so rotating addresses inside it does not help', () => {
+    expect(addressKey('2001:db8:1:2:aaaa::1')).toBe('2001:db8:1:2::/64');
+    expect(addressKey('2001:0db8:0001:0002:ffff:1:2:3')).toBe('2001:db8:1:2::/64');
+    expect(addressKey('[2001:db8:1:2::9]')).toBe('2001:db8:1:2::/64');
+    expect(addressKey('fe80::1%eth0')).toBe('fe80:0:0:0::/64');
+    expect(addressKey('::1')).toBe('0:0:0:0::/64');
+    expect(addressKey('2001:db8:1:3::1')).not.toBe(addressKey('2001:db8:1:2::1'));
+  });
+
+  it('keeps IPv4 (also IPv4-mapped) as is, and anything else bounded', () => {
+    expect(addressKey('1.2.3.4')).toBe('1.2.3.4');
+    expect(addressKey('::ffff:1.2.3.4')).toBe('1.2.3.4');
+    expect(addressKey('unknown')).toBe('unknown');
+    expect(addressKey(`${'a:'.repeat(100)}`).length).toBeLessThanOrEqual(64);
+  });
+
+  it('shares the per-address limit across one /64', async () => {
+    const w = await limited({ ipPerMinute: 2 });
+    expect((await post(w, 'team-a', w.tokens.alice, LIST, from('2001:db8::1'))).status).toBe(200);
+    expect((await post(w, 'team-a', w.tokens.alice, LIST, from('2001:db8::2'))).status).toBe(200);
+    expect((await post(w, 'team-a', w.tokens.alice, LIST, from('2001:db8::3'))).status).toBe(429);
+    expect((await post(w, 'team-a', w.tokens.alice, LIST, from('2001:db8:0:1::1'))).status).toBe(200);
   });
 });

@@ -32,6 +32,7 @@ export {
   readMcpBody,
 } from './mcp-request.ts';
 export {
+  addressKey,
   clientAddress,
   createRequestLimits,
   DEFAULT_RATE_LIMITS,

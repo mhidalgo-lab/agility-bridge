@@ -83,6 +83,8 @@ export interface RateLimitConfig {
   readonly tokenPerMinute: number;
   /** Requests per minute per grant, all its devices together (default 300; a grant's `rateLimit.perMinute` lowers it). */
   readonly grantPerMinute: number;
+  /** Validations of new pass-through tokens per minute per instance, each costing Agility requests (default 30). */
+  readonly validationsPerMinute: number;
 }
 
 export const DEFAULT_RATE_LIMITS: RateLimitConfig = Object.freeze({
@@ -91,9 +93,35 @@ export const DEFAULT_RATE_LIMITS: RateLimitConfig = Object.freeze({
   authFailuresPer5Minutes: 10,
   tokenPerMinute: 120,
   grantPerMinute: 300,
+  validationsPerMinute: 30,
 });
 
 const MINUTE = 60_000;
+
+/**
+ * The key an address is limited under: IPv4 as is, IPv6 by its /64 network, since one client usually holds a whole /64
+ * and could otherwise rotate addresses past the limits (P2-17 review L4). IPv4-mapped IPv6 counts as IPv4.
+ */
+export function addressKey(ip: string): string {
+  const raw = ip
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '')
+    .replace(/%.*$/, '');
+  if (!raw.includes(':')) return raw;
+  const mapped = /^(?:0*:)*:?ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(raw);
+  if (mapped !== null) return mapped[1] as string;
+  const [head = '', tail] = raw.split('::', 2) as [string, string | undefined];
+  const left = head === '' ? [] : head.split(':');
+  const right = tail === undefined || tail === '' ? [] : tail.split(':');
+  const missing = tail === undefined ? 0 : Math.max(0, 8 - left.length - right.length);
+  const groups = [...left, ...Array<string>(missing).fill('0'), ...right];
+  if (groups.length !== 8 || groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return raw.slice(0, 64);
+  return `${groups
+    .slice(0, 4)
+    .map((g) => Number.parseInt(g, 16).toString(16))
+    .join(':')}::/64`;
+}
 
 /** The request hooks of the HTTP app over a limiter. */
 export function createRequestLimits(
@@ -121,20 +149,29 @@ export function createRequestLimits(
     beforeAuth(ip, now) {
       if (!config.enabled) return { ok: true };
       return safely('ip', () =>
-        limiter.take(`ip:${ip}`, { limit: config.ipPerMinute, windowMs: MINUTE }, now),
+        limiter.take(`ip:${addressKey(ip)}`, { limit: config.ipPerMinute, windowMs: MINUTE }, now),
       );
     },
     async onAuthFailure(ip, now) {
       if (!config.enabled) return;
-      await safely('auth_failures', () => limiter.take(`authfail:${ip}`, failures, now));
+      await safely('auth_failures', () => limiter.take(`authfail:${addressKey(ip)}`, failures, now));
     },
     async failuresExhausted(ip, now) {
       if (!config.enabled) return false;
       try {
-        return !(await limiter.peek(`authfail:${ip}`, failures, now));
+        return !(await limiter.peek(`authfail:${addressKey(ip)}`, failures, now));
       } catch {
         return false;
       }
+    },
+    beforeValidation(instanceId, now) {
+      // Fail closed here: an unbounded stream of new tokens would spend the instance's Agility quota (A10).
+      if (!config.enabled) return { ok: true };
+      return limiter.take(
+        `validate:${instanceId}`,
+        { limit: config.validationsPerMinute, windowMs: MINUTE },
+        now,
+      );
     },
     async afterAuth(access: EffectiveAccess, mcp: ClassifiedRequest, now) {
       // A long-lived listen stream is not a call (L-015).

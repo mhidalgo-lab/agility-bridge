@@ -6,8 +6,16 @@ import {
   resolvePassthroughAccess,
   type ValidationResult,
 } from '@agility-bridge/auth';
+import { silentLogger } from '@agility-bridge/core';
 import { describe, expect, it } from 'vitest';
 import { instance, SETTINGS, TOOLS, workspace } from '../../auth/test/helpers/access.ts';
+import {
+  createRequestLimits,
+  DEFAULT_RATE_LIMITS,
+  type HttpAppOptions,
+  MemoryRateLimiter,
+  type RateLimitConfig,
+} from '../src/index.ts';
 import { connect, ORIGIN, post, type World, world } from './helpers/world.ts';
 
 const GOOD = '1.CallerOwnAgilityTokenNotReal0001';
@@ -34,10 +42,9 @@ function validator(): CredentialValidator & { calls: number } {
   return v;
 }
 
-async function ptWorld(enabled = true) {
-  const v = validator();
-  const w = await world(
-    enabled
+async function ptWorld(enabled = true, over: Partial<HttpAppOptions> = {}, v = validator()) {
+  const w = await world({
+    ...(enabled
       ? {
           passthrough: {
             validator: v,
@@ -45,8 +52,9 @@ async function ptWorld(enabled = true) {
             identityTtlSeconds: 60,
           },
         }
-      : {},
-  );
+      : {}),
+    ...over,
+  });
   await w.storage.workspaces.update(w.ids.workspaceA, { credentialSource: 'passthrough' });
   return { w, v };
 }
@@ -133,6 +141,58 @@ describe('pass-through access', () => {
     expect((await client.listTools()).tools.length).toBeGreaterThan(0);
     await client.close();
     expect(ORIGIN).toContain('127.0.0.1');
+  });
+});
+
+describe('pass-through validation costs (P2-17 review F2)', () => {
+  const limits = (config: Partial<RateLimitConfig>) => ({
+    limits: createRequestLimits(new MemoryRateLimiter(), { ...DEFAULT_RATE_LIMITS, ...config }, silentLogger),
+    clientIp: (c: { req: { header(name: string): string | undefined } }) =>
+      c.req.header('x-test-ip') ?? 'unknown',
+  });
+  const from = (ip: string) => ({ ...https, 'x-test-ip': ip });
+
+  it('an address out of failed attempts gets 429 without another upstream validation', async () => {
+    const { w, v } = await ptWorld(true, limits({ authFailuresPer5Minutes: 2 }));
+    expect((await send(w, 'wrong-token-0000000001', LIST, 'team-a', from('9.9.9.9'))).status).toBe(401);
+    expect((await send(w, 'wrong-token-0000000002', LIST, 'team-a', from('9.9.9.9'))).status).toBe(401);
+    expect(v.calls).toBe(2);
+    expect((await send(w, 'wrong-token-0000000003', LIST, 'team-a', from('9.9.9.9'))).status).toBe(429);
+    expect(v.calls).toBe(2);
+    // Another address is unaffected.
+    expect((await send(w, GOOD, LIST, 'team-a', from('8.8.8.8'))).status).toBe(200);
+  });
+
+  it('caps new-token validations per instance, whatever the addresses', async () => {
+    const { w, v } = await ptWorld(true, limits({ validationsPerMinute: 2 }));
+    expect((await send(w, 'wrong-token-0000000001', LIST, 'team-a', from('1.0.0.1'))).status).toBe(401);
+    expect((await send(w, 'wrong-token-0000000002', LIST, 'team-a', from('1.0.0.2'))).status).toBe(401);
+    const third = await send(w, 'wrong-token-0000000003', LIST, 'team-a', from('1.0.0.3'));
+    expect(third.status).toBe(429);
+    expect(third.headers.get('retry-after')).toBe('30');
+    expect(v.calls).toBe(2);
+  });
+
+  it('concurrent requests with the same new token share one upstream validation', async () => {
+    const base = validator();
+    let release = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const slow = Object.assign(base, {
+      validate: async (...args: Parameters<CredentialValidator['validate']>) => {
+        await gate;
+        return validator()
+          .validate(...args)
+          .finally(() => base.calls++);
+      },
+    });
+    const { w } = await ptWorld(true, {}, slow);
+    const pending = [send(w, GOOD), send(w, GOOD), send(w, GOOD)];
+    await new Promise((r) => setTimeout(r, 20));
+    release();
+    expect((await Promise.all(pending)).map((r) => r.status)).toEqual([200, 200, 200]);
+    expect(slow.calls).toBe(1);
   });
 });
 

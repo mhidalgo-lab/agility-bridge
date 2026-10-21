@@ -48,7 +48,7 @@ function real(path: string): string {
 }
 
 /** True when `file` is `dir` or inside it, after resolving links. */
-function isInside(file: string, dir: string): boolean {
+export function isInside(file: string, dir: string): boolean {
   const rel = relative(real(dir), real(file));
   return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }

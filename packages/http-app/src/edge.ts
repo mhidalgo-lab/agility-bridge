@@ -23,12 +23,14 @@ export interface Edge {
 
 const LOOPBACK = ['localhost', '127.0.0.1', '[::1]'];
 
-/** Lower-cased host without a port (`[::1]:8787` → `[::1]`). */
-function hostName(host: string): string {
-  const h = host.trim().toLowerCase();
-  if (h.startsWith('[')) return h.slice(0, h.indexOf(']') + 1);
-  const colon = h.lastIndexOf(':');
-  return colon > 0 ? h.slice(0, colon) : h;
+/** A `Host` value: a DNS name or IPv4 address, or a bracketed IPv6 address, and an optional numeric port. */
+const HOST = /^(?:([a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?)|(\[[0-9a-f:.]{2,45}\]))(?::([0-9]{1,5}))?$/;
+
+/** Lower-cased host without a port (`[::1]:8787` → `[::1]`), or `null` when the value is not a well-formed host. */
+function hostName(host: string): string | null {
+  const m = HOST.exec(host.toLowerCase());
+  if (m === null) return null;
+  return (m[1] ?? m[2]) as string;
 }
 
 function canonicalOrigin(origin: string): string | null {
@@ -49,7 +51,7 @@ export function createEdge(options: EdgeOptions): Edge {
   for (const h of options.allowedHosts ?? []) {
     const v = h.trim().toLowerCase();
     if (v.includes(':') && !v.startsWith('[')) exactHosts.add(v);
-    else hosts.add(hostName(v));
+    else hosts.add(hostName(v) ?? v);
   }
   const origins = new Set<string>();
   if (publicUrl !== undefined) origins.add(publicUrl.origin);
@@ -78,8 +80,11 @@ export function createEdge(options: EdgeOptions): Edge {
     securityHeaders: Object.freeze(securityHeaders),
     hostAllowed(host) {
       if (typeof host !== 'string' || host === '' || host.length > 300) return false;
-      const lower = host.trim().toLowerCase();
-      return exactHosts.has(lower) || hosts.has(hostName(lower));
+      // Strict syntax first (P2-17 review L3): `localhost:x`, `localhost:8787, evil`, trailing junk are refused.
+      const name = hostName(host);
+      if (name === null) return false;
+      const lower = host.toLowerCase();
+      return exactHosts.has(lower) || hosts.has(name);
     },
     originAllowed(origin) {
       if (origin === undefined || origin === null) return true;

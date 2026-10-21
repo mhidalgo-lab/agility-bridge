@@ -129,7 +129,9 @@ own Agility access token in the `X-Agility-Token` header instead of a device tok
   `X-Forwarded-Proto: https` only with `AB_TRUSTED_PROXY_HOPS`).
 - The token is checked against the workspace's instance (the member behind it), then trusted for 5 minutes by its
   keyed fingerprint (HMAC); the token itself is never stored or logged. The audit log and the rate limits identify
-  callers by that fingerprint (`pt:…`).
+  callers by that fingerprint (`pt:…`). Checking a new token costs Agility requests, so the server checks at most
+  `AB_RATE_LIMIT_VALIDATIONS_PER_MINUTE` new tokens per instance (30), shares one check between concurrent requests
+  with the same token, and stops checking for a client address that has used up its failed attempts.
 - Every workspace control applies unchanged: Agility projects, asset types, tools, limits, rate limits. There are no
   grants, and **never write tools** (read-only in 1.0, D-04).
 - Anyone with a valid token for the instance and network access to the server can use such a workspace: keep it on a

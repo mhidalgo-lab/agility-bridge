@@ -240,6 +240,16 @@ describe('grants: the token policy (ADR-0008)', () => {
     ]);
   });
 
+  it('moving a grant onto a personal credential revokes the device tokens issued before (P2-17 review M2)', async () => {
+    const w = await world();
+    const { record } = await svc.grants.create({ workspaceId: w.ws.id, userId: w.alice.id });
+    const { record: tok } = await svc.tokens.issue({ grantId: record.id, label: 'old' });
+    await svc.grants.update(record.id, { label: 'renamed' });
+    expect((await storage.accessTokens.get(tok.id))?.revokedAt).toBeNull();
+    await svc.grants.update(record.id, { credentialId: w.aliceCred.id });
+    expect((await storage.accessTokens.get(tok.id))?.revokedAt).toBe(NOW);
+  });
+
   it('a grant made through the services resolves end to end', async () => {
     const w = await world();
     const { record } = await svc.grants.create({

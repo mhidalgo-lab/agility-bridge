@@ -47,7 +47,7 @@ import { serve as serveNode } from '@hono/node-server';
 import pkg from '../package.json' with { type: 'json' };
 import { createNodeFetch } from './agility-fetch.ts';
 import { ConfigError, checkEnvNames, DEFAULTS } from './config.ts';
-import { readMasterKeys } from './master-key.ts';
+import { isInside, readMasterKeys } from './master-key.ts';
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -188,6 +188,13 @@ export function loadServeConfig(env: Env): ServeConfig {
         1,
         100_000,
       ),
+      validationsPerMinute: integer(
+        'AB_RATE_LIMIT_VALIDATIONS_PER_MINUTE',
+        env['AB_RATE_LIMIT_VALIDATIONS_PER_MINUTE'],
+        DEFAULT_RATE_LIMITS.validationsPerMinute,
+        1,
+        10_000,
+      ),
     },
     trustedProxyHops: integer('AB_TRUSTED_PROXY_HOPS', env['AB_TRUSTED_PROXY_HOPS'], 0, 0, 10),
     auditRetentionDays: integer('AB_AUDIT_RETENTION_DAYS', env['AB_AUDIT_RETENTION_DAYS'], 90, 0, 36_500),
@@ -305,10 +312,9 @@ export async function startServe(
       ? {
           passthrough: {
             validator: credentialValidator(hostServices),
-            // HTTPS only (P2-14): directly, or through a trusted proxy that says so.
-            secure: (c) =>
-              new URL(c.req.url).protocol === 'https:' ||
-              (config.trustedProxyHops > 0 && c.req.header('x-forwarded-proto') === 'https'),
+            // HTTPS only (P2-14). This server speaks plain HTTP, so only a trusted proxy can say the client used TLS;
+            // the request URL's scheme is the client's choice (absolute-form targets, P2-17 review F1).
+            secure: (c) => config.trustedProxyHops > 0 && c.req.header('x-forwarded-proto') === 'https',
           },
         }
       : {}),
@@ -346,7 +352,9 @@ export async function startServe(
   });
 
   const server = await new Promise<ReturnType<typeof serveNode>>((resolve, reject) => {
-    const s = serveNode({ fetch: app.fetch, port: config.port, hostname: config.host }, () => resolve(s));
+    const s = serveNode({ fetch: originFormOnly(app.fetch), port: config.port, hostname: config.host }, () =>
+      resolve(s),
+    );
     s.once('error', reject);
   });
   // Bound slow clients at the socket too (L-084); the app bounds the exchange at 180 s.
@@ -384,12 +392,35 @@ export async function startServe(
 }
 
 /** `AB_ADMIN_TOKEN` or `AB_ADMIN_TOKEN_FILE` (a 0600 file outside the data directory), or undefined: no admin API. */
+type NodeFetch = (
+  request: Request,
+  env: { incoming?: { url?: string | undefined } },
+) => Response | Promise<Response>;
+
+/**
+ * Refuses request targets that are not origin-form (`/path`): an absolute-form target (`GET http://host/…`) or `*`
+ * would let the client choose the URL the app sees, scheme and host included (P2-17 review F1).
+ */
+export function originFormOnly(fetch: NodeFetch): NodeFetch {
+  return (request, env) => {
+    const target = env?.incoming?.url;
+    if (typeof target !== 'string' || !target.startsWith('/') || target.startsWith('//')) {
+      return new Response(JSON.stringify({ error: 'bad request' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return fetch(request, env);
+  };
+}
+
 export function readAdminToken(env: Env, dataDir?: string): string | undefined {
   const value = env['AB_ADMIN_TOKEN'];
   const file = env['AB_ADMIN_TOKEN_FILE'];
   if (value && file) throw new ConfigError('Set AB_ADMIN_TOKEN or AB_ADMIN_TOKEN_FILE, not both.');
   if (file) {
-    if (dataDir !== undefined && resolve(file).startsWith(`${resolve(dataDir)}${sep}`)) {
+    // Symbolic links resolved, like the master key's check (P2-17 review L1).
+    if (dataDir !== undefined && isInside(file, dataDir)) {
       throw new ConfigError(
         'AB_ADMIN_TOKEN_FILE is inside the data directory; keep it away from the database and its backups.',
       );

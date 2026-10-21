@@ -173,6 +173,17 @@ describe('request hygiene', () => {
     for (const headers of [
       { host: 'evil.example' },
       { host: 'localhost.evil.example:8787' },
+      // Malformed Host values are refused, never parsed leniently into an allowed name (P2-17 review L3).
+      { host: 'localhost:8787@evil.example' },
+      { host: 'localhost:8787, evil.example' },
+      { host: 'localhost:evil.example' },
+      { host: 'localhost:' },
+      { host: '[::1]junk' },
+      { host: 'localhost/evil' },
+      { host: 'localhost:87x' },
+      { host: 'localhost:8787:1' },
+      { host: 'evil.example#localhost' },
+      { host: '' },
       { origin: 'null' },
       { origin: 'https://evil.example' },
     ]) {

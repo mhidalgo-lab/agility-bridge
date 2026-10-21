@@ -128,7 +128,7 @@ CREATE TABLE kv (
   value TEXT NOT NULL,
   expires_at INTEGER
 ) STRICT;
-INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (1, 'init', '357a846646072119af32b6b5764ce54fae071b7989f49ad5f49c541d8e139d59', 1792540800000);
+INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (1, 'init', '9179ce1e9c7e44bf0c9ff9efc7b532f200e5065f696ee3380bdeeee3c754aa9f', 1792540800000);
 INSERT INTO users (id, email, display_name, idp, idp_subject, role, created_at, updated_at, disabled_at) VALUES ('u-owner', 'owner@example.test', 'Owner', NULL, NULL, 'owner', 1792540800000, 1792540800000, NULL);
 INSERT INTO users (id, email, display_name, idp, idp_subject, role, created_at, updated_at, disabled_at) VALUES ('u-member', 'member@example.test', NULL, 'github', '1001', 'member', 1792540800000, 1792540800000, NULL);
 INSERT INTO instances (id, label, base_url, tls, number_prefixes, meta_fingerprint, created_at, updated_at, disabled_at) VALUES ('i-main', 'Main', 'https://agility.example.test/Main', NULL, '{"Story":"S"}', '"1.0"', 1792540800000, 1792540800000, NULL);
@@ -188,6 +188,33 @@ WHEN (NEW.base_url IS NOT OLD.base_url OR NEW.tls IS NOT OLD.tls) AND EXISTS (
   SELECT 1 FROM credentials c WHERE c.instance_id = NEW.id AND c.revoked_at IS NULL)
 BEGIN
   SELECT RAISE(ABORT, 'ab_conflict: instances.base_url and tls cannot change while the instance has credentials that are not revoked');
+END;
+CREATE TRIGGER users_last_owner_update BEFORE UPDATE OF role, disabled_at ON users
+WHEN OLD.role = 'owner' AND OLD.disabled_at IS NULL AND (NEW.role IS NOT 'owner' OR NEW.disabled_at IS NOT NULL)
+  AND NOT EXISTS (SELECT 1 FROM users u WHERE u.role = 'owner' AND u.disabled_at IS NULL AND u.id <> OLD.id)
+BEGIN
+  SELECT RAISE(ABORT, 'ab_conflict: the last active owner cannot lose the owner role or be disabled');
+END;
+CREATE TRIGGER users_last_owner_delete BEFORE DELETE ON users
+WHEN OLD.role = 'owner' AND OLD.disabled_at IS NULL
+  AND NOT EXISTS (SELECT 1 FROM users u WHERE u.role = 'owner' AND u.disabled_at IS NULL AND u.id <> OLD.id)
+BEGIN
+  SELECT RAISE(ABORT, 'ab_conflict: the last active owner cannot be deleted');
+END;
+CREATE TRIGGER credentials_revocation_final BEFORE UPDATE OF revoked_at ON credentials
+WHEN OLD.revoked_at IS NOT NULL AND NEW.revoked_at IS NOT OLD.revoked_at
+BEGIN
+  SELECT RAISE(ABORT, 'ab_conflict: credentials.revoked_at cannot change once set');
+END;
+CREATE TRIGGER grants_revocation_final BEFORE UPDATE OF revoked_at ON grants
+WHEN OLD.revoked_at IS NOT NULL AND NEW.revoked_at IS NOT OLD.revoked_at
+BEGIN
+  SELECT RAISE(ABORT, 'ab_conflict: grants.revoked_at cannot change once set');
+END;
+CREATE TRIGGER access_tokens_revocation_final BEFORE UPDATE OF revoked_at ON access_tokens
+WHEN OLD.revoked_at IS NOT NULL AND NEW.revoked_at IS NOT OLD.revoked_at
+BEGIN
+  SELECT RAISE(ABORT, 'ab_conflict: access_tokens.revoked_at cannot change once set');
 END;
 CREATE TRIGGER audit_log_append_only BEFORE UPDATE ON audit_log
 BEGIN
