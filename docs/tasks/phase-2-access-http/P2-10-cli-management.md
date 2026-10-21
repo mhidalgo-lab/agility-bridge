@@ -2,12 +2,12 @@
 id: P2-10
 title: CLI management commands (local and remote)
 phase: 2
-status: todo
+status: review
 priority: medium
 depends_on: [P2-09]
 adr: ["0008"]
 lessons: [L-026, L-065]
-owner: ""
+owner: "Matias Hidalgo"
 ---
 
 # P2-10 — CLI management commands (local and remote)
@@ -26,8 +26,18 @@ Operators manage a deployment from the terminal with the same validation and aud
 - Secrets only from a hidden prompt, stdin, a file or an environment variable — never flags.
 
 ## Acceptance criteria
-- [ ] Local and remote modes produce identical results and audit rows (local rows carry `via: cli`).
-- [ ] No secret appears in argv in any documented command (test).
+- [x] Local and remote modes produce identical results and audit rows (local rows carry `via: cli`).
+  *(`apps/cli/test/manage.test.ts` runs the same ten-step administration locally and against a running server;
+  normalised outputs and audit rows are equal, `via` is `cli` and `api`.)*
+- [x] No secret appears in argv in any documented command (test). *(No command option or argument looks like a
+  secret; every command line in docs/guide/cli.md is scanned for token and key shapes; `--token` is refused.)*
+
+## Notes
+- `apps/cli/src/manage/`: `commands.ts` (one table for parsing, help, the run and the generated reference),
+  `client.ts` (local: the admin API in process over SQLite as break-glass owner with `via: cli`; remote: HTTPS, no
+  redirects, the admin token), `secret-input.ts` (`--from-file`, environment, standard input, hidden prompt).
+- Credentials added from the CLI are shared: personal tokens are stored only by their own user (P4-07).
+- `keys status|rotate|retire` run on the local database only.
 
 ## Security notes
 THREAT_MODEL T8, T23.
@@ -37,8 +47,8 @@ THREAT_MODEL T8, T23.
 - L-065 — Every alternate writer is an authorization boundary.
 
 ## Docs to update
-- docs/guide/cli.md (new)
-- docs/reference/cli.md (generated)
+- [x] docs/guide/cli.md (new)
+- [x] docs/reference/cli.md (generated)
 
 ## Out of scope
 - Anything not listed under Scope.

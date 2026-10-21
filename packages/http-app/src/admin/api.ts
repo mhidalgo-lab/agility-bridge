@@ -34,6 +34,8 @@ export interface AdminApiOptions {
   readonly clientIp: (c: Context) => string;
   readonly logger: Logger;
   readonly clock: Clock;
+  /** Recorded in admin audit rows: `api` (default) or `cli` for the in-process local client (P2-10). */
+  readonly via?: string;
 }
 
 /** The break-glass authenticator: `Authorization: Bearer ab_admin_…` matching `AB_ADMIN_TOKEN`. */
@@ -367,7 +369,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       targetType: spec.audit.targetType,
       targetId: targetId.slice(0, 128),
       requestId: (c.get('requestId' as never) as string | undefined) ?? null,
-      via: 'api',
+      via: options.via ?? 'api',
       details: {
         actor: actor.kind === 'user' ? actor.role : 'break_glass',
         ...(extra as Record<string, never>),

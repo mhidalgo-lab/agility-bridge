@@ -346,12 +346,12 @@ export async function startServe(
 }
 
 /** `AB_ADMIN_TOKEN` or `AB_ADMIN_TOKEN_FILE` (a 0600 file outside the data directory), or undefined: no admin API. */
-export function readAdminToken(env: Env, dataDir: string): string | undefined {
+export function readAdminToken(env: Env, dataDir?: string): string | undefined {
   const value = env['AB_ADMIN_TOKEN'];
   const file = env['AB_ADMIN_TOKEN_FILE'];
   if (value && file) throw new ConfigError('Set AB_ADMIN_TOKEN or AB_ADMIN_TOKEN_FILE, not both.');
   if (file) {
-    if (resolve(file).startsWith(`${resolve(dataDir)}${sep}`)) {
+    if (dataDir !== undefined && resolve(file).startsWith(`${resolve(dataDir)}${sep}`)) {
       throw new ConfigError(
         'AB_ADMIN_TOKEN_FILE is inside the data directory; keep it away from the database and its backups.',
       );
