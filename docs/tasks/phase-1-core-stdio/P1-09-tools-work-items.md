@@ -2,7 +2,7 @@
 id: P1-09
 title: "Tools: search_work_items, get_work_item, list_my_work"
 phase: 1
-status: review
+status: done
 priority: high
 depends_on: [P1-08]
 adr: ["0015"]
