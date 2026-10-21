@@ -825,6 +825,12 @@ Foreign-scope rows, forged identifiers, poisoned strings, malformed payloads, an
 permission-limited responses.
 *Applied in:* P1-12.
 
+**L-174 — Check that the upstream answered the question you asked.**
+The P2-12 hostile-upstream run found `get_assets` and `resolveAsset` accepting any in-scope row the upstream sent: an
+upstream that ignored the `Number`/`ID` filter made `B-01003` (another project) come back as `B-01001`. Scope rechecks
+are not enough; a lookup by identity keeps only rows with that identity.
+*Applied in:* P2-12, `tools/query/get-assets.ts`, `identity/resolve.ts`.
+
 **L-123 — Make property tests meaningful and deterministic.**
 Generators must produce interesting cases (not worlds where almost everything is rejected), seeds must be replayable,
 generated values must not collide with planted secrets, and crypto, cold-start and browser tests need explicit timeouts.

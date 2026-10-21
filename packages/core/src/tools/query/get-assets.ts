@@ -84,8 +84,13 @@ export const getAssets: ToolDefinition = defineTool({
         },
         { allowAbstract: true },
       );
+      const asked = new Set(unknown.map((n) => n.toUpperCase()));
       for (const r of (await runQuery(ctx, compiled)).rows) {
-        if (typeof r['AssetType'] === 'string' && typeof r['Number'] === 'string')
+        if (
+          typeof r['AssetType'] === 'string' &&
+          typeof r['Number'] === 'string' &&
+          asked.has(r['Number'].toUpperCase())
+        )
           group(r['AssetType']).numbers.add(r['Number']);
       }
     }
@@ -133,8 +138,13 @@ export const getAssets: ToolDefinition = defineTool({
       const info = await fieldInfo(ctx, type, compiled.fields);
       for (const f of info.richText) richText.add(f);
       for (const f of compiled.fields) columns.add(f);
-      for (const r of (await runQuery(ctx, compiled)).rows)
-        items.push(toItem(r, type, compiled.fields, info, compiled.keys));
+      const numbers = new Set([...wanted.numbers].map((n) => n.toUpperCase()));
+      for (const r of (await runQuery(ctx, compiled)).rows) {
+        // Only the assets that were asked for: an upstream that ignores the filter must not add others (L-122).
+        const item = toItem(r, type, compiled.fields, info, compiled.keys);
+        const number = typeof item['number'] === 'string' ? item['number'].toUpperCase() : '';
+        if (wanted.oids.has(item['oid'] as string) || numbers.has(number)) items.push(item);
+      }
     }
     const found = new Set(
       items.flatMap((i) => [i['oid'], i['number']].filter((x): x is string => typeof x === 'string')),

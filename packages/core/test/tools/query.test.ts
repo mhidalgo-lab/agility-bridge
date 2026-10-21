@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // P1-08 generic tools: every asset type with custom fields, scope rechecks, cursors, global/denied types, the group switch.
 import { describe, expect, it } from 'vitest';
+import { resolveAsset } from '../../src/identity/resolve.ts';
 import {
   buildMcpServer,
   createBudget,
@@ -246,6 +247,17 @@ describe('query_assets', () => {
 });
 
 describe('get_assets', () => {
+  it('never lets an upstream that ignores the filter substitute another asset (P2-12)', async () => {
+    const { ctx } = setup({}, false, { filters: 'ignore-filters' });
+    for (const ref of ['B-01003', 'Story:1003', 'XX-09999']) {
+      const r = await call(getAssets, ctx(), { assets: [ref], fields: ['Name'] });
+      expect(r['structuredContent'], ref).toMatchObject({ items: [], notFound: [ref] });
+    }
+    for (const ref of ['B-01003', 'Story:1003']) {
+      await expect(resolveAsset(ctx(), ref), ref).rejects.toMatchObject({ code: 'AB_NOT_FOUND' });
+    }
+  });
+
   it('gets numbers and OID tokens across types, listing what is not found or not visible', async () => {
     const { ctx } = setup({ assetTypes: { deny: ['Epic'] } });
     const r = await call(getAssets, ctx(), {

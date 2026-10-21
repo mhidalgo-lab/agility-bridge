@@ -139,6 +139,12 @@ export async function resolveAsset(
   const { rows } = await runQuery(ctx, compiled);
   const visible: Row[] = [];
   for (const r of rows) {
+    // Only the asset that was asked for: an upstream that ignores the filter must not substitute another (L-122).
+    const same =
+      ref.kind === 'oid'
+        ? stripMoment(r['_oid']) === ref.oid
+        : typeof r['Number'] === 'string' && r['Number'].toUpperCase() === ref.number.toUpperCase();
+    if (!same) continue;
     const type = typeof r['AssetType'] === 'string' ? r['AssetType'] : compiled.assetType;
     if (await readableType(ctx, type)) visible.push(r);
   }
