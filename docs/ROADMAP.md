@@ -101,6 +101,7 @@ provenance, a GitHub Release with SBOM and checksums, and (from Phase 2) a signe
 | 2026-10-16 | Primary clients documented equally: GitHub Copilot (VS Code, JetBrains, CLI), Claude (Code, Desktop, web, mobile), Cursor, Windsurf, MCP Inspector | ADR-0016 |
 | 2026-10-16 | "Workspace" names agility-bridge's unit of access; "Agility project" always means Agility's `Scope` | ARCHITECTURE §4 |
 | 2026-10-19 | Owner answered D-01 – D-24. Live tests use a read-only third-party tenant (writable sandbox needed before Phase 7); npm `agility-bridge`, Node ≥ 24, releases every phase; opt-in attachment download in 1.0 (deviates from the recommendation); all others as recommended | [pending-decisions/phase-0.md](pending-decisions/phase-0.md) |
+| 2026-10-21 | MCP SDK v2, stateless HTTP, both protocol eras accepted on real-client evidence (P0-07) | ADR-0005 |
 
 ## Task index
 
@@ -118,7 +119,7 @@ Status lives in each task file.
 | P0-04 | [Security tooling baseline](tasks/phase-0-foundations/P0-04-security-tooling.md) | high | P0-03 | review |
 | P0-05 | [Agent workflow and task tooling](tasks/phase-0-foundations/P0-05-agent-workflow.md) | high | P0-01 | done |
 | P0-06 | [Spike: Agility API behaviour, limits and fixtures](tasks/phase-0-foundations/P0-06-spike-agility-api.md) | high | P0-01, P0-12 | todo |
-| P0-07 | [Spike: MCP SDK v2 dual-era handler with real clients](tasks/phase-0-foundations/P0-07-spike-mcp-sdk-clients.md) | high | P0-01 | blocked |
+| P0-07 | [Spike: MCP SDK v2 dual-era handler with real clients](tasks/phase-0-foundations/P0-07-spike-mcp-sdk-clients.md) | high | P0-01 | review |
 | P0-08 | [Spike: OAuth 2.1 portability on Node and Workers](tasks/phase-0-foundations/P0-08-spike-oauth.md) | high | P0-07 | todo |
 | P0-09 | [Spike: Cloudflare Workers limits with Agility-shaped payloads](tasks/phase-0-foundations/P0-09-spike-workers-limits.md) | high | P0-01 | review |
 | P0-10 | [Prior-art review](tasks/phase-0-foundations/P0-10-prior-art-review.md) | medium | — | done |
