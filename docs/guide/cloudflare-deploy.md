@@ -1,12 +1,18 @@
 # Deploy to Cloudflare Workers
 
-> Deployment mode D: agility-bridge as a Cloudflare Worker on D1, reachable from every device, no server to run. First
-> version (P3-05); the custom-domain, migration and client sections arrive with P3-07 and P3-09. Limits per plan:
-> [Cloudflare limits](cloudflare-limits.md).
+> Deployment mode D: agility-bridge as a Cloudflare Worker on D1, reachable from every device, no server to run.
+> Limits, measured costs and rate limits per plan: [Cloudflare limits](cloudflare-limits.md). Executed against a real
+> account as recorded in [verification](../dev/verification.md#cloudflare-deployment-p3-05-p3-07).
 
-Workers reach only instances that are on the internet with publicly trusted certificates. For an on-premises Agility
-or one with a private CA, run [`agility-bridge serve`](self-hosting.md) instead
-([ADR-0014](../adr/0014-supported-agility-installations.md)).
+## Which Agility instances a Worker can reach
+
+- **Hosted Agility** (`*.v1host.com`) and any instance reachable **from the internet with a publicly trusted
+  certificate**: yes.
+- **On-premises** Agility on a private network, or with a certificate from a private CA: Workers cannot trust a private
+  CA and cannot reach private networks. Either publish the instance through a
+  [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) with a public
+  hostname (it then has a publicly trusted certificate, and you decide who may reach it), or run
+  [`agility-bridge serve`](self-hosting.md) next to it ([ADR-0014](../adr/0014-supported-agility-installations.md)).
 
 ## What you need
 
@@ -92,6 +98,38 @@ keep working at the new address. One-way, into an **empty** deployment (L-078):
    and checks the row counts. Rate-limit counters and other transient state are not copied.
 5. Point the devices at `https://<address>/w/<slug>/mcp` (their tokens are unchanged), then stop the old server and
    delete the backup.
+
+## A custom domain
+
+```sh
+pnpm cf:setup --name agility-bridge --domain mcp.example.com --secrets-file ~/.config/agility-bridge/prod.secrets
+```
+
+The domain must be a zone in the same Cloudflare account. `--domain` adds a Workers custom domain (Cloudflare creates
+the DNS record and the certificate), makes `https://mcp.example.com` the public URL (`AB_PUBLIC_URL`) and turns the
+`workers.dev` address off, so the Worker has one address and refuses every other `Host` (T24). Clients then use
+`https://mcp.example.com/w/<slug>/mcp`.
+
+**Bot protection must not challenge MCP clients** (L-028). On the zone, *Bot Fight Mode*, *Browser Integrity Check*
+and challenge rules answer non-browser clients with a challenge page, `403` or error `1010`, and MCP clients cannot
+pass them. Add a WAF custom rule *Skip* for `http.request.uri.path wildcard "/w/*/mcp"` (and `/api/admin/*` if you
+use the admin API remotely) that skips Browser Integrity Check and the managed bot rules, or turn Bot Fight Mode off
+for the zone. Leave the Worker's own limits in place: they apply after the skip.
+
+## Costs
+
+| | Free | Workers Paid (from 5 USD a month) |
+|---|---|---|
+| Requests | 100,000 a day | 10 million a month included |
+| CPU per request | 10 ms ([measured](cloudflare-limits.md#measured-cost): warm calls fit, a new isolate's first request does not yet, P3-14) | 30 s default |
+| Agility requests per tool call | 45 (preset and ceiling) | 1,000 |
+| D1 | 5 million rows read and 100,000 written a day | 25 billion read and 50 million written a month included |
+| Scheduled housekeeping | every 15 minutes, in small slices | same |
+
+Every MCP request reads a few D1 rows (access resolution is one batch, the access cache saves most of it) and writes an
+audit row per tool call, so the Free plan's 100,000 written rows a day are the first limit for a busy team. Prices
+and allowances: [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/),
+[D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/) (checked 2026-10).
 
 ## First setup of a workspace
 

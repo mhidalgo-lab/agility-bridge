@@ -2,7 +2,7 @@
 id: P3-07
 title: Cloudflare docs (deploy, limits, costs, custom domain)
 phase: 3
-status: todo
+status: review
 priority: medium
 depends_on: [P3-05]
 adr: ["0014"]
@@ -30,9 +30,9 @@ An operator deploys to a Cloudflare account by following the guide literally.
   zone, an Agility credential on the Worker.
 
 ## Acceptance criteria
-- [ ] Every command of the guide that needs no owner resource was executed against staging and recorded; the others are
+- [x] Every command of the guide that needs no owner resource was executed against staging and recorded; the others are
       owner steps.
-- [ ] `cf:setup --domain` tested; the guide's links and commands checked by the docs check.
+- [x] `cf:setup --domain` tested; the guide's links and commands checked by the docs check.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.

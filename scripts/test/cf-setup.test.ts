@@ -170,6 +170,32 @@ describe('cf:setup', () => {
     expect(prod['vars']).toMatchObject({ AB_ENVIRONMENT: 'production' });
   });
 
+  it('--domain: a custom domain as the only address and the public URL', async () => {
+    const { state, wrangler } = fakeWrangler();
+    let health = '';
+    await setup(
+      options(wrangler, {
+        domain: 'mcp.example.test',
+        fetchHealth: async (url) => {
+          health = url;
+          return 200;
+        },
+      }),
+    );
+    const config = readJsonc(readFileSync(localConfigPath(workerDir, 'agility-bridge-staging'), 'utf8'));
+    expect(config).toMatchObject({
+      workers_dev: false,
+      routes: [{ pattern: 'mcp.example.test', custom_domain: true }],
+      vars: { AB_PUBLIC_URL: 'https://mcp.example.test' },
+    });
+    expect(state.deploys).toBe(1); // the public URL is known: no second deploy
+    expect(health).toBe('https://mcp.example.test/health');
+    await expect(setup(options(wrangler, { domain: 'Not A Host' }))).rejects.toThrow(/--domain/);
+    await expect(
+      setup(options(wrangler, { domain: 'mcp.example.test', publicUrl: 'https://other.example.test' })),
+    ).rejects.toThrow(/disagree/);
+  });
+
   it('a dry run changes nothing', async () => {
     const { state, wrangler } = fakeWrangler();
     const lines: string[] = [];
