@@ -12,16 +12,23 @@ owner: ""
 
 # P3-11 — Phase 3 review and staging verification
 
-> Later-phase task: **refine scope and acceptance criteria before starting** (tasks/README rule 7).
+> Refined 2026-10-22 (tasks/README rule 7).
 
 ## Goal
 Verify the Worker deployment for real before adding identity and OAuth.
 
 ## Scope
-- Staging deployment with smoke tests; multi-isolate behaviour; client checks over HTTPS; review; findings → tasks.
+- An independent adversarial review of the Phase 3 code; findings fixed with mutation-checked regression tests, turned
+  into tasks, or documented.
+- Staging verification on `agility-bridge-staging`: smoke checks over HTTPS (`scripts/staging-smoke.ts` and a
+  hand-run *Staging smoke* workflow that takes the address as input and needs no secret), MCP Inspector over HTTPS in
+  both eras, multi-isolate behaviour observed; real clients are owner steps.
+- `docs/reviews/phase-3-review.md`, threat-model statuses after Phase 3, go for Phase 4 (D-28).
 
 ## Acceptance criteria
-- [ ] `docs/reviews/phase-3-review.md`; staging smoke workflow green; go for Phase 4.
+- [ ] `docs/reviews/phase-3-review.md`; every finding fixed or documented, with tests.
+- [ ] Staging smoke checks green (script against staging; the workflow added and tested).
+- [ ] Go for Phase 4 recorded (D-28); owner steps listed.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.
@@ -31,7 +38,7 @@ None beyond the shared rules in AGENTS.md.
 - L-004 — End every phase with a review and a live pass, and reserve capacity for follow-ups.
 
 ## Docs to update
-- docs/reviews/phase-3-review.md (new)
+- docs/reviews/phase-3-review.md (new), docs/THREAT_MODEL.md, docs/pending-decisions/phase-3.md
 
 ## Out of scope
-- Anything not listed under Scope.
+- P3-12 (optional), D-27 (owner decision).
