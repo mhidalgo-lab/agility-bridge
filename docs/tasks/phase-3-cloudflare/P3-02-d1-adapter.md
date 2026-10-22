@@ -12,18 +12,32 @@ owner: ""
 
 # P3-02 — D1 adapter and shared migration runner
 
-> Later-phase task: **refine scope and acceptance criteria before starting** (tasks/README rule 7).
+> Refined 2026-10-22 (tasks/README rule 7).
 
 ## Goal
-D1 passes the same storage contract as SQLite, with the same migrations.
+D1 passes the same storage contract as SQLite and memory, with the same migrations, and resolving access costs one
+D1 round trip.
 
 ## Scope
-- D1 adapter: conditional single statements, `batch()` for multi-statement atomicity, constraint-name error mapping.
-- Embedded migrations applied at first request (single-flight, concurrent-boot safe); SQLite `PRAGMA`s skipped where D1 ignores them.
-- Access resolution in one `batch()`.
+- The D1 `SqlDriver` (P3-01) moves to `packages/storage` (`createD1Driver`, web-standard, no dependency), next to the
+  driver contract; the Worker imports it from there.
+- The full storage contract suite (`packages/storage/test/contract.ts`) runs on local D1 (Miniflare, from Node through
+  `getD1Database`), with a fresh database per test. Every difference it finds is fixed in the driver or the shared SQL,
+  never by weakening the contract: error classification of D1's messages (`ab_invalid`, `ab_conflict`, unique, foreign
+  key, check), conditional writes decided on `RETURNING` rows (L-161), atomic `batch()`.
+- Migrations on D1: concurrent first boots of the same database (several isolates migrating at once) end with one
+  history and no error; a database written by a newer version is refused, as on SQLite.
+- **Access in one round trip**: a storage method that loads the token, grant, workspace, user, instance and credential
+  for a token hash in one call — one `batch()` of single-table SELECTs keyed by subqueries on SQL, a lookup in memory —
+  used by `authenticateDeviceToken`; the result is identical to the current sequential loads (property-checked on the
+  contract suite's worlds).
 
 ## Acceptance criteria
-- [ ] The full storage contract suite passes on local D1; concurrent first boots tested.
+- [ ] `storageContract('d1 (local)', …)` passes in full; concurrent first boots tested (several storages migrating one
+      database at once).
+- [ ] The access bundle returns the same records as the sequential loads on memory, SQLite and D1, including revoked,
+      expired, disabled and missing rows; on SQL it is one driver call.
+- [ ] `docs/dev/storage.md` describes the D1 driver, its batch semantics and the access bundle.
 
 ## Security notes
 THREAT_MODEL T7.
@@ -37,4 +51,4 @@ THREAT_MODEL T7.
 - docs/dev/storage.md
 
 ## Out of scope
-- Anything not listed under Scope.
+- Remote D1 (P3-05 creates databases; P3-11 runs against one); Durable Objects; read replicas.

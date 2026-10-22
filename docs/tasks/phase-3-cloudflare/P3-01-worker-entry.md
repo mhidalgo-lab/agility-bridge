@@ -2,7 +2,7 @@
 id: P3-01
 title: Worker entry, bindings and boot single-flight
 phase: 3
-status: review
+status: done
 priority: high
 depends_on: [P2-17]
 adr: ["0004", "0006", "0007", "0010"]
