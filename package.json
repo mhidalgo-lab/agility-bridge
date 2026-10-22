@@ -1,7 +1,7 @@
 {
   "name": "agility-bridge-monorepo",
   "private": true,
-  "description": "Unofficial MCP server for Digital.ai Agility — monorepo root",
+  "description": "Unofficial MCP server for Digital.ai Agility \u2014 monorepo root",
   "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@12.11.2",
@@ -26,7 +26,8 @@
     "docs:admin-api": "node --conditions=source scripts/admin-api-reference.ts",
     "docs:cli": "node --conditions=source scripts/cli-reference.ts",
     "version-packages": "changeset version && node scripts/release.ts sync-version",
-    "check:package": "node scripts/check-package.ts"
+    "check:package": "node scripts/check-package.ts",
+    "cf:setup": "node --conditions=source scripts/cf-setup.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

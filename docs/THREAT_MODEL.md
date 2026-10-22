@@ -101,7 +101,7 @@ All `planned` unless stated. Tasks name where the mitigation is built.
 | T31 | Write tools misused (injected or careless approval) | T | ADR-0013 layers: off by default, typed single-asset operations, approval bound to the exact change, re-check, intent audit, deployment-wide write limit (see A2) | P7-01 – P7-09 |
 | T32 | Task handle leakage | I | 256-bit ids, hashed; sealed records bound to the owner device; short TTL | P8-10 |
 | T33 | Public tool catalogue reveals information | I | Off by default; static read-only catalogue only | P8-11 |
-| T34 | Staging configuration pointed at production | T | Per-environment setup with name checks; separate databases; documented checks | P3-05 |
+| T34 | Staging configuration pointed at production | T | Per-environment setup with name checks; separate databases; documented checks (`pnpm cf:setup`: every resource named after `--name`, a local config of another deployment refused, only production issues `ab_live_` tokens; P3-05) | P3-05 |
 | T35 | ReDoS or filesystem races | D, T | Linear-time parsing with caps; `O_EXCL`/`O_NOFOLLOW`; opened-handle operations; the database path re-checked against the opened inode (P2-02) | P1-04, P2-02 |
 
 ## 6. Threats specific to Digital.ai Agility

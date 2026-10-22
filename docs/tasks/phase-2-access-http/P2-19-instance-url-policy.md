@@ -2,7 +2,7 @@
 id: P2-19
 title: Instance URL policy for servers (no plain HTTP, optional private-address refusal)
 phase: 2
-status: review
+status: done
 priority: medium
 depends_on: [P2-13]
 adr: ["0014"]

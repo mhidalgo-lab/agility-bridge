@@ -18,6 +18,8 @@ spikes/**/results/
 spikes/**/pnpm-lock.yaml
 live/results/
 spikes/**/wrangler.deploy*.jsonc
+# Per-deployment Worker configs with resource ids (scripts/cf-setup.ts), never committed.
+apps/worker/wrangler.*.local.jsonc
 # Local IDE and MCP client configuration (machine-specific paths and test settings), never committed.
 .idea/
 .vscode/
