@@ -29,15 +29,28 @@ export interface WorkerEnv {
   readonly [name: string]: unknown;
 }
 
-/** Workers Free presets (ADR-0010): 45 Agility requests per call, 512 KiB per response. P3-03 adds the Paid plan. */
-export const WORKER_DEFAULTS: SettingDefaults = Object.freeze({
-  callBudget: 45,
-  maxResponseBytes: 512 * 1024,
-});
+export type WorkersPlan = 'free' | 'paid';
 
-/** Secrets the Worker reads besides the shared settings (never `vars`, P3-05). */
-const WORKER_SECRETS = ['AB_MASTER_KEY', 'AB_MASTER_KEY_PREVIOUS', 'AB_ADMIN_TOKEN'];
-const KNOWN = new Set([...SERVER_SETTING_NAMES, ...WORKER_SECRETS]);
+/**
+ * Presets per Workers plan (ADR-0010, P3-03). Free allows 50 subrequests per request, so 45 Agility requests per call
+ * and 512 KiB per response are also ceilings there: no setting, workspace or grant goes above them.
+ */
+export const PLAN_PRESETS: Readonly<Record<WorkersPlan, SettingDefaults & { readonly ceiling: boolean }>> =
+  Object.freeze({
+    free: { callBudget: 45, maxResponseBytes: 512 * 1024, ceiling: true },
+    paid: { callBudget: 1_000, maxResponseBytes: 8 * 1024 * 1024, ceiling: false },
+  });
+
+/** Settings only the Worker reads, and its secrets (never `vars`, P3-05). */
+const WORKER_ONLY = ['AB_PLAN', 'AB_MASTER_KEY', 'AB_MASTER_KEY_PREVIOUS', 'AB_ADMIN_TOKEN'];
+const KNOWN = new Set([...SERVER_SETTING_NAMES, ...WORKER_ONLY]);
+
+/** `AB_PLAN` (default `free`). */
+export function workersPlan(settings: Readonly<Record<string, string>>): WorkersPlan {
+  const plan = settings['AB_PLAN'] ?? 'free';
+  if (plan !== 'free' && plan !== 'paid') throw new BootError('AB_PLAN must be free or paid.');
+  return plan;
+}
 
 /** The boot failed for a reason the operator must fix; the message names a setting, never a value. */
 export class BootError extends Error {
@@ -64,7 +77,17 @@ export function workerSettings(env: WorkerEnv): Record<string, string> {
 
 export async function boot(env: WorkerEnv, version: string): Promise<Booted> {
   const settingsEnv = workerSettings(env);
-  const settings = parseServerSettings(settingsEnv, WORKER_DEFAULTS);
+  const plan = workersPlan(settingsEnv);
+  const preset = PLAN_PRESETS[plan];
+  const settings = parseServerSettings(settingsEnv, preset);
+  if (preset.ceiling && settings.callBudget > preset.callBudget) {
+    throw new BootError(`AB_CALL_BUDGET above ${preset.callBudget} does not fit the Workers ${plan} plan.`);
+  }
+  if (preset.ceiling && settings.maxResponseBytes > preset.maxResponseBytes) {
+    throw new BootError(
+      `AB_LIMITS_MAX_RESPONSE_BYTES above ${preset.maxResponseBytes} does not fit the Workers ${plan} plan.`,
+    );
+  }
   const logger = createLogger({
     level: settings.logLevel,
     sink: (line) => console.error(line),
@@ -106,11 +129,19 @@ export async function boot(env: WorkerEnv, version: string): Promise<Booted> {
     isolation: 'request',
     background: (c, work) => c.executionCtx.waitUntil(work),
     ...(adminVerifier === undefined ? {} : { adminVerifier }),
+    ...(preset.ceiling
+      ? { ceilings: { callBudget: preset.callBudget, maxResponseBytes: preset.maxResponseBytes } }
+      : {}),
     // Set by Cloudflare's edge for every request; a client cannot choose it.
     clientIp: (c) => c.req.header('cf-connecting-ip') ?? 'unknown',
     // Cloudflare terminates TLS, so the request URL's scheme is the one the client used.
     passthroughSecure: (c) => new URL(c.req.url).protocol === 'https:',
   });
-  logger.info('booted', { adminApi: adminVerifier !== undefined, publicUrl: settings.publicUrl ?? null });
+  logger.info('booted', {
+    plan,
+    callBudget: settings.callBudget,
+    adminApi: adminVerifier !== undefined,
+    publicUrl: settings.publicUrl ?? null,
+  });
   return { app, logger };
 }

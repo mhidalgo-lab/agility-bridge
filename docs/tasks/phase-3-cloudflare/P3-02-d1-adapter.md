@@ -2,7 +2,7 @@
 id: P3-02
 title: D1 adapter and shared migration runner
 phase: 3
-status: review
+status: done
 priority: high
 depends_on: [P3-01]
 adr: ["0006"]

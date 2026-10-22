@@ -7,6 +7,7 @@ import {
   type AdminTokenVerifier,
   accessServices,
   credentialValidator,
+  type DeploymentLimits,
   type Keyring,
 } from '@agility-bridge/auth';
 import { CORE_TOOLS, DEFAULT_LIMITS, type Logger, type LogLevel } from '@agility-bridge/core';
@@ -272,6 +273,8 @@ export interface ServerParts {
   readonly passthroughSecure: (c: Context) => boolean;
   /** The break-glass admin token; absent = no admin API (404). */
   readonly adminVerifier?: AdminTokenVerifier;
+  /** Limits no workspace or grant may exceed on this runtime (Workers Free, P3-03). */
+  readonly ceilings?: DeploymentLimits['ceilings'];
 }
 
 export interface AssembledServer {
@@ -308,7 +311,7 @@ export function assembleServer(parts: ServerParts): AssembledServer {
           callBudget: settings.callBudget,
           genericQuery: true,
         },
-        ceilings: {},
+        ceilings: parts.ceilings ?? {},
       },
     },
     tools: CORE_TOOLS,

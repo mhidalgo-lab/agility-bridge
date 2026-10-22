@@ -59,7 +59,11 @@ async function call(mf: Miniflare, path: string, init: RequestInit = {}): Promis
 }
 
 /** Instance, shared credential, workspace(s), service grant and a device token, through the admin API. */
-async function setUp(mf: Miniflare, admin: string, workspaces: { slug: string; scope: string }[]) {
+async function setUp(
+  mf: Miniflare,
+  admin: string,
+  workspaces: { slug: string; scope: string; limits?: Record<string, number> }[],
+) {
   const api = async (method: string, path: string, body?: unknown) => {
     const res = await call(mf, `/api/admin/v1${path}`, {
       method,
@@ -86,6 +90,7 @@ async function setUp(mf: Miniflare, admin: string, workspaces: { slug: string; s
       instanceId: instance['id'],
       allowedScopeIds: [w.scope],
       defaultCredentialId: credential['id'],
+      ...(w.limits === undefined ? {} : { limits: w.limits }),
     });
     const grant = await api('POST', '/grants', { workspaceId: ws['id'], userId: null, label: 'service' });
     const issued = await api('POST', `/grants/${(grant['record'] as { id: string }).id}/tokens`, {
@@ -181,6 +186,70 @@ describe('the Worker in workerd', () => {
   });
 });
 
+describe('plan presets (P3-03)', () => {
+  const callTool = (name: string) => ({
+    jsonrpc: '2.0',
+    id: 3,
+    method: 'tools/call',
+    params: { name, arguments: {} },
+  });
+
+  it('on Free every tool fits the 45-request budget, and the requests used are in the audit row', async () => {
+    const admin = generateAdminToken();
+    const mf = worker({ AB_MASTER_KEY: generateMasterKey(1), AB_ADMIN_TOKEN: admin });
+    const tokens = await setUp(mf, admin, [{ slug: 'team', scope: 'Scope:1001' }]);
+    const tools = await (await mcp(mf, 'team', tokens['team'] as string, list)).text();
+    for (const name of ['list_asset_types', 'search_work_items', 'get_work_item', 'whoami']) {
+      expect(tools).toContain(`"${name}"`);
+    }
+    await (await mcp(mf, 'team', tokens['team'] as string, search)).text();
+    let rows: { action: string; agilityRequests: number | null }[] = [];
+    for (let i = 0; i < 20 && rows.length === 0; i++) {
+      const res = await call(mf, '/api/admin/v1/audit?kind=tool_call', {
+        headers: { authorization: `Bearer ${admin}` },
+      });
+      rows = (await res.json()) as typeof rows;
+      if (rows.length === 0) await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(rows[0]?.action).toBe('search_work_items');
+    expect(rows[0]?.agilityRequests).toBeGreaterThan(0);
+    expect(rows[0]?.agilityRequests).toBeLessThanOrEqual(45);
+  });
+
+  it('hides and refuses tools that cost more than the budget', async () => {
+    const admin = generateAdminToken();
+    const mf = worker({ AB_MASTER_KEY: generateMasterKey(1), AB_ADMIN_TOKEN: admin, AB_CALL_BUDGET: '10' });
+    const tokens = await setUp(mf, admin, [{ slug: 'team', scope: 'Scope:1001' }]);
+    const tools = await (await mcp(mf, 'team', tokens['team'] as string, list)).text();
+    expect(tools).toContain('"whoami"');
+    expect(tools).toContain('"list_sprints"');
+    for (const name of ['list_asset_types', 'search_work_items', 'get_work_item', 'query_assets']) {
+      expect(tools).not.toContain(`"${name}"`);
+    }
+    const refused = await (
+      await mcp(mf, 'team', tokens['team'] as string, callTool('search_work_items'))
+    ).text();
+    expect(refused).not.toContain('B-01001');
+    expect(refused).toMatch(/"isError":true|"error":\{/);
+  });
+
+  it('caps a workspace that asks for more than the Free plan allows (whoami shows the effective limits)', async () => {
+    const admin = generateAdminToken();
+    const mf = worker({ AB_MASTER_KEY: generateMasterKey(1), AB_ADMIN_TOKEN: admin });
+    const tokens = await setUp(mf, admin, [
+      { slug: 'big', scope: 'Scope:1001', limits: { callBudget: 500, maxResponseBytes: 8 * 1024 * 1024 } },
+    ]);
+    const text = await (await mcp(mf, 'big', tokens['big'] as string, callTool('whoami'))).text();
+    expect(text).toContain('"requestsPerCall":45');
+    expect(text).toContain(`"maxResponseBytes":${512 * 1024}`);
+  });
+
+  it('paid allows a budget above 45', async () => {
+    const mf = worker({ AB_MASTER_KEY: generateMasterKey(1), AB_PLAN: 'paid', AB_CALL_BUDGET: '500' });
+    expect((await call(mf, '/health')).status).toBe(200);
+  });
+});
+
 describe('boot failures', () => {
   const secured = (res: Response) => {
     expect(res.status).toBe(503);
@@ -195,6 +264,9 @@ describe('boot failures', () => {
       { AB_MASTER_KEY: generateMasterKey(1), AB_LOG_LEVEL: 'loud' },
       { AB_MASTER_KEY: generateMasterKey(1), AB_DB_PATH: '/data/x.db' },
       { AB_MASTER_KEY: generateMasterKey(1), AB_ADMIN_TOKEN: 'ab_admin_letmein' },
+      { AB_MASTER_KEY: generateMasterKey(1), AB_PLAN: 'enterprise' },
+      { AB_MASTER_KEY: generateMasterKey(1), AB_CALL_BUDGET: '46' },
+      { AB_MASTER_KEY: generateMasterKey(1), AB_LIMITS_MAX_RESPONSE_BYTES: String(1024 * 1024) },
     ]) {
       const mf = worker({ ...bindings, AB_PUBLIC_URL: 'https://mcp.example.test' });
       const res = await call(mf, '/w/team/mcp', { method: 'POST', headers: MCP_HEADERS, body: '{}' });
