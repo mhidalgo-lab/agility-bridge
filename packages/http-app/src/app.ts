@@ -311,6 +311,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         logger: services.logger,
         clock: services.clock,
         background: keepAlive,
+        keyring: options.keyring,
       }),
     );
   }

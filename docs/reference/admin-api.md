@@ -56,6 +56,13 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | `DELETE` | `/instances/{id}` | Delete an unused instance | — | 200 object |
 | `POST` | `/instances/{id}/retarget` | Change an instance's origin or TLS trust (owner; revokes its credentials and grants) | `baseUrl`: string<br>`tls`?: object \| null | 200 object |
 
+## keys
+
+| Method | Path | What | Body | Response |
+|---|---|---|---|---|
+| `GET` | `/keys` | Master-key versions: credentials on each, loaded, current, retired (owner) | — | 200 KeyVersion[] |
+| `POST` | `/keys/{id}/retire` | Retire a master-key version no credential uses any more (owner; recorded in the audit log) | `reason`: string | 200 KeyVersion[] |
+
 ## tokens
 
 | Method | Path | What | Body | Response |
@@ -91,5 +98,6 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 - **DeviceToken**: `id`: string, `grantId`: string, `prefix`: string, `label`: string, `createdAt`: number, `expiresAt`: number \| null, `lastUsedAt`: number \| null, `revokedAt`: number \| null
 - **Grant**: `id`: string, `workspaceId`: string, `userId`: string \| null, `label`: string \| null, `credentialId`: string \| null, `tools`: array \| null, `scopeIds`: array \| null, `assetTypes`: object \| null, `limits`: object, `rateLimit`: object \| null, `createdAt`: number, `updatedAt`: number, `expiresAt`: number \| null, `revokedAt`: number \| null
 - **Instance**: `id`: string, `label`: string, `baseUrl`: string, `tls`: object \| null, `numberPrefixes`: object \| null, `metaFingerprint`: string \| null, `createdAt`: number, `updatedAt`: number, `disabledAt`: number \| null
+- **KeyVersion**: `version`: number, `credentials`: number, `loaded`: boolean, `current`: boolean, `retired`: boolean
 - **User**: `id`: string, `email`: string, `displayName`: string \| null, `idp`: string \| null, `idpSubject`: string \| null, `role`: "owner" \| "admin" \| "member", `createdAt`: number, `updatedAt`: number, `disabledAt`: number \| null
 - **Workspace**: `id`: string, `slug`: string, `name`: string, `instanceId`: string, `allowedScopeIds`: string[], `includeChildScopes`: boolean, `assetTypes`: object \| null, `enabledTools`: array \| null, `limits`: object, `defaultCredentialId`: string \| null, `writePolicy`: object, `credentialSource`: "stored" \| "passthrough", `createdAt`: number, `updatedAt`: number, `disabledAt`: number \| null

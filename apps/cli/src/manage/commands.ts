@@ -2,7 +2,7 @@
 // Management commands (P2-10): one table drives parsing, help and the generated reference (docs/reference/cli.md).
 // Every change goes through the admin API — remotely, or in process over the local database — so validation, guards
 // and audit are the same on every path (L-065). Output is JSON on stdout; messages go to stderr.
-import { generateAdminToken, keyStatus, retireKeyVersion, rotateCredentialKeys } from '@agility-bridge/auth';
+import { generateAdminToken, rotateCredentialKeys } from '@agility-bridge/auth';
 import { restoreSqliteBackup } from '@agility-bridge/storage-sqlite';
 import { ConfigError } from '../config.ts';
 import { createMasterKeyFile, defaultMasterKeyFile } from '../master-key.ts';
@@ -128,10 +128,20 @@ export const COMMANDS: readonly CommandSpec[] = [
         kind: 'string',
         help: 'Where to write it (default ~/.config/agility-bridge/master.key)',
       },
+      {
+        name: 'version',
+        kind: 'string',
+        help: 'Key version (default 1); a rotation needs one higher than the current key',
+      },
     ],
     async run(r, p) {
+      const version = p.opts['version'] === undefined ? 1 : Number(p.opts['version']);
+      if (!Number.isInteger(version) || version < 1 || version > 1_000_000) {
+        throw new ConfigError('--version is a whole number ≥ 1.');
+      }
       const path = createMasterKeyFile(
         typeof p.opts['key-file'] === 'string' ? p.opts['key-file'] : defaultMasterKeyFile(r.env),
+        version,
       );
       r.out(JSON.stringify({ masterKeyFile: path }));
       r.err(
@@ -488,8 +498,8 @@ export const COMMANDS: readonly CommandSpec[] = [
   },
   {
     words: ['keys', 'status'],
-    summary: 'Credentials per master-key version (local)',
-    local: async ({ storage, keyring }) => keyStatus(storage, keyring),
+    summary: 'Credentials per master-key version (owner)',
+    api: async () => ({ method: 'GET', path: '/keys' }),
   },
   {
     words: ['keys', 'rotate'],
@@ -500,18 +510,18 @@ export const COMMANDS: readonly CommandSpec[] = [
   },
   {
     words: ['keys', 'retire'],
-    summary: 'Retire a master-key version no credential uses any more (local)',
+    summary: 'Retire a master-key version no credential uses any more (owner)',
     args: [id('version', 'Key version, e.g. 1')],
     options: [{ name: 'reason', kind: 'string', help: 'Why, for the audit log', required: true }],
-    local: async ({ storage, keyring }, p) => {
+    api: async (_r, p) => {
       const version = Number(p.args[0]);
       if (!Number.isInteger(version) || version < 1)
         throw new ConfigError('The version is a whole number ≥ 1.');
-      await retireKeyVersion(storage, keyring, version, {
-        reason: String(p.opts['reason']),
-        actor: { via: 'cli' },
-      });
-      return { retired: version };
+      return {
+        method: 'POST',
+        path: `/keys/${version}/retire`,
+        body: { reason: String(p.opts['reason']) },
+      };
     },
   },
 ];

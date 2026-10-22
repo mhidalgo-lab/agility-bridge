@@ -82,6 +82,10 @@ export function toAdminError(error: unknown): { status: number; body: AdminError
   } else if (error instanceof UpstreamCheckError) {
     code = 'upstream';
     message = error.message;
+  } else if (error instanceof SecretsError && error.code === 'in_use') {
+    // "N credential(s) still use version V" / "V is the current key": counts and versions only.
+    code = 'conflict';
+    message = error.message;
   } else if (error instanceof SecretsError) {
     code = 'unavailable';
     message = 'The server cannot use its master key for this.';

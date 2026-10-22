@@ -28,7 +28,8 @@ shown again.
 
 Rotate on a schedule, when someone who had the key leaves, or after a suspected leak of the key.
 
-1. Generate a new key with a **higher version** (for example `v2:…`) and keep the old one.
+1. Generate a new key with a **higher version** and keep the old one:
+   `agility-bridge init --key-file ~/.config/agility-bridge/master-v2.key --version 2`.
 2. Restart **every** server process with the new key as current and the old one as previous:
    `AB_MASTER_KEY_FILE=new.key` and `AB_MASTER_KEY_FILE_PREVIOUS=old.key` (or `AB_MASTER_KEY` /
    `AB_MASTER_KEY_PREVIOUS`). New and changed tokens are now encrypted with the new key; old ones still open with the
@@ -36,7 +37,8 @@ Rotate on a schedule, when someone who had the key leaves, or after a suspected 
 3. Re-encrypt the stored tokens: `agility-bridge keys rotate --reason "<why>"`. Each row is replaced only if nobody
    changed it meanwhile, so it is safe while the server runs; if it stops half-way, run it again and it resumes.
    `agility-bridge keys status` shows how many credentials use each version.
-4. When no credential uses the old version, retire it: `agility-bridge keys retire 1`. A retired version can never be
+4. When no credential uses the old version, retire it: `agility-bridge keys retire 1 --reason "<why>"` (owners; it
+   works locally and through the admin API, so also for a Worker). A retired version can never be
    used as the current key again. Remove the previous key from the configuration and restart.
 
 Every re-encryption and retirement is recorded in the audit log with the credential id, the versions and your reason —

@@ -60,6 +60,8 @@ function routes(w: World): [string, string, unknown?][] {
     ['PATCH', `/instances/${w.ids.instance}`, { label: 'Renamed' }],
     ['POST', `/instances/${w.ids.instance}/retarget`, { baseUrl: 'https://evil.example.test/x' }],
     ['DELETE', `/instances/${w.ids.instance}`],
+    ['GET', '/keys'],
+    ['POST', '/keys/1/retire', { reason: 'x' }],
     ['GET', '/credentials'],
     [
       'POST',
@@ -147,6 +149,8 @@ describe('negative authorization (every route)', () => {
     const before = await snapshot(w);
     const ownerOnly: [string, string, unknown?][] = [
       ['POST', `/instances/${w.ids.instance}/retarget`, { baseUrl: 'https://evil.example.test/x' }],
+      ['GET', '/keys'],
+      ['POST', '/keys/1/retire', { reason: 'x' }],
       ['POST', '/users', { email: 'boss@example.test', role: 'owner' }],
       ['POST', '/users', { email: 'adm@example.test', role: 'admin' }],
       ['PATCH', `/users/${w.ids.alice}`, { role: 'admin' }],
@@ -172,7 +176,8 @@ describe('negative authorization (every route)', () => {
     }
     expect(await snapshot(w)).toBe(before);
     const denied = await w.storage.audit.query({ kind: 'admin', status: 'denied', limit: 100 });
-    expect(denied.length).toBe(ownerOnly.length);
+    // Every refused change is recorded; reads (GET /keys) are not audited.
+    expect(denied.length).toBe(ownerOnly.filter(([method]) => method !== 'GET').length);
   });
 
   it('nobody stores a personal token for someone else, not even the break-glass token', async () => {
@@ -232,6 +237,22 @@ describe("personal Agility tokens stay their owner's (P2-17 review M2)", () => {
 });
 
 describe('owner actions', () => {
+  it('master keys (P3-13): an owner sees the versions; retiring needs a recent sign-in and an unused version', async () => {
+    const w = await world({}, { admin: true });
+    const status = await call(w, 'owner', 'GET', '/keys');
+    expect(status.status).toBe(200);
+    expect(await status.json()).toEqual([
+      { version: 1, credentials: 2, loaded: true, current: true, retired: false },
+    ]);
+    expect((await call(w, 'owner_stale', 'POST', '/keys/1/retire', { reason: 'x' })).status).toBe(403);
+    const current = await call(w, 'break_glass', 'POST', '/keys/1/retire', { reason: 'x' });
+    expect(current.status).toBe(409);
+    expect(JSON.stringify(await current.json())).toContain('current key');
+    expect((await call(w, 'break_glass', 'POST', '/keys/0/retire', { reason: 'x' })).status).toBe(422);
+    expect((await call(w, 'break_glass', 'POST', '/keys/1/retire', {})).status).toBe(422);
+    expect(await w.storage.kv.get('crypto:retired:v1')).toBeNull();
+  });
+
   it('an owner retargets an instance only after a recent sign-in, and the change revokes its credentials and grants', async () => {
     const w = await world({}, { admin: true });
     const body = { baseUrl: 'https://agility2.example.test/Main' };

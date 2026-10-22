@@ -13,6 +13,8 @@ import {
   type User,
   type Workspace,
 } from '@agility-bridge/storage';
+import { type KeyVersionStatus, keyStatus, retireKeyVersion } from '../secrets/credentials.ts';
+import type { Keyring } from '../secrets/keyring.ts';
 import type { ToolInfo } from './resolve.ts';
 import type {
   AccessServices,
@@ -52,6 +54,8 @@ const needOwner = (a: Actor, what: string) => need(isOwner(a), `Only an owner ca
 export interface GuardContext {
   readonly storage: Storage;
   readonly tools: ReadonlyMap<string, ToolInfo>;
+  /** For the master-key operations (P3-13); without it they are unavailable. */
+  readonly keyring?: Keyring;
 }
 
 /** The services, each call checked against the actor's role (and, for members, ownership). */
@@ -291,7 +295,29 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     },
   };
 
-  return Object.freeze({ actor, users, instances, credentials, workspaces, grants, tokens });
+  /** Master-key versions (P3-13): owners only; retiring needs a recent sign-in, like a retarget. */
+  const keys = {
+    async status(): Promise<KeyVersionStatus[]> {
+      needOwner(actor, 'see the master-key versions');
+      if (ctx.keyring === undefined)
+        throw new ForbiddenError('Master-key operations are not available here.');
+      return keyStatus(storage, ctx.keyring);
+    },
+    async retire(version: number, reason: string): Promise<KeyVersionStatus[]> {
+      needOwner(actor, 'retire a master-key version');
+      need(
+        actor.kind === 'break_glass' || actor.recentAuth,
+        'Sign in again before retiring a master-key version.',
+      );
+      if (ctx.keyring === undefined)
+        throw new ForbiddenError('Master-key operations are not available here.');
+      // The admin API writes the audit row, success or refusal, like every other admin change.
+      await retireKeyVersion(storage, ctx.keyring, version, { reason, record: false });
+      return keyStatus(storage, ctx.keyring);
+    },
+  };
+
+  return Object.freeze({ actor, users, instances, credentials, workspaces, grants, tokens, keys });
 }
 
 export type GuardedServices = ReturnType<typeof guardedServices>;

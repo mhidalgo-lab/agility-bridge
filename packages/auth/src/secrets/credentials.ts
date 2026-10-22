@@ -236,7 +236,13 @@ export async function retireKeyVersion(
   storage: Storage,
   keyring: Keyring,
   version: number,
-  options: { reason: string; now?: () => number; actor?: { userId?: string; via?: string } },
+  options: {
+    reason: string;
+    now?: () => number;
+    actor?: { userId?: string; via?: string };
+    /** Write the audit row here (default); the admin API records the change itself (P3-13). */
+    record?: boolean;
+  },
 ): Promise<void> {
   if (version === keyring.currentVersion) {
     throw new SecretsError('in_use', `Master key version ${version} is the current key.`);
@@ -250,6 +256,7 @@ export async function retireKeyVersion(
   }
   const now = options.now ?? Date.now;
   await storage.kv.set(RETIRED_KEY(version), String(now()));
+  if (options.record === false) return;
   await storage.audit.append({
     id: crypto.randomUUID(),
     ts: now(),

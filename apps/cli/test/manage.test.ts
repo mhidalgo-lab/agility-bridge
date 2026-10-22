@@ -190,7 +190,7 @@ describe('local and remote management', () => {
     expect(help.out).toContain('agility-bridge token issue <grant-id> --label <value>');
   });
 
-  it('keys status, rotate and retire work on the local database only', async () => {
+  it('keys status, rotate and retire on the local database; rotate stays local', async () => {
     const env = {
       AB_DATA_DIR: join(dir, 'd'),
       AB_MASTER_KEY_FILE: keyFile('k.key'),
@@ -212,8 +212,18 @@ describe('local and remote management', () => {
       rotated: 1,
       remaining: 0,
     });
-    expect((await cli(['keys', 'retire', '1', '--reason', 'done'], rotated)).json).toEqual({ retired: 1 });
-    const remote = await cli(['keys', 'status'], { ...env, AB_ADMIN_URL: 'https://mcp.example.test' });
+    expect((await cli(['keys', 'retire', '1', '--reason', 'done'], rotated)).json).toEqual([
+      { version: 1, credentials: 0, loaded: true, current: false, retired: true },
+      { version: 2, credentials: 1, loaded: true, current: true, retired: false },
+    ]);
+    // Retiring the current key or one still in use is a conflict.
+    const busy = await cli(['keys', 'retire', '2', '--reason', 'x'], rotated);
+    expect(busy.code).not.toBe(0);
+    expect(busy.err).toMatch(/current key/);
+    const remote = await cli(['keys', 'rotate', '--reason', 'x'], {
+      ...env,
+      AB_ADMIN_URL: 'https://mcp.example.test',
+    });
     expect(remote.code).toBe(1);
     expect(remote.err).toContain('local database only');
   });
@@ -243,6 +253,13 @@ describe('local and remote management', () => {
     expect(first.json).toEqual({ masterKeyFile: path });
     expect(readFileSync(path, 'utf8')).toMatch(/^v1:/);
     expect((await cli(['init', '--key-file', path], {})).code).toBe(1);
+    // A rotation needs a higher version (P3-13).
+    const next = join(dir, 'cfg', 'master-v2.key');
+    expect((await cli(['init', '--key-file', next, '--version', '2'], {})).code).toBe(0);
+    expect(readFileSync(next, 'utf8')).toMatch(/^v2:/);
+    const bad = await cli(['init', '--key-file', join(dir, 'cfg', 'x.key'), '--version', '0'], {});
+    expect(bad.code).not.toBe(0);
+    expect(bad.err).toContain('--version');
   });
 
   it('remote mode refuses plain HTTP to other hosts and redirects', async () => {
