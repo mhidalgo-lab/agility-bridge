@@ -2,7 +2,13 @@
 // Boot of the Worker (P3-01): settings, keyring, D1 storage with migrations, key check, and the app `serve` also runs.
 // Each boot runs inside one request and completes before it is cached (L-096): a concurrent request boots on its own
 // instead of awaiting another request's boot.
-import { type AccessServices, AdminTokenVerifier, Keyring, verifyKeyring } from '@agility-bridge/auth';
+import {
+  type AccessServices,
+  AdminTokenVerifier,
+  KeyPurpose,
+  Keyring,
+  verifyKeyring,
+} from '@agility-bridge/auth';
 import {
   CircuitBreakers,
   CORE_TOOLS,
@@ -10,6 +16,7 @@ import {
   createLogger,
   type Logger,
   MetadataService,
+  prewarmToolSchemas,
   systemClock,
   ToolRegistry,
   webCryptoRandom,
@@ -54,6 +61,8 @@ export const PLAN_PRESETS: Readonly<Record<WorkersPlan, SettingDefaults & { read
 const REGISTRY = (() => {
   const registry = new ToolRegistry();
   for (const tool of CORE_TOOLS) registry.register(tool);
+  // And the JSON Schemas `tools/list` hands out, cached per isolate (L-020).
+  prewarmToolSchemas(CORE_TOOLS);
   return registry;
 })();
 
@@ -128,7 +137,9 @@ export async function boot(env: WorkerEnv, version: string): Promise<Booted> {
   if (current === undefined || current === '') throw new BootError('The secret AB_MASTER_KEY is missing.');
   const previous = settingsEnv['AB_MASTER_KEY_PREVIOUS'];
   const keyring = await Keyring.create(current, previous === '' ? undefined : previous);
-  await keyring.warm();
+  // Only the purposes requests use today: each derivation costs CPU in the first request (P3-14). A purpose used by
+  // later phases (approvals, tasks, cache ids) must be added here, or a first use could be shared in flight (L-096).
+  await keyring.warm([KeyPurpose.Credentials, KeyPurpose.KeyCheck, KeyPurpose.AuditIdentity]);
   const storage = await openSqlStorage(createD1Driver(env.DB));
   const check = await verifyKeyring(storage, keyring);
   for (const w of check.warnings) logger.warn(w);

@@ -198,7 +198,7 @@ Status lives in each task file.
 | P3-11 | [Phase 3 review and staging verification](tasks/phase-3-cloudflare/P3-11-phase-3-review.md) | high | P3-04, P3-06, P3-07, P3-08, P3-09, P3-10 | todo |
 | P3-12 | [Optional exact rate limiter on a Durable Object](tasks/phase-3-cloudflare/P3-12-durable-object-limiter.md) | low | P3-04 | todo |
 | P3-13 | [Master-key status and retirement through the admin API; init --version](tasks/phase-3-cloudflare/P3-13-remote-key-admin.md) | medium | P3-08 | review |
-| P3-14 | [Cut the Worker's cold-start CPU under the Free plan's budget](tasks/phase-3-cloudflare/P3-14-cold-start-cpu.md) | high | P3-10 | todo |
+| P3-14 | [Cut the Worker's cold-start CPU under the Free plan's budget](tasks/phase-3-cloudflare/P3-14-cold-start-cpu.md) | high | P3-10 | blocked |
 
 ### Phase 4
 

@@ -67,10 +67,14 @@ async function coldBoot(): Promise<number> {
   const http = await import('../packages/http-app/src/index.ts');
   const storageMod = await import('../packages/storage/src/index.ts');
   const imported = cpu() - t;
+  // As the Worker does at module scope (startup, not the request's budget, P3-14).
+  const registry = new core.ToolRegistry();
+  for (const tool of core.CORE_TOOLS) registry.register(tool);
+  core.prewarmToolSchemas(core.CORE_TOOLS);
   const start = cpu();
   const settings = http.parseServerSettings({}, { callBudget: 45, maxResponseBytes: 524_288 });
   const keyring = await auth.Keyring.create(auth.generateMasterKey(1));
-  await keyring.warm();
+  await keyring.warm([auth.KeyPurpose.Credentials, auth.KeyPurpose.KeyCheck, auth.KeyPurpose.AuditIdentity]);
   const storage = storageMod.createMemoryStorage();
   await auth.verifyKeyring(storage, keyring);
   const adminVerifier = await auth.AdminTokenVerifier.create(auth.generateAdminToken());
@@ -92,6 +96,7 @@ async function coldBoot(): Promise<number> {
     limiter: new http.MemoryRateLimiter(),
     version: 'bench',
     isolation: 'request',
+    registry,
     clientIp: () => 'bench',
     passthroughSecure: () => true,
     adminVerifier,

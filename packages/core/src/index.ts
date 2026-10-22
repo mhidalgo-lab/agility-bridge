@@ -189,6 +189,7 @@ export {
   type BuildServerOptions,
   buildMcpServer,
   DEFAULT_SERVER_INFO,
+  prewarmToolSchemas,
   type ServerInfo,
   type ToolCallEvent,
   toCallToolResult,
