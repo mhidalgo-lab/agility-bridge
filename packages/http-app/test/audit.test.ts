@@ -3,6 +3,7 @@
 import { auditFacts } from '@agility-bridge/core';
 import { createMemoryStorage, type Storage } from '@agility-bridge/storage';
 import { describe, expect, it } from 'vitest';
+import { tamperLast } from '../../auth/test/helpers/tamper.ts';
 import { purgeAudit, scheduleAuditRetention } from '../src/index.ts';
 import { ALICE_AGILITY, BOB_AGILITY, connect, post, world } from './helpers/world.ts';
 
@@ -70,7 +71,7 @@ describe('no secrets, bodies or Agility content in any row', () => {
       },
     });
     await client.close();
-    await post(w, 'team-a', `${w.tokens.alice.slice(0, -1)}Q`, {
+    await post(w, 'team-a', tamperLast(w.tokens.alice), {
       jsonrpc: '2.0',
       id: 1,
       method: 'tools/list',

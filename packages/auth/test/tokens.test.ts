@@ -15,6 +15,7 @@ import {
   TOUCH_INTERVAL_MS,
 } from '../src/index.ts';
 import { NOW, SETTINGS, TOOLS } from './helpers/access.ts';
+import { tamperLast } from './helpers/tamper.ts';
 
 const FORMAT = /^ab_live_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}$/;
 
@@ -141,7 +142,7 @@ describe('issuing and authenticating', () => {
   it('checks format and checksum before any storage read', async () => {
     const { token } = await svc.tokens.issue({ grantId, label: 'laptop' });
     reads = 0;
-    for (const bad of ['', 'garbage', `${token.slice(0, -1)}x`, token.replace('ab_live', 'ab_test')]) {
+    for (const bad of ['', 'garbage', tamperLast(token), token.replace('ab_live', 'ab_test')]) {
       expect(await authenticateDeviceToken(storage, bad, 'team-a', settings, t)).toEqual({
         ok: false,
         reason: 'token_malformed',
