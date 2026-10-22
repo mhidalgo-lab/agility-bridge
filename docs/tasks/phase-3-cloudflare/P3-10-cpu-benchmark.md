@@ -2,7 +2,7 @@
 id: P3-10
 title: CPU benchmark and cost check
 phase: 3
-status: review
+status: done
 priority: low
 depends_on: [P3-03]
 adr: ["0010"]
