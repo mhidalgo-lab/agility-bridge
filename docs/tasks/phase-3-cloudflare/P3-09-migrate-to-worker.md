@@ -22,8 +22,9 @@ Move a self-hosted deployment to Cloudflare without re-entering every token.
   `agility-bridge backup` (the source is never the live database):
   - checks the backup like `restore` does (an agility-bridge database, not from a newer release) and that the target
     Worker is deployed and booted (its D1 is migrated to the **same schema version**);
-  - refuses a target with any row in users, instances, credentials, workspaces, grants, access tokens, audit or
-    settings (L-078: explicit and one-way, into an empty deployment only);
+  - refuses a target with any row in users, instances, credentials, workspaces, grants, access tokens or settings
+    (L-078: explicit and one-way, into an empty deployment only); audit rows already on the target (refused probes,
+    L-181) stay, and the server's are added;
   - checks the **master key**: the target's key-check value for each version used by the backup's credentials must
     equal the backup's (the Worker runs with the server's key, or with a new key as current and the server's as
     `AB_MASTER_KEY_PREVIOUS`, after which the P3-08 cron re-encrypts); a mismatch is refused before anything is
@@ -50,6 +51,12 @@ THREAT_MODEL T7, T29.
 
 ## Docs to update
 - docs/guide/cloudflare-deploy.md (migration section)
+
+## Notes
+- Real run, 2026-10-22: a synthetic self-hosted deployment (sealed with staging's key, instance at an unreachable
+  `agility.invalid` address) migrated into `agility-bridge-staging`. The first attempt was refused as "not empty"
+  because of two audit rows from refused smoke requests (L-181); the audit log no longer counts. After the fix the
+  import succeeded (counts verified) and the migrated device token listed the 13 tools on Cloudflare.
 
 ## Out of scope
 - Worker → self-hosted (the reverse), merging into a non-empty deployment.
