@@ -232,6 +232,19 @@ describe('services with a validator', () => {
     expect(await s.credentials.revalidate(NOW + 1)).toBe(1);
     expect((await storage.credentials.get(c.id))?.validationStatus).toBe('valid');
     expect(await s.credentials.revalidate(NOW - 1)).toBe(0);
+    // Bounded per run, oldest first (Workers, P3-08).
+    const d = await s.credentials.create({
+      instanceId: inst.id,
+      ownerUserId: null,
+      label: 'svc2',
+      token: TOKEN,
+    });
+    await storage.credentials.update(c.id, { validatedAt: NOW - 10 });
+    await storage.credentials.update(d.id, { validatedAt: NOW - 20 });
+    expect(await s.credentials.revalidate(NOW, 1)).toBe(1);
+    expect((await storage.credentials.get(d.id))?.validatedAt).not.toBe(NOW - 20);
+    expect((await storage.credentials.get(c.id))?.validatedAt).toBe(NOW - 10);
+    expect(await s.credentials.revalidate(NOW, 0)).toBe(0);
   });
 
   it('a retarget probes the new origin first: a bad origin revokes nothing', async () => {

@@ -224,13 +224,19 @@ function both(a: unknown, b: unknown): Promise<void> | undefined {
 }
 
 /**
- * Deletes audit rows older than `retentionDays` (0 keeps them forever), in bounded batches. Returns the number deleted.
+ * Deletes audit rows older than `retentionDays` (0 keeps them forever), in batches of 1,000, at most `maxBatches`
+ * (default 1,000; Workers use a few per scheduled run, P3-08). Returns the number deleted.
  */
-export async function purgeAudit(storage: Storage, retentionDays: number, now: number): Promise<number> {
+export async function purgeAudit(
+  storage: Storage,
+  retentionDays: number,
+  now: number,
+  maxBatches = 1_000,
+): Promise<number> {
   if (retentionDays <= 0) return 0;
   const before = now - retentionDays * 86_400_000;
   let total = 0;
-  for (let i = 0; i < 1_000; i++) {
+  for (let i = 0; i < maxBatches; i++) {
     const n = await storage.audit.purge(before, 1_000);
     total += n;
     if (n < 1_000) break;
