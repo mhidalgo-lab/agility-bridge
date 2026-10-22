@@ -2,7 +2,7 @@
 id: P3-09
 title: Self-hosted to Worker migration
 phase: 3
-status: review
+status: done
 priority: low
 depends_on: [P3-02]
 adr: ["0006"]

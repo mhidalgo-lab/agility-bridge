@@ -39,6 +39,30 @@ tools fit the Free budget today (the largest declares 24); a workspace or grant 
 - **`whoami`**: the call's budget (`requestsPerCall`) and the effective limits.
 - Exceeding the budget inside a call ends it with `AB_BUDGET_EXHAUSTED` and a hint to narrow the request.
 
+## Measured cost
+
+CPU per request, 2026-10-22. *Local*: Node 24 (the same V8 as workerd), `pnpm bench:worker`, medians, request
+isolation as on Workers, Agility-shaped fake responses. *Staging*: `agility-bridge-staging` on the Free plan,
+`wrangler tail` CPU time, a synthetic deployment migrated in (no Agility reachable, so no tool call there, D-01).
+
+| Path | Local CPU | Staging CPU | Agility requests |
+|---|---|---|---|
+| First request of a new isolate (boot: settings, keys, key check, admin token, app, routes) | 90–110 ms | 38–80 ms (wall about 380 ms) | 0 |
+| `GET /health`, warm | < 1 ms | 0 ms | 0 |
+| `tools/list`, warm | about 2 ms | 4–10 ms | 0 |
+| `whoami`, warm | about 2.5 ms | — | 1 |
+| `search_work_items` (25 rows), warm | about 4 ms | — | 1 |
+| `get_work_item`, warm | about 3 ms | — | 2 |
+
+Warm calls fit the Free plan's 10 ms. **The first request of every new isolate does not**: the boot costs several
+times the Free budget. Cloudflare has served it so far (occasional overruns are tolerated), but L-097 says not to
+design on that tolerance; cutting the boot cost is P3-14. On the Paid plan (30 s of CPU) it does not matter.
+
+A non-required CI job runs the benchmark on every pull request, keeps the numbers as an artifact and flags a path
+whose cost, relative to a calibration workload in the same run, more than doubles against
+`scripts/bench/worker-baseline.json`. After an intended change, refresh the baseline with
+`pnpm bench:worker --update`.
+
 ## Rate limits
 
 The limits of `agility-bridge serve` (`AB_RATE_LIMIT_*`, [configuration](configuration.md#rate-limits)) apply on
