@@ -2,7 +2,7 @@
 id: P3-06
 title: Worker test suite (workerd)
 phase: 3
-status: todo
+status: review
 priority: medium
 depends_on: [P3-02]
 adr: []
@@ -32,9 +32,9 @@ Everything that runs on Workers is tested on workerd, not only on Node.
 - **Isolation**: every test gets its own Miniflare and database (no shared state between tests).
 
 ## Acceptance criteria
-- [ ] The workerd suites run in CI (the Linux test job), each test on its own database.
-- [ ] The P2-12 denial matrix passes on workerd with zero Agility requests per denial.
-- [ ] `docs/dev/testing.md` (or the closest existing page) explains how the Worker is tested and why not the pool.
+- [x] The workerd suites run in CI (the Linux test job), each test on its own database.
+- [x] The P2-12 denial matrix passes on workerd with zero Agility requests per denial.
+- [x] `docs/dev/testing.md` explains how the Worker is tested and why not the pool.
 
 ## Security notes
 THREAT_MODEL T2, T3, T15, T19, T21.
