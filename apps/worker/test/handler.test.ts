@@ -9,6 +9,7 @@ const ctx = { waitUntil: () => {}, passThroughOnException: () => {} };
 const booted: Booted = {
   app: { fetch: () => new Response('ok') } as unknown as Booted['app'],
   logger: {} as Booted['logger'],
+  jobs: {} as Booted['jobs'],
 };
 
 describe('createWorker', () => {

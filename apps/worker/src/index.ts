@@ -3,6 +3,7 @@
 import { VERSION } from '@agility-bridge/core';
 import { createEdge } from '@agility-bridge/http-app';
 import { type Booted, boot, type WorkerEnv } from './boot.ts';
+import { runScheduled } from './scheduled.ts';
 
 interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
@@ -48,6 +49,19 @@ function bootFailure(env: WorkerEnv, error: unknown): Response {
 export function createWorker(bootWorker: (env: WorkerEnv) => Promise<Booted>) {
   let booted: Booted | undefined;
   return {
+    /** The cron trigger (P3-08): housekeeping in bounded slices, kept alive with waitUntil. */
+    async scheduled(
+      controller: { scheduledTime: number },
+      env: WorkerEnv,
+      ctx: ExecutionContext,
+    ): Promise<void> {
+      let current = booted;
+      if (current === undefined) {
+        current = await bootWorker(env);
+        booted = current;
+      }
+      ctx.waitUntil(runScheduled(current.jobs, controller.scheduledTime, crypto.randomUUID()));
+    },
     async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
       let current = booted;
       if (current === undefined) {

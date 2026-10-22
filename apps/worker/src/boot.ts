@@ -2,7 +2,7 @@
 // Boot of the Worker (P3-01): settings, keyring, D1 storage with migrations, key check, and the app `serve` also runs.
 // Each boot runs inside one request and completes before it is cached (L-096): a concurrent request boots on its own
 // instead of awaiting another request's boot.
-import { AdminTokenVerifier, Keyring, verifyKeyring } from '@agility-bridge/auth';
+import { type AccessServices, AdminTokenVerifier, Keyring, verifyKeyring } from '@agility-bridge/auth';
 import {
   CircuitBreakers,
   CredentialLimiters,
@@ -18,10 +18,11 @@ import {
   MemoryRateLimiter,
   parseServerSettings,
   SERVER_SETTING_NAMES,
+  type ServerSettings,
   type SettingDefaults,
   settingWarnings,
 } from '@agility-bridge/http-app';
-import { createD1Driver, type D1Database, openSqlStorage } from '@agility-bridge/storage';
+import { createD1Driver, type D1Database, openSqlStorage, type Storage } from '@agility-bridge/storage';
 import { BackstopRateLimiter, type RateLimitBinding } from './rate-limit.ts';
 
 /** The Worker's bindings: `DB` (D1), the rate-limit backstops, the secrets and the `AB_*` variables. */
@@ -60,9 +61,19 @@ export class BootError extends Error {
   override name = 'BootError';
 }
 
+/** What the scheduled jobs use (P3-08). */
+export interface JobContext {
+  readonly storage: Storage;
+  readonly keyring: Keyring;
+  readonly services: AccessServices;
+  readonly settings: ServerSettings;
+  readonly logger: Logger;
+}
+
 export interface Booted {
   readonly app: HttpApp;
   readonly logger: Logger;
+  readonly jobs: JobContext;
 }
 
 /** The `AB_*` string values of the environment; anything else with the prefix is a typo or a Node-only setting. */
@@ -123,7 +134,7 @@ export async function boot(env: WorkerEnv, version: string): Promise<Booted> {
     clock: systemClock,
     random: webCryptoRandom,
   };
-  const { app } = assembleServer({
+  const { app, services } = assembleServer({
     settings,
     storage,
     keyring,
@@ -156,5 +167,5 @@ export async function boot(env: WorkerEnv, version: string): Promise<Booted> {
     adminApi: adminVerifier !== undefined,
     publicUrl: settings.publicUrl ?? null,
   });
-  return { app, logger };
+  return { app, logger, jobs: { storage, keyring, services, settings, logger } };
 }

@@ -46,6 +46,27 @@ Every resource is named after `--name`: `agility-bridge` is production, `agility
 or database name differs from `--name` is refused, so a staging config can never be pointed at production by mistake
 (THREAT_MODEL T34).
 
+## Housekeeping and key rotation
+
+A cron trigger (every 15 minutes, `wrangler.jsonc`) runs the jobs `agility-bridge serve` runs on timers, in small
+slices that fit the Free plan's limits per run:
+
+| Job | Per run | Setting |
+|---|---|---|
+| Audit retention | up to 3,000 rows older than the retention | `AB_AUDIT_RETENTION_DAYS` (90; `0` keeps them) |
+| Expired `kv` entries | up to 1,000 | — |
+| Master-key rotation | 10 credentials re-encrypted with the current key | runs while `AB_MASTER_KEY_PREVIOUS` is set and credentials remain on it |
+| Credential revalidation | 1 credential, the stalest | `AB_CREDENTIAL_REVALIDATION_HOURS` (24; `0` = never) |
+
+**Rotating the master key on Workers**: put a new key with a **higher version** (`v2:…`, 32 random bytes in base64;
+a `--version` option for `agility-bridge init` is P3-13) in place with wrangler: the current value becomes
+`AB_MASTER_KEY_PREVIOUS`, the new one `AB_MASTER_KEY` (`wrangler secret put … --config
+apps/worker/wrangler.<name>.local.jsonc`, the value through stdin). The cron re-encrypts ten credentials per run; each
+row is replaced only if it still holds what was read, so an interrupted or overlapping run is safe, and a `kv` lease
+keeps two runs off the same batch. Progress shows in the Worker's log (`key rotation continues` with the remaining
+count). Keep `AB_MASTER_KEY_PREVIOUS` set until the rotation is done; checking the remaining count and retiring the old
+version through the admin API arrive with P3-13 ([secrets](secrets.md)).
+
 ## First setup of a workspace
 
 With the admin token from the secrets file, create the instance, credential, workspace, grant and device token

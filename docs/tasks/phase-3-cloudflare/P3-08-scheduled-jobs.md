@@ -2,7 +2,7 @@
 id: P3-08
 title: "Scheduled jobs: audit purge and key rotation on D1"
 phase: 3
-status: todo
+status: review
 priority: medium
 depends_on: [P3-02]
 adr: ["0007"]
@@ -32,11 +32,11 @@ Housekeeping works on Workers without a long-running process.
   the others.
 
 ## Acceptance criteria
-- [ ] workerd tests (Miniflare `scheduled`): retention purges only old rows; expired `kv` entries go; an interrupted
+- [x] workerd tests (Miniflare `scheduled`): retention purges only old rows; expired `kv` entries go; an interrupted
       rotation (one batch per run) finishes over several runs and never double-rotates; a held lease skips the run;
       revalidation touches at most one credential per run.
-- [ ] Unit tests for the new limits; the Node behaviour unchanged.
-- [ ] `docs/guide/cloudflare-deploy.md` (housekeeping and key rotation on Workers).
+- [x] Unit tests for the new limits; the Node behaviour unchanged.
+- [x] `docs/guide/cloudflare-deploy.md` (housekeeping and key rotation on Workers).
 
 ## Security notes
 THREAT_MODEL T7.

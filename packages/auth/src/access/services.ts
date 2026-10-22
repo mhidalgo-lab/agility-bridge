@@ -419,10 +419,16 @@ export function accessServices(options: AccessServicesOptions) {
      * Revalidates every unrevoked credential last validated before `olderThan` (or never), one at a time. Returns how
      * many were checked; failures are recorded on the credential, never thrown.
      */
-    async revalidate(olderThan: number): Promise<number> {
+    /**
+     * Revalidates live credentials not validated since `olderThan`, never-validated and oldest first, at most `limit`
+     * (Workers revalidate one per scheduled run: each costs Agility requests, P3-08).
+     */
+    async revalidate(olderThan: number, limit = Number.POSITIVE_INFINITY): Promise<number> {
+      const due = (await storage.credentials.list())
+        .filter((c) => c.revokedAt === null && (c.validatedAt === null || c.validatedAt < olderThan))
+        .sort((a, b) => (a.validatedAt ?? -1) - (b.validatedAt ?? -1));
       let n = 0;
-      for (const c of await storage.credentials.list()) {
-        if (c.revokedAt !== null || (c.validatedAt !== null && c.validatedAt >= olderThan)) continue;
+      for (const c of due.slice(0, Math.max(0, limit))) {
         await validateCredential(c.id).catch(() => undefined);
         n++;
       }
