@@ -2,7 +2,7 @@
 id: P3-03
 title: Workers limits presets and per-call budgets
 phase: 3
-status: review
+status: done
 priority: high
 depends_on: [P3-01]
 adr: ["0010"]

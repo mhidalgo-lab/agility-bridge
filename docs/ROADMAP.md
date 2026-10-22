@@ -187,8 +187,8 @@ Status lives in each task file.
 |---|---|---|---|---|
 | P3-01 | [Worker entry, bindings and boot single-flight](tasks/phase-3-cloudflare/P3-01-worker-entry.md) | high | P2-17 | done |
 | P3-02 | [D1 adapter and shared migration runner](tasks/phase-3-cloudflare/P3-02-d1-adapter.md) | high | P3-01 | done |
-| P3-03 | [Workers limits presets and per-call budgets](tasks/phase-3-cloudflare/P3-03-workers-limits.md) | high | P3-01 | review |
-| P3-04 | [Rate limiting on Workers](tasks/phase-3-cloudflare/P3-04-workers-rate-limiting.md) | medium | P3-01 | todo |
+| P3-03 | [Workers limits presets and per-call budgets](tasks/phase-3-cloudflare/P3-03-workers-limits.md) | high | P3-01 | done |
+| P3-04 | [Rate limiting on Workers](tasks/phase-3-cloudflare/P3-04-workers-rate-limiting.md) | medium | P3-01 | review |
 | P3-05 | [Cloudflare setup script](tasks/phase-3-cloudflare/P3-05-cloudflare-setup.md) | high | P3-02 | todo |
 | P3-06 | [Worker test suite (workerd)](tasks/phase-3-cloudflare/P3-06-worker-tests.md) | medium | P3-02 | todo |
 | P3-07 | [Cloudflare docs (deploy, limits, costs, custom domain)](tasks/phase-3-cloudflare/P3-07-cloudflare-docs.md) | medium | P3-05 | todo |
@@ -196,6 +196,7 @@ Status lives in each task file.
 | P3-09 | [Self-hosted to Worker migration](tasks/phase-3-cloudflare/P3-09-migrate-to-worker.md) | low | P3-02 | todo |
 | P3-10 | [CPU benchmark and cost check](tasks/phase-3-cloudflare/P3-10-cpu-benchmark.md) | low | P3-03 | todo |
 | P3-11 | [Phase 3 review and staging verification](tasks/phase-3-cloudflare/P3-11-phase-3-review.md) | high | P3-04, P3-06, P3-07, P3-08, P3-09, P3-10 | todo |
+| P3-12 | [Optional exact rate limiter on a Durable Object](tasks/phase-3-cloudflare/P3-12-durable-object-limiter.md) | low | P3-04 | todo |
 
 ### Phase 4
 

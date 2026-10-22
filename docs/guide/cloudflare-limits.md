@@ -41,5 +41,19 @@ tools fit the Free budget today (the largest declares 24); a workspace or grant 
 
 ## Rate limits
 
-The request, token and grant limits of `agility-bridge serve` apply on Workers too (counters per isolate until P3-04
-adds Cloudflare's rate-limiting binding).
+The limits of `agility-bridge serve` (`AB_RATE_LIMIT_*`, [configuration](configuration.md#rate-limits)) apply on
+Workers too, counted exactly **per isolate**. Cloudflare runs many isolates, so on their own they are not
+deployment-wide (L-081). Two Rate Limiting bindings add a **backstop** across isolates (L-099), declared in
+`wrangler.jsonc`:
+
+| Binding | Counts | Default | When it refuses |
+|---|---|---|---|
+| `RL_IP` | requests per client address (`CF-Connecting-IP`) before authentication | 600 per 60 s | `429` for that address for 60 s in that isolate |
+| `RL_AUTH` | failed authentications per address | 20 per 60 s | that address is out of failed attempts for 60 s: more failures get `429` without contacting Agility; valid tokens keep working |
+
+- The local buckets decide first; the binding is asked only when they allow. Bindings count per Cloudflare location
+  and are eventually consistent, so they slow an attack down rather than stop it at an exact number.
+- A binding that **throws** lets the request through (the local buckets still apply) and logs
+  `rate limit binding failed` at most once a minute; a **missing** binding means per-isolate limits only, with a
+  warning when the Worker starts. Rate limits never decide authorization.
+- An exact deployment-wide limiter (a Durable Object) is planned as an option (P3-12).
