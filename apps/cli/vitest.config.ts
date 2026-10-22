@@ -20,5 +20,6 @@ export default defineProject({
       ),
     },
   },
-  test: { name: 'cli' },
+  // Real servers, SQLite files and child processes: the Windows runner needs well over the 5 s default.
+  test: { name: 'cli', testTimeout: 30_000 },
 });
