@@ -22,10 +22,13 @@ import {
   settingWarnings,
 } from '@agility-bridge/http-app';
 import { createD1Driver, type D1Database, openSqlStorage } from '@agility-bridge/storage';
+import { BackstopRateLimiter, type RateLimitBinding } from './rate-limit.ts';
 
-/** The Worker's bindings: `DB` (D1), the secrets and the `AB_*` variables. */
+/** The Worker's bindings: `DB` (D1), the rate-limit backstops, the secrets and the `AB_*` variables. */
 export interface WorkerEnv {
   readonly DB?: D1Database;
+  readonly RL_IP?: RateLimitBinding;
+  readonly RL_AUTH?: RateLimitBinding;
   readonly [name: string]: unknown;
 }
 
@@ -95,6 +98,9 @@ export async function boot(env: WorkerEnv, version: string): Promise<Booted> {
   });
   for (const warning of settingWarnings(settingsEnv, settings)) logger.warn(warning);
   if (env.DB === undefined) throw new BootError('The D1 binding DB is missing.');
+  if (settings.rateLimits.enabled && (env.RL_IP === undefined || env.RL_AUTH === undefined)) {
+    logger.warn('Rate limit bindings RL_IP and RL_AUTH are missing: limits count per isolate only.');
+  }
   const current = settingsEnv['AB_MASTER_KEY'];
   if (current === undefined || current === '') throw new BootError('The secret AB_MASTER_KEY is missing.');
   const previous = settingsEnv['AB_MASTER_KEY_PREVIOUS'];
@@ -123,8 +129,15 @@ export async function boot(env: WorkerEnv, version: string): Promise<Booted> {
     keyring,
     host,
     logger,
-    // Counters per isolate until P3-04 adds the rate-limiting binding.
-    limiter: new MemoryRateLimiter(),
+    // Exact per isolate, with Cloudflare's binding as a backstop across isolates (P3-04).
+    limiter: new BackstopRateLimiter(
+      new MemoryRateLimiter(),
+      {
+        ...(env.RL_IP === undefined ? {} : { ip: env.RL_IP }),
+        ...(env.RL_AUTH === undefined ? {} : { authFailures: env.RL_AUTH }),
+      },
+      logger,
+    ),
     version,
     isolation: 'request',
     background: (c, work) => c.executionCtx.waitUntil(work),

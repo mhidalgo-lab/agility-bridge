@@ -38,7 +38,11 @@ afterEach(async () => {
   if (persist !== undefined) rmSync(persist, { recursive: true, force: true });
 });
 
-function worker(bindings: Record<string, string>, persistTo?: string): Miniflare {
+function worker(
+  bindings: Record<string, string>,
+  persistTo?: string,
+  ratelimits?: Record<string, { namespace_id: string; simple: { limit: number; period: 60 } }>,
+): Miniflare {
   // Miniflare 5 (the version wrangler 4.149 pins) takes a new options shape; the v4 shape converts to it.
   const mf = new Miniflare(
     convertV4MiniflareOptions({
@@ -46,6 +50,7 @@ function worker(bindings: Record<string, string>, persistTo?: string): Miniflare
       scriptPath: SCRIPT,
       compatibilityDate: '2026-09-26',
       d1Databases: ['DB'],
+      ...(ratelimits === undefined ? {} : { ratelimits }),
       ...(persistTo === undefined ? {} : { resourcePersistencePath: persistTo }),
       bindings: { AB_ENVIRONMENT: 'test', ...bindings },
     }),
@@ -247,6 +252,33 @@ describe('plan presets (P3-03)', () => {
   it('paid allows a budget above 45', async () => {
     const mf = worker({ AB_MASTER_KEY: generateMasterKey(1), AB_PLAN: 'paid', AB_CALL_BUDGET: '500' });
     expect((await call(mf, '/health')).status).toBe(200);
+  });
+});
+
+describe('rate-limit backstops (P3-04)', () => {
+  it('RL_IP refuses past its limit across the local buckets', async () => {
+    const mf = worker({ AB_MASTER_KEY: generateMasterKey(1) }, undefined, {
+      RL_IP: { namespace_id: '1001', simple: { limit: 2, period: 60 } },
+      RL_AUTH: { namespace_id: '1002', simple: { limit: 100, period: 60 } },
+    });
+    const statuses: number[] = [];
+    for (let i = 0; i < 4; i++) statuses.push((await mcp(mf, 'team', null, list)).status);
+    expect(statuses.slice(0, 2)).toEqual([401, 401]);
+    expect(statuses.slice(2)).toEqual([429, 429]);
+  });
+
+  it('RL_AUTH turns failed attempts into 429 while a valid token keeps working', async () => {
+    const admin = generateAdminToken();
+    const mf = worker({ AB_MASTER_KEY: generateMasterKey(1), AB_ADMIN_TOKEN: admin }, undefined, {
+      RL_IP: { namespace_id: '1001', simple: { limit: 1000, period: 60 } },
+      RL_AUTH: { namespace_id: '1002', simple: { limit: 2, period: 60 } },
+    });
+    const tokens = await setUp(mf, admin, [{ slug: 'team', scope: 'Scope:1001' }]);
+    const wrong = `${(tokens['team'] as string).slice(0, -1)}${(tokens['team'] as string).endsWith('x') ? 'y' : 'x'}`;
+    const statuses: number[] = [];
+    for (let i = 0; i < 4; i++) statuses.push((await mcp(mf, 'team', wrong, list)).status);
+    expect(statuses).toEqual([401, 401, 401, 429]);
+    expect((await mcp(mf, 'team', tokens['team'] as string, list)).status).toBe(200);
   });
 });
 

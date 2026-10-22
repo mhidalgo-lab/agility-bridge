@@ -68,7 +68,7 @@ All `planned` unless stated. Tasks name where the mitigation is built.
 
 | Id | Threat | STRIDE | Mitigations | Tasks |
 |---|---|---|---|---|
-| T1 | Device/admin token guessing or brute force | S | 256-bit CSPRNG tokens with typed prefix and checksum (format checked before any storage read); SHA-256 at rest; constant-time compare (device tokens implemented in P2-05); failure-only per-IP throttling (after the budget, failed attempts get 429 while valid tokens pass; P2-07; IPv6 counted per /64, P2-17); weak admin tokens refused at boot | P2-05, P2-07, P3-04 |
+| T1 | Device/admin token guessing or brute force | S | 256-bit CSPRNG tokens with typed prefix and checksum (format checked before any storage read); SHA-256 at rest; constant-time compare (device tokens implemented in P2-05); failure-only per-IP throttling (after the budget, failed attempts get 429 while valid tokens pass; P2-07; IPv6 counted per /64, P2-17; on Workers per isolate plus the `RL_AUTH` Rate Limiting binding as a backstop across isolates, P3-04); weak admin tokens refused at boot | P2-05, P2-07, P3-04 |
 | T2 | Audience confusion: a token for workspace A used at B | S, E | Token bound to one workspace and checked first (resolver, tested with revoked tokens too; P2-04, P2-05); OAuth RFC 8707 audience per workspace URL; refresh cannot retarget | P2-05, P5-02 |
 | T3 | Unauthorized tool, Agility project or asset type | E, I | One effective-permission resolver (pure, deny by default, audience first, property-tested: never exceeds any input; P2-04); ungranted tools not listed and refused; server-owned scope predicate in every query; post-response scope check; composites check sibling grants | P2-04, P1-04, P1-08, P2-12, P6-11 |
 | T4 | Query/filter injection | T, I | Structured input only; values only through `with`; metadata-validated identifiers; operator allowlist; scope predicate at the top level; fuzz and property tests (see A3). Live finding (P0-06): `with` keeps quotes and operators literal but **splits a scalar at commas into a value list**, so commas in scalar values are refused (L-162). Live finding (P1-04): `filter` entries are ANDed, so the server's scope and dead-asset predicates are separate entries that no caller OR (kept inside its own parenthesised entry) can reach | P1-04, P0-06 |
@@ -87,7 +87,7 @@ All `planned` unless stated. Tasks name where the mitigation is built.
 | T17 | Repudiation of reads or writes | R | Audit rows with user, device, grant, tool, asset numbers, masked queries and refusals (P2-08); approval hash; synchronous intent write before mutation (API ready, P2-08; used in P7-01, see A6); audit rows cannot be updated (storage trigger, P2-01) | P2-01, P2-08, P7-01 |
 | T18 | Malicious dependency, action or artifact | T | Frozen lockfile, minimum release age, pinned actions by SHA, separate publish job, provenance, SBOM, signed image (image built from digest-pinned bases and scanned in CI, P2-11; published by a separate `image` job behind the `release` approval, pushed only once the version is live on npm, never re-pushed over a version tag, provenance and SBOM attested to GHCR, P2-18); CodeQL, `pnpm audit` and dependency review on every PR; Renovate with a 3-day release age and approval for majors; OpenSSF Scorecard | P0-03, P0-04, P1-15 |
 | T19 | Enumeration of workspaces or instances | I | Same 401 for unknown slug and bad token; authenticate before revealing existence (one body for every denial, tested; P2-06) | P2-06 |
-| T20 | Public endpoint abuse | D | Minimal unauthenticated routes (`/health`, `/version`); per-IP limits; body caps (declared and streamed, 1 MiB); batches refused; 180 s exchange deadline; socket timeouts (P2-06) | P2-06, P2-07 |
+| T20 | Public endpoint abuse | D | Minimal unauthenticated routes (`/health`, `/version`); per-IP limits (on Workers per isolate plus the `RL_IP` binding backstop, P3-04); body caps (declared and streamed, 1 MiB); batches refused; 180 s exchange deadline; socket timeouts (P2-06) | P2-06, P2-07 |
 | T21 | Credential or grant bleed through module state | I, E | Per-request immutable context; two-workspace concurrency tests (HTTP, two credentials, 24 interleaved calls; P2-12; also on workerd, P3-01); on Workers nothing in flight is shared between requests (request isolation, L-096, P3-01) | P1-01, P2-12, P3-01 |
 | T22 | Raw API passthrough bypasses controls | E | No raw `query.v1`/`rest-1.v1`/`api/asset` tool (ADR-0012) | P1-04, P1-08 |
 | T23 | Secrets accepted as tool arguments | I | Registry refuses secret-like fields; credential management never as tools | P1-01 |
@@ -154,7 +154,8 @@ All `planned` unless stated. Tasks name where the mitigation is built.
   directly against Agility.
 - Elicitation is answered by the client, which may not prove a human looked at it; the approval page is the stronger
   channel.
-- Per-isolate limits on Workers are approximate unless the shared limiter is enabled.
+- Per-isolate limits on Workers are approximate unless the shared limiter is enabled: the Rate Limiting binding backstop
+  (P3-04) counts per Cloudflare location and is eventually consistent; an exact Durable Object limiter is P3-12.
 - Workers cannot trust private CAs; on-premises instances with internal CAs need the Node deployment.
 - Data returned to the client leaves our control (LLM provider retention).
 - A process holding the master key can decrypt every stored token.

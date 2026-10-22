@@ -2,7 +2,7 @@
 id: P3-04
 title: Rate limiting on Workers
 phase: 3
-status: todo
+status: review
 priority: medium
 depends_on: [P3-01]
 adr: ["0010"]
@@ -31,14 +31,14 @@ Edge rate limits that behave predictably across isolates.
 - `wrangler.jsonc` declares both bindings with their limits (`RL_IP` 600 per 60 s, `RL_AUTH` 20 per 60 s); the setup
   script (P3-05) keeps them.
 - A shared exact limiter (Durable Object) is **not** in this task: the binding's eventual consistency is the accepted
-  residual risk for now, recorded in the threat model; a follow-up task holds the Durable Object option.
+  residual risk for now, recorded in the threat model; a follow-up task holds the Durable Object option (P3-12).
 
 ## Acceptance criteria
-- [ ] Unit tests of the composite limiter: local first, binding as backstop, the auth-failure mark, missing and
+- [x] Unit tests of the composite limiter: local first, binding as backstop, the auth-failure mark, missing and
       throwing bindings (fail open, logged).
-- [ ] workerd tests with Miniflare's rate-limit bindings: the binding refuses → `429`; failed authentications beyond
+- [x] workerd tests with Miniflare's rate-limit bindings: the binding refuses → `429`; failed authentications beyond
       `RL_AUTH` → `429` while a valid token still works.
-- [ ] `docs/guide/cloudflare-limits.md` (rate limits) and THREAT_MODEL T1/T20 updated; follow-up task for the Durable
+- [x] `docs/guide/cloudflare-limits.md` (rate limits) and THREAT_MODEL T1/T20 updated; follow-up task for the Durable
       Object limiter.
 
 ## Security notes
