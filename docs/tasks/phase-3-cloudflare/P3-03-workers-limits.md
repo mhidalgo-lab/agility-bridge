@@ -2,7 +2,7 @@
 id: P3-03
 title: Workers limits presets and per-call budgets
 phase: 3
-status: todo
+status: review
 priority: high
 depends_on: [P3-01]
 adr: ["0010"]
@@ -29,11 +29,11 @@ Tool calls fit the plan they run on, and tools that cannot fit are hidden.
   headers (L-101).
 
 ## Acceptance criteria
-- [ ] Worker tests: on the Free preset every tool fits (the largest declares 24) and the audit row records the
+- [x] Worker tests: on the Free preset every tool fits (the largest declares 24) and the audit row records the
       requests used; with a smaller budget the tools above it are absent from `tools/list` and refused when called; a
       workspace limit above the Free ceiling is capped; out-of-plan settings stop the boot.
-- [ ] Unit tests for the presets and the plan check.
-- [ ] `docs/guide/cloudflare-limits.md` (new): plans, presets, ceilings, what is hidden, where usage shows.
+- [x] Unit tests for the presets and the plan check.
+- [x] `docs/guide/cloudflare-limits.md` (new): plans, presets, ceilings, what is hidden, where usage shows.
 
 ## Security notes
 THREAT_MODEL T5, A10.
