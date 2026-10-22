@@ -2,7 +2,7 @@
 id: P3-08
 title: "Scheduled jobs: audit purge and key rotation on D1"
 phase: 3
-status: review
+status: done
 priority: medium
 depends_on: [P3-02]
 adr: ["0007"]
