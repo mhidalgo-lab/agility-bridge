@@ -1,5 +1,48 @@
 # agility-bridge
 
+## 0.2.0
+
+### Minor Changes
+
+- 5cc97dc: Admin REST API for `agility-bridge serve` at `/api/admin/v1` (instances, credentials, workspaces, grants, device
+  tokens, users, audit), enabled by a break-glass token from the new `agility-bridge admin-token` command
+  (`AB_ADMIN_TOKEN_FILE`). Owner/admin/member guards apply to every change, secrets are never returned, and every change
+  is audited. Reference: docs/reference/admin-api.md.
+- ced47c2: `agility-bridge serve` keeps an audit log of tool calls (asset numbers, masked queries, durations, Agility requests),
+  refused requests and admin changes — never tokens, request values or Agility content — with a retention of
+  `AB_AUDIT_RETENTION_DAYS` (default 90). See docs/guide/audit-log.md.
+- 7c3b1ad: `agility-bridge backup <file>` writes a consistent copy of the server database while it runs, and
+  `agility-bridge restore <backup> <target>` checks and restores one; the self-hosting guide covers Node, Docker, reverse
+  proxies, on-premises CAs, backups and upgrades, and a new guide covers one token per device.
+- e74b966: Management commands for a server: `agility-bridge init`, and `user`, `instance`, `credential`, `workspace`, `grant`,
+  `token`, `audit tail` and `keys status|rotate|retire`, either on the local database or through the admin API of
+  `AB_ADMIN_URL`, with the same rules and audit. Secrets come from files, the environment, standard input or a hidden
+  prompt, never from arguments. See docs/guide/cli.md.
+- b031032: Stored Agility tokens are validated on save, on demand (`agility-bridge credential validate`), every
+  `AB_CREDENTIAL_REVALIDATION_HOURS` and after repeated refusals; new or changed instance addresses are probed without a
+  token before use. Clear messages separate a revoked token from a wrong instance address.
+- dd09769: Optional pass-through workspaces (`AB_PASSTHROUGH=on`, off by default): callers send their own Agility token in
+  `X-Agility-Token` over HTTPS; nothing is stored, every workspace control applies, and they are read-only. Also: the
+  startup warning for `AB_RATE_LIMIT=off` is now printed.
+- cdae959: `agility-bridge serve` limits requests per client address, failed authentications per address (valid tokens are never
+  locked out), and requests per device token and per grant, answering `429` with `Retry-After`. Settings:
+  `AB_RATE_LIMIT*` and `AB_TRUSTED_PROXY_HOPS` (docs/guide/configuration.md).
+- 6d72adf: New `agility-bridge serve`: a team server over HTTP that exposes each workspace at `/w/<slug>/mcp` to per-device
+  tokens, with SQLite storage, Agility tokens encrypted under a master key (`AB_MASTER_KEY_FILE`), per-workspace and
+  per-grant access, and both MCP protocol eras. See docs/guide/secrets.md and docs/guide/access-model.md.
+
+### Patch Changes
+
+- 12008ec: `get_assets` and the single-item tools keep only the assets that were asked for: an Agility response that ignores the
+  number or OID filter can no longer make another asset appear in place of the one requested.
+- fc15b31: Phase 2 review fixes for `agility-bridge serve`: requests whose target is not a plain path (`GET https://…`) get
+  `400`, and pass-through workspaces treat a request as HTTPS only when a trusted proxy says so; a client address out of
+  failed attempts no longer triggers Agility validations, new pass-through tokens are checked at most
+  `AB_RATE_LIMIT_VALIDATIONS_PER_MINUTE` times per instance (default 30) and concurrent requests share one check; IPv6
+  clients are rate-limited per /64; malformed `Host` headers are refused; an admin token file reached through a
+  symbolic link into the data directory is refused; the database refuses to leave the server without an active owner
+  and to un-revoke anything; only a member can issue device tokens for a grant on their own personal Agility token.
+
 ## 0.1.0
 
 ### Minor Changes
