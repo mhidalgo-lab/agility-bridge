@@ -10,7 +10,12 @@ export {
   agilityClient,
   type QueryBody,
 } from './agility/client.ts';
-export { canonicalInstanceUrl } from './agility/instance.ts';
+export {
+  type AddressClass,
+  addressClass,
+  canonicalInstanceUrl,
+  type InstanceUrlOptions,
+} from './agility/instance.ts';
 export { CredentialLimiters, Semaphore } from './agility/limiter.ts';
 export { parseXml, type XmlElement } from './agility/xml.ts';
 export {

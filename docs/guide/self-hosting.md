@@ -115,6 +115,11 @@ give that instance the CA bundle (PEM) when you add it — it is added to the pu
 agility-bridge instance add "On-prem" https://agility.corp.example/Agility --ca-file /etc/agility-bridge/corp-ca.pem
 ```
 
+The instance must use HTTPS (`http://` is accepted only for loopback test fixtures with `AB_ALLOW_HTTP_INSTANCES=on`).
+If the server should never reach your private networks through an instance address, set
+`AB_INSTANCE_PRIVATE_ADDRESSES=refuse` ([configuration](configuration.md#server-mode-agility-bridge-serve)); leave it
+at `allow` when the instance itself is on a private network.
+
 The server probes a new address without any token before using it, and validates every stored token against it
 ([access model](access-model.md#credential-validation)). The Cloudflare Worker deployment cannot trust private CAs;
 use this server for such instances.

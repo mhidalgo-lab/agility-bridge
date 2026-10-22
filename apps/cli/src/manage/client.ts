@@ -7,6 +7,7 @@ import { accessServices, credentialValidator, Keyring, verifyKeyring } from '@ag
 import { CORE_TOOLS, type Logger, systemClock, webCryptoRandom } from '@agility-bridge/core';
 import { ADMIN_BASE, AuditWriter, createAdminApi } from '@agility-bridge/http-app';
 import { openSqliteStorage, type SqliteStorage } from '@agility-bridge/storage-sqlite';
+import { checkPublicHost } from '../agility-fetch.ts';
 import { ConfigError } from '../config.ts';
 import { readMasterKeys } from '../master-key.ts';
 import { loadServeConfig, nodeHostServices } from '../serve.ts';
@@ -47,7 +48,14 @@ export async function localClient(
       keyring,
       tools,
       environment: config.environment,
-      validator: credentialValidator(nodeHostServices(logger)),
+      validator: credentialValidator(
+        nodeHostServices(logger, { publicOnly: config.privateAddresses === 'refuse' }),
+      ),
+      // The same instance policy as the server (P2-19).
+      instanceUrls: {
+        httpLoopback: config.allowHttpInstances,
+        ...(config.privateAddresses === 'refuse' ? { checkHost: checkPublicHost } : {}),
+      },
     }),
     storage,
     tools,

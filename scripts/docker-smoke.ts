@@ -55,7 +55,8 @@ try {
     [
       ...run(`run -d --name ${name} -p 127.0.0.1:${port}:8787 --read-only --tmpfs /tmp`),
       ...run('--health-interval 2s --health-start-period 2s'),
-      ...run('-e AB_MASTER_KEY -e AB_ADMIN_TOKEN -e AB_ENVIRONMENT=test'),
+      // The synthetic Agility answers on plain HTTP, accepted only with AB_ALLOW_HTTP_INSTANCES (P2-19).
+      ...run('-e AB_MASTER_KEY -e AB_ADMIN_TOKEN -e AB_ENVIRONMENT=test -e AB_ALLOW_HTTP_INSTANCES=on'),
       ...run(`-v ${name}:/data ${image}`),
     ],
     { AB_MASTER_KEY: generateMasterKey(1), AB_ADMIN_TOKEN: adminToken },

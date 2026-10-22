@@ -3,7 +3,8 @@
 // run in order, verbatim, in a fresh Node 24 container that installs the package built from this checkout, against the
 // synthetic Agility. Only these substitutions are made, and they are printed: the npm package name → the packed
 // tarball; the example instance and public URLs → the synthetic Agility and the local server; `<…-id>` placeholders →
-// the ids the previous commands printed; `agility-bridge serve` → started in the background until /health answers.
+// the ids the previous commands printed; `agility-bridge serve` → started in the background until /health answers;
+// `AB_ALLOW_HTTP_INSTANCES=on`, because the synthetic Agility speaks plain HTTP.
 //   pnpm --filter agility-bridge build && mkdir -p /tmp/pkg && (cd apps/cli && npm pack --pack-destination /tmp/pkg)
 //   node --conditions=source scripts/walkthrough.ts /tmp/pkg/agility-bridge-<version>.tgz
 import { execFileSync } from 'node:child_process';
@@ -51,6 +52,9 @@ export function script(tarball: string): string {
     'node --conditions=source /src/scripts/fixture-agility.ts 18788 > /tmp/agility.log 2>&1 &',
     // A token file for `credential add --from-file`, as an operator would have saved it.
     "printf 'synthetic-service-token-any-value' > ./service.token && chmod 600 ./service.token",
+    // The synthetic Agility answers on plain HTTP; a real instance needs nothing (P2-19).
+    'echo "# substituted: the synthetic Agility needs AB_ALLOW_HTTP_INSTANCES=on"',
+    'export AB_ALLOW_HTTP_INSTANCES=on',
     "json() { node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(eval('JSON.parse(s)'+process.argv[1])))\" \"$1\"; }",
   ];
   for (const block of walkthroughBlocks()) {

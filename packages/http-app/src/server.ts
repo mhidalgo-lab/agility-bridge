@@ -50,6 +50,7 @@ export const SERVER_SETTING_NAMES: readonly string[] = Object.freeze([
   'AB_CREDENTIAL_REVALIDATION_HOURS',
   'AB_PASSTHROUGH',
   'AB_WRITE_TOOLS',
+  'AB_ALLOW_HTTP_INSTANCES',
 ]);
 
 export interface ServerSettings {
@@ -68,6 +69,8 @@ export interface ServerSettings {
   readonly revalidationHours: number;
   /** `AB_PASSTHROUGH=on`: pass-through workspaces accept the caller's own Agility token (P2-14, off by default). */
   readonly passthrough: boolean;
+  /** `AB_ALLOW_HTTP_INSTANCES=on`: plain-HTTP loopback instance URLs, for tests and local fixtures (P2-19). */
+  readonly allowHttpInstances: boolean;
 }
 
 /** Host defaults: ADR-0010 presets (Node 1,000 requests and 8 MiB; Workers Free 45 and 512 KiB). */
@@ -200,6 +203,7 @@ export function parseServerSettings(env: Env, defaults: SettingDefaults): Server
       8_760,
     ),
     passthrough: onOff('AB_PASSTHROUGH', env['AB_PASSTHROUGH'], false),
+    allowHttpInstances: onOff('AB_ALLOW_HTTP_INSTANCES', env['AB_ALLOW_HTTP_INSTANCES'], false),
   };
 }
 
@@ -210,6 +214,11 @@ export function settingWarnings(env: Env, settings: ServerSettings): string[] {
     warnings.push('AB_WRITE_TOOLS is on, but this version has no write tools.');
   if (!settings.rateLimits.enabled) {
     warnings.push('AB_RATE_LIMIT is off: no request, token or authentication-failure limits.');
+  }
+  if (settings.allowHttpInstances) {
+    warnings.push(
+      'AB_ALLOW_HTTP_INSTANCES is on: plain-HTTP loopback instance URLs are accepted (tests only).',
+    );
   }
   if (settings.passthrough) {
     warnings.push(
@@ -275,6 +284,8 @@ export interface ServerParts {
   readonly adminVerifier?: AdminTokenVerifier;
   /** Limits no workspace or grant may exceed on this runtime (Workers Free, P3-03). */
   readonly ceilings?: DeploymentLimits['ceilings'];
+  /** Refuses an instance host by throwing (Node: one resolving to a private address, P2-19). */
+  readonly checkInstanceHost?: (hostname: string) => Promise<void>;
 }
 
 export interface AssembledServer {
@@ -295,7 +306,17 @@ export function assembleServer(parts: ServerParts): AssembledServer {
     ...(parts.isolation === 'request' ? { detached: true } : {}),
   });
   const validator = credentialValidator(host);
-  const services = accessServices({ storage, keyring, tools, environment: settings.environment, validator });
+  const services = accessServices({
+    storage,
+    keyring,
+    tools,
+    environment: settings.environment,
+    validator,
+    instanceUrls: {
+      httpLoopback: settings.allowHttpInstances,
+      ...(parts.checkInstanceHost === undefined ? {} : { checkHost: parts.checkInstanceHost }),
+    },
+  });
   const authErrors = revalidateOnAuthErrors(services, logger, () => host.clock.now());
   const app = createHttpApp({
     storage,

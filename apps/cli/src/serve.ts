@@ -36,7 +36,7 @@ import {
 } from '@agility-bridge/storage-sqlite';
 import { serve as serveNode } from '@hono/node-server';
 import pkg from '../package.json' with { type: 'json' };
-import { createNodeFetch } from './agility-fetch.ts';
+import { checkPublicHost, createNodeFetch } from './agility-fetch.ts';
 import { ConfigError, checkEnvNames, DEFAULTS } from './config.ts';
 import { isInside, readMasterKeys } from './master-key.ts';
 
@@ -48,6 +48,8 @@ export interface ServeConfig extends ServerSettings {
   readonly port: number;
   /** Proxies in front whose `X-Forwarded-For` entries are trusted (default 0). */
   readonly trustedProxyHops: number;
+  /** `AB_INSTANCE_PRIVATE_ADDRESSES`: `refuse` limits instances to public addresses (P2-19; default `allow`). */
+  readonly privateAddresses: 'allow' | 'refuse';
 }
 
 /** The default data directory (`$XDG_DATA_HOME` or `~/.local/share`; `%LOCALAPPDATA%` on Windows). */
@@ -63,6 +65,12 @@ export function dataDir(
   return join(base, 'agility-bridge');
 }
 
+function privateAddressPolicy(value: string | undefined): 'allow' | 'refuse' {
+  if (value === undefined || value === '' || value === 'allow') return 'allow';
+  if (value === 'refuse') return 'refuse';
+  throw new ConfigError('AB_INSTANCE_PRIVATE_ADDRESSES must be allow or refuse.');
+}
+
 /** The shared settings (checked by `parseServerSettings`, P3-01) plus the Node-only ones. */
 export function loadServeConfig(env: Env): ServeConfig {
   checkEnvNames(env);
@@ -75,6 +83,7 @@ export function loadServeConfig(env: Env): ServeConfig {
       host: env['AB_HOST'] || '127.0.0.1',
       port: settingInteger('AB_PORT', env['AB_PORT'], 8787, 0, 65_535),
       trustedProxyHops: settingInteger('AB_TRUSTED_PROXY_HOPS', env['AB_TRUSTED_PROXY_HOPS'], 0, 0, 10),
+      privateAddresses: privateAddressPolicy(env['AB_INSTANCE_PRIVATE_ADDRESSES']),
     };
   } catch (error) {
     if (error instanceof SettingsError) throw new ConfigError(error.message);
@@ -123,7 +132,7 @@ export async function startServe(
       ? error
       : new ConfigError(`AB_ADMIN_TOKEN: ${(error as Error).message}`);
   }
-  const hostServices = nodeHostServices(logger);
+  const hostServices = nodeHostServices(logger, { publicOnly: config.privateAddresses === 'refuse' });
   const { app, audit, services } = assembleServer({
     settings: config,
     storage,
@@ -134,6 +143,7 @@ export async function startServe(
     version: pkg.version,
     isolation: 'process',
     ...(adminVerifier === undefined ? {} : { adminVerifier }),
+    ...(config.privateAddresses === 'refuse' ? { checkInstanceHost: checkPublicHost } : {}),
     clientIp: (c) =>
       clientAddress(
         (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming?.socket
@@ -233,7 +243,7 @@ export function readAdminToken(env: Env, dataDir?: string): string | undefined {
 }
 
 /** Per-process services for Agility calls: the `fetch` pinned to an instance's TLS (custom CA), limiters, breakers. */
-export function nodeHostServices(logger: Logger) {
+export function nodeHostServices(logger: Logger, options: { readonly publicOnly?: boolean } = {}) {
   const fetches = new Map<string, FetchLike>();
   return {
     fetchFor(instance: { id: string; tls: Record<string, unknown> | null }): FetchLike {
@@ -242,7 +252,10 @@ export function nodeHostServices(logger: Logger) {
       const key = `${instance.id}|${caFile ?? ''}`;
       let f = fetches.get(key);
       if (f === undefined) {
-        f = createNodeFetch(caFile === undefined ? {} : { caFile });
+        f = createNodeFetch({
+          ...(caFile === undefined ? {} : { caFile }),
+          ...(options.publicOnly === true ? { publicOnly: true } : {}),
+        });
         fetches.set(key, f);
       }
       return f;

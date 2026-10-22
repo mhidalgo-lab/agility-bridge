@@ -20,7 +20,7 @@ import {
   webCryptoRandom,
 } from '@agility-bridge/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createNodeFetch } from '../src/agility-fetch.ts';
+import { checkPublicHost, createNodeFetch, PrivateAddressError } from '../src/agility-fetch.ts';
 
 const hasOpenssl = (() => {
   try {
@@ -125,5 +125,23 @@ describe.skipIf(!hasOpenssl)('createNodeFetch with a private CA', () => {
   it('refuses a CA file without a certificate', () => {
     writeFileSync(join(dir, 'empty.pem'), 'nothing here\n');
     expect(() => createNodeFetch({ caFile: join(dir, 'empty.pem') })).toThrow(/no PEM certificate/);
+  });
+});
+
+describe('public addresses only (AB_INSTANCE_PRIVATE_ADDRESSES=refuse, P2-19)', () => {
+  it('refuses hosts that are, or resolve to, non-public addresses', async () => {
+    for (const host of ['127.0.0.1', '[::1]', '10.0.0.5', '169.254.169.254', 'localhost']) {
+      await expect(checkPublicHost(host), host).rejects.toThrow(PrivateAddressError);
+    }
+    await expect(checkPublicHost('8.8.8.8')).resolves.toBeUndefined();
+  });
+
+  it('refuses at connect time: an address literal, and a name whose lookup answers a private address', async () => {
+    const f = createNodeFetch({ publicOnly: true });
+    await expect(f(new Request('http://127.0.0.1:65000/x'))).rejects.toThrow(PrivateAddressError);
+    await expect(f(new Request('http://[::1]:65000/x'))).rejects.toThrow(PrivateAddressError);
+    // `localhost` reaches the connect-time lookup, which refuses it (a rebinding answer looks the same).
+    const error = await f(new Request('http://localhost:65000/x')).catch((e: unknown) => e as Error);
+    expect(String((error as Error & { cause?: unknown }).cause ?? error)).toMatch(/non-public address/);
   });
 });

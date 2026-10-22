@@ -179,7 +179,7 @@ Status lives in each task file.
 | P2-16 | [Self-hosting docs and executable-docs check](tasks/phase-2-access-http/P2-16-self-hosting-docs.md) | medium | P2-11 | done |
 | P2-17 | [Phase 2 review and live verification](tasks/phase-2-access-http/P2-17-phase-2-review.md) | high | P2-02, P2-07, P2-10, P2-12, P2-13, P2-14, P2-15, P2-16 | done |
 | P2-18 | [Publish the Docker image (signed, provenance, latest never backwards)](tasks/phase-2-access-http/P2-18-image-publishing.md) | medium | P2-11 | done |
-| P2-19 | [Instance URL policy for servers (no plain HTTP, optional private-address refusal)](tasks/phase-2-access-http/P2-19-instance-url-policy.md) | medium | P2-13 | todo |
+| P2-19 | [Instance URL policy for servers (no plain HTTP, optional private-address refusal)](tasks/phase-2-access-http/P2-19-instance-url-policy.md) | medium | P2-13 | review |
 
 ### Phase 3
 
@@ -188,7 +188,7 @@ Status lives in each task file.
 | P3-01 | [Worker entry, bindings and boot single-flight](tasks/phase-3-cloudflare/P3-01-worker-entry.md) | high | P2-17 | done |
 | P3-02 | [D1 adapter and shared migration runner](tasks/phase-3-cloudflare/P3-02-d1-adapter.md) | high | P3-01 | done |
 | P3-03 | [Workers limits presets and per-call budgets](tasks/phase-3-cloudflare/P3-03-workers-limits.md) | high | P3-01 | done |
-| P3-04 | [Rate limiting on Workers](tasks/phase-3-cloudflare/P3-04-workers-rate-limiting.md) | medium | P3-01 | review |
+| P3-04 | [Rate limiting on Workers](tasks/phase-3-cloudflare/P3-04-workers-rate-limiting.md) | medium | P3-01 | done |
 | P3-05 | [Cloudflare setup script](tasks/phase-3-cloudflare/P3-05-cloudflare-setup.md) | high | P3-02 | todo |
 | P3-06 | [Worker test suite (workerd)](tasks/phase-3-cloudflare/P3-06-worker-tests.md) | medium | P3-02 | todo |
 | P3-07 | [Cloudflare docs (deploy, limits, costs, custom domain)](tasks/phase-3-cloudflare/P3-07-cloudflare-docs.md) | medium | P3-05 | todo |

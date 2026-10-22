@@ -130,7 +130,11 @@ function normalize(value: unknown): unknown {
 
 describe('local and remote management', () => {
   it('give identical results and audit rows (local rows carry via: cli)', async () => {
-    const localEnv = { AB_DATA_DIR: join(dir, 'local'), AB_MASTER_KEY_FILE: keyFile('local.key') };
+    const localEnv = {
+      AB_DATA_DIR: join(dir, 'local'),
+      AB_MASTER_KEY_FILE: keyFile('local.key'),
+      AB_ALLOW_HTTP_INSTANCES: 'on',
+    };
     const local = await script(localEnv);
 
     const adminToken = generateAdminToken();
@@ -140,6 +144,7 @@ describe('local and remote management', () => {
       AB_MASTER_KEY_FILE: keyFile('remote.key'),
       AB_ADMIN_TOKEN_FILE: join(dir, 'admin.token'),
       AB_PORT: '0',
+      AB_ALLOW_HTTP_INSTANCES: 'on',
     };
     server = await startServe(serverEnv, { sink: () => {} });
     const remote = await script({ AB_ADMIN_URL: server.url, AB_ADMIN_TOKEN_FILE: join(dir, 'admin.token') });
@@ -169,7 +174,11 @@ describe('local and remote management', () => {
   });
 
   it('reports API errors on stderr with exit 1, and usage errors with exit 2', async () => {
-    const env = { AB_DATA_DIR: join(dir, 'd'), AB_MASTER_KEY_FILE: keyFile('k.key') };
+    const env = {
+      AB_DATA_DIR: join(dir, 'd'),
+      AB_MASTER_KEY_FILE: keyFile('k.key'),
+      AB_ALLOW_HTTP_INSTANCES: 'on',
+    };
     const missing = await cli(['grant', 'revoke', 'grt_404'], env);
     expect(missing.code).toBe(1);
     expect(missing.err).toContain('not_found');
@@ -182,7 +191,11 @@ describe('local and remote management', () => {
   });
 
   it('keys status, rotate and retire work on the local database only', async () => {
-    const env = { AB_DATA_DIR: join(dir, 'd'), AB_MASTER_KEY_FILE: keyFile('k.key') };
+    const env = {
+      AB_DATA_DIR: join(dir, 'd'),
+      AB_MASTER_KEY_FILE: keyFile('k.key'),
+      AB_ALLOW_HTTP_INSTANCES: 'on',
+    };
     const inst = (await cli(['instance', 'add', 'M', agility.url], env)).json as {
       id: string;
     };
@@ -206,7 +219,11 @@ describe('local and remote management', () => {
   });
 
   it('backup writes a consistent copy that restore checks and copies, never overwriting', async () => {
-    const env = { AB_DATA_DIR: join(dir, 'd'), AB_MASTER_KEY_FILE: keyFile('k.key') };
+    const env = {
+      AB_DATA_DIR: join(dir, 'd'),
+      AB_MASTER_KEY_FILE: keyFile('k.key'),
+      AB_ALLOW_HTTP_INSTANCES: 'on',
+    };
     await cli(['user', 'add', 'bo@example.test'], env);
     const backup = join(dir, 'backups', 'b1.db');
     expect((await cli(['backup', backup], env)).json).toEqual({ backup });
