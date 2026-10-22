@@ -154,8 +154,8 @@ docker build -f docker/Dockerfile -t agility-bridge:local .
 
 ### With Docker Compose and Caddy
 
-[`docker/compose.yaml`](../../docker/compose.yaml) runs the server behind [Caddy](https://caddyserver.com), which gets and
-renews the TLS certificate:
+[`docker/compose.yaml`](../../docker/compose.yaml) runs the published image (pinned by digest) behind
+[Caddy](https://caddyserver.com), which gets and renews the TLS certificate:
 
 1. Set your host name in [`docker/Caddyfile`](../../docker/Caddyfile) and in `AB_PUBLIC_URL` in the compose file.
 2. Create the secrets **outside** the data volume (a backup of the volume must never hold the key):
@@ -180,7 +180,7 @@ docker run -d --name agility-bridge --read-only --tmpfs /tmp -p 127.0.0.1:8787:8
   -v agility-bridge-data:/data \
   -v "$PWD/secrets/master.key:/run/secrets/master.key:ro" -e AB_MASTER_KEY_FILE=/run/secrets/master.key \
   -e AB_PUBLIC_URL=https://mcp.example.com \
-  agility-bridge:local
+  ghcr.io/mhidalgo-lab/agility-bridge:0.2.0
 ```
 
 Publish the port on `127.0.0.1` and put the TLS proxy in front.

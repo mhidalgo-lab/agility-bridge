@@ -6,9 +6,8 @@
 
 1. ~~**Required checks**: add **"Docker image (build, smoke test, scan)"** (P2-11) to the rulesets.~~ Done
    2026-10-22 (both rulesets, `docs/security/repo-settings.md`).
-4. **First image release** (P2-18): after the first run that pushes the image, make the GHCR package
-   `agility-bridge` public and check the `image` job's harden-runner log ([releasing](../dev/releasing.md)); then
-   `docker/compose.yaml` can switch to the published image.
+4. ~~**First image release** (P2-18).~~ Done 2026-10-22: v0.2.0 published, the GHCR package is public, the `image`
+   job ran with its egress allowlist, and `docker/compose.yaml` pins the published digest.
 2. **Client runs over HTTP** (P2-17): connect VS Code, JetBrains, Copilot CLI, Claude Code and Cursor to
    `agility-bridge serve` (`https://<host>/w/<slug>/mcp`, a device token in the `Authorization` header, as in
    [devices](../guide/multi-device.md)) and record the versions in the
@@ -39,3 +38,4 @@
 - **Options:** (a) go for Phase 3 now, P2-19 in parallel; (b) go after P2-19 and the owner's client runs; (c) hold.
 - **Recommendation:** (a): P2-19 hardens `serve` only and does not touch the edge work; the client runs repeat
   transports already verified against the spike in P0-07.
+- **Owner (2026-10-22):** Decided: (a), go for Phase 3 now, P2-19 in parallel.

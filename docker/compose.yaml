@@ -5,14 +5,12 @@
 #      agility-bridge admin-token > ./secrets/admin.token
 #      sudo chown 65532:65532 ./secrets/* && chmod 600 ./secrets/*   (the image runs as uid 65532)
 #   3. docker compose up -d
-# The image is built from this repository; releases from v0.2 also publish ghcr.io/mhidalgo-lab/agility-bridge (P2-18):
-# replace `build:` with `image: ghcr.io/mhidalgo-lab/agility-bridge:<version>@sha256:<verified digest>` to use it.
+# The published image (P2-18), pinned by digest: verify it first (docs/guide/verify-release.md#the-docker-image), and
+# pin the new digest when you upgrade. To run an image built from this repository instead, replace `image:` with
+#   build: { context: .., dockerfile: docker/Dockerfile }
 services:
   agility-bridge:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    image: agility-bridge:local
+    image: ghcr.io/mhidalgo-lab/agility-bridge:0.2.0@sha256:38dca26cb4e4216c8a0288c4818bb2b94bad39352032eda978e1563f191d85b6
     restart: unless-stopped
     read_only: true
     tmpfs:
