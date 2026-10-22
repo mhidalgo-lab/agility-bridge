@@ -111,6 +111,27 @@ Bind integers in SQL arithmetic with `CAST(? AS INTEGER)`: `node:sqlite` binds J
 3. Add its checksum to `FROZEN` once the release that ships it is cut.
 4. Keep D1 limits in mind (P0-09): no interactive transactions, 100 bound parameters per statement.
 
+## D1 on Cloudflare Workers (`createD1Driver`)
+
+`createD1Driver(binding)` (`packages/storage/src/sql/d1.ts`, P3-01/P3-02) is the `SqlDriver` over a D1 binding; the
+Worker opens storage with `openSqlStorage(createD1Driver(env.DB))`, which migrates at the first request.
+
+- Statements run with `prepare(sql).bind(…)`; rows come back as arrays (`raw()`), like `node:sqlite`'s
+  `setReturnArrays`. Booleans bind as `0`/`1`, `undefined` as `NULL`. D1 enforces foreign keys itself.
+- `batch()` is D1's atomic batch. Rows read in a batch come back as objects and are turned into arrays in column order,
+  so a batched SELECT must not repeat a column name (single-table SELECTs, as in the access bundle).
+- Errors carry SQLite's text (with a `D1_ERROR:` prefix and a `: SQLITE_…` suffix); `classifySqlError` maps them like
+  `node:sqlite`'s.
+- **Tested**: the whole contract suite runs on local D1 (`apps/worker/test/d1-contract.test.ts`, Miniflare's binding
+  driven from Node, an empty database per test), plus concurrent first boots of one database (one history, no error)
+  and the refusal of a newer database.
+
+**Access bundle** — `accessTokens.bundleByHash(hash)` returns the token and the grant, workspace, user, instance and
+credential its access reads (the grant's credential or the workspace default), `null` for whatever is missing. On SQL
+it is one `batch()` of six single-table SELECTs keyed by subqueries on the token hash: one D1 round trip instead of four
+sequential ones on every access-cache miss. The contract suite checks it equals the sequential reads, revoked,
+disabled and missing rows included.
+
 ## SQLite on Node (`packages/storage-sqlite`)
 
 `openSqliteStorage({ path, now?, busyTimeoutMs?, onWarning? })` opens the database of `agility-bridge serve` and

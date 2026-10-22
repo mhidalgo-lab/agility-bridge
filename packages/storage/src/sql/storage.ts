@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // The Storage interface over any SqlDriver (node:sqlite, D1). Every conditional write is one statement whose outcome
 // is read from its RETURNING rows, never from driver change counters (L-072, L-161).
-import { and, asc, desc, eq, gte, isNull, lt, lte, or, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, type SQL, sql } from 'drizzle-orm';
 import type { SQLiteColumn, SQLiteTableWithColumns } from 'drizzle-orm/sqlite-core';
 import { drizzle } from 'drizzle-orm/sqlite-proxy';
 import { InvalidInputError, NotFoundError } from '../errors.ts';
@@ -17,6 +17,7 @@ import {
 import { checkIncrement, checkKey, checkKvValue, checkPrefix, isLive } from '../kv-rules.ts';
 import * as schema from '../schema.ts';
 import type {
+  AccessBundle,
   AccessToken,
   AccessTokenPatch,
   AccessTokenRepository,
@@ -252,6 +253,44 @@ export function createSqlStorage(driver: SqlDriver, options: SqlStorageOptions =
         .where(eq(schema.accessTokens.tokenHash, tokenHash))
         .limit(1);
       return rows[0] ?? null;
+    },
+    async bundleByHash(tokenHash) {
+      if (typeof tokenHash !== 'string') {
+        return { token: null, grant: null, workspace: null, user: null, instance: null, credential: null };
+      }
+      // Each record keyed by a subquery on the token hash, so the six reads go out as one batch (one D1 round trip).
+      const { accessTokens: t, grants: g, workspaces: w, users: u, instances: i, credentials: c } = schema;
+      const grantIds = db.select({ id: t.grantId }).from(t).where(eq(t.tokenHash, tokenHash));
+      const workspaceIds = db.select({ id: g.workspaceId }).from(g).where(inArray(g.id, grantIds));
+      const credentialIds = db
+        .select({ id: sql<string>`coalesce(${g.credentialId}, ${w.defaultCredentialId})` })
+        .from(g)
+        .innerJoin(w, eq(w.id, g.workspaceId))
+        .where(inArray(g.id, grantIds));
+      const [tokens, grantRows, workspaceRows, userRows, instanceRows, credentialRows] = await db.batch([
+        db.select().from(t).where(eq(t.tokenHash, tokenHash)).limit(1),
+        db.select().from(g).where(inArray(g.id, grantIds)).limit(1),
+        db.select().from(w).where(inArray(w.id, workspaceIds)).limit(1),
+        db
+          .select()
+          .from(u)
+          .where(inArray(u.id, db.select({ id: g.userId }).from(g).where(inArray(g.id, grantIds))))
+          .limit(1),
+        db
+          .select()
+          .from(i)
+          .where(inArray(i.id, db.select({ id: w.instanceId }).from(w).where(inArray(w.id, workspaceIds))))
+          .limit(1),
+        db.select().from(c).where(inArray(c.id, credentialIds)).limit(1),
+      ]);
+      return {
+        token: tokens[0] ?? null,
+        grant: grantRows[0] ?? null,
+        workspace: workspaceRows[0] ?? null,
+        user: userRows[0] ?? null,
+        instance: instanceRows[0] ?? null,
+        credential: credentialRows[0] ?? null,
+      } as AccessBundle;
     },
     list(filter = {}) {
       return tokenRepo.list(

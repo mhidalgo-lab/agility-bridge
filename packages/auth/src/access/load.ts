@@ -4,7 +4,7 @@ import type { AccessRecords } from './resolve.ts';
 
 /**
  * Loads the records `resolveAccess` needs for one grant. Reads only; whatever is missing comes back `null` and the
- * resolver denies. (On D1 this becomes one `batch()`, P3-02.)
+ * resolver denies. Device tokens use `accessTokens.bundleByHash` instead: the same records in one round trip (P3-02).
  */
 export async function loadAccessRecords(storage: Storage, grantId: string): Promise<AccessRecords> {
   const grant = await storage.grants.get(grantId);

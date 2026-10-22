@@ -3,7 +3,6 @@
 // random bits and a CRC-32 checksum so secret scanners recognise them (the checksum is not a security control). Only the
 // SHA-256 is stored; the token is shown once. The checksum is verified before any storage read.
 import type { AccessToken, Storage } from '@agility-bridge/storage';
-import { loadAccessRecords } from '../access/load.ts';
 import { type AccessDecision, type AccessSettings, resolveAccess } from '../access/resolve.ts';
 import { timingSafeEqual } from '../secrets/keyring.ts';
 
@@ -132,16 +131,11 @@ export async function authenticateDeviceToken(
   if (!isWellFormedDeviceToken(presented, settings.environment))
     return { ok: false, reason: 'token_malformed' };
   const hash = await hashDeviceToken(presented);
-  const token = await storage.accessTokens.getByHash(hash);
+  // The token and every record its access reads, in one round trip (one D1 batch, P3-02).
+  const { token, ...records } = await storage.accessTokens.bundleByHash(hash);
   if (token === null || !timingSafeEqual(token.tokenHash, hash))
     return { ok: false, reason: 'token_unknown' };
-  const decision = resolveAccess(
-    { kind: 'device_token', token },
-    slug,
-    await loadAccessRecords(storage, token.grantId),
-    settings,
-    now,
-  );
+  const decision = resolveAccess({ kind: 'device_token', token }, slug, records, settings, now);
   if (!decision.ok) return decision;
   try {
     await storage.accessTokens.touch(token.id, TOUCH_INTERVAL_MS);

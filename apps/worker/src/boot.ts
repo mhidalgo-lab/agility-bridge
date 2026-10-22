@@ -21,8 +21,7 @@ import {
   type SettingDefaults,
   settingWarnings,
 } from '@agility-bridge/http-app';
-import { openSqlStorage } from '@agility-bridge/storage';
-import { createD1Driver, type D1Database } from './d1.ts';
+import { createD1Driver, type D1Database, openSqlStorage } from '@agility-bridge/storage';
 
 /** The Worker's bindings: `DB` (D1), the secrets and the `AB_*` variables. */
 export interface WorkerEnv {

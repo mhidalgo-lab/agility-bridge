@@ -13,6 +13,7 @@ import {
   migrate,
   migrationChecksum,
   openSqlStorage,
+  type SqlDriver,
   schema,
 } from '@agility-bridge/storage';
 import { getTableConfig, type SQLiteTable } from 'drizzle-orm/sqlite-core';
@@ -237,5 +238,29 @@ describe('atomic single-use state across connections (L-073)', () => {
     expect(await a.kv.get('n')).toBe('15');
     await a.close();
     await b.close();
+  });
+});
+
+describe('access bundle (P3-02)', () => {
+  it('reads a token and its access records in one driver call (one D1 round trip)', async () => {
+    const inner = createSqliteDriver(new DatabaseSync(':memory:'));
+    const calls: string[] = [];
+    const counting: SqlDriver = {
+      query: (st) => {
+        calls.push('query');
+        return inner.query(st);
+      },
+      batch: (sts) => {
+        calls.push(`batch:${sts.length}`);
+        return inner.batch(sts);
+      },
+      close: () => inner.close(),
+    };
+    const storage = await openSqlStorage(counting);
+    calls.length = 0;
+    const bundle = await storage.accessTokens.bundleByHash('a'.repeat(64));
+    expect(bundle.token).toBeNull();
+    expect(calls).toEqual(['batch:6']);
+    await storage.close();
   });
 });

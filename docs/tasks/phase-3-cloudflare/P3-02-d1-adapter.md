@@ -2,7 +2,7 @@
 id: P3-02
 title: D1 adapter and shared migration runner
 phase: 3
-status: todo
+status: review
 priority: high
 depends_on: [P3-01]
 adr: ["0006"]
@@ -33,11 +33,11 @@ D1 round trip.
   contract suite's worlds).
 
 ## Acceptance criteria
-- [ ] `storageContract('d1 (local)', …)` passes in full; concurrent first boots tested (several storages migrating one
+- [x] `storageContract('d1 (local)', …)` passes in full; concurrent first boots tested (several storages migrating one
       database at once).
-- [ ] The access bundle returns the same records as the sequential loads on memory, SQLite and D1, including revoked,
+- [x] The access bundle returns the same records as the sequential loads on memory, SQLite and D1, including revoked,
       expired, disabled and missing rows; on SQL it is one driver call.
-- [ ] `docs/dev/storage.md` describes the D1 driver, its batch semantics and the access bundle.
+- [x] `docs/dev/storage.md` describes the D1 driver, its batch semantics and the access bundle.
 
 ## Security notes
 THREAT_MODEL T7.
@@ -49,6 +49,11 @@ THREAT_MODEL T7.
 
 ## Docs to update
 - docs/dev/storage.md
+
+## Notes
+- The contract suite passed on D1 as soon as it ran: the shared SQL already decided every conditional write on
+  `RETURNING` rows, so no driver or SQL change was needed. The only fix was test-side (dropping tables child-first
+  between tests).
 
 ## Out of scope
 - Remote D1 (P3-05 creates databases; P3-11 runs against one); Durable Objects; read replicas.

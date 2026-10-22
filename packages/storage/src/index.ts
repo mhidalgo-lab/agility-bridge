@@ -13,6 +13,7 @@ export { createMemoryStorage, type MemoryStorageOptions } from './memory.ts';
 export { MIGRATIONS, type Migration } from './migrations/index.ts';
 export { readOnlyStorage } from './read-only.ts';
 export * as schema from './schema.ts';
+export { createD1Driver, type D1Database, type D1PreparedStatement } from './sql/d1.ts';
 export {
   classifySqlError,
   mapSqlError,
