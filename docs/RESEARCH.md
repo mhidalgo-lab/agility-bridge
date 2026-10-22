@@ -392,6 +392,10 @@ Checked 2026-10 in Cloudflare documentation; P0-09 measures with Agility-shaped 
   Cloudflare services), 128 MB memory, 6 simultaneous open connections; Paid — 30 s default CPU (configurable up to
   5 min), 10,000 subrequests (configurable), no daily request cap. —
   [Workers limits](https://developers.cloudflare.com/workers/platform/limits/)
+- **Pricing (2026-10-22)**: Workers Paid from 5 USD a month per account, 10 million requests and 30 million CPU-ms
+  included; D1 Free 5 million rows read and 100,000 written a day, 5 GB; D1 on Paid 25 billion read and 50 million
+  written a month included. — [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/),
+  [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/)
 - **D1**: no interactive transactions (`batch()` is one transaction); statement size ≤ 100 KB; ≤ 100 bound parameters;
   rows/strings ≤ 2 MB; 30 s per query; read-only queries retried by the platform, writes not; foreign keys enforced;
   Free: 5 M rows read and 100,000 written per day. — [D1 limits](https://developers.cloudflare.com/d1/platform/limits/)

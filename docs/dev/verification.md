@@ -105,3 +105,23 @@ tokens from its output. The CI Docker job runs it on every change; the image its
 A container is not a full virtual machine (no init system, no reverse proxy, no TLS); the systemd unit, the proxy
 configurations and the Compose file are validated separately (`docker compose config`, `caddy validate`) and by the
 image smoke test.
+
+## Cloudflare deployment (P3-05, P3-07)
+
+Executed against the owner's Cloudflare account (Free plan) on the owner-approved name `agility-bridge-staging`
+(`workers.dev`), following [the deploy guide](../guide/cloudflare-deploy.md). No Agility tenant is reached from the
+Worker (D-01): instances are a synthetic one at an unreachable address and Digital.ai's public example instance
+(unauthenticated `meta.v1` only).
+
+| Date | Step | Result |
+|---|---|---|
+| 2026-10-22 | `pnpm cf:setup --name agility-bridge-staging --secrets-file …` (first run) | D1 created, local config written, deployed, both secrets set through stdin into a `0600` file; first `/health` got `403` without `AB_PUBLIC_URL` (L-180), fixed in the script |
+| 2026-10-22 | `pnpm cf:setup --name agility-bridge-staging` (again) | Only a redeploy; nothing created |
+| 2026-10-22 | Smoke | `/health` 200 with HSTS; admin API 401 without and 200 with the break-glass token; MCP 401 without a token |
+| 2026-10-22 | `pnpm cf:migrate --name agility-bridge-staging --from <synthetic backup>` | First refused as "not empty" (two refusal audit rows, L-181), then imported with counts verified; the migrated device token listed 13 tools |
+| 2026-10-22 | `AB_ADMIN_URL=… agility-bridge instance add "Example (public)" https://www14.v1host.com/v1sdktesting` | Created through the Worker's admin API; the Worker probed the origin from Cloudflare (metadata fingerprint recorded) |
+| 2026-10-22 | `wrangler tail` CPU | Warm `tools/list` 4–10 ms; a new isolate's first request 38–80 ms (P3-14) |
+
+Not executed (owner resources): a custom domain on a zone with the WAF exception, and an Agility credential on the
+Worker ([pending decisions](../pending-decisions/phase-3.md)).
+
