@@ -527,7 +527,17 @@ export function accessServices(options: AccessServicesOptions) {
         next.scopeIds,
         next.limits,
       );
-      return { record: await storage.grants.update(id, out), warnings };
+      const record = await storage.grants.update(id, out);
+      // Tokens issued on the old credential must not start acting as the owner of a personal one (P2-17 review M2).
+      if (next.credentialId !== current.credentialId && next.credentialId !== null) {
+        const credential = await storage.credentials.get(next.credentialId);
+        if (credential?.ownerUserId !== null) {
+          for (const t of await storage.accessTokens.list({ grantId: id })) {
+            if (t.revokedAt === null) await storage.accessTokens.update(t.id, { revokedAt: now() });
+          }
+        }
+      }
+      return { record, warnings };
     },
     revoke: (id: string) => storage.grants.update(id, { revokedAt: now() }),
     delete: (id: string) => storage.grants.delete(id),

@@ -199,6 +199,46 @@ export function storageContract(name: string, factory: StorageFactory): void {
       });
     });
 
+    describe('owners and revocation (P2-17 review)', () => {
+      it('never leaves zero active owners, even with concurrent changes', async () => {
+        await s.users.create({ id: 'o1', email: 'o1@example.test', role: 'owner' });
+        await expect(s.users.update('o1', { role: 'admin' })).rejects.toThrow(ConflictError);
+        await expect(s.users.update('o1', { disabledAt: 1 })).rejects.toThrow(ConflictError);
+        await expect(s.users.delete('o1')).rejects.toThrow(ConflictError);
+        await s.users.create({ id: 'o2', email: 'o2@example.test', role: 'owner' });
+        const results = await Promise.allSettled([
+          s.users.update('o1', { role: 'member' }),
+          s.users.update('o2', { role: 'member' }),
+        ]);
+        expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+        expect((await s.users.list()).filter((u) => u.role === 'owner')).toHaveLength(1);
+        // Changes that keep an active owner stay possible.
+        await s.users.create({ id: 'm', email: 'm@example.test', role: 'member' });
+        await s.users.update('m', { role: 'owner' });
+        expect(await s.users.update('m', { displayName: 'x' })).toMatchObject({ role: 'owner' });
+      });
+
+      it('a revocation is final for credentials, grants and device tokens', async () => {
+        await seed(s);
+        await s.grants.create({ id: 'g', workspaceId: 'w-1', userId: 'u-alice' });
+        await s.accessTokens.create({
+          id: 't',
+          grantId: 'g',
+          prefix: 'ab_live_Ab12',
+          tokenHash: HASH_A,
+          label: 'x',
+        });
+        await s.credentials.update('c-alice', { revokedAt: 5 });
+        await s.grants.update('g', { revokedAt: 5 });
+        await s.accessTokens.update('t', { revokedAt: 5 });
+        await expect(s.credentials.update('c-alice', { revokedAt: null })).rejects.toThrow(ConflictError);
+        await expect(s.grants.update('g', { revokedAt: null })).rejects.toThrow(ConflictError);
+        await expect(s.accessTokens.update('t', { revokedAt: null })).rejects.toThrow(ConflictError);
+        await expect(s.grants.update('g', { revokedAt: 9 })).rejects.toThrow(ConflictError);
+        expect(await s.grants.update('g', { label: 'still editable' })).toMatchObject({ revokedAt: 5 });
+      });
+    });
+
     describe('instances and credentials', () => {
       it('validates instance URLs and keeps them unique', async () => {
         await expect(s.instances.create({ id: 'i', label: 'x', baseUrl: 'ftp://x.test' })).rejects.toThrow(
@@ -547,8 +587,8 @@ export function storageContract(name: string, factory: StorageFactory): void {
         await s.users.delete('u-bob');
         await s.credentials.delete('c-shared-other');
         await s.instances.delete('i-2');
-        await s.users.delete('u-owner');
-        expect((await s.users.list()).map((u) => u.id)).toEqual(['u-alice']);
+        await expect(s.users.delete('u-owner')).rejects.toThrow(ConflictError); // the last active owner
+        expect((await s.users.list()).map((u) => u.id).sort()).toEqual(['u-alice', 'u-owner']);
       });
     });
 

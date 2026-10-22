@@ -14,6 +14,7 @@ import {
   openCredentialToken,
   resolvePassthroughAccess,
   type TokenEnvironment,
+  type ValidationResult,
 } from '@agility-bridge/auth';
 import {
   buildMcpServer,
@@ -88,6 +89,8 @@ export interface RequestLimits {
   beforeAuth?(ip: string, now: number): LimitDecision | Promise<LimitDecision>;
   /** Charged only when authentication fails (a valid token is never locked out by others' failures). */
   onAuthFailure?(ip: string, now: number): void | Promise<void>;
+  /** Before an upstream validation of a new pass-through token (P2-14), per instance. */
+  beforeValidation?(instanceId: string, now: number): LimitDecision | Promise<LimitDecision>;
   /** True when the IP has no failures left: a failed attempt then answers 429 instead of 401. */
   failuresExhausted?(ip: string, now: number): boolean | Promise<boolean>;
   /** Per token and grant, after authentication. */
@@ -155,6 +158,8 @@ interface PreparedRequest {
 }
 
 const UNAUTHORIZED = JSON.stringify({ error: 'unauthorized' });
+/** Pass-through identities kept at most (P2-14). */
+const MAX_IDENTITIES = 10_000;
 
 /** Ends a streamed body at the deadline. */
 function withDeadline(response: Response, ms: number, onTimeout: () => void): Response {
@@ -202,6 +207,22 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
   const cache = new AccessCache((options.accessCacheTtlSeconds ?? 30) * 1000);
   /** Pass-through identities validated recently: HMAC fingerprint → valid until (P2-14). */
   const identities = new Map<string, number>();
+  /** Validations in flight by the same key: concurrent requests with one new token share one upstream check. */
+  const validating = new Map<string, Promise<ValidationResult>>();
+  const remember = (key: string, until: number, now: number) => {
+    // Bounded: drop expired entries first, then the oldest (P2-17 review F4); never a wholesale clear that would
+    // make every caller validate again at once.
+    if (identities.size >= MAX_IDENTITIES) {
+      for (const [k, expires] of identities) if (expires <= now) identities.delete(k);
+      while (identities.size >= MAX_IDENTITIES) {
+        const oldest = identities.keys().next();
+        if (oldest.done === true) break;
+        identities.delete(oldest.value);
+      }
+    }
+    identities.delete(key);
+    identities.set(key, until);
+  };
   const { services } = options;
   const registry = new ToolRegistry();
   for (const tool of options.tools) registry.register(tool);
@@ -350,7 +371,19 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         // fingerprint (the identity cache holds no token).
         const key = `${fingerprint}|${instance.id}`;
         if ((identities.get(key) ?? 0) <= started) {
-          const result = await pt.validator.validate(instance, decision.access.credential.id, agilityToken);
+          // An IP out of failed attempts gets no further upstream checks (P2-17 review F2).
+          if ((await options.limits?.failuresExhausted?.(ip, started)) === true) return tooMany(300);
+          let pending = validating.get(key);
+          if (pending === undefined) {
+            const cap = await options.limits?.beforeValidation?.(instance.id, started);
+            if (cap !== undefined && !cap.ok) return tooMany(cap.retryAfterSeconds);
+            const credentialId = decision.access.credential.id;
+            pending = pt.validator
+              .validate(instance, credentialId, agilityToken)
+              .finally(() => validating.delete(key));
+            validating.set(key, pending);
+          }
+          const result = await pending;
           if (result.status === 'unavailable') {
             return finish(
               c.json({ error: 'temporarily unavailable' }, 503, { 'retry-after': '5' }),
@@ -358,8 +391,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
             );
           }
           if (result.status !== 'valid') return unauthorized('passthrough_invalid');
-          if (identities.size >= 10_000) identities.clear();
-          identities.set(key, started + (pt.identityTtlSeconds ?? 300) * 1000);
+          remember(key, started + (pt.identityTtlSeconds ?? 300) * 1000, started);
         }
         access = decision.access;
         passthroughToken = agilityToken;

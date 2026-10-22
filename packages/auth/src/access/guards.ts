@@ -240,6 +240,10 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     async update(id: string, patch: GrantPatchInput): Promise<WithWarnings<Grant>> {
       needManager(actor);
       if (writeTools(patch.tools).length > 0) needOwner(actor, 'grant write tools');
+      const current = await load(storage.grants.get(id), 'grant');
+      if (patch.credentialId !== undefined && patch.credentialId !== current.credentialId) {
+        await needCredentialOwner(patch.credentialId, "put a grant on someone's personal Agility token");
+      }
       return services.grants.update(id, patch);
     },
     async revoke(id: string): Promise<Grant> {
@@ -258,13 +262,26 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     if (!isManager(actor) && !mineGrant(g)) throw new NotFoundError('No grant with this id.');
     return g;
   }
+
+  /**
+   * A device token on a grant that uses someone's personal Agility token acts as that person in Agility: only they
+   * may issue one (P2-17 review M2). Grants on shared credentials stay with owners and admins.
+   */
+  async function needCredentialOwner(credentialId: string | null, what: string): Promise<void> {
+    if (credentialId === null) return;
+    const c = await storage.credentials.get(credentialId);
+    if (c !== null && c.ownerUserId !== null && c.ownerUserId !== self) {
+      throw new ForbiddenError(`Only the owner of the personal Agility token can ${what}.`);
+    }
+  }
   const tokens = {
     async list(grantId: string): Promise<AccessToken[]> {
       await ownGrant(grantId);
       return services.tokens.list(grantId);
     },
     async issue(input: Parameters<AccessServices['tokens']['issue']>[0]) {
-      await ownGrant(input.grantId);
+      const grant = await ownGrant(input.grantId);
+      await needCredentialOwner(grant.credentialId, 'issue device tokens on this grant');
       return services.tokens.issue(input);
     },
     async revoke(id: string): Promise<AccessToken> {

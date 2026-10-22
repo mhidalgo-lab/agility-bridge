@@ -4,7 +4,7 @@
 // key to the user configuration directory, not the data directory.
 import { closeSync, realpathSync, writeSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { generateMasterKey, parseMasterKey, SecretsError } from '@agility-bridge/auth';
 import {
   ensurePrivateDir,
@@ -39,16 +39,27 @@ export function defaultMasterKeyFile(env: Env): string {
   return join(configDir(env), 'master.key');
 }
 
+/**
+ * The path with every link resolved, also for a path that does not exist yet: its deepest existing ancestor is
+ * resolved and the rest appended (macOS `/var` → `/private/var`, a linked data directory).
+ */
 function real(path: string): string {
-  try {
-    return realpathSync(path);
-  } catch {
-    return resolve(path);
+  const missing: string[] = [];
+  let current = resolve(path);
+  for (;;) {
+    try {
+      return join(realpathSync(current), ...missing.reverse());
+    } catch {
+      const parent = dirname(current);
+      if (parent === current) return resolve(path);
+      missing.push(basename(current));
+      current = parent;
+    }
   }
 }
 
 /** True when `file` is `dir` or inside it, after resolving links. */
-function isInside(file: string, dir: string): boolean {
+export function isInside(file: string, dir: string): boolean {
   const rel = relative(real(dir), real(file));
   return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }

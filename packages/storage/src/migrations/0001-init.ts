@@ -190,6 +190,29 @@ WHEN (NEW.base_url IS NOT OLD.base_url OR NEW.tls IS NOT OLD.tls) AND EXISTS (
 BEGIN
   SELECT RAISE(ABORT, 'ab_conflict: instances.base_url and tls cannot change while the instance has credentials that are not revoked');
 END`,
+    // At least one active owner, decided in the same statement as the change, so concurrent requests cannot both
+    // pass a check made before writing (P2-17 review M1).
+    `CREATE TRIGGER users_last_owner_update BEFORE UPDATE OF role, disabled_at ON users
+WHEN OLD.role = 'owner' AND OLD.disabled_at IS NULL AND (NEW.role IS NOT 'owner' OR NEW.disabled_at IS NOT NULL)
+  AND NOT EXISTS (SELECT 1 FROM users u WHERE u.role = 'owner' AND u.disabled_at IS NULL AND u.id <> OLD.id)
+BEGIN
+  SELECT RAISE(ABORT, 'ab_conflict: the last active owner cannot lose the owner role or be disabled');
+END`,
+    `CREATE TRIGGER users_last_owner_delete BEFORE DELETE ON users
+WHEN OLD.role = 'owner' AND OLD.disabled_at IS NULL
+  AND NOT EXISTS (SELECT 1 FROM users u WHERE u.role = 'owner' AND u.disabled_at IS NULL AND u.id <> OLD.id)
+BEGIN
+  SELECT RAISE(ABORT, 'ab_conflict: the last active owner cannot be deleted');
+END`,
+    // Revocation is final (P2-17 review L2): a revoked credential, grant or device token never becomes usable again,
+    // e.g. after its instance was retargeted to another origin (THREAT_MODEL A14).
+    ...['credentials', 'grants', 'access_tokens'].map(
+      (table) => `CREATE TRIGGER ${table}_revocation_final BEFORE UPDATE OF revoked_at ON ${table}
+WHEN OLD.revoked_at IS NOT NULL AND NEW.revoked_at IS NOT OLD.revoked_at
+BEGIN
+  SELECT RAISE(ABORT, 'ab_conflict: ${table}.revoked_at cannot change once set');
+END`,
+    ),
     // Append-only audit (THREAT_MODEL T17): rows are never updated; retention deletes whole rows.
     `CREATE TRIGGER audit_log_append_only BEFORE UPDATE ON audit_log
 BEGIN

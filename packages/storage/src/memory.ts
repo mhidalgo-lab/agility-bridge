@@ -127,8 +127,20 @@ export function createMemoryStorage(options: MemoryStorageOptions = {}): Storage
     if (table === 'access_tokens' && !has('grants', row['grantId'])) throw missingParent(table);
   }
 
+  const otherActiveOwner = (id: string) =>
+    [...tables.users.values()].some((u) => u.role === 'owner' && u.disabledAt === null && u.id !== id);
+
   /** Delete restrictions, or the rows a delete cascades to. */
   function deleteRow(table: IdTable, id: string): void {
+    const row = tables[table].get(id);
+    if (
+      table === 'users' &&
+      row?.['role'] === 'owner' &&
+      row['disabledAt'] === null &&
+      !otherActiveOwner(id)
+    ) {
+      throw new ConflictError('the last active owner cannot be deleted.');
+    }
     const refs = (t: IdTable, column: string) => [...tables[t].values()].some((r) => r[column] === id);
     const stillReferenced =
       (table === 'users' && (refs('credentials', 'ownerUserId') || refs('grants', 'userId'))) ||
@@ -173,6 +185,22 @@ export function createMemoryStorage(options: MemoryStorageOptions = {}): Storage
         checkRow(name, next);
         checkUnique(table, next);
         checkReferences(table, next, new Set(Object.keys(values)));
+        if (
+          'revokedAt' in values &&
+          current['revokedAt'] !== null &&
+          current['revokedAt'] !== next['revokedAt']
+        ) {
+          throw new ConflictError(`${table}.revoked_at cannot change once set.`);
+        }
+        if (
+          table === 'users' &&
+          current['role'] === 'owner' &&
+          current['disabledAt'] === null &&
+          (next['role'] !== 'owner' || next['disabledAt'] !== null) &&
+          !otherActiveOwner(id)
+        ) {
+          throw new ConflictError('the last active owner cannot lose the owner role or be disabled.');
+        }
         if (table === 'instances') {
           const changed =
             next['baseUrl'] !== current['baseUrl'] ||

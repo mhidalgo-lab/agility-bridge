@@ -2,7 +2,7 @@
 id: P2-14
 title: Pass-through workspaces (optional, off by default)
 phase: 2
-status: review
+status: done
 priority: low
 depends_on: [P2-06, P2-08]
 adr: ["0008", "0009"]

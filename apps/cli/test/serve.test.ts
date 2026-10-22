@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // `agility-bridge serve` on a real socket (P2-06): configuration checks before listening, a token-authenticated MCP
 // request over Node HTTP, uniform 401, headers and health.
-import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { accessServices, generateAdminToken, generateMasterKey, Keyring } from '@agility-bridge/auth';
@@ -155,6 +156,57 @@ describe('serve over HTTP', () => {
   });
 });
 
+/** One raw HTTP/1.1 exchange: the request line is sent exactly as given. */
+function raw(url: string, requestLine: string, headers: string[] = []): Promise<string> {
+  const { hostname, port } = new URL(url);
+  return new Promise((resolve, reject) => {
+    const socket = connect(Number(port), hostname, () => {
+      socket.end(
+        [requestLine, `Host: ${hostname}:${port}`, 'Connection: close', ...headers, '', ''].join('\r\n'),
+      );
+    });
+    let out = '';
+    socket.on('data', (d) => {
+      out += d.toString('utf8');
+    });
+    socket.on('end', () => resolve(out));
+    socket.on('error', reject);
+  });
+}
+
+describe('request targets and HTTPS (P2-17 review F1)', () => {
+  it('refuses absolute-form request targets: the client cannot choose the scheme or host the app sees', async () => {
+    running = await startServe(env(), { sink: () => {} });
+    const { port } = new URL(running.url);
+    for (const line of [
+      `GET https://127.0.0.1:${port}/health HTTP/1.1`,
+      `GET http://evil.example/health HTTP/1.1`,
+      'OPTIONS * HTTP/1.1',
+      'GET //evil.example/health HTTP/1.1',
+    ]) {
+      expect((await raw(running.url, line)).split('\r\n')[0], line).toBe('HTTP/1.1 400 Bad Request');
+    }
+    expect((await raw(running.url, 'GET /health HTTP/1.1')).split('\r\n')[0]).toBe('HTTP/1.1 200 OK');
+  });
+
+  it('never treats a pass-through request as HTTPS without a trusted proxy saying so', async () => {
+    const lines: string[] = [];
+    running = await startServe(env({ AB_PASSTHROUGH: 'on' }), { sink: (l) => lines.push(l) });
+    const res = await fetch(`${running.url}/w/team/mcp`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+        'x-forwarded-proto': 'https',
+        'x-agility-token': '1.CallerOwnAgilityTokenNotReal0001',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+    });
+    expect(res.status).toBe(401);
+    expect(lines.join('\n')).toContain('"refusal":"passthrough_insecure"');
+  });
+});
+
 describe('admin API through serve', () => {
   it('is 404 without an admin token, and served to the configured one', async () => {
     running = await startServe(env(), { sink: () => {} });
@@ -189,6 +241,18 @@ describe('admin API through serve', () => {
       startServe(env({ AB_ADMIN_TOKEN_FILE: join(dir, 'data', 'admin.token') }), { sink: () => {} }),
     ).rejects.toThrow(/inside the data directory/);
   });
+
+  it.skipIf(process.platform === 'win32')(
+    'refuses an admin token file reached through a symbolic link into the data directory (P2-17 review L1)',
+    async () => {
+      mkdirSync(join(dir, 'data'), { recursive: true, mode: 0o700 });
+      writeFileSync(join(dir, 'data', 'admin.token'), `${generateAdminToken()}\n`, { mode: 0o600 });
+      symlinkSync(join(dir, 'data'), join(dir, 'alias'));
+      await expect(
+        startServe(env({ AB_ADMIN_TOKEN_FILE: join(dir, 'alias', 'admin.token') }), { sink: () => {} }),
+      ).rejects.toThrow(/inside the data directory/);
+    },
+  );
 });
 
 describe('revalidation after repeated Agility refusals', () => {

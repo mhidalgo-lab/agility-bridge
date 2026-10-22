@@ -30,9 +30,9 @@ How to use it:
 | [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172 |
-| [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070 |
-| [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161 |
-| [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151 |
+| [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177 |
+| [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
+| [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164 |
 | [K. Admin UI](#k-admin-ui) | L-095 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101 |
@@ -40,7 +40,7 @@ How to use it:
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163 |
@@ -504,6 +504,13 @@ A token for workspace A is rejected at workspace B before anything else is evalu
 same way.
 *Applied in:* P2-05, P5-02.
 
+**L-177 — A rule over several rows lives in storage, not in a read-then-write guard.**
+The last-owner rule counted active owners and then wrote in a separate step; two owners demoting each other at the same
+time left none (P2-17 review M1). Cross-row invariants (last owner, personal credentials, revocation is final) are
+storage triggers with the same rule in the memory adapter, so every writer and every interleaving is covered; the
+service guard stays for a friendly error.
+*Applied in:* P2-17, `packages/storage/src/migrations/0001-init.ts`.
+
 **L-068 — Bound the access cache.**
 At most 60 s (default 30 s), keyed by token hash and workspace, cleared on local admin changes; document that other
 processes or isolates may honour a revocation only after the TTL.
@@ -610,6 +617,20 @@ Query strings leak into logs, history and `Referer`; put setup codes in the URL 
 **L-151 — Health endpoints reveal nothing.**
 Liveness and version only; no dependency details, configuration or stack traces on unauthenticated routes.
 *Applied in:* P2-06, P3-01.
+
+**L-175 — The request URL is the client's choice: never derive transport security from it.**
+Node's HTTP server accepts absolute-form targets (`POST https://host/path HTTP/1.1`) on a plain socket, and
+`@hono/node-server` builds the request URL from them, so `new URL(c.req.url).protocol === 'https:'` was true over clear
+text (P2-17 review F1). Decide "HTTPS" from the socket or from a trusted proxy's `X-Forwarded-Proto` only, and refuse
+request targets that are not origin-form (`/path`) before routing.
+*Applied in:* P2-14, P2-17, `apps/cli/src/serve.ts` (`originFormOnly`).
+
+**L-176 — An authentication step that costs upstream calls needs its own budget, checked before it runs.**
+Validating a pass-through token costs Agility requests; checking the failure limit only after validating let an
+exhausted address keep spending the instance's quota (P2-17 review F2). Check exhausted failure budgets first, cap
+validations per instance, share one validation between concurrent requests with the same token, and count IPv6 clients
+by their /64 so address rotation does not reset the limits.
+*Applied in:* P2-14, P2-17, `packages/http-app/src/app.ts`, `rate-limit.ts`.
 
 ## J. OAuth and identity
 

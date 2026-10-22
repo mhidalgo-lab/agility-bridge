@@ -191,6 +191,46 @@ describe('negative authorization (every route)', () => {
   });
 });
 
+describe("personal Agility tokens stay their owner's (P2-17 review M2)", () => {
+  it("nobody but the owner issues a device token on a grant that uses a member's personal credential", async () => {
+    const w = await world({}, { admin: true });
+    const before = (await w.storage.accessTokens.list({ grantId: w.ids.aliceGrant })).length;
+    for (const who of ['admin', 'owner', 'break_glass'] as const) {
+      const res = await call(w, who, 'POST', `/grants/${w.ids.aliceGrant}/tokens`, { label: 'stolen' });
+      expect(res.status, who).toBe(403);
+    }
+    expect((await w.storage.accessTokens.list({ grantId: w.ids.aliceGrant })).length).toBe(before);
+    expect(
+      (await call(w, 'member', 'POST', `/grants/${w.ids.aliceGrant}/tokens`, { label: 'mine' })).status,
+    ).toBe(201);
+  });
+
+  it("an existing grant cannot be moved onto someone's personal credential", async () => {
+    const w = await world({}, { admin: true });
+    await w.storage.credentials.create({
+      id: 'c-shared',
+      instanceId: w.ids.instance,
+      ownerUserId: null,
+      label: 'shared',
+      tokenCiphertext: 'x',
+      tokenIv: 'y',
+      keyVersion: 1,
+      tokenHint: 'abcd',
+    });
+    const created = await call(w, 'owner', 'POST', '/grants', {
+      workspaceId: w.ids.workspaceA,
+      userId: w.ids.alice,
+      credentialId: 'c-shared',
+    });
+    expect(created.status).toBe(201);
+    const grant = (await created.json()) as { record: { id: string } };
+    const res = await call(w, 'owner', 'PATCH', `/grants/${grant.record.id}`, {
+      credentialId: w.ids.aliceCredential,
+    });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('owner actions', () => {
   it('an owner retargets an instance only after a recent sign-in, and the change revokes its credentials and grants', async () => {
     const w = await world({}, { admin: true });
@@ -238,8 +278,9 @@ describe('secrets are never returned', () => {
     const listed = await (await call(w, 'admin', 'GET', '/credentials')).text();
     for (const leak of [token, 'tokenCiphertext', 'tokenIv']) expect(listed).not.toContain(leak);
 
+    // Alice's grant uses her personal token: she issues her own device tokens (P2-17 review M2).
     const issued = (await (
-      await call(w, 'admin', 'POST', `/grants/${w.ids.aliceGrant}/tokens`, { label: 'ci' })
+      await call(w, 'member', 'POST', `/grants/${w.ids.aliceGrant}/tokens`, { label: 'ci' })
     ).json()) as {
       token: string;
       record: Record<string, unknown>;

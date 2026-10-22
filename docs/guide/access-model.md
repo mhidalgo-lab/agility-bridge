@@ -37,7 +37,10 @@ anything else is looked at.
 - **Shared credentials are read-only.** A grant that uses a shared credential (its own or the workspace default) never
   gets write tools, and service grants are always read-only.
 - **Nobody uses another person's token.** A grant can name a shared credential or its own user's personal credential —
-  never someone else's. Every way of changing configuration (the admin API, the CLI, imports) enforces this.
+  never someone else's. Only that user can put a grant on their personal credential or issue device tokens for such a
+  grant (a device token acts as them in Agility), and switching a grant to a personal credential revokes the grant's
+  existing device tokens. Every way of changing configuration (the admin API, the CLI, imports) enforces this, and the
+  database itself refuses to leave the server without an active owner or to un-revoke anything.
 - **Write tools** (Phase 7) additionally need the server switch, the workspace's write policy, and both the workspace
   and the grant naming each write tool explicitly: "all tools" never includes a write tool.
 

@@ -116,8 +116,9 @@ follows in the self-hosting guide.
 | `AB_RATE_LIMIT_AUTH_FAILURES` | `10` | Failed authentications per client address per 5 minutes; after that, failed attempts get `429` while valid tokens keep working |
 | `AB_RATE_LIMIT_TOKEN_PER_MINUTE` | `120` | Requests per device token (a `subscriptions/listen` stream does not count) |
 | `AB_RATE_LIMIT_GRANT_PER_MINUTE` | `300` | Requests per grant, all its devices together; a grant's own rate limit can lower it |
+| `AB_RATE_LIMIT_VALIDATIONS_PER_MINUTE` | `30` | Checks of new pass-through tokens against Agility, per instance ([pass-through](self-hosting.md#pass-through-workspaces-optional)); beyond it, new tokens get `429` while known ones keep working |
 | `AB_RATE_LIMIT` | `on` | `off` turns every limit off (logged as a warning) |
 
 A limited request gets `429` with `Retry-After`. The counters live in each server process: several replicas each
-count on their own. If the limiter itself fails, requests are allowed and the failure is logged (authorization never
+count on their own. Client addresses are counted as is for IPv4 and by their `/64` network for IPv6. If the limiter itself fails, requests are allowed and the failure is logged (authorization never
 fails open).
