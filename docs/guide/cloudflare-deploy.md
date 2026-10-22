@@ -85,7 +85,8 @@ keep working at the new address. One-way, into an **empty** deployment (L-078):
    pnpm cf:migrate --name <worker> --from ./agility-bridge-backup.db
    ```
 
-   It refuses, before writing anything, a target that has any row, a different schema version (upgrade the server and
+   It refuses, before writing anything, a target that already has users, instances, credentials, workspaces,
+   grants, device tokens or settings (audit rows of refused requests are fine: they stay), a different schema version (upgrade the server and
    the Worker to the same release first), or a Worker without the server's master key. It writes the rows as SQL
    (`0600`, deleted afterwards; it holds ciphertext and token hashes), imports it with `wrangler d1 execute --remote`,
    and checks the row counts. Rate-limit counters and other transient state are not copied.

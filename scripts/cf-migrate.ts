@@ -24,8 +24,11 @@ export const TABLES = [
   'audit_log',
   'kv',
 ] as const;
-/** Tables that must be empty on the target (L-078). */
-const MUST_BE_EMPTY = TABLES.filter((t) => t !== 'kv');
+/**
+ * Tables that must be empty on the target (L-078). Not the audit log: an internet-facing Worker records refused probes
+ * within minutes of its first deploy (L-181); its rows stay and the server's are added.
+ */
+const MUST_BE_EMPTY = TABLES.filter((t) => t !== 'kv' && t !== 'audit_log');
 const KV_KEPT = "key LIKE 'crypto:%'";
 
 export class MigrationRefused extends Error {

@@ -152,6 +152,13 @@ describe('self-hosted to Worker', () => {
     const exp = exported(source.backup);
     expect(exp.counts).toMatchObject({ users: 2, credentials: 1, access_tokens: 1, audit_log: 1, kv: 1 });
     const target = await worker(key);
+    // An internet-facing Worker is probed before anyone migrates into it: the refusal's audit row must not block.
+    await target.mf.dispatchFetch('http://127.0.0.1/w/team/mcp', { method: 'POST', body: '{}' });
+    const migrated = await openSqlStorage(createD1Driver(target.d1));
+    for (let i = 0; i < 40 && (await migrated.audit.query({ limit: 5 })).length === 0; i++) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    expect((await migrated.audit.query({ limit: 5 })).length).toBe(1);
     const state = await targetState(target.d1);
     checkTarget(exp, state);
     const statements = statementsFor(exp, state);
@@ -160,8 +167,10 @@ describe('self-hosted to Worker', () => {
     expect(statements.some((s) => s.includes('rl:transient'))).toBe(false);
     await target.d1.batch(statements.map((s) => target.d1.prepare(s)));
 
-    const migrated = await openSqlStorage(createD1Driver(target.d1));
-    expect(await dump(migrated)).toEqual(await dump(source.storage));
+    const [after, before] = [await dump(migrated), await dump(source.storage)];
+    // The probe's row stays; the server's rows are added.
+    expect({ ...after, audit: after.audit.filter((r) => r.kind !== 'auth') }).toEqual(before);
+    expect(after.audit).toHaveLength(before.audit.length + 1);
     const res = await target.mf.dispatchFetch('http://127.0.0.1/w/team/mcp', {
       method: 'POST',
       headers: {
