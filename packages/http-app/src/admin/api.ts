@@ -270,6 +270,8 @@ interface RouteSpec {
   status?: 200 | 201;
   /** For the audit row; undefined = a read (not audited). */
   audit?: { action: string; targetType: string };
+  /** Body values recorded with the audit row (operator reasons only; never secrets or names, P3-11 review). */
+  auditBody?: readonly string[];
 }
 
 const ERROR_RESPONSES = Object.fromEntries(
@@ -439,7 +441,15 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
             ((result as { id?: string; record?: { id?: string } })?.record?.id ??
               (result as { id?: string })?.id ??
               '');
-          auditRow(c, spec, 'ok', target, { fields: Object.keys(body).filter((k) => k !== 'token') });
+          auditRow(c, spec, 'ok', target, {
+            fields: Object.keys(body).filter((k) => k !== 'token'),
+            ...Object.fromEntries(
+              (spec.auditBody ?? []).map((k) => [
+                k,
+                String((body as Record<string, unknown>)[k] ?? '').slice(0, 200),
+              ]),
+            ),
+          });
           options.onChange();
         }
         return c.json(result as never, spec.status ?? 200);
@@ -921,6 +931,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       body: z.object({ reason: z.string().min(1).max(200) }),
       out: z.array(KeyVersionOut),
       audit: { action: 'crypto.retire_key', targetType: 'key_version' },
+      auditBody: ['reason'],
     },
     (c, { id, body }) => {
       const version = Number(id);

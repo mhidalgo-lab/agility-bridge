@@ -2,7 +2,7 @@
 id: P3-13
 title: Master-key status and retirement through the admin API; init --version
 phase: 3
-status: review
+status: done
 priority: medium
 depends_on: [P3-08]
 adr: ["0007"]

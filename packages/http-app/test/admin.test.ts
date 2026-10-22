@@ -251,6 +251,13 @@ describe('owner actions', () => {
     expect((await call(w, 'break_glass', 'POST', '/keys/0/retire', { reason: 'x' })).status).toBe(422);
     expect((await call(w, 'break_glass', 'POST', '/keys/1/retire', {})).status).toBe(422);
     expect(await w.storage.kv.get('crypto:retired:v1')).toBeNull();
+    // A version the database never used, or a future one, is refused and nothing is recorded (P3-11 review): it would
+    // make a later boot with that key fail for good.
+    for (const v of [5, 2]) {
+      const res = await call(w, 'break_glass', 'POST', `/keys/${v}/retire`, { reason: 'x' });
+      expect(res.status, `v${v}`).toBe(409);
+      expect(await w.storage.kv.get(`crypto:retired:v${v}`)).toBeNull();
+    }
   });
 
   it('an owner retargets an instance only after a recent sign-in, and the change revokes its credentials and grants', async () => {

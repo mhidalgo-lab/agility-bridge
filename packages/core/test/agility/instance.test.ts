@@ -78,6 +78,21 @@ describe('instance URL policy (P2-19)', () => {
       ['999.1.1.1', 'invalid'],
       ['example.com', 'invalid'],
       ['fe80::1%eth0', 'invalid'],
+      // P3-11 review: IPv4 embedded in IPv6, site-local, discard, and special IPv4 ranges.
+      ['::7f00:1', 'loopback'],
+      ['64:ff9b::7f00:1', 'loopback'],
+      ['64:ff9b::a9fe:a9fe', 'link-local'],
+      ['64:ff9b::808:808', 'public'],
+      ['2002:7f00:1::1', 'loopback'],
+      ['2002:a00:1::1', 'private'],
+      ['::ffff:0:7f00:1', 'loopback'],
+      ['fec0::1', 'private'],
+      ['100::1', 'reserved'],
+      ['192.0.0.192', 'reserved'],
+      ['198.18.0.1', 'reserved'],
+      ['192.0.2.1', 'reserved'],
+      ['198.51.100.1', 'reserved'],
+      ['203.0.113.7', 'reserved'],
     ];
     for (const [ip, kind] of cases) expect(addressClass(ip), ip).toBe(kind);
   });

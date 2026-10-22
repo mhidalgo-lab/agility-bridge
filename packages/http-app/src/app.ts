@@ -338,6 +338,12 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
             await next();
           });
           inner.route(ADMIN_BASE, build());
+          // The same JSON answers as the main app, and errors logged by name only (P3-11 review).
+          inner.onError((error, ic) => {
+            services.logger.error('unhandled error', { error: error.name });
+            return ic.json({ error: 'internal error' }, 500);
+          });
+          inner.notFound((ic) => ic.json({ error: 'not found' }, 404));
           adminApp = inner;
         }
         const headers = new Headers(c.req.raw.headers);

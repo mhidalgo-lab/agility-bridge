@@ -11,7 +11,11 @@
 2. **An Agility credential on the Worker** (P3-07): a real tool call on staging needs an Agility token. The third-party
    tenant is read-only and reached only through the live guard (D-01), so a staging credential needs a tenant you own
    or explicit permission; until then staging holds only synthetic data.
-3. **Staging secrets file**: back up `~/.config/agility-bridge/staging.secrets` (master key and admin token of
+3. **Client runs over HTTPS**: connect VS Code, JetBrains, Copilot CLI, Claude Code and Cursor to the staging Worker
+   (`https://agility-bridge-staging.<subdomain>.workers.dev/w/bench/mcp`, the migrated synthetic workspace, a device
+   token from `agility-bridge token issue` through the admin API) and record the versions in the client matrix. MCP
+   Inspector CLI 2.11.0 is verified in both eras.
+4. **Staging secrets file**: back up `~/.config/agility-bridge/staging.secrets` (master key and admin token of
    `agility-bridge-staging`) the way you keep master keys.
 
 ## Open decisions
@@ -26,3 +30,11 @@
   the MCP SDK maintainers for an eager or warmable protocol-schema build (a public issue), then measure again.
 - **Recommendation:** (a) for any deployment people depend on, with (c) as a follow-up; Free stays fine for trying
   agility-bridge out. P3-14 stays blocked on this decision.
+
+### D-28 — Go for Phase 4 *(P3-11)*
+- **Context:** the [Phase 3 review](../reviews/phase-3-review.md) found no high issue; two medium and five low ones are
+  fixed with mutation-checked regression tests. The Worker runs on staging, the smoke checks and MCP Inspector pass over
+  HTTPS. Open: D-27 (cold start on Free), P3-12 (optional exact limiter), the owner's client runs.
+- **Options:** (a) go for Phase 4 now; (b) go after D-27 is decided and the clients are verified; (c) hold.
+- **Recommendation:** (a): Phase 4 (identity and the admin panel) does not depend on D-27, which only matters for a
+  production deployment on the Free plan.

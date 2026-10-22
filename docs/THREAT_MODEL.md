@@ -210,6 +210,23 @@ From the [Phase 2 review](reviews/phase-2-review.md). Rows from 8a that did not 
 | A10 | implemented | Per-credential limiter and breaker; pass-through validations capped per instance (review F2) |
 | A14 | verified | Origin and TLS immutable while credentials live (trigger), retarget revokes, revocation final (review L2), probe without token |
 
+## 8c. Status after Phase 3 (2026-10-22)
+
+From the [Phase 3 review](reviews/phase-3-review.md). The Cloudflare Worker (mode D) is the new surface.
+
+| Id | Status | Evidence |
+|---|---|---|
+| T1 | verified (Workers) | Failure-only throttling per isolate plus the `RL_AUTH` backstop; valid tokens never locked out (workerd tests) |
+| T2 / T3 | verified (Workers) | The P2-12 denial matrix on workerd: one `401`, zero Agility requests, no change, audit reasons |
+| T5 / A10 | verified | Plan presets and Free ceilings (workspace and grant limits capped), per-call budgets, hidden tools; CPU measured (P3-10) |
+| T7 | verified | Same envelope on D1; rotation in cron slices behind a lease; key status and retirement owner-only through the API, only earlier recorded versions (review M1) |
+| T15 | verified | Access cache per isolate ≤ 60 s, documented for Workers |
+| T20 | implemented | Per-isolate limits plus the `RL_IP` backstop; exact deployment-wide limit is optional (P3-12) |
+| T21 | verified (Workers) | Request isolation: no in-flight work shared between requests (L-096, L-179); reviewed |
+| T24 | verified (Workers) | One public host (`AB_PUBLIC_URL` set by `cf:setup`, custom domain turns `workers.dev` off); hostile Origin refused on staging |
+| T34 | verified | `cf:setup` and `cf:migrate` refuse another deployment's config; only production issues `ab_live_` tokens |
+| A9 | verified | Workers reach only public instances with trusted certificates; Node's public-only mode covers embedded IPv4 forms (review L4) |
+
 ## 9. Maintenance
 
 - Update this file in the same PR as any security-relevant change (AGENTS.md).
