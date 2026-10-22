@@ -2,7 +2,7 @@
 id: P3-07
 title: Cloudflare docs (deploy, limits, costs, custom domain)
 phase: 3
-status: review
+status: done
 priority: medium
 depends_on: [P3-05]
 adr: ["0014"]

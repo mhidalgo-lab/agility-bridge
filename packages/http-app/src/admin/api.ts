@@ -8,6 +8,7 @@ import {
   type AdminTokenVerifier,
   bearerToken,
   guardedServices,
+  type Keyring,
   type ToolInfo,
 } from '@agility-bridge/auth';
 import type { Clock, Logger } from '@agility-bridge/core';
@@ -38,6 +39,8 @@ export interface AdminApiOptions {
   readonly via?: string;
   /** Keeps an audit write alive after the response (Workers: `waitUntil`, L-096). */
   readonly background?: (c: Context, work: Promise<unknown>) => void;
+  /** For `/keys` (P3-13): master-key versions and their retirement; without it those routes answer 403. */
+  readonly keyring?: Keyring;
 }
 
 /** The break-glass authenticator: `Authorization: Bearer ab_admin_…` matching `AB_ADMIN_TOKEN`. */
@@ -359,7 +362,11 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
   const services = (c: Context) =>
     guardedServices(
       options.services,
-      { storage: options.storage, tools: options.tools },
+      {
+        storage: options.storage,
+        tools: options.tools,
+        ...(options.keyring === undefined ? {} : { keyring: options.keyring }),
+      },
       c.get('actor' as never) as Actor,
     );
 
@@ -877,6 +884,46 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
           ? { after: { ts: q.afterTs, id: q.afterId } }
           : {}),
       });
+    },
+  );
+
+  const KeyVersionOut = z
+    .object({
+      version: z.number(),
+      credentials: z.number(),
+      loaded: z.boolean(),
+      current: z.boolean(),
+      retired: z.boolean(),
+    })
+    .openapi('KeyVersion');
+  const keys = { tag: 'keys' };
+  add(
+    {
+      method: 'get',
+      path: '/keys',
+      ...keys,
+      summary: 'Master-key versions: credentials on each, loaded, current, retired (owner)',
+      out: z.array(KeyVersionOut),
+    },
+    (c) => services(c).keys.status(),
+  );
+  add(
+    {
+      method: 'post',
+      path: '/keys/{id}/retire',
+      ...keys,
+      params: true,
+      summary: 'Retire a master-key version no credential uses any more (owner; recorded in the audit log)',
+      body: z.object({ reason: z.string().min(1).max(200) }),
+      out: z.array(KeyVersionOut),
+      audit: { action: 'crypto.retire_key', targetType: 'key_version' },
+    },
+    (c, { id, body }) => {
+      const version = Number(id);
+      if (!Number.isInteger(version) || version < 1) {
+        throw new AdminError('invalid_input', 'The key version is a whole number ≥ 1.', 'id');
+      }
+      return services(c).keys.retire(version, (body as { reason: string }).reason);
     },
   );
 

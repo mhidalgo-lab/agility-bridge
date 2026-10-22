@@ -66,6 +66,7 @@ export async function localClient(
     logger,
     clock: systemClock,
     via: 'cli',
+    keyring,
   });
   return {
     mode: 'local',

@@ -64,14 +64,16 @@ slices that fit the Free plan's limits per run:
 | Master-key rotation | 10 credentials re-encrypted with the current key | runs while `AB_MASTER_KEY_PREVIOUS` is set and credentials remain on it |
 | Credential revalidation | 1 credential, the stalest | `AB_CREDENTIAL_REVALIDATION_HOURS` (24; `0` = never) |
 
-**Rotating the master key on Workers**: put a new key with a **higher version** (`v2:…`, 32 random bytes in base64;
-a `--version` option for `agility-bridge init` is P3-13) in place with wrangler: the current value becomes
-`AB_MASTER_KEY_PREVIOUS`, the new one `AB_MASTER_KEY` (`wrangler secret put … --config
-apps/worker/wrangler.<name>.local.jsonc`, the value through stdin). The cron re-encrypts ten credentials per run; each
-row is replaced only if it still holds what was read, so an interrupted or overlapping run is safe, and a `kv` lease
-keeps two runs off the same batch. Progress shows in the Worker's log (`key rotation continues` with the remaining
-count). Keep `AB_MASTER_KEY_PREVIOUS` set until the rotation is done; checking the remaining count and retiring the old
-version through the admin API arrive with P3-13 ([secrets](secrets.md)).
+**Rotating the master key on Workers**:
+
+1. Generate the next key: `agility-bridge init --key-file ./master-v2.key --version 2` (one higher than the current).
+2. With wrangler (`--config apps/worker/wrangler.<name>.local.jsonc`, values through stdin), put the current key into
+   `AB_MASTER_KEY_PREVIOUS` and the new one into `AB_MASTER_KEY`.
+3. The cron re-encrypts ten credentials per run; each row is replaced only if it still holds what was read, so an
+   interrupted or overlapping run is safe, and a `kv` lease keeps two runs off the same batch. Watch it with
+   `agility-bridge keys status` (with `AB_ADMIN_URL` and the admin token, through the admin API).
+4. When version 1 has no credentials left: `agility-bridge keys retire 1 --reason "rotation"`, then delete
+   `AB_MASTER_KEY_PREVIOUS` ([secrets](secrets.md)).
 
 ## Move a self-hosted deployment to the Worker
 

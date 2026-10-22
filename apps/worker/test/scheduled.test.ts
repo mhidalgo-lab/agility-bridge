@@ -4,7 +4,7 @@
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { accessServices, generateMasterKey, Keyring } from '@agility-bridge/auth';
+import { accessServices, generateAdminToken, generateMasterKey, Keyring } from '@agility-bridge/auth';
 import { CORE_TOOLS } from '@agility-bridge/core';
 import { createD1Driver, type D1Database, openSqlStorage, type Storage } from '@agility-bridge/storage';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
@@ -152,5 +152,43 @@ describe('scheduled housekeeping on workerd', () => {
     const validated = (await w.storage.credentials.list()).filter((c) => c.validatedAt !== null);
     expect(validated).toHaveLength(1);
     expect(agility.requests()).toBeGreaterThan(upstream);
+  });
+
+  it('a rotation finishes on workerd: the cron until nothing remains, then the old version is retired via the API', async () => {
+    const admin = generateAdminToken();
+    const w = await setUp({ AB_ADMIN_TOKEN: admin });
+    const api = async (method: string, path: string, body?: unknown) => {
+      const res = (await w.mf.dispatchFetch(`http://127.0.0.1/api/admin/v1${path}`, {
+        method,
+        headers: { authorization: `Bearer ${admin}`, 'content-type': 'application/json' },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      })) as unknown as Response;
+      return { status: res.status, body: (await res.json()) as unknown };
+    };
+    // Too early: credentials still use version 1.
+    expect((await api('POST', '/keys/1/retire', { reason: 'rotation done' })).status).toBe(409);
+    const now = Date.now();
+    for (let run = 1; run <= 3; run++) await w.run(now + run * 900_000);
+    await until(async () => (await onVersion(w.storage, 1)) === 0);
+    const status = await api('GET', '/keys');
+    expect(status.body).toEqual([
+      { version: 1, credentials: 0, loaded: true, current: false, retired: false },
+      { version: 2, credentials: 25, loaded: true, current: true, retired: false },
+    ]);
+    const retired = await api('POST', '/keys/1/retire', { reason: 'rotation done' });
+    expect(retired.status).toBe(200);
+    expect((retired.body as { version: number; retired: boolean }[])[0]).toMatchObject({
+      version: 1,
+      retired: true,
+    });
+    await until(async () =>
+      (await w.storage.audit.query({ kind: 'admin', limit: 200 })).some(
+        (r) => r.action === 'crypto.retire_key',
+      ),
+    );
+    const row = (await w.storage.audit.query({ kind: 'admin', limit: 200 })).find(
+      (r) => r.action === 'crypto.retire_key' && r.status === 'ok',
+    );
+    expect(row).toMatchObject({ targetType: 'key_version', targetId: '1' });
   });
 });

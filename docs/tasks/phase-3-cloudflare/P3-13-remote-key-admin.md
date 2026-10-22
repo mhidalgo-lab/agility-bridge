@@ -2,7 +2,7 @@
 id: P3-13
 title: Master-key status and retirement through the admin API; init --version
 phase: 3
-status: todo
+status: review
 priority: medium
 depends_on: [P3-08]
 adr: ["0007"]
@@ -24,9 +24,9 @@ Finish a master-key rotation on a deployment whose database the operator cannot 
 - The secrets and deploy guides use them.
 
 ## Acceptance criteria
-- [ ] Negative authorization tests for both routes (member, admin where owner-only); remote `keys status` and
+- [x] Negative authorization tests for both routes (member, admin where owner-only); remote `keys status` and
       `keys retire` give the same output as local.
-- [ ] A rotation on workerd driven end to end: new key, cron runs until nothing remains, retire through the API.
+- [x] A rotation on workerd driven end to end: new key, cron runs until nothing remains, retire through the API.
 
 ## Security notes
 THREAT_MODEL T7, T14.

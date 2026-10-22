@@ -12,12 +12,13 @@ when `AB_ADMIN_URL` is set ([guide](../guide/cli.md)). Output is JSON on stdout.
 Write a new master key (0600) to the user configuration directory, never overwriting one.
 
 ```text
-agility-bridge init [--key-file <value>]
+agility-bridge init [--key-file <value>] [--version <value>]
 ```
 
 | Name | Kind | Meaning |
 |---|---|---|
 | `--key-file` | string | Where to write it (default ~/.config/agility-bridge/master.key) |
+| `--version` | string | Key version (default 1); a rotation needs one higher than the current key |
 
 Runs without a server.
 
@@ -500,13 +501,13 @@ Runs without a server.
 
 ### `keys status`
 
-Credentials per master-key version (local).
+Credentials per master-key version (owner).
 
 ```text
 agility-bridge keys status
 ```
 
-Local database only.
+Local or remote.
 
 ### `keys rotate`
 
@@ -524,7 +525,7 @@ Local database only.
 
 ### `keys retire`
 
-Retire a master-key version no credential uses any more (local).
+Retire a master-key version no credential uses any more (owner).
 
 ```text
 agility-bridge keys retire <version> --reason <value>
@@ -535,4 +536,4 @@ agility-bridge keys retire <version> --reason <value>
 | `<version>` | argument | Key version, e.g. 1 |
 | `--reason` | string, required | Why, for the audit log |
 
-Local database only.
+Local or remote.
