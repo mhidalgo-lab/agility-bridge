@@ -60,8 +60,12 @@ function ipv4(text: string): number[] | null {
   return out;
 }
 
-function ipv4Class([a, b]: number[] = []): AddressClass {
+function ipv4Class([a, b, c]: number[] = []): AddressClass {
   if (a === undefined || b === undefined) return 'invalid';
+  // IETF protocol assignments, benchmarking, and the three documentation ranges (P3-11 review).
+  if (a === 192 && b === 0 && (c === 0 || c === 2)) return 'reserved';
+  if (a === 198 && (b === 18 || b === 19)) return 'reserved';
+  if ((a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113)) return 'reserved';
   if (a === 0) return 'unspecified';
   if (a === 127) return 'loopback';
   if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return 'private';
@@ -105,9 +109,16 @@ export function addressClass(ip: string): AddressClass {
   const [g0 = 0, , , , , g5 = 0, g6 = 0, g7 = 0] = g;
   if (g.every((x) => x === 0)) return 'unspecified';
   if (g.slice(0, 7).every((x) => x === 0) && g7 === 1) return 'loopback';
-  if (g.slice(0, 5).every((x) => x === 0) && g5 === 0xffff) {
-    return ipv4Class([g6 >> 8, g6 & 0xff, g7 >> 8, g7 & 0xff]);
-  }
+  const embedded = (hi: number, lo: number) => ipv4Class([hi >> 8, hi & 0xff, lo >> 8, lo & 0xff]);
+  // IPv4 inside IPv6 counts as that IPv4 address (P3-11 review): mapped ::ffff:a.b.c.d, SIIT ::ffff:0:a.b.c.d,
+  // IPv4-compatible ::a.b.c.d, NAT64 64:ff9b::a.b.c.d, and 6to4 2002:aabb:ccdd::.
+  if (g.slice(0, 5).every((x) => x === 0) && g5 === 0xffff) return embedded(g6, g7);
+  if (g.slice(0, 4).every((x) => x === 0) && g[4] === 0xffff && g5 === 0) return embedded(g6, g7);
+  if (g.slice(0, 6).every((x) => x === 0)) return embedded(g6, g7);
+  if (g0 === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0)) return embedded(g6, g7);
+  if (g0 === 0x2002) return embedded(g[1] ?? 0, g[2] ?? 0);
+  if ((g0 & 0xffc0) === 0xfec0) return 'private'; // fec0::/10 site-local (deprecated)
+  if (g0 === 0x0100 && g.slice(1, 4).every((x) => x === 0)) return 'reserved'; // 100::/64 discard
   if ((g0 & 0xfe00) === 0xfc00) return 'private'; // fc00::/7 unique local
   if ((g0 & 0xffc0) === 0xfe80) return 'link-local';
   if ((g0 & 0xff00) === 0xff00) return 'reserved'; // multicast

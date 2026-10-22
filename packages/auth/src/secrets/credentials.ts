@@ -247,6 +247,14 @@ export async function retireKeyVersion(
   if (version === keyring.currentVersion) {
     throw new SecretsError('in_use', `Master key version ${version} is the current key.`);
   }
+  // Only a version this database has used and that is older than the current one: retiring an unknown or future
+  // version would make a later boot with that key fail for good (P3-11 review).
+  if (version > keyring.currentVersion || (await storage.kv.get(KCV_KEY(version))) === null) {
+    throw new SecretsError(
+      'in_use',
+      `Master key version ${version} is not an earlier version of this database.`,
+    );
+  }
   const users = await storage.credentials.list({ keyVersion: version });
   if (users.length > 0) {
     throw new SecretsError(

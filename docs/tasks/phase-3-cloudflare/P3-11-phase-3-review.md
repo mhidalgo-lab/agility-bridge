@@ -2,7 +2,7 @@
 id: P3-11
 title: Phase 3 review and staging verification
 phase: 3
-status: todo
+status: review
 priority: high
 depends_on: [P3-04, P3-06, P3-07, P3-08, P3-09, P3-10]
 adr: []
@@ -26,9 +26,9 @@ Verify the Worker deployment for real before adding identity and OAuth.
 - `docs/reviews/phase-3-review.md`, threat-model statuses after Phase 3, go for Phase 4 (D-28).
 
 ## Acceptance criteria
-- [ ] `docs/reviews/phase-3-review.md`; every finding fixed or documented, with tests.
-- [ ] Staging smoke checks green (script against staging; the workflow added and tested).
-- [ ] Go for Phase 4 recorded (D-28); owner steps listed.
+- [x] `docs/reviews/phase-3-review.md`; every finding fixed or documented, with tests.
+- [x] Staging smoke checks green (script against staging; the workflow added and tested).
+- [x] Go for Phase 4 recorded (D-28); owner steps listed.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.

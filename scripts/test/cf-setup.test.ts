@@ -196,6 +196,19 @@ describe('cf:setup', () => {
     ).rejects.toThrow(/disagree/);
   });
 
+  it('writes each secret to the file before Cloudflare gets it (P3-11 review)', async () => {
+    const { state, wrangler } = fakeWrangler();
+    const file = join(dir, 'order.secrets');
+    const seen: string[] = [];
+    const checking: Wrangler = (args, o) => {
+      if (args[0] === 'secret' && args[1] === 'put') seen.push(readFileSync(file, 'utf8'));
+      return wrangler(args, o);
+    };
+    await setup(options(checking, { secretsFile: file }));
+    expect(seen[0]).toContain(`AB_MASTER_KEY=${state.puts[0]?.input}`);
+    expect(seen[1]).toContain(`AB_ADMIN_TOKEN=${state.puts[1]?.input}`);
+  });
+
   it('a dry run changes nothing', async () => {
     const { state, wrangler } = fakeWrangler();
     const lines: string[] = [];

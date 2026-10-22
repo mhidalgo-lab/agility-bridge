@@ -9,6 +9,7 @@ import {
   closeSync,
   constants,
   existsSync,
+  fsyncSync,
   mkdtempSync,
   openSync,
   readFileSync,
@@ -22,7 +23,16 @@ import { fileURLToPath } from 'node:url';
 import { generateAdminToken, generateMasterKey } from '../packages/auth/src/index.ts';
 
 const WORKER_DIR = fileURLToPath(new URL('../apps/worker/', import.meta.url));
-const NAME_RE = /^agility-bridge(?:-[a-z0-9]+)*$/;
+export const NAME_RE = /^agility-bridge(?:-[a-z0-9]+)*$/;
+
+/** Whether a local config text belongs to deployment `name` (worker and database named after it, T34). */
+export function configBelongsTo(text: string, name: string): boolean {
+  const config = readJsonc(text);
+  const db = ((config['d1_databases'] as Record<string, unknown>[] | undefined) ?? []).find(
+    (d) => d['binding'] === 'DB',
+  );
+  return config['name'] === name && (db === undefined || db['database_name'] === name);
+}
 const SECRETS = ['AB_MASTER_KEY', 'AB_ADMIN_TOKEN'] as const;
 
 export interface RunResult {
@@ -248,12 +258,17 @@ export async function setup(o: SetupOptions): Promise<{ created: string[]; url: 
     try {
       for (const secret of missing) {
         const value = secret === 'AB_MASTER_KEY' ? generateMasterKey(1) : generateAdminToken();
+        // Kept (and on disk) before Cloudflare has it: a secret only Cloudflare holds can never be read back, and a
+        // rerun would see it as present (P3-11 review).
+        if (fd !== undefined) {
+          writeSync(fd, `${secret}=${value}\n`);
+          fsyncSync(fd);
+        }
+        if (o.showSecrets) o.log(`${secret}=${value}`);
         must(
           o.wrangler(['secret', 'put', secret, '--config', configPath], { input: value }),
           `wrangler secret put ${secret}`,
         );
-        if (fd !== undefined) writeSync(fd, `${secret}=${value}\n`);
-        if (o.showSecrets) o.log(`${secret}=${value}`);
         created.push(secret);
       }
     } finally {

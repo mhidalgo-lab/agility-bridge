@@ -30,7 +30,7 @@ How to use it:
 | [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172 |
-| [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177 |
+| [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164 |
@@ -510,6 +510,12 @@ time left none (P2-17 review M1). Cross-row invariants (last owner, personal cre
 storage triggers with the same rule in the memory adapter, so every writer and every interleaving is covered; the
 service guard stays for a friendly error.
 *Applied in:* P2-17, `packages/storage/src/migrations/0001-init.ts`.
+
+**L-183 — Check that an identifier names something that exists before recording an irreversible fact about it.**
+`POST /keys/5/retire` succeeded on a deployment that had never used key version 5 (P3-11 review), and a later boot
+with that key failed for good, with no way back through the API. Retirement, revocation and similar one-way markers
+accept only identifiers the system has seen (here: a recorded key-check value of an earlier version).
+*Applied in:* P3-11, `retireKeyVersion`.
 
 **L-068 — Bound the access cache.**
 At most 60 s (default 30 s), keyed by token hash and workspace, cleared on local admin changes; document that other

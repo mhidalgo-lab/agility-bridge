@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // The migration script's wrangler steps against a fake wrangler (P3-09): refusals happen before any write, the SQL file
 // is deleted afterwards, and the row counts are checked. The round trip on workerd is apps/worker/test/migrate.test.ts.
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -61,8 +61,18 @@ function fakeD1(state: { version: number | null; rows: number; kcv: Record<strin
   return { wrangler, files, calls };
 }
 
-const run = (from: string, wrangler: Wrangler) =>
-  migrate({ name: 'agility-bridge-staging', from, workerDir: tmpdir(), wrangler, log: () => {} });
+/** A worker directory with the staging deployment's local config, as cf:setup writes it. */
+function workerDir(name = 'agility-bridge-staging'): string {
+  const dir = mkdtempSync(join(tmpdir(), 'ab-cfm-worker-'));
+  writeFileSync(
+    join(dir, `wrangler.${name}.local.jsonc`),
+    JSON.stringify({ name, d1_databases: [{ binding: 'DB', database_name: name, database_id: 'x' }] }),
+  );
+  return dir;
+}
+
+const run = (from: string, wrangler: Wrangler, dir = workerDir()) =>
+  migrate({ name: 'agility-bridge-staging', from, workerDir: dir, wrangler, log: () => {} });
 
 describe('cf:migrate', () => {
   it('imports into an empty, migrated target with the same key, then deletes the SQL file', async () => {
@@ -89,6 +99,38 @@ describe('cf:migrate', () => {
       await expect(run(b.path, d1.wrangler)).rejects.toThrow(error);
       expect(d1.files).toEqual([]);
     }
+  });
+
+  it('refuses a failed count or key-check read, a bad name, and a config of another deployment (P3-11 review)', async () => {
+    const b = await backup();
+    const d1 = fakeD1({ version: 1, rows: 0, kcv: { 'crypto:kcv:v1': b.kcv } });
+    const flaky: Wrangler = (args, o) => {
+      const sql = args[args.indexOf('--command') + 1] ?? '';
+      if (args.includes('--command') && sql.includes('count(*)'))
+        return { code: 1, stdout: '', stderr: 'boom' };
+      return d1.wrangler(args, o);
+    };
+    await expect(run(b.path, flaky)).rejects.toThrow(/Could not read the target/);
+    expect(d1.files).toEqual([]);
+    await expect(
+      migrate({
+        name: '../../tmp/evil',
+        from: b.path,
+        workerDir: workerDir(),
+        wrangler: d1.wrangler,
+        log: () => {},
+      }),
+    ).rejects.toThrow(/--name/);
+    const other = workerDir();
+    writeFileSync(
+      join(other, 'wrangler.agility-bridge-staging.local.jsonc'),
+      JSON.stringify({
+        name: 'agility-bridge',
+        d1_databases: [{ binding: 'DB', database_name: 'agility-bridge' }],
+      }),
+    );
+    await expect(run(b.path, d1.wrangler, other)).rejects.toThrow(/another deployment/);
+    expect(d1.calls.filter((c) => c.includes('--file'))).toEqual([]);
   });
 
   it('reports an import that landed fewer rows than it exported', async () => {

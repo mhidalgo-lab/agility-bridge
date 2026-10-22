@@ -45,6 +45,16 @@ The database is migrated by the Worker at its first request. `--dry-run` shows t
 Keep the secrets file like the master key of a self-hosted server: away from the data, backed up separately
 ([secrets](secrets.md)).
 
+## Things that differ from a single server
+
+- **Revocations reach every isolate within the access-cache time.** Each isolate keeps resolved access for up to
+  `AB_ACCESS_CACHE_TTL` seconds (default 30, at most 60). A device token, grant or user you revoke stops at once on the
+  isolate that handled the change and within that time on the others; set `AB_ACCESS_CACHE_TTL` lower for faster
+  cut-off at the cost of more D1 reads.
+- **Rate limits** count per isolate, with Cloudflare's Rate Limiting binding as a backstop ([limits](cloudflare-limits.md#rate-limits)).
+- **Instances on private addresses** cannot be reached from Workers at all, so the `AB_INSTANCE_PRIVATE_ADDRESSES`
+  setting of `serve` does not exist here.
+
 ## Staging and production stay apart
 
 Every resource is named after `--name`: `agility-bridge` is production, `agility-bridge-staging` (or any

@@ -190,5 +190,7 @@ describe('scheduled housekeeping on workerd', () => {
       (r) => r.action === 'crypto.retire_key' && r.status === 'ok',
     );
     expect(row).toMatchObject({ targetType: 'key_version', targetId: '1' });
+    // The operator's reason is kept with the row (P3-11 review).
+    expect(row?.details).toMatchObject({ reason: 'rotation done' });
   });
 });

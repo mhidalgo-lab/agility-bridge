@@ -4,13 +4,13 @@
 // AB_MASTER_KEY_PREVIOUS). Explicit and one-way; the SQL file is written 0600 and deleted afterwards.
 //   pnpm cf:migrate --name agility-bridge-staging --from ./agility-bridge-backup.db
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { MIGRATIONS } from '../packages/storage/src/index.ts';
-import { localConfigPath, type Wrangler } from './cf-setup.ts';
+import { configBelongsTo, localConfigPath, NAME_RE, type Wrangler } from './cf-setup.ts';
 
 /** In dependency order. `kv` keeps only the key-check values; everything else in it is transient. */
 export const TABLES = [
@@ -156,9 +156,15 @@ export function readTarget(wrangler: Wrangler, name: string, config: string): Ta
   };
   const version = query(STATE_SQL[0] as string);
   if (version === null) return { schemaVersion: null, rows: 0, keyChecks: {} };
-  const rows = Number(query(STATE_SQL[1] as string)?.[0]?.['n'] ?? 0);
+  // Once the schema is there, a failed count or key-check query is an error, never "empty" (P3-11 review).
+  const count = query(STATE_SQL[1] as string);
+  const checks = query(STATE_SQL[2] as string);
+  if (count === null || checks === null || count[0]?.['n'] === undefined) {
+    throw new MigrationRefused('Could not read the target database; nothing was written. Try again.');
+  }
+  const rows = Number(count[0]['n']);
   const keyChecks: Record<number, string> = {};
-  for (const r of query(STATE_SQL[2] as string) ?? []) {
+  for (const r of checks) {
     keyChecks[Number(String(r['key']).slice('crypto:kcv:v'.length))] = String(r['value']);
   }
   return { schemaVersion: Number(version[0]?.['v'] ?? 0) || null, rows, keyChecks };
@@ -171,7 +177,19 @@ export async function migrate(options: {
   readonly wrangler: Wrangler;
   readonly log: (line: string) => void;
 }): Promise<Record<string, number>> {
+  if (!NAME_RE.test(options.name) || options.name.length > 54) {
+    throw new MigrationRefused('--name must be agility-bridge or agility-bridge-<suffix> (lower case).');
+  }
   const config = localConfigPath(options.workerDir, options.name);
+  let configText: string;
+  try {
+    configText = readFileSync(config, 'utf8');
+  } catch {
+    throw new MigrationRefused(`${config} is missing: run pnpm cf:setup --name ${options.name} first.`);
+  }
+  if (!configBelongsTo(configText, options.name)) {
+    throw new MigrationRefused(`${config} belongs to another deployment; refusing to mix them (T34).`);
+  }
   const db = new DatabaseSync(options.from, { readOnly: true });
   let source: Export;
   try {

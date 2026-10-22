@@ -169,3 +169,19 @@ describe("isolation: 'request' admin API (P3-14)", () => {
     expect(row?.requestId).not.toBe('chosen-by-client');
   });
 });
+
+describe("isolation: 'request' admin API answers", () => {
+  it('an unknown admin path answers the same JSON 404 as the rest (P3-11 review)', async () => {
+    const w = await world(
+      { isolation: 'request', background: () => {} },
+      { admin: true, detachedAudit: true },
+    );
+    const res = await w.app.fetch(
+      new Request('http://127.0.0.1:8787/api/admin/v1/nope', { headers: { 'x-test-actor': 'owner' } }),
+    );
+    expect(res.status).toBe(404);
+    expect(res.headers.get('content-type')).toContain('application/json');
+    expect(await res.json()).toEqual({ error: 'not found' });
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+  });
+});
