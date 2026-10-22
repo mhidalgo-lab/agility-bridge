@@ -35,7 +35,7 @@ How to use it:
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164 |
 | [K. Admin UI](#k-admin-ui) | L-095 |
-| [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101 |
+| [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
@@ -704,6 +704,14 @@ panel calls the admin API in-process so validation, authorization and audit are 
 I/O started by one request may hang or fail when awaited by another. Cache completed values only; make boot
 single-flight per request.
 *Applied in:* P3-01.
+
+**L-179 — Local workerd does not catch shared in-flight work: test the rule where it is made.**
+A boot promise shared by concurrent requests passed every Miniflare test (P3-01): local workerd neither hangs nor warns
+when one request awaits a promise another request created, while production may cancel that work with the first
+request. Keep the rule in code the tests can drive (the handler takes its boot function; the app's isolation mode) and
+assert it there, with a mutation check. Also: Miniflare 5 (pinned by wrangler 4.149) takes a new options shape;
+`convertV4MiniflareOptions` and `resourcePersistencePath` (not `d1Persist`) work.
+*Applied in:* P3-01, `apps/worker/test/handler.test.ts`, `packages/http-app/test/isolation.test.ts`.
 
 **L-097 — Design for the Free plan's limits, not its tolerance.**
 About 10 ms CPU per request, 50 external subrequests and 6 simultaneous outbound connections on the Free plan *(re-verify)*.

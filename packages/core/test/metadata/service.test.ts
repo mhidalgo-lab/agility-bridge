@@ -137,6 +137,14 @@ describe('cache and budget', () => {
     expect(fake.requests).toBe(1);
   });
 
+  it('with shareInflight: false (Workers, L-096) each call loads on its own, then completed values are shared', async () => {
+    const { ctx, fake } = setup({ service: { shareInflight: false } });
+    await Promise.all([1, 2, 3].map(() => metadataFor(ctx()).assetType('Story')));
+    expect(fake.requests).toBe(3);
+    await metadataFor(ctx()).assetType('Story');
+    expect(fake.requests).toBe(3);
+  });
+
   it('fetches again after the TTL, and a new schema fingerprint drops what was derived', async () => {
     let now = 0;
     let stamp = '1';

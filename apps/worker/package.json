@@ -8,12 +8,20 @@
   "scripts": {
     "build": "wrangler deploy --dry-run --outdir dist",
     "dev": "wrangler dev",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --project worker"
   },
   "agilityBridge": {
     "runtime": "workers"
   },
   "devDependencies": {
+    "miniflare": "5.20261006.1-alpha",
     "wrangler": "4.149.0"
+  },
+  "dependencies": {
+    "@agility-bridge/auth": "workspace:*",
+    "@agility-bridge/core": "workspace:*",
+    "@agility-bridge/http-app": "workspace:*",
+    "@agility-bridge/storage": "workspace:*"
   }
 }

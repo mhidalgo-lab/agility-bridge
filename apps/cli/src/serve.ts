@@ -3,39 +3,30 @@
 // tokens and per-workspace MCP endpoints. Configuration only from the environment, never flags (L-026).
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import {
-  type AccessServices,
-  AdminTokenVerifier,
-  accessServices,
-  credentialValidator,
-  Keyring,
-  verifyKeyring,
-} from '@agility-bridge/auth';
+import { type AccessServices, AdminTokenVerifier, Keyring, verifyKeyring } from '@agility-bridge/auth';
 import {
   CircuitBreakers,
-  CORE_TOOLS,
   CredentialLimiters,
   createLogger,
-  DEFAULT_LIMITS,
   type FetchLike,
   type Logger,
-  type LogLevel,
   MetadataService,
   stderrSink,
   systemClock,
   webCryptoRandom,
 } from '@agility-bridge/core';
 import {
-  AuditWriter,
-  adminTokenAuthenticator,
+  type AuditWriter,
+  assembleServer,
   clientAddress,
-  createHttpApp,
-  createRequestLimits,
-  DEFAULT_RATE_LIMITS,
   type HttpApp,
   MemoryRateLimiter,
-  type RateLimitConfig,
+  parseServerSettings,
+  type ServerSettings,
+  SettingsError,
   scheduleAuditRetention,
+  settingInteger,
+  settingWarnings,
 } from '@agility-bridge/http-app';
 import {
   openSqliteStorage,
@@ -51,27 +42,12 @@ import { isInside, readMasterKeys } from './master-key.ts';
 
 type Env = Readonly<Record<string, string | undefined>>;
 
-export interface ServeConfig {
+export interface ServeConfig extends ServerSettings {
   readonly dbPath: string;
   readonly host: string;
   readonly port: number;
-  readonly publicUrl?: string;
-  readonly allowedHosts: readonly string[];
-  readonly allowedOrigins: readonly string[];
-  readonly accessCacheTtlSeconds: number;
-  readonly environment: 'live' | 'test';
-  readonly callBudget: number;
-  readonly maxResponseBytes: number;
-  readonly logLevel: LogLevel;
-  readonly rateLimits: RateLimitConfig;
   /** Proxies in front whose `X-Forwarded-For` entries are trusted (default 0). */
   readonly trustedProxyHops: number;
-  /** Days audit rows are kept (default 90; 0 keeps them forever). */
-  readonly auditRetentionDays: number;
-  /** Hours between credential revalidations (default 24; 0 = never). */
-  readonly revalidationHours: number;
-  /** `AB_PASSTHROUGH=on`: pass-through workspaces accept the caller's own Agility token (P2-14, off by default). */
-  readonly passthrough: boolean;
 }
 
 /** The default data directory (`$XDG_DATA_HOME` or `~/.local/share`; `%LOCALAPPDATA%` on Windows). */
@@ -87,138 +63,23 @@ export function dataDir(
   return join(base, 'agility-bridge');
 }
 
-function list(value: string | undefined): string[] {
-  return (value ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s !== '');
-}
-
-function integer(
-  name: string,
-  value: string | undefined,
-  fallback: number,
-  min: number,
-  max: number,
-): number {
-  if (value === undefined || value === '') return fallback;
-  const n = Number(value);
-  if (!Number.isInteger(n) || n < min || n > max)
-    throw new ConfigError(`${name} must be an integer from ${min} to ${max}.`);
-  return n;
-}
-
+/** The shared settings (checked by `parseServerSettings`, P3-01) plus the Node-only ones. */
 export function loadServeConfig(env: Env): ServeConfig {
   checkEnvNames(env);
-  const level = env['AB_LOG_LEVEL'] ?? 'info';
-  if (!['debug', 'info', 'warn', 'error'].includes(level))
-    throw new ConfigError('AB_LOG_LEVEL must be debug, info, warn or error.');
-  const environment = env['AB_ENVIRONMENT'] ?? 'production';
-  if (environment !== 'production' && environment !== 'test') {
-    throw new ConfigError('AB_ENVIRONMENT must be production (device tokens ab_live_…) or test (ab_test_…).');
+  try {
+    const settings = parseServerSettings(env, DEFAULTS);
+    const dbPath = env['AB_DB_PATH'] || join(env['AB_DATA_DIR'] || dataDir(env), 'agility-bridge.db');
+    return {
+      ...settings,
+      dbPath,
+      host: env['AB_HOST'] || '127.0.0.1',
+      port: settingInteger('AB_PORT', env['AB_PORT'], 8787, 0, 65_535),
+      trustedProxyHops: settingInteger('AB_TRUSTED_PROXY_HOPS', env['AB_TRUSTED_PROXY_HOPS'], 0, 0, 10),
+    };
+  } catch (error) {
+    if (error instanceof SettingsError) throw new ConfigError(error.message);
+    throw error;
   }
-  let publicUrl: string | undefined;
-  if (env['AB_PUBLIC_URL'] !== undefined && env['AB_PUBLIC_URL'] !== '') {
-    try {
-      const u = new URL(env['AB_PUBLIC_URL']);
-      if (
-        (u.protocol !== 'https:' && u.protocol !== 'http:') ||
-        u.username !== '' ||
-        u.search !== '' ||
-        u.hash !== ''
-      ) {
-        throw new Error('bad');
-      }
-      publicUrl = u.origin;
-    } catch {
-      throw new ConfigError('AB_PUBLIC_URL must be the public origin, e.g. https://mcp.example.com.');
-    }
-  }
-  for (const o of list(env['AB_ALLOWED_ORIGINS'])) {
-    if (o === 'null' || !/^https?:\/\/[^/\s]+$/.test(o)) {
-      throw new ConfigError(`AB_ALLOWED_ORIGINS has an invalid origin: "${o.slice(0, 60)}".`);
-    }
-  }
-  const dbPath = env['AB_DB_PATH'] || join(env['AB_DATA_DIR'] || dataDir(env), 'agility-bridge.db');
-  return {
-    dbPath,
-    host: env['AB_HOST'] || '127.0.0.1',
-    port: integer('AB_PORT', env['AB_PORT'], 8787, 0, 65_535),
-    ...(publicUrl === undefined ? {} : { publicUrl }),
-    allowedHosts: list(env['AB_ALLOWED_HOSTS']),
-    allowedOrigins: list(env['AB_ALLOWED_ORIGINS']),
-    accessCacheTtlSeconds: integer('AB_ACCESS_CACHE_TTL', env['AB_ACCESS_CACHE_TTL'], 30, 0, 60),
-    environment: environment === 'production' ? 'live' : 'test',
-    callBudget: integer('AB_CALL_BUDGET', env['AB_CALL_BUDGET'], DEFAULTS.callBudget, 1, 10_000),
-    maxResponseBytes: integer(
-      'AB_LIMITS_MAX_RESPONSE_BYTES',
-      env['AB_LIMITS_MAX_RESPONSE_BYTES'],
-      DEFAULTS.maxResponseBytes,
-      65_536,
-      64 * 1024 * 1024,
-    ),
-    logLevel: level as LogLevel,
-    rateLimits: {
-      enabled: rateLimitSwitch(env['AB_RATE_LIMIT']),
-      ipPerMinute: integer(
-        'AB_RATE_LIMIT_IP_PER_MINUTE',
-        env['AB_RATE_LIMIT_IP_PER_MINUTE'],
-        DEFAULT_RATE_LIMITS.ipPerMinute,
-        1,
-        1_000_000,
-      ),
-      authFailuresPer5Minutes: integer(
-        'AB_RATE_LIMIT_AUTH_FAILURES',
-        env['AB_RATE_LIMIT_AUTH_FAILURES'],
-        DEFAULT_RATE_LIMITS.authFailuresPer5Minutes,
-        1,
-        10_000,
-      ),
-      tokenPerMinute: integer(
-        'AB_RATE_LIMIT_TOKEN_PER_MINUTE',
-        env['AB_RATE_LIMIT_TOKEN_PER_MINUTE'],
-        DEFAULT_RATE_LIMITS.tokenPerMinute,
-        1,
-        100_000,
-      ),
-      grantPerMinute: integer(
-        'AB_RATE_LIMIT_GRANT_PER_MINUTE',
-        env['AB_RATE_LIMIT_GRANT_PER_MINUTE'],
-        DEFAULT_RATE_LIMITS.grantPerMinute,
-        1,
-        100_000,
-      ),
-      validationsPerMinute: integer(
-        'AB_RATE_LIMIT_VALIDATIONS_PER_MINUTE',
-        env['AB_RATE_LIMIT_VALIDATIONS_PER_MINUTE'],
-        DEFAULT_RATE_LIMITS.validationsPerMinute,
-        1,
-        10_000,
-      ),
-    },
-    trustedProxyHops: integer('AB_TRUSTED_PROXY_HOPS', env['AB_TRUSTED_PROXY_HOPS'], 0, 0, 10),
-    auditRetentionDays: integer('AB_AUDIT_RETENTION_DAYS', env['AB_AUDIT_RETENTION_DAYS'], 90, 0, 36_500),
-    revalidationHours: integer(
-      'AB_CREDENTIAL_REVALIDATION_HOURS',
-      env['AB_CREDENTIAL_REVALIDATION_HOURS'],
-      24,
-      0,
-      8_760,
-    ),
-    passthrough: onOff('AB_PASSTHROUGH', env['AB_PASSTHROUGH']),
-  };
-}
-
-function onOff(name: string, value: string | undefined): boolean {
-  if (value === undefined || value === '' || value === 'off') return false;
-  if (value === 'on') return true;
-  throw new ConfigError(`${name} must be on or off.`);
-}
-
-function rateLimitSwitch(value: string | undefined): boolean {
-  if (value === undefined || value === '' || value === 'on') return true;
-  if (value === 'off') return false;
-  throw new ConfigError('AB_RATE_LIMIT must be on or off.');
 }
 
 export interface RunningServer {
@@ -240,16 +101,7 @@ export async function startServe(
     sink: options.sink ?? stderrSink,
     fields: { mode: 'serve' },
   });
-  if (env['AB_WRITE_TOOLS'] === 'on')
-    logger.warn('AB_WRITE_TOOLS is on, but this version has no write tools.');
-  if (!config.rateLimits.enabled) {
-    logger.warn('AB_RATE_LIMIT is off: no request, token or authentication-failure limits.');
-  }
-  if (config.passthrough) {
-    logger.warn(
-      'AB_PASSTHROUGH is on: pass-through workspaces accept any valid Agility token of their instance.',
-    );
-  }
+  for (const warning of settingWarnings(env, config)) logger.warn(warning);
   const keys = readMasterKeys(env, { dataDir: dirname(config.dbPath) });
   const keyring = await Keyring.create(keys.current, keys.previous);
   const storage = await openSqliteStorage({ path: config.dbPath, onWarning: (m) => logger.warn(m) });
@@ -271,62 +123,17 @@ export async function startServe(
       ? error
       : new ConfigError(`AB_ADMIN_TOKEN: ${(error as Error).message}`);
   }
-  const tools = new Map(CORE_TOOLS.map((t) => [t.name, { kind: t.kind, group: t.group }]));
-  const audit = new AuditWriter({ storage, logger, clock: systemClock, random: webCryptoRandom });
-  const stopRetention = scheduleAuditRetention(storage, config.auditRetentionDays, systemClock, logger);
   const hostServices = nodeHostServices(logger);
-  const services = accessServices({
+  const { app, audit, services } = assembleServer({
+    settings: config,
     storage,
     keyring,
-    tools,
-    environment: config.environment,
-    validator: credentialValidator(hostServices),
-  });
-  const stopRevalidation = scheduleRevalidation(services, config.revalidationHours, logger);
-  const authErrors = revalidateOnAuthErrors(services, logger);
-  const app = createHttpApp({
-    storage,
-    keyring,
-    access: {
-      tools,
-      writesEnabled: false,
-      environment: config.environment,
-      limits: {
-        defaults: {
-          ...DEFAULT_LIMITS,
-          maxResponseBytes: config.maxResponseBytes,
-          callBudget: config.callBudget,
-          genericQuery: true,
-        },
-        ceilings: {},
-      },
-    },
-    tools: CORE_TOOLS,
-    services: hostServices,
-    ...(config.publicUrl === undefined ? {} : { publicUrl: config.publicUrl }),
-    allowedHosts: config.allowedHosts,
-    allowedOrigins: config.allowedOrigins,
-    accessCacheTtlSeconds: config.accessCacheTtlSeconds,
-    limits: createRequestLimits(new MemoryRateLimiter(), config.rateLimits, logger),
-    ...(config.passthrough
-      ? {
-          passthrough: {
-            validator: credentialValidator(hostServices),
-            // HTTPS only (P2-14). This server speaks plain HTTP, so only a trusted proxy can say the client used TLS;
-            // the request URL's scheme is the client's choice (absolute-form targets, P2-17 review F1).
-            secure: (c) => config.trustedProxyHops > 0 && c.req.header('x-forwarded-proto') === 'https',
-          },
-        }
-      : {}),
-    ...(adminVerifier === undefined
-      ? {}
-      : {
-          admin: {
-            services,
-            audit,
-            authenticate: adminTokenAuthenticator(adminVerifier),
-          },
-        }),
+    host: hostServices,
+    logger,
+    limiter: new MemoryRateLimiter(),
+    version: pkg.version,
+    isolation: 'process',
+    ...(adminVerifier === undefined ? {} : { adminVerifier }),
     clientIp: (c) =>
       clientAddress(
         (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming?.socket
@@ -334,22 +141,12 @@ export async function startServe(
         c.req.header('x-forwarded-for'),
         config.trustedProxyHops,
       ),
-    observer: audit.observer({
-      toolCall: (e) => authErrors(e.access.credential.id, e.errorCode),
-      request: (e) =>
-        logger.info('request', {
-          requestId: e.requestId,
-          workspace: e.slug,
-          status: e.status,
-          method: e.mcp?.method ?? null,
-          kind: e.mcp?.kind ?? null,
-          tool: e.mcp?.tool ?? null,
-          durationMs: e.durationMs,
-          ...(e.refusal === null ? {} : { refusal: e.refusal }),
-        }),
-    }),
-    version: pkg.version,
+    // HTTPS only (P2-14). This server speaks plain HTTP, so only a trusted proxy can say the client used TLS; the
+    // request URL's scheme is the client's choice (absolute-form targets, P2-17 review F1).
+    passthroughSecure: (c) => config.trustedProxyHops > 0 && c.req.header('x-forwarded-proto') === 'https',
   });
+  const stopRetention = scheduleAuditRetention(storage, config.auditRetentionDays, systemClock, logger);
+  const stopRevalidation = scheduleRevalidation(services, config.revalidationHours, logger);
 
   const server = await new Promise<ReturnType<typeof serveNode>>((resolve, reject) => {
     const s = serveNode({ fetch: originFormOnly(app.fetch), port: config.port, hostname: config.host }, () =>
@@ -479,40 +276,5 @@ function scheduleRevalidation(services: AccessServices, hours: number, logger: L
   return () => {
     clearTimeout(first);
     clearInterval(timer);
-  };
-}
-
-/**
- * Revalidates a credential after 3 consecutive `AB_AGILITY_AUTH` errors (a revoked token), at most once per 10 minutes
- * per credential, so a dead token is marked invalid instead of failing every call (P2-13, A10).
- */
-export function revalidateOnAuthErrors(
-  services: AccessServices,
-  logger: Logger,
-  now: () => number = Date.now,
-): (credentialId: string, errorCode: string | null) => void {
-  const streaks = new Map<string, number>();
-  const last = new Map<string, number>();
-  return (credentialId, errorCode) => {
-    if (errorCode !== 'AB_AGILITY_AUTH') {
-      streaks.delete(credentialId);
-      return;
-    }
-    const n = (streaks.get(credentialId) ?? 0) + 1;
-    streaks.set(credentialId, n);
-    if (n < 3 || now() - (last.get(credentialId) ?? 0) < 600_000) return;
-    last.set(credentialId, now());
-    streaks.delete(credentialId);
-    services.credentials
-      .validate(credentialId)
-      .then((c) =>
-        logger.warn('credential revalidated after Agility refused it', {
-          credential: c.id,
-          status: c.validationStatus,
-        }),
-      )
-      .catch((error: unknown) =>
-        logger.error('credential revalidation failed', { error: (error as Error).name }),
-      );
   };
 }

@@ -241,7 +241,23 @@ importers:
         version: 0.23.1(typescript@7.0.2)
 
   apps/worker:
+    dependencies:
+      '@agility-bridge/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@agility-bridge/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agility-bridge/http-app':
+        specifier: workspace:*
+        version: link:../../packages/http-app
+      '@agility-bridge/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
     devDependencies:
+      miniflare:
+        specifier: 5.20261006.1-alpha
+        version: 5.20261006.1-alpha(@types/node@24.19.2)
       wrangler:
         specifier: 4.149.0
         version: 4.149.0(@types/node@24.19.2)

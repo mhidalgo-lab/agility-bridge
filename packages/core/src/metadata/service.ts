@@ -153,6 +153,11 @@ export interface MetadataServiceOptions {
   readonly prefixOverrides?: Readonly<Record<string, Readonly<Record<string, string>>>>;
   /** Field tiers per asset type that override the computed ones (paths validated on use). */
   readonly tierOverrides?: Readonly<Record<string, Partial<FieldTiers>>>;
+  /**
+   * Share a load in flight with other tool calls (default true). Workers set false: I/O started by one request must
+   * not be awaited by another (L-096); completed values are still shared.
+   */
+  readonly shareInflight?: boolean;
 }
 
 interface Cached<T> {
@@ -256,6 +261,8 @@ export class InstanceMetadata {
   readonly #service: MetadataService;
   readonly #ctx: ToolContext;
   readonly #cache: InstanceCache;
+  /** Loads in flight: shared with other calls, or this call's own (`shareInflight: false`). */
+  readonly #inflight: Map<string, Promise<AssetTypeMeta | null>>;
   /** Asset types this call asked for that the instance does not have (each one a meta.v1 404, review M6). */
   #absentInCall = 0;
 
@@ -263,6 +270,7 @@ export class InstanceMetadata {
     this.#service = service;
     this.#ctx = ctx;
     this.#cache = service.cache(ctx.instance.id);
+    this.#inflight = service.options.shareInflight === false ? new Map() : this.#cache.inflight;
   }
 
   /** The asset type, or AB_INPUT_INVALID when the instance has no such type. */
@@ -279,10 +287,10 @@ export class InstanceMetadata {
     if (this.#service.fresh(cached)) return cached.value ?? undefined;
     // Unknown names cost a 404 each, which the tenant's error quota counts (A10): a few per call, then no more.
     if (this.#absentInCall >= MAX_ABSENT_PER_CALL && !KNOWN_TYPES.has(name)) return undefined;
-    let pending = this.#cache.inflight.get(name);
+    let pending = this.#inflight.get(name);
     if (pending === undefined) {
-      pending = this.#load(name).finally(() => this.#cache.inflight.delete(name));
-      this.#cache.inflight.set(name, pending);
+      pending = this.#load(name).finally(() => this.#inflight.delete(name));
+      this.#inflight.set(name, pending);
     }
     const meta = await pending;
     if (meta === null) this.#absentInCall++;

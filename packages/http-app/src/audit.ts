@@ -16,6 +16,11 @@ export interface AuditOptions {
   readonly refusalsPerMinute?: number;
   /** Rows waiting to be written before new ones are dropped (and counted in the log) (default 10,000). */
   readonly maxPending?: number;
+  /**
+   * Write each row at once instead of after the previous one (Workers, L-096): no write waits on a write started by
+   * another request. The methods then return the write, for the host to keep alive (`waitUntil`).
+   */
+  readonly detached?: boolean;
 }
 
 export interface AdminChange {
@@ -45,6 +50,7 @@ export class AuditWriter {
   #pending = 0;
   #dropped = 0;
   #tail: Promise<void> = Promise.resolve();
+  readonly #inflight = new Set<Promise<void>>();
   #window = { start: 0, written: 0, suppressed: 0, firstSuppressed: 0 };
 
   constructor(options: AuditOptions) {
@@ -53,34 +59,47 @@ export class AuditWriter {
     this.#maxPending = options.maxPending ?? 10_000;
   }
 
-  /** Queues a row; never throws, never blocks the request. */
-  enqueue(row: Omit<NewAuditEntry, 'id' | 'ts'>): void {
+  /**
+   * Queues a row; never throws, never blocks the request. Detached, it returns the write (which never rejects) for the
+   * host to keep alive; queued, it returns nothing.
+   */
+  enqueue(row: Omit<NewAuditEntry, 'id' | 'ts'>): Promise<void> | undefined {
     if (this.#pending >= this.#maxPending) {
       this.#dropped++;
       if (this.#dropped === 1 || this.#dropped % 1_000 === 0) {
         this.#options.logger.error('audit queue full; rows dropped', { dropped: this.#dropped });
       }
-      return;
+      return undefined;
     }
     const entry: NewAuditEntry = { ...row, id: this.#options.random.uuid(), ts: this.#options.clock.now() };
     this.#pending++;
-    this.#tail = this.#tail
-      .then(() => this.#options.storage.audit.append(entry))
-      .catch((error: unknown) => {
-        this.#options.logger.error('audit write failed', {
-          action: entry.action,
-          error: (error as Error).name,
+    const write = () =>
+      this.#options.storage.audit
+        .append(entry)
+        .catch((error: unknown) => {
+          this.#options.logger.error('audit write failed', {
+            action: entry.action,
+            error: (error as Error).name,
+          });
+        })
+        .finally(() => {
+          this.#pending--;
         });
-      })
-      .finally(() => {
-        this.#pending--;
-      });
+    if (this.#options.detached === true) {
+      const written = write();
+      this.#inflight.add(written);
+      void written.finally(() => this.#inflight.delete(written));
+      return written;
+    }
+    this.#tail = this.#tail.then(write);
+    return undefined;
   }
 
   /** Resolves when every queued row has been written (or failed). For shutdown and tests. */
   async flush(): Promise<void> {
     this.#flushWindow(Number.POSITIVE_INFINITY);
     await this.#tail;
+    await Promise.all([...this.#inflight]);
   }
 
   /**
@@ -93,8 +112,8 @@ export class AuditWriter {
     return id;
   }
 
-  toolCall(e: ToolCallRecord): void {
-    this.enqueue({
+  toolCall(e: ToolCallRecord): Promise<void> | undefined {
+    return this.enqueue({
       kind: 'tool_call',
       action: e.tool,
       status: e.status,
@@ -119,17 +138,17 @@ export class AuditWriter {
   }
 
   /** A refused MCP request (authentication or limits), capped per minute. */
-  request(e: RequestEvent): void {
-    if (e.refusal === null || !AUDITED_REFUSALS.has(e.status)) return;
+  request(e: RequestEvent): Promise<void> | undefined {
+    if (e.refusal === null || !AUDITED_REFUSALS.has(e.status)) return undefined;
     const now = this.#options.clock.now();
-    this.#flushWindow(now);
+    const summary = this.#flushWindow(now);
     if (this.#window.written >= this.#perMinute) {
       if (this.#window.suppressed === 0) this.#window.firstSuppressed = now;
       this.#window.suppressed++;
-      return;
+      return summary;
     }
     this.#window.written++;
-    this.enqueue({
+    const row = this.enqueue({
       kind: 'auth',
       action: e.status === 429 ? 'mcp.rate_limited' : 'mcp.unauthenticated',
       status: 'denied',
@@ -148,10 +167,11 @@ export class AuditWriter {
         ...(e.mcp?.method ? { method: e.mcp.method } : {}),
       },
     });
+    return both(summary, row);
   }
 
-  admin(change: AdminChange): void {
-    this.enqueue(this.#adminRow(change));
+  admin(change: AdminChange): Promise<void> | undefined {
+    return this.enqueue(this.#adminRow(change));
   }
 
   #adminRow(change: AdminChange): Omit<NewAuditEntry, 'id' | 'ts'> {
@@ -171,11 +191,12 @@ export class AuditWriter {
   }
 
   /** Ends the refusal window once a minute has passed, writing a summary of what was suppressed. */
-  #flushWindow(now: number): void {
+  #flushWindow(now: number): Promise<void> | undefined {
     const w = this.#window;
-    if (now - w.start < 60_000) return;
+    if (now - w.start < 60_000) return undefined;
+    let summary: Promise<void> | undefined;
     if (w.suppressed > 0) {
-      this.enqueue({
+      summary = this.enqueue({
         kind: 'auth',
         action: 'audit.refusals_suppressed',
         status: 'denied',
@@ -183,21 +204,23 @@ export class AuditWriter {
       });
     }
     this.#window = { start: Number.isFinite(now) ? now : 0, written: 0, suppressed: 0, firstSuppressed: 0 };
+    return summary;
   }
 
-  /** The observer to give `createHttpApp`. */
+  /** The observer to give `createHttpApp`; it returns the writes it started (detached) for the host to keep alive. */
   observer(next?: HttpObserver): HttpObserver {
     return {
-      request: (e) => {
-        this.request(e);
-        next?.request?.(e);
-      },
-      toolCall: (e) => {
-        this.toolCall(e);
-        next?.toolCall?.(e);
-      },
+      request: (e) => both(this.request(e), next?.request?.(e)),
+      toolCall: (e) => both(this.toolCall(e), next?.toolCall?.(e)),
     };
   }
+}
+
+/** One promise for the work two steps started, or nothing when neither started any. */
+function both(a: unknown, b: unknown): Promise<void> | undefined {
+  const work = [a, b].filter((w): w is Promise<unknown> => w instanceof Promise);
+  if (work.length === 0) return undefined;
+  return Promise.all(work).then(() => undefined);
 }
 
 /**
