@@ -100,12 +100,16 @@ const fake = new FakeAgility({
 export interface FixtureAgility {
   /** Base URL of the synthetic instance, e.g. http://127.0.0.1:41234/SyntheticInstance. */
   readonly url: string;
+  /** Requests answered so far (tests assert that a denial reaches no Agility). */
+  readonly requests: () => number;
   close(): Promise<void>;
 }
 
 /** Starts the synthetic Agility on 127.0.0.1 (port 0 = any free port). */
 export function startFixtureAgility(port = 0): Promise<FixtureAgility> {
+  let requests = 0;
   const server = createServer(async (req, res) => {
+    requests++;
     const chunks: Buffer[] = [];
     for await (const c of req) chunks.push(c as Buffer);
     try {
@@ -128,6 +132,7 @@ export function startFixtureAgility(port = 0): Promise<FixtureAgility> {
       const { port: bound } = server.address() as AddressInfo;
       resolve({
         url: `http://127.0.0.1:${bound}/SyntheticInstance`,
+        requests: () => requests,
         close: () => new Promise<void>((done) => server.close(() => done())),
       });
     });

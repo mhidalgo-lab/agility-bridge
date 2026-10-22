@@ -51,6 +51,23 @@ either protocol era; `post(...)` sends raw JSON-RPC. Options: `assets`, `filters
 
 Every regression test must fail when its fix is reverted (L-121): check it once by reverting the fix locally.
 
+## Worker tests (`apps/worker/test`, Phase 3)
+
+The Worker is tested **in workerd**, on the bundle CI builds (`wrangler deploy --dry-run`), driven from Node through
+Miniflare, with a local D1 that Node opens too (`getD1Database` + `createD1Driver`) to build worlds and inspect
+state. Each test gets its own Miniflare and database. The Vitest Workers pool (`@cloudflare/vitest-pool-workers`) is
+not used: its 0.23 release needs Vitest 4, the repository is on Vitest 5 with strict peer dependencies; driving the
+shipped bundle also tests the bundling itself.
+
+| File | What it proves |
+|---|---|
+| `worker.test.ts` (P3-01, P3-03, P3-04) | MCP with a device token against the synthetic Agility, the admin API, the uniform `401`, two workspaces under 24 interleaved calls, boot failures (`503`, security headers, no detail), a wrong master key, plan presets and ceilings, rate-limit bindings, no `node:` import in the bundle |
+| `authz.test.ts` (P3-06) | The P2-12 denial matrix on workerd: 14 denied principals × `initialize`, `tools/list` and every tool — `401` with one body, **zero Agility requests** (the synthetic Agility counts them), no change to the database, `auth` audit rows with the reason and the `CF-Connecting-IP` address written through `waitUntil`, no `tool_call` row |
+| `d1-contract.test.ts` (P3-02) | The whole storage contract on local D1, concurrent first boots, newer-database refusal |
+| `handler.test.ts`, `plan.test.ts`, `rate-limit.test.ts` | Unit tests of the boot rule (L-179), plan presets and the rate-limit backstop |
+
+Miniflare 5 (pinned by wrangler) takes `convertV4MiniflareOptions({...})`; persist with `resourcePersistencePath`.
+
 ## Fixtures
 
 Synthetic Agility responses live in `packages/core/test/fixtures/agility/` (see its README); `meta-snapshot.json` is the
