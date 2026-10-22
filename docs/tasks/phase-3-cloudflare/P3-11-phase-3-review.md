@@ -2,7 +2,7 @@
 id: P3-11
 title: Phase 3 review and staging verification
 phase: 3
-status: review
+status: done
 priority: high
 depends_on: [P3-04, P3-06, P3-07, P3-08, P3-09, P3-10]
 adr: []

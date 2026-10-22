@@ -61,8 +61,11 @@ depend on the environment to module scope (Workers run it at startup, under a se
 admin request; the boot derives only the keys in use and routes with a router that needs no compilation. That halved
 the cost, but the rest is the boot's crypto and D1 round trips and the MCP SDK building its own protocol schemas on
 its first request, which only the SDK can move. Cloudflare has served every such request so far (occasional overruns
-are tolerated); whether production should rely on that is decision D-27 in
-[pending decisions](../pending-decisions/phase-3.md). On the Paid plan (30 s of CPU) it does not matter.
+are tolerated). The project accepts that on Free (decision D-27 in
+[pending decisions](../pending-decisions/phase-3.md)): it is a tolerance, not a guarantee, so if Cloudflare ever
+enforces the limit strictly, the first request of a new isolate fails (error 1102, `exceededCpu`) and the client's
+retry, served by a warm isolate, succeeds. A deployment that cannot accept that runs on the Paid plan (30 s of CPU),
+where it does not matter.
 
 A non-required CI job runs the benchmark on every pull request, keeps the numbers as an artifact and flags a path
 whose cost, relative to a calibration workload in the same run, more than doubles against

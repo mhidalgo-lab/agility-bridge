@@ -30,6 +30,9 @@
   the MCP SDK maintainers for an eager or warmable protocol-schema build (a public issue), then measure again.
 - **Recommendation:** (a) for any deployment people depend on, with (c) as a follow-up; Free stays fine for trying
   agility-bridge out. P3-14 stays blocked on this decision.
+- **Owner (2026-10-22):** Decided: (b), stay on Free and accept the cold-start overrun as a documented, tolerated
+  risk (as relic-bridge does). P3-14 closes with the criterion changed; warm calls keep the 10 ms budget. Paid stays
+  the documented way out for anyone who cannot accept it.
 
 ### D-28 — Go for Phase 4 *(P3-11)*
 - **Context:** the [Phase 3 review](../reviews/phase-3-review.md) found no high issue; two medium and five low ones are

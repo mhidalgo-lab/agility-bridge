@@ -2,7 +2,7 @@
 id: P3-14
 title: Cut the Worker's cold-start CPU under the Free plan's budget
 phase: 3
-status: blocked
+status: review
 priority: high
 depends_on: [P3-10]
 adr: ["0010"]
@@ -27,14 +27,16 @@ The first request of a new isolate fits the Free plan's 10 ms of CPU, instead of
 - Re-measure with `pnpm bench:worker` and on staging; update the baseline and `docs/guide/cloudflare-limits.md`.
 
 ## Acceptance criteria
-- [ ] Staging: the first request of a new isolate under 10 ms CPU in `wrangler tail` (several samples).
+- [x] ~~Staging: the first request of a new isolate under 10 ms CPU in `wrangler tail` (several samples).~~ Changed by
+      D-27 (b): cut what our code controls, measure it on staging and document the remaining overrun as a tolerated
+      risk with Paid as the way out (`docs/guide/cloudflare-limits.md`).
 - [x] No change to the security checks at boot (wrong key, unknown settings, admin token format) — the boot-failure
       tests still pass; L-096 tests still pass.
 
-## Blocker
-The first criterion is not met: after this task the first request of a new isolate uses 20–40 ms (bare boot) and
+## Decision
+D-27 (b), 2026-10-22: stay on Free and accept the overrun. The original criterion was not met: after this task the first request of a new isolate uses 20–40 ms (bare boot) and
 45–86 ms (first MCP request) on staging, down from 60–129 ms. The rest is outside our code (the MCP SDK's first-request
-schema build) or inherent (crypto, D1 round trips). Decision D-27 ([pending decisions](../../pending-decisions/phase-3.md)).
+schema build) or inherent (crypto, D1 round trips). See D-27 in [pending decisions](../../pending-decisions/phase-3.md).
 
 ## Done in this task
 - Module scope (startup, not the request's budget): the tool registry and the JSON Schemas `tools/list` hands out
