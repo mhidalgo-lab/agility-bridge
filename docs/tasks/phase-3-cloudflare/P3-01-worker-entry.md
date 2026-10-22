@@ -5,29 +5,54 @@ phase: 3
 status: todo
 priority: high
 depends_on: [P2-17]
-adr: ["0004", "0006"]
+adr: ["0004", "0006", "0007", "0010"]
 lessons: [L-083, L-086, L-096, L-151]
 owner: ""
 ---
 
 # P3-01 — Worker entry, bindings and boot single-flight
 
-> Later-phase task: **refine scope and acceptance criteria before starting** (tasks/README rule 7).
+> Refined 2026-10-22 (tasks/README rule 7).
 
 ## Goal
-The same HTTP app runs as a Cloudflare Worker with D1, secrets and bindings.
+The same HTTP app that `agility-bridge serve` runs (MCP per workspace, admin API, health) runs as a Cloudflare Worker
+with D1, secrets and bindings, without sharing in-flight I/O between requests.
 
 ## Scope
-- `apps/worker` entry: environment parsing, bindings (D1, rate limiting, optional Durable Object), secrets (`AB_MASTER_KEY`, `AB_ADMIN_TOKEN`).
-- Boot single-flight per request; never await I/O started by another request; cache only completed values.
-- Security headers (including HSTS) on boot-failure responses.
+- **Shared server settings and assembly** (`packages/http-app`): the `AB_*` settings both hosts read (public URL,
+  hosts, origins, environment, access cache, budgets, limits, rate limits, pass-through, log level) parsed from a
+  plain string record by one web-standard function, and the app assembled by one function from storage, keyring,
+  host services and settings. `apps/cli` `serve` uses both (no behaviour change; its tests stay green); the Worker uses
+  both. Node-only settings (paths, host, port, proxy hops, CA bundles) stay in the CLI.
+- **Per-request isolation** (`isolation: 'request'`, Workers; Node keeps `'process'`), L-096:
+  - audit rows are written as they happen and handed to the request's `waitUntil` (no shared write chain);
+  - the per-credential concurrency limiter is created per request;
+  - metadata loads and pass-through validations are never shared in flight between requests (completed values are
+    still cached).
+- **`apps/worker` entry**: `fetch` and the bindings `DB` (D1), secrets `AB_MASTER_KEY` (and `AB_MASTER_KEY_PREVIOUS`),
+  optional `AB_ADMIN_TOKEN`, and `AB_*` variables. A minimal D1 `SqlDriver` (`query`, `batch`, `close`) so the SQL
+  storage runs on D1; the full contract suite, concurrent first boots and constraint mapping on D1 are P3-02.
+- **Boot single-flight per request**: the first request in an isolate (or the first after a failed boot) parses the
+  settings, imports the keyring, applies migrations and verifies the key-check values, then caches only the completed
+  result; a concurrent request runs its own boot instead of awaiting another request's; a failed boot is not cached.
+- **Boot failures** answer `503` with a generic body (no setting names or values) and the security headers, including
+  HSTS when `AB_PUBLIC_URL` is HTTPS (L-083); the cause is logged to the Workers log, redacted. `/health` stays
+  `{"status":"ok"}` and reveals nothing (L-151).
+- No `nodejs_compat` (ADR-0004); no Node built-ins in the bundle (checked).
 
 ## Acceptance criteria
-- [ ] workerd integration tests for MCP calls, admin API and boot failures.
-- [ ] No module-level request state (shared concurrency test runs on workerd too).
+- [ ] workerd integration tests (local, `wrangler`'s Miniflare with a local D1; no Cloudflare account) for: an MCP
+      `tools/list` and tool call with a device token against the synthetic Agility, the admin API with the
+      break-glass token, the uniform 401, `/health`, and boot failures (missing or malformed master key, wrong master
+      key) with security headers and no detail in the body.
+- [ ] No module-level request state: the two-workspace concurrency test from P2-12 runs against the Worker too, and
+      concurrent first requests each boot on their own (no request awaits another's boot).
+- [ ] Unit tests for the isolation mode: no shared audit chain, a limiter per request, no shared in-flight metadata
+      load or pass-through validation; `serve` unchanged.
+- [ ] The Worker bundle builds with `wrangler deploy --dry-run` and contains no `node:` import.
 
 ## Security notes
-THREAT_MODEL T20, T21.
+THREAT_MODEL T20, T21. Secrets only as Worker secrets, never `vars` (the setup script, P3-05, enforces it).
 
 ## Lessons applied
 - L-083 — Derive security headers from the public URL.
@@ -36,7 +61,9 @@ THREAT_MODEL T20, T21.
 - L-151 — Health endpoints reveal nothing.
 
 ## Docs to update
+- docs/ARCHITECTURE.md (deployment mode D: request isolation)
 - docs/guide/cloudflare-deploy.md (P3-07)
 
 ## Out of scope
-- Anything not listed under Scope.
+- D1 contract suite and migration concurrency (P3-02), Workers limits presets (P3-03), rate-limit bindings (P3-04),
+  the setup script (P3-05), the full workerd suite and CI wiring (P3-06), scheduled jobs (P3-08).
