@@ -120,6 +120,22 @@ function openSchema(schema: unknown): unknown {
   return out;
 }
 
+/** The JSON Schema draft the MCP SDK asks tool schemas for (`JSON_SCHEMA_CONVERSION_TARGET` in SDK 2.x). */
+const SDK_SCHEMA_TARGET = 'draft-2020-12';
+
+/**
+ * Converts every tool's schemas now, into the cache `tools/list` reads (L-020). Workers call it at module scope, so the
+ * first request of an isolate does not pay for the conversion (P3-14).
+ */
+export function prewarmToolSchemas(tools: readonly ToolDefinition[]): void {
+  for (const def of tools) {
+    withCachedJsonSchema(def.inputSchema)['~standard'].jsonSchema.input({ target: SDK_SCHEMA_TARGET });
+    if (def.outputSchema !== undefined) {
+      withCachedJsonSchema(def.outputSchema)['~standard'].jsonSchema.output({ target: SDK_SCHEMA_TARGET });
+    }
+  }
+}
+
 /** The same schema (validation unchanged) whose `~standard.jsonSchema` answers from the per-process cache. */
 export function withCachedJsonSchema(schema: StandardSchemaWithJSON): StandardSchemaWithJSON {
   const hit = cachedSchemas.get(schema);

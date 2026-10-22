@@ -2,7 +2,7 @@
 id: P3-14
 title: Cut the Worker's cold-start CPU under the Free plan's budget
 phase: 3
-status: todo
+status: blocked
 priority: high
 depends_on: [P3-10]
 adr: ["0010"]
@@ -28,8 +28,23 @@ The first request of a new isolate fits the Free plan's 10 ms of CPU, instead of
 
 ## Acceptance criteria
 - [ ] Staging: the first request of a new isolate under 10 ms CPU in `wrangler tail` (several samples).
-- [ ] No change to the security checks at boot (wrong key, unknown settings, admin token format) — the boot-failure
+- [x] No change to the security checks at boot (wrong key, unknown settings, admin token format) — the boot-failure
       tests still pass; L-096 tests still pass.
+
+## Blocker
+The first criterion is not met: after this task the first request of a new isolate uses 20–40 ms (bare boot) and
+45–86 ms (first MCP request) on staging, down from 60–129 ms. The rest is outside our code (the MCP SDK's first-request
+schema build) or inherent (crypto, D1 round trips). Decision D-27 ([pending decisions](../../pending-decisions/phase-3.md)).
+
+## Done in this task
+- Module scope (startup, not the request's budget): the tool registry and the JSON Schemas `tools/list` hands out
+  (`prewarmToolSchemas`, the SDK's `draft-2020-12` target).
+- The admin API is built on the first admin request (Workers); the request id reaches its audit rows through an
+  internal header the server sets (tested, a client copy is replaced).
+- The boot derives only the keys requests use (credentials, key check, audit identity); the routers of the Worker's
+  apps are `LinearRouter` (no compile step).
+- Measured on staging with `wrangler tail` after each change: about 96 ms → 69 → 47 → 45–55 ms for the first MCP
+  request; the benchmark mirrors the Worker's module scope, baseline refreshed.
 
 ## Security notes
 THREAT_MODEL T5, T21.

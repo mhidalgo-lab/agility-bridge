@@ -35,6 +35,7 @@ import {
 import type { Storage } from '@agility-bridge/storage';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { type Context, Hono } from 'hono';
+import { LinearRouter } from 'hono/router/linear-router';
 import { AccessCache } from './access-cache.ts';
 import { ADMIN_BASE, type AdminApiOptions, createAdminApi } from './admin/api.ts';
 import { createEdge, type EdgeOptions } from './edge.ts';
@@ -151,6 +152,11 @@ export interface HttpAppOptions extends EdgeOptions {
   readonly isolation?: 'process' | 'request';
   /** Keeps work started for a request alive after the response (Workers: `c.executionCtx.waitUntil`). */
   readonly background?: (c: Context, work: Promise<unknown>) => void;
+  /**
+   * The tools, registered once (their JSON Schemas converted, L-020). Workers build it at module scope, outside the
+   * request's CPU budget (P3-14); default: built here from `tools`.
+   */
+  readonly registry?: ToolRegistry;
 }
 
 export interface HttpApp {
@@ -172,6 +178,8 @@ interface PreparedRequest {
 }
 
 const UNAUTHORIZED = JSON.stringify({ error: 'unauthorized' });
+/** Carries the request id into the lazily built admin app (Workers); set by the server, never trusted from clients. */
+const INTERNAL_REQUEST_ID = 'x-agility-bridge-internal-request-id';
 /** Pass-through identities kept at most (P2-14). */
 const MAX_IDENTITIES = 10_000;
 
@@ -238,8 +246,8 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     identities.set(key, until);
   };
   const { services } = options;
-  const registry = new ToolRegistry();
-  for (const tool of options.tools) registry.register(tool);
+  const registry = options.registry ?? new ToolRegistry();
+  if (options.registry === undefined) for (const tool of options.tools) registry.register(tool);
   const clientIp = options.clientIp ?? (() => 'unknown');
 
   const keepAlive = (c: Context, work: Promise<unknown>) => {
@@ -272,7 +280,8 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     { legacy: 'stateless' },
   );
 
-  const app = new Hono();
+  // Workers build the app in a request: the linear router has no compile step on its first match (P3-14).
+  const app = perRequest ? new Hono({ router: new LinearRouter() }) : new Hono();
 
   // Request id, security headers on every response (errors and 404s too), Host/Origin allowlists.
   app.use('*', async (c, next) => {
@@ -299,10 +308,10 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
   app.notFound((c) => c.json({ error: 'not found' }, 404));
 
   if (options.admin !== undefined) {
-    app.route(
-      ADMIN_BASE,
+    const admin = options.admin;
+    const build = () =>
       createAdminApi({
-        ...options.admin,
+        ...admin,
         storage: options.storage,
         tools: options.access.tools,
         onChange: () => cache.clear(),
@@ -312,8 +321,39 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         clock: services.clock,
         background: keepAlive,
         keyring: options.keyring,
-      }),
-    );
+        ...(perRequest ? { lightweightRouter: true } : {}),
+      });
+    if (!perRequest) {
+      app.route(ADMIN_BASE, build());
+    } else {
+      // Workers: the admin API (about 40 validated routes) is built on the first admin request, not at every boot,
+      // so MCP requests never pay for it (P3-14). Built synchronously and kept only once complete (L-096).
+      let adminApp: Hono | undefined;
+      app.all(`${ADMIN_BASE}/*`, (c) => {
+        if (adminApp === undefined) {
+          const inner = new Hono({ router: new LinearRouter() });
+          // The outer app's request id travels in an internal header it sets itself (any client copy is replaced).
+          inner.use(async (ic, next) => {
+            ic.set('requestId' as never, (ic.req.header(INTERNAL_REQUEST_ID) ?? '') as never);
+            await next();
+          });
+          inner.route(ADMIN_BASE, build());
+          adminApp = inner;
+        }
+        const headers = new Headers(c.req.raw.headers);
+        headers.set(INTERNAL_REQUEST_ID, c.get('requestId' as never) as string);
+        const forwarded = new Request(c.req.raw, { headers });
+        let ctx: { waitUntil(p: Promise<unknown>): void; passThroughOnException(): void } | undefined;
+        try {
+          ctx = c.executionCtx;
+        } catch {
+          ctx = undefined;
+        }
+        return ctx === undefined
+          ? adminApp.fetch(forwarded, c.env)
+          : adminApp.fetch(forwarded, c.env, ctx as never);
+      });
+    }
   }
 
   // Liveness and version only (L-151).

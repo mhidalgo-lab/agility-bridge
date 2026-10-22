@@ -1,18 +1,18 @@
 {
-  "calibrationMs": 3.828000000000003,
+  "calibrationMs": 3.358000000000004,
   "ms": {
-    "cold: boot": 90.37399999999991,
-    "warm: tools/list": 2.1510000000000673,
-    "warm: whoami": 2.338999999999942,
-    "warm: search_work_items": 3.855000000000018,
-    "warm: get_work_item": 3.2369999999998527
+    "cold: boot": 70.45299999999997,
+    "warm: tools/list": 2.1800000000000637,
+    "warm: whoami": 2.7719999999999345,
+    "warm: search_work_items": 3.6089999999999236,
+    "warm: get_work_item": 2.8239999999998417
   },
   "relative": {
-    "cold: boot": 23.609,
-    "warm: tools/list": 0.562,
-    "warm: whoami": 0.611,
-    "warm: search_work_items": 1.007,
-    "warm: get_work_item": 0.846
+    "cold: boot": 20.981,
+    "warm: tools/list": 0.649,
+    "warm: whoami": 0.825,
+    "warm: search_work_items": 1.075,
+    "warm: get_work_item": 0.841
   },
   "requests": {
     "whoami": 1,

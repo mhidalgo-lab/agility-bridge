@@ -35,7 +35,7 @@ How to use it:
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164 |
 | [K. Admin UI](#k-admin-ui) | L-095 |
-| [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-181 |
+| [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
@@ -724,6 +724,14 @@ The first real migration into staging was refused as "not empty" (P3-09): two au
 smoke check. Any public Worker records refused probes within minutes of its deploy. Define "empty" on configuration
 and identity tables, and keep the target's audit rows next to the imported ones.
 *Applied in:* P3-09, `scripts/cf-migrate.ts`.
+
+**L-182 — Measure a Worker's cold start on Cloudflare, then move what needs no environment to module scope.**
+Node is a poor proxy for a cold isolate (its crypto and loader dominate), and inside a Worker the CPU cannot be timed
+(the clock does not advance during computation). `wrangler tail` reports `cpuTime` per request: a redeploy starts new
+isolates, so the requests after it are cold samples (wrangler's own request to `/` is one too). Module scope runs at
+startup under its own limit, so registries, converted schemas and route tables belong there; whatever a library builds
+lazily on its first request (the MCP SDK's protocol schemas) stays in that request unless the library offers a hook.
+*Applied in:* P3-10, P3-14.
 
 **L-097 — Design for the Free plan's limits, not its tolerance.**
 About 10 ms CPU per request, 50 external subrequests and 6 simultaneous outbound connections on the Free plan *(re-verify)*.

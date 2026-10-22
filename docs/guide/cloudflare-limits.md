@@ -47,16 +47,22 @@ isolation as on Workers, Agility-shaped fake responses. *Staging*: `agility-brid
 
 | Path | Local CPU | Staging CPU | Agility requests |
 |---|---|---|---|
-| First request of a new isolate (boot: settings, keys, key check, admin token, app, routes) | 90–110 ms | 38–80 ms (wall about 380 ms) | 0 |
+| First request of a new isolate, bare boot (settings, keys, D1, key check, admin token, app) | about 70 ms | 20–40 ms (was 60–118 before P3-14) | 0 |
+| First `tools/list` of a new isolate (boot and the MCP SDK's first request) | — | 45–86 ms (was 70–129 before P3-14) | 0 |
 | `GET /health`, warm | < 1 ms | 0 ms | 0 |
 | `tools/list`, warm | about 2 ms | 4–10 ms | 0 |
 | `whoami`, warm | about 2.5 ms | — | 1 |
 | `search_work_items` (25 rows), warm | about 4 ms | — | 1 |
 | `get_work_item`, warm | about 3 ms | — | 2 |
 
-Warm calls fit the Free plan's 10 ms. **The first request of every new isolate does not**: the boot costs several
-times the Free budget. Cloudflare has served it so far (occasional overruns are tolerated), but L-097 says not to
-design on that tolerance; cutting the boot cost is P3-14. On the Paid plan (30 s of CPU) it does not matter.
+Warm calls fit the Free plan's 10 ms. **The first request of every new isolate does not.** P3-14 moved what does not
+depend on the environment to module scope (Workers run it at startup, under a separate limit; startup is about
+80–100 ms): the tool registry and the JSON Schemas `tools/list` returns, and the admin API is built only on the first
+admin request; the boot derives only the keys in use and routes with a router that needs no compilation. That halved
+the cost, but the rest is the boot's crypto and D1 round trips and the MCP SDK building its own protocol schemas on
+its first request, which only the SDK can move. Cloudflare has served every such request so far (occasional overruns
+are tolerated); whether production should rely on that is decision D-27 in
+[pending decisions](../pending-decisions/phase-3.md). On the Paid plan (30 s of CPU) it does not matter.
 
 A non-required CI job runs the benchmark on every pull request, keeps the numbers as an artifact and flags a path
 whose cost, relative to a calibration workload in the same run, more than doubles against

@@ -142,3 +142,30 @@ describe("isolation: 'request' over HTTP", () => {
     expect(calls).toBe(3);
   });
 });
+
+describe("isolation: 'request' admin API (P3-14)", () => {
+  it('is built on the first admin request, carries the server request id into audit rows, and ignores a client copy', async () => {
+    const w = await world(
+      { isolation: 'request', background: () => {} },
+      { admin: true, detachedAudit: true },
+    );
+    const res = await w.app.fetch(
+      new Request('http://127.0.0.1:8787/api/admin/v1/users', {
+        method: 'POST',
+        headers: {
+          'x-test-actor': 'owner',
+          'content-type': 'application/json',
+          'x-agility-bridge-internal-request-id': 'chosen-by-client',
+        },
+        body: JSON.stringify({ email: 'new@example.test', role: 'member' }),
+      }),
+    );
+    expect(res.status).toBe(201);
+    const requestId = res.headers.get('x-request-id');
+    await w.audit.flush();
+    const [row] = await w.storage.audit.query({ kind: 'admin', limit: 5 });
+    expect(row?.action).toBe('user.create');
+    expect(row?.requestId).toBe(requestId);
+    expect(row?.requestId).not.toBe('chosen-by-client');
+  });
+});

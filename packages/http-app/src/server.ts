@@ -10,7 +10,13 @@ import {
   type DeploymentLimits,
   type Keyring,
 } from '@agility-bridge/auth';
-import { CORE_TOOLS, DEFAULT_LIMITS, type Logger, type LogLevel } from '@agility-bridge/core';
+import {
+  CORE_TOOLS,
+  DEFAULT_LIMITS,
+  type Logger,
+  type LogLevel,
+  type ToolRegistry,
+} from '@agility-bridge/core';
 import type { Storage } from '@agility-bridge/storage';
 import type { Context } from 'hono';
 import { adminTokenAuthenticator } from './admin/api.ts';
@@ -286,6 +292,8 @@ export interface ServerParts {
   readonly ceilings?: DeploymentLimits['ceilings'];
   /** Refuses an instance host by throwing (Node: one resolving to a private address, P2-19). */
   readonly checkInstanceHost?: (hostname: string) => Promise<void>;
+  /** The tool registry built once (Workers: at module scope, P3-14). */
+  readonly registry?: ToolRegistry;
 }
 
 export interface AssembledServer {
@@ -363,6 +371,7 @@ export function assembleServer(parts: ServerParts): AssembledServer {
       },
     }),
     isolation: parts.isolation,
+    ...(parts.registry === undefined ? {} : { registry: parts.registry }),
     ...(parts.background === undefined ? {} : { background: parts.background }),
     version: parts.version,
   });

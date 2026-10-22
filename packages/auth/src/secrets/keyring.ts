@@ -174,10 +174,8 @@ export class Keyring {
    * Derives every purpose key of every loaded version now. Workers boot with it (L-096): the keyring is shared by the
    * requests of an isolate, and a derivation started by one request must not be awaited by another.
    */
-  async warm(): Promise<void> {
-    await Promise.all(
-      this.versions.flatMap((v) => Object.values(KeyPurpose).map((purpose) => this.#key(purpose, v))),
-    );
+  async warm(purposes: readonly KeyPurpose[] = Object.values(KeyPurpose)): Promise<void> {
+    await Promise.all(this.versions.flatMap((v) => purposes.map((purpose) => this.#key(purpose, v))));
   }
 
   #key(purpose: KeyPurpose, version: number): Promise<Key> {
