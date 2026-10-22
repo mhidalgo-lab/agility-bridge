@@ -5,11 +5,13 @@
 import { type AccessServices, AdminTokenVerifier, Keyring, verifyKeyring } from '@agility-bridge/auth';
 import {
   CircuitBreakers,
+  CORE_TOOLS,
   CredentialLimiters,
   createLogger,
   type Logger,
   MetadataService,
   systemClock,
+  ToolRegistry,
   webCryptoRandom,
 } from '@agility-bridge/core';
 import {
@@ -44,6 +46,16 @@ export const PLAN_PRESETS: Readonly<Record<WorkersPlan, SettingDefaults & { read
     free: { callBudget: 45, maxResponseBytes: 512 * 1024, ceiling: true },
     paid: { callBudget: 1_000, maxResponseBytes: 8 * 1024 * 1024, ceiling: false },
   });
+
+/**
+ * The tools with their converted JSON Schemas, built when the module loads: Workers run module scope at startup, under
+ * its own limit, not in the first request's CPU budget (P3-14, L-020). A completed value, shared by every request.
+ */
+const REGISTRY = (() => {
+  const registry = new ToolRegistry();
+  for (const tool of CORE_TOOLS) registry.register(tool);
+  return registry;
+})();
 
 /** Settings only the Worker reads, and its secrets (never `vars`, P3-05). */
 const WORKER_ONLY = ['AB_PLAN', 'AB_MASTER_KEY', 'AB_MASTER_KEY_PREVIOUS', 'AB_ADMIN_TOKEN'];
@@ -151,6 +163,7 @@ export async function boot(env: WorkerEnv, version: string): Promise<Booted> {
     ),
     version,
     isolation: 'request',
+    registry: REGISTRY,
     background: (c, work) => c.executionCtx.waitUntil(work),
     ...(adminVerifier === undefined ? {} : { adminVerifier }),
     ...(preset.ceiling

@@ -15,6 +15,7 @@ import type { Clock, Logger } from '@agility-bridge/core';
 import type { AccessToken, AuditKind, AuditStatus, Credential, Storage } from '@agility-bridge/storage';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
+import { LinearRouter } from 'hono/router/linear-router';
 import type { RequestLimits } from '../app.ts';
 import type { AuditWriter } from '../audit.ts';
 import { AdminError, errorBody, toAdminError } from './errors.ts';
@@ -41,6 +42,8 @@ export interface AdminApiOptions {
   readonly background?: (c: Context, work: Promise<unknown>) => void;
   /** For `/keys` (P3-13): master-key versions and their retirement; without it those routes answer 403. */
   readonly keyring?: Keyring;
+  /** A router without a compile step on the first match (Workers, P3-14). */
+  readonly lightweightRouter?: boolean;
 }
 
 /** The break-glass authenticator: `Authorization: Bearer ab_admin_…` matching `AB_ADMIN_TOKEN`. */
@@ -281,6 +284,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
     if (work !== undefined) options.background?.(c, work);
   };
   const api = new OpenAPIHono({
+    ...(options.lightweightRouter === true ? { router: new LinearRouter() } : {}),
     defaultHook: (result, c) => {
       if (!result.success) {
         const issue = result.error.issues[0];
