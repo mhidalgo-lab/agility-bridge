@@ -35,7 +35,7 @@ How to use it:
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164 |
 | [K. Admin UI](#k-admin-ui) | L-095 |
-| [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 |
+| [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179, L-180 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
@@ -712,6 +712,12 @@ request. Keep the rule in code the tests can drive (the handler takes its boot f
 assert it there, with a mutation check. Also: Miniflare 5 (pinned by wrangler 4.149) takes a new options shape;
 `convertV4MiniflareOptions` and `resourcePersistencePath` (not `d1Persist`) work.
 *Applied in:* P3-01, `apps/worker/test/handler.test.ts`, `packages/http-app/test/isolation.test.ts`.
+
+**L-180 — A Host allowlist needs the public address on every platform.**
+The first staging deploy answered `403` on `workers.dev` (P3-05): the edge accepts only loopback names and the public
+URL's host, and the Worker had no `AB_PUBLIC_URL`. The control worked; the setup did not configure it. A deployment
+tool sets the public URL from the address it deployed to, and checks `/health` through that address.
+*Applied in:* P3-05, `scripts/cf-setup.ts`.
 
 **L-097 — Design for the Free plan's limits, not its tolerance.**
 About 10 ms CPU per request, 50 external subrequests and 6 simultaneous outbound connections on the Free plan *(re-verify)*.
