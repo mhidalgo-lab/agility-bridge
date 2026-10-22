@@ -271,8 +271,21 @@ export interface GrantRepository extends Repository<Grant, NewGrant, GrantPatch>
   list(filter?: { workspaceId?: string; userId?: string; credentialId?: string }): Promise<Grant[]>;
 }
 
+/** Everything access resolution reads for one device token; missing rows are `null` (the resolver denies). */
+export interface AccessBundle {
+  readonly token: AccessToken | null;
+  readonly grant: Grant | null;
+  readonly workspace: Workspace | null;
+  readonly user: User | null;
+  readonly instance: Instance | null;
+  /** The grant's credential, or the workspace default when the grant names none. */
+  readonly credential: Credential | null;
+}
+
 export interface AccessTokenRepository extends Repository<AccessToken, NewAccessToken, AccessTokenPatch> {
   getByHash(tokenHash: string): Promise<AccessToken | null>;
+  /** The token by hash and every record its access depends on, in one round trip on SQL (one `batch()`, P3-02). */
+  bundleByHash(tokenHash: string): Promise<AccessBundle>;
   list(filter?: { grantId?: string }): Promise<AccessToken[]>;
   /** Sets `lastUsedAt` to now unless it was set less than `minIntervalMs` ago; `true` when it wrote. */
   touch(id: string, minIntervalMs: number): Promise<boolean>;

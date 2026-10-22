@@ -419,6 +419,75 @@ export function storageContract(name: string, factory: StorageFactory): void {
     });
 
     describe('grants and access tokens', () => {
+      it('bundles a token with every record its access reads, as the sequential reads would (P3-02)', async () => {
+        await seed(s);
+        // What access resolution read before the bundle: one record after the other.
+        const sequential = async (hash: string) => {
+          const token = await s.accessTokens.getByHash(hash);
+          const grant = token === null ? null : await s.grants.get(token.grantId);
+          const workspace = grant === null ? null : await s.workspaces.get(grant.workspaceId);
+          const user = grant?.userId == null ? null : await s.users.get(grant.userId);
+          const instance = workspace === null ? null : await s.instances.get(workspace.instanceId);
+          const credentialId =
+            grant === null || workspace === null
+              ? null
+              : (grant.credentialId ?? workspace.defaultCredentialId);
+          const credential = credentialId === null ? null : await s.credentials.get(credentialId);
+          return { token, grant, workspace, user, instance, credential };
+        };
+        const token = (id: string, grantId: string, tokenHash: string) =>
+          s.accessTokens.create({ id, grantId, prefix: 'ab_live_Ab12', tokenHash, label: id });
+        // A member's grant on their own credential, a service grant on the workspace default.
+        await s.grants.create({
+          id: 'g-own',
+          workspaceId: 'w-1',
+          userId: 'u-alice',
+          credentialId: 'c-alice',
+        });
+        await s.grants.create({ id: 'g-svc', workspaceId: 'w-1', label: 'bot' });
+        await token('t-own', 'g-own', HASH_A);
+        await token('t-svc', 'g-svc', HASH_B);
+        const hashC = 'c'.repeat(64);
+        const hashD = 'd'.repeat(64);
+        // A workspace without a default credential, and a revoked token on a disabled workspace.
+        await s.workspaces.create({
+          id: 'w-2',
+          slug: 'team-b',
+          name: 'B',
+          instanceId: 'i-1',
+          allowedScopeIds: ['Scope:1'],
+        });
+        await s.grants.create({ id: 'g-none', workspaceId: 'w-2', label: 'no credential' });
+        await token('t-none', 'g-none', hashC);
+        await token('t-revoked', 'g-svc', hashD);
+        await s.accessTokens.update('t-revoked', { revokedAt: clock.now() });
+        await s.workspaces.update('w-2', { disabledAt: clock.now() });
+
+        for (const hash of [HASH_A, HASH_B, hashC, hashD, 'e'.repeat(64)]) {
+          expect(await s.accessTokens.bundleByHash(hash), hash.slice(0, 1)).toEqual(await sequential(hash));
+        }
+        const own = await s.accessTokens.bundleByHash(HASH_A);
+        expect([own.token?.id, own.grant?.id, own.workspace?.id, own.user?.id, own.instance?.id]).toEqual([
+          't-own',
+          'g-own',
+          'w-1',
+          'u-alice',
+          'i-1',
+        ]);
+        expect(own.credential?.id).toBe('c-alice');
+        expect((await s.accessTokens.bundleByHash(HASH_B)).credential?.id).toBe('c-shared');
+        expect((await s.accessTokens.bundleByHash(HASH_B)).user).toBeNull();
+        expect((await s.accessTokens.bundleByHash(hashC)).credential).toBeNull();
+        expect(await s.accessTokens.bundleByHash('e'.repeat(64))).toEqual({
+          token: null,
+          grant: null,
+          workspace: null,
+          user: null,
+          instance: null,
+          credential: null,
+        });
+      });
+
       it('needs a label on service grants', async () => {
         await seed(s);
         await expect(s.grants.create({ id: 'g', workspaceId: 'w-1' })).rejects.toThrow(InvalidInputError);

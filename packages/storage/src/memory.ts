@@ -310,6 +310,17 @@ export function createMemoryStorage(options: MemoryStorageOptions = {}): Storage
       const row = [...tables.access_tokens.values()].find((t) => t.tokenHash === tokenHash);
       return row === undefined ? null : clone(row);
     },
+    async bundleByHash(tokenHash) {
+      const token = await this.getByHash(tokenHash);
+      const grant = token === null ? null : await grants.get(token.grantId);
+      const workspace = grant === null ? null : await workspaces.get(grant.workspaceId);
+      const user = grant?.userId == null ? null : await users.get(grant.userId);
+      const instance = workspace === null ? null : await instances.get(workspace.instanceId);
+      const credentialId =
+        grant === null || workspace === null ? null : (grant.credentialId ?? workspace.defaultCredentialId);
+      const credential = credentialId === null ? null : await credentials.get(credentialId);
+      return { token, grant, workspace, user, instance, credential };
+    },
     list: (f = {}) => tokenRepo.list((t) => f.grantId === undefined || t.grantId === f.grantId),
     async touch(id, minIntervalMs) {
       checkId('access_tokens', id);

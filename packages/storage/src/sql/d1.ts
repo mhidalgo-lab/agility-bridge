@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-// The SqlDriver over a D1 binding (P3-01; the full storage contract on D1 is P3-02). D1 enforces foreign keys and runs
-// a `batch()` atomically; rows come back as arrays (`raw()`), like node:sqlite's `setReturnArrays`.
-
-import type { SqlDriver, SqlResult, SqlStatement } from '@agility-bridge/storage';
+// The SqlDriver over a D1 binding (P3-01, P3-02). D1 enforces foreign keys and runs a `batch()` atomically; rows come
+// back as arrays (`raw()`), like node:sqlite's `setReturnArrays`. Web-standard, no dependency: the Worker passes its
+// binding, tests pass Miniflare's.
+import type { SqlDriver, SqlResult, SqlStatement } from './driver.ts';
 
 /** The part of the D1 binding the driver uses (Cloudflare's `D1Database`). */
 export interface D1Database {
