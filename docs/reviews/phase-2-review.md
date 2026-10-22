@@ -11,7 +11,7 @@
   mutation-checked: the test fails with the fix reverted (L-121). Live: the read-only suite against the third-party
   tenant, plus a new server check (`live/server.live.test.ts`) that runs the Phase 2 path in-process through the guarded
   fetch; MCP Inspector CLI against `agility-bridge serve` with a device token (synthetic upstream).
-- **Checks:** `pnpm lint && pnpm typecheck && pnpm test` green (1,055 tests); `pnpm test:live` green (11 tests, about
+- **Checks:** `pnpm lint && pnpm typecheck && pnpm test` green (1,056 tests); `pnpm test:live` green (11 tests, about
   15 read requests for the server check; counts and statuses only were recorded).
 
 ## Verdict
@@ -79,7 +79,7 @@ Tests in `packages/http-app/test/passthrough.test.ts`. Lesson L-176.
 ### Low
 
 - **L1 — the admin-token-file check followed no symbolic links** — **fixed:** it uses the master key's realpath-based
-  `isInside`, so a link into the data directory is refused (test skipped on Windows).
+  `isInside`, so a link into the data directory is refused (test skipped on Windows). CI on macOS then showed that `isInside` did not resolve links for a file that does not exist yet (`/var` → `/private/var`), so a missing file in a linked data directory passed the check; it now resolves the deepest existing ancestor.
 - **L2 — "retarget while revoked, then un-revoke" was possible in storage** (no route exposed it) — **fixed:**
   revocation is final for credentials, grants and tokens (trigger and memory adapter).
 - **L3 — the `Host` allowlist accepted malformed values** (`localhost:8787, evil`, `localhost:evil`, `[::1]junk`) —

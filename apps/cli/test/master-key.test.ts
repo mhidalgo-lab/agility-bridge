@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { generateMasterKey } from '@agility-bridge/auth';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ConfigError } from '../src/config.ts';
-import { configDir, createMasterKeyFile, readMasterKeys } from '../src/master-key.ts';
+import { configDir, createMasterKeyFile, isInside, readMasterKeys } from '../src/master-key.ts';
 
 const posix = process.platform !== 'win32';
 let dir: string;
@@ -107,6 +107,20 @@ describe('readMasterKeys', () => {
       configError(() => readMasterKeys({ AB_MASTER_KEY_FILE: join(dir, 'nope.key') })).message,
     ).toContain('does not exist');
   });
+});
+
+describe('isInside', () => {
+  it.skipIf(!posix)(
+    'resolves links also for files that do not exist yet (macOS /var → /private/var, P2-17)',
+    () => {
+      mkdirSync(join(dir, 'real', 'data'), { recursive: true });
+      symlinkSync(join(dir, 'real'), join(dir, 'alias'));
+      const data = join(dir, 'alias', 'data');
+      expect(isInside(join(data, 'missing.token'), data)).toBe(true);
+      expect(isInside(join(data, 'new', 'missing.token'), join(dir, 'real', 'data'))).toBe(true);
+      expect(isInside(join(dir, 'real', 'missing.token'), data)).toBe(false);
+    },
+  );
 });
 
 describe('createMasterKeyFile', () => {
