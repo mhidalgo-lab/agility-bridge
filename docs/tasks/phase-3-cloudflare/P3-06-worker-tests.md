@@ -2,7 +2,7 @@
 id: P3-06
 title: Worker test suite (workerd)
 phase: 3
-status: review
+status: done
 priority: medium
 depends_on: [P3-02]
 adr: []

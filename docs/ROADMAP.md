@@ -190,7 +190,7 @@ Status lives in each task file.
 | P3-03 | [Workers limits presets and per-call budgets](tasks/phase-3-cloudflare/P3-03-workers-limits.md) | high | P3-01 | done |
 | P3-04 | [Rate limiting on Workers](tasks/phase-3-cloudflare/P3-04-workers-rate-limiting.md) | medium | P3-01 | done |
 | P3-05 | [Cloudflare setup script](tasks/phase-3-cloudflare/P3-05-cloudflare-setup.md) | high | P3-02 | done |
-| P3-06 | [Worker test suite (workerd)](tasks/phase-3-cloudflare/P3-06-worker-tests.md) | medium | P3-02 | review |
+| P3-06 | [Worker test suite (workerd)](tasks/phase-3-cloudflare/P3-06-worker-tests.md) | medium | P3-02 | done |
 | P3-07 | [Cloudflare docs (deploy, limits, costs, custom domain)](tasks/phase-3-cloudflare/P3-07-cloudflare-docs.md) | medium | P3-05 | todo |
 | P3-08 | [Scheduled jobs: audit purge and key rotation on D1](tasks/phase-3-cloudflare/P3-08-scheduled-jobs.md) | medium | P3-02 | todo |
 | P3-09 | [Self-hosted to Worker migration](tasks/phase-3-cloudflare/P3-09-migrate-to-worker.md) | low | P3-02 | todo |
