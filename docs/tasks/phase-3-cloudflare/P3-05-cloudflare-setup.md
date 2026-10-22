@@ -12,18 +12,36 @@ owner: ""
 
 # P3-05 — Cloudflare setup script
 
-> Later-phase task: **refine scope and acceptance criteria before starting** (tasks/README rule 7).
+> Refined 2026-10-22 (tasks/README rule 7).
 
 ## Goal
 One idempotent command creates or updates a deployment per environment.
 
 ## Scope
-- `pnpm cf:setup --name <worker>`: per-name configuration and D1 database, persisted `database_id`, dashboard variables preserved, permission and name checks.
-- Secrets generated and revealed before an optional `0600` backup is written; nothing generated before the output path is proven writable.
-- Committed config without ids plus an ignored local config.
+- `pnpm cf:setup --name <worker>` (`scripts/cf-setup.ts`), driving `wrangler` (logged in by the operator; no
+  Cloudflare token in the repository or on the command line):
+  - checks the name (`agility-bridge` or `agility-bridge-<suffix>`, lower case) and that wrangler is logged in;
+  - finds or creates the D1 database of the same name and keeps its id in an **ignored local config**
+    (`apps/worker/wrangler.<name>.local.jsonc`) built from the committed `wrangler.jsonc` (which holds no ids), with
+    `keep_vars: true` so variables set in the dashboard survive a deploy, and `AB_PLAN` (`--plan`, default `free`);
+  - deploys, then sets only the **missing** secrets (`AB_MASTER_KEY`, `AB_ADMIN_TOKEN`) through stdin, never as
+    arguments or `vars`;
+  - checks `/health` on the deployed URL.
+- Secrets: a secrets file (`--secrets-file`, created `0600`, refused if it exists) is opened **before** anything is
+  generated; values are written to it, and printed only with `--show-secrets`; with neither, the script refuses to
+  generate (the operator would lose the master key).
+- Separation (T34): every resource is named after `--name`; a local config whose worker or database name differs
+  from `--name` is refused; `agility-bridge` (production) never gets `AB_ENVIRONMENT=test`.
+- `--dry-run` prints the plan without changing anything.
 
 ## Acceptance criteria
-- [ ] Re-running is a no-op; staging and production stay separate; a name mismatch is refused.
+- [ ] Tests with a fake wrangler: a first run creates the database, writes the local config, deploys and sets both
+      secrets; a second run is a no-op apart from the deploy (no new database, no secret changed); a name mismatch and
+      an existing secrets file are refused before anything changes; nothing is generated when the secrets file cannot
+      be created.
+- [ ] A real run creates `agility-bridge-staging` (owner-approved name) and a second run changes nothing; `/health`
+      answers.
+- [ ] `docs/guide/cloudflare-deploy.md` (first version; P3-07 completes it).
 
 ## Security notes
 THREAT_MODEL T34.
@@ -35,4 +53,4 @@ THREAT_MODEL T34.
 - docs/guide/cloudflare-deploy.md
 
 ## Out of scope
-- Anything not listed under Scope.
+- Custom domains and the CI deploy workflow (P3-07, P3-11); rotating existing secrets (`keys rotate`, P3-08).
