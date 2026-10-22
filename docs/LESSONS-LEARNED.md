@@ -40,7 +40,7 @@ How to use it:
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163 |
@@ -851,6 +851,12 @@ The P2-12 hostile-upstream run found `get_assets` and `resolveAsset` accepting a
 upstream that ignored the `Number`/`ID` filter made `B-01003` (another project) come back as `B-01001`. Scope rechecks
 are not enough; a lookup by identity keeps only rows with that identity.
 *Applied in:* P2-12, `tools/query/get-assets.ts`, `identity/resolve.ts`.
+
+**L-178 — A tampered random value must differ from the original.**
+Four tests made a "wrong" device token by replacing its last character with a fixed letter; one run in 62 the token
+already ended with it, the "wrong" token was the right one, and Node 26 CI failed with 200 instead of 429 (2026-10-22).
+Derive the tampered value from the original so it always changes (`tamperLast`).
+*Applied in:* `packages/auth/test/helpers/tamper.ts`.
 
 **L-123 — Make property tests meaningful and deterministic.**
 Generators must produce interesting cases (not worlds where almost everything is rejected), seeds must be replayable,

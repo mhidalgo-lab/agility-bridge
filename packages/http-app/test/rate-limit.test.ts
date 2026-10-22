@@ -3,6 +3,7 @@
 // proxy hops, fail-open.
 import { silentLogger } from '@agility-bridge/core';
 import { describe, expect, it } from 'vitest';
+import { tamperLast } from '../../auth/test/helpers/tamper.ts';
 import {
   addressKey,
   clientAddress,
@@ -64,7 +65,7 @@ describe('limits over HTTP', () => {
     const shared = from('10.0.0.1'); // e.g. one office NAT
     for (let i = 0; i < 3; i++) expect((await post(w, 'team-a', null, LIST, shared)).status).toBe(401);
     // Failures exhausted: further failed attempts answer 429 …
-    expect((await post(w, 'team-a', `${w.tokens.alice.slice(0, -1)}x`, LIST, shared)).status).toBe(429);
+    expect((await post(w, 'team-a', tamperLast(w.tokens.alice), LIST, shared)).status).toBe(429);
     expect((await post(w, 'team-b', w.tokens.alice, LIST, shared)).status).toBe(429);
     // … but a valid token from the same address still works.
     expect((await post(w, 'team-a', w.tokens.alice, LIST, shared)).status).toBe(200);

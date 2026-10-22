@@ -2,6 +2,7 @@
 // The HTTP app end to end (P2-06): both protocol eras, batch refusal, body caps, hostile Host/Origin, wrong workspace,
 // uniform 401, headers on every response, method classification.
 import { describe, expect, it } from 'vitest';
+import { tamperLast } from '../../auth/test/helpers/tamper.ts';
 import { classifyMcpMessage } from '../src/index.ts';
 import { ALICE_AGILITY, BOB_AGILITY, connect, type Era, ORIGIN, post, world } from './helpers/world.ts';
 
@@ -64,7 +65,7 @@ describe('authentication', () => {
     const cases: [string, string | null][] = [
       ['team-a', null],
       ['team-a', 'ab_live_not-a-token'],
-      ['team-a', `${w.tokens.alice.slice(0, -1)}A`],
+      ['team-a', tamperLast(w.tokens.alice)],
       ['team-a', w.tokens.bob],
       ['team-b', w.tokens.alice],
       ['nope', w.tokens.alice],
