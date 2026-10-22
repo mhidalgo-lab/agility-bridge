@@ -2,7 +2,7 @@
 id: P3-10
 title: CPU benchmark and cost check
 phase: 3
-status: todo
+status: review
 priority: low
 depends_on: [P3-03]
 adr: ["0010"]
@@ -30,10 +30,10 @@ Know the CPU and request cost of each tool on Workers and catch regressions.
   `docs/guide/cloudflare-limits.md`.
 
 ## Acceptance criteria
-- [ ] Local and staging numbers published in `docs/guide/cloudflare-limits.md`; the cold-start finding (over the Free
-      plan's 10 ms) recorded with a follow-up task.
-- [ ] The regression check flags a slowed path in a test (an injected slowdown) and passes on the baseline.
-- [ ] The CI job runs (not required) and keeps the results as an artifact.
+- [x] Local and staging numbers published in `docs/guide/cloudflare-limits.md`; the cold-start finding (over the Free
+      plan's 10 ms) recorded with a follow-up task (P3-14).
+- [x] The regression check flags a slowed path in a test (an injected slowdown) and passes on the baseline.
+- [x] The CI job runs (not required) and keeps the results as an artifact.
 
 ## Security notes
 THREAT_MODEL T5, A10.

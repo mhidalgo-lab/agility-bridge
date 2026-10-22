@@ -12,7 +12,7 @@ import {
   webCryptoRandom,
 } from '@agility-bridge/core';
 import { createMemoryStorage, type Storage } from '@agility-bridge/storage';
-import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import type { Client } from '@modelcontextprotocol/client';
 import snapshotJson from '../../../core/test/fixtures/agility/meta-snapshot.json' with { type: 'json' };
 import { FAKE_BASE_URL, FakeAgility } from '../../../core/test/harness/index.ts';
 import {
@@ -247,6 +247,8 @@ export type Era = 'legacy' | { pin: '2026-07-28' };
 
 /** An SDK client connected in-process to the app (both protocol eras, ADR-0005). */
 export async function connect(w: World, slug: string, token: string, mode: Era = 'legacy'): Promise<Client> {
+  // Loaded here, so scripts that only need the world (scripts/worker-bench.ts) do not load the MCP client.
+  const { Client, StreamableHTTPClientTransport } = await import('@modelcontextprotocol/client');
   const transport = new StreamableHTTPClientTransport(new URL(`${ORIGIN}/w/${slug}/mcp`), {
     fetch: (url, init) => Promise.resolve(w.app.fetch(new Request(url, init))),
     requestInit: { headers: { authorization: `Bearer ${token}` } },

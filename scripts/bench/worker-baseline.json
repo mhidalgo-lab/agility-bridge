@@ -1,0 +1,22 @@
+{
+  "calibrationMs": 3.828000000000003,
+  "ms": {
+    "cold: boot": 90.37399999999991,
+    "warm: tools/list": 2.1510000000000673,
+    "warm: whoami": 2.338999999999942,
+    "warm: search_work_items": 3.855000000000018,
+    "warm: get_work_item": 3.2369999999998527
+  },
+  "relative": {
+    "cold: boot": 23.609,
+    "warm: tools/list": 0.562,
+    "warm: whoami": 0.611,
+    "warm: search_work_items": 1.007,
+    "warm: get_work_item": 0.846
+  },
+  "requests": {
+    "whoami": 1,
+    "search_work_items": 1,
+    "get_work_item": 2
+  }
+}
