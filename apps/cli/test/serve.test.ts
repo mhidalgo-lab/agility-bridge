@@ -39,6 +39,8 @@ const env = (over: Record<string, string> = {}) => ({
   AB_DATA_DIR: join(dir, 'data'),
   AB_MASTER_KEY_FILE: join(dir, 'master.key'),
   AB_PORT: '0',
+  // The synthetic Agility answers on http://127.0.0.1 (P2-19).
+  AB_ALLOW_HTTP_INSTANCES: 'on',
   ...over,
 });
 
@@ -204,6 +206,40 @@ describe('request targets and HTTPS (P2-17 review F1)', () => {
     });
     expect(res.status).toBe(401);
     expect(lines.join('\n')).toContain('"refusal":"passthrough_insecure"');
+  });
+});
+
+describe('instance URL policy (P2-19, THREAT_MODEL A9)', () => {
+  async function addInstance(over: Record<string, string>) {
+    const token = generateAdminToken();
+    writeFileSync(join(dir, 'admin.token'), `${token}\n`, { mode: 0o600 });
+    running = await startServe(env({ AB_ADMIN_TOKEN_FILE: join(dir, 'admin.token'), ...over }), {
+      sink: () => {},
+    });
+    const res = await fetch(`${running.url}/api/admin/v1/instances`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ label: 'Main', baseUrl: agility.url }),
+    });
+    return { status: res.status, body: JSON.stringify(await res.json()) };
+  }
+
+  it('refuses a plain-HTTP loopback instance unless AB_ALLOW_HTTP_INSTANCES=on', async () => {
+    const refused = await addInstance({ AB_ALLOW_HTTP_INSTANCES: 'off' });
+    expect(refused.status).toBe(422);
+    expect(refused.body).toContain('https');
+  });
+
+  it('with AB_INSTANCE_PRIVATE_ADDRESSES=refuse, refuses a loopback instance even over the HTTP switch', async () => {
+    const refused = await addInstance({ AB_INSTANCE_PRIVATE_ADDRESSES: 'refuse' });
+    expect(refused.status).toBe(422);
+    expect(refused.body).toContain('loopback address');
+  });
+
+  it('refuses an unknown policy value before listening', async () => {
+    await expect(
+      startServe(env({ AB_INSTANCE_PRIVATE_ADDRESSES: 'maybe' }), { sink: () => {} }),
+    ).rejects.toThrow(/allow or refuse/);
   });
 });
 

@@ -52,7 +52,8 @@ function worker(
       d1Databases: ['DB'],
       ...(ratelimits === undefined ? {} : { ratelimits }),
       ...(persistTo === undefined ? {} : { resourcePersistencePath: persistTo }),
-      bindings: { AB_ENVIRONMENT: 'test', ...bindings },
+      // The synthetic Agility answers on http://127.0.0.1 (P2-19).
+      bindings: { AB_ENVIRONMENT: 'test', AB_ALLOW_HTTP_INSTANCES: 'on', ...bindings },
     }),
   );
   running.push(mf);

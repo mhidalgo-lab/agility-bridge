@@ -2,7 +2,7 @@
 id: P2-19
 title: Instance URL policy for servers (no plain HTTP, optional private-address refusal)
 phase: 2
-status: todo
+status: review
 priority: medium
 depends_on: [P2-13]
 adr: ["0014"]
@@ -30,9 +30,9 @@ only (loopback for tests)".
 - The origin probe's errors stay uniform for "nothing listens" and "not an Agility instance" when the switch refuses.
 
 ## Acceptance criteria
-- [ ] Tests: `http://127.0.0.1` refused by `serve` without the switch, accepted with it; a private address refused
+- [x] Tests: `http://127.0.0.1` refused by `serve` without the switch, accepted with it; a private address refused
       with `refuse`, at create and at connect; the stdio mode unchanged.
-- [ ] THREAT_MODEL A9 and the configuration guide describe both settings; the walkthrough still passes.
+- [x] THREAT_MODEL A9 and the configuration guide describe both settings; the walkthrough still passes.
 
 ## Security notes
 Private addresses are an accepted residual risk by default (on-premises instances need them); only owners and admins

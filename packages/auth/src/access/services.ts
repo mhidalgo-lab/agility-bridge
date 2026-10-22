@@ -45,6 +45,15 @@ export interface AccessServicesOptions {
   readonly validator?: CredentialValidator;
   /** Id generator (tests); default `<prefix>_<random>`. */
   readonly newId?: (prefix: string) => string;
+  /**
+   * Which instance origins are accepted (P2-19, THREAT_MODEL A9). `httpLoopback` (default true) allows plain-HTTP
+   * loopback URLs; servers pass `AB_ALLOW_HTTP_INSTANCES`. `checkHost` may refuse a host (e.g. one that resolves to a
+   * private address) by throwing; it runs before the origin is probed.
+   */
+  readonly instanceUrls?: {
+    readonly httpLoopback?: boolean;
+    readonly checkHost?: (hostname: string) => Promise<void>;
+  };
 }
 
 /** A result with notes for the operator: requested access that will not be effective. */
@@ -262,6 +271,12 @@ export function accessServices(options: AccessServicesOptions) {
     disable: (id: string) => storage.users.update(id, { disabledAt: now() }),
   };
 
+  /** Canonical, and allowed by this deployment's policy (P2-19). */
+  const acceptedInstanceUrl = async (input: string): Promise<string> => {
+    const url = canonicalInstanceUrl(input, { httpLoopback: options.instanceUrls?.httpLoopback ?? true });
+    await options.instanceUrls?.checkHost?.(new URL(url).hostname);
+    return url;
+  };
   const instances = {
     async create(input: {
       label: string;
@@ -271,7 +286,7 @@ export function accessServices(options: AccessServicesOptions) {
     }): Promise<Instance> {
       let baseUrl: string;
       try {
-        baseUrl = canonicalInstanceUrl(input.baseUrl);
+        baseUrl = await acceptedInstanceUrl(input.baseUrl);
       } catch (error) {
         throw new InvalidInputError(`baseUrl: ${(error as Error).message}`);
       }
@@ -314,7 +329,7 @@ export function accessServices(options: AccessServicesOptions) {
       const current = await mustGet(storage.instances.get(id), 'instance');
       let baseUrl: string;
       try {
-        baseUrl = canonicalInstanceUrl(target.baseUrl);
+        baseUrl = await acceptedInstanceUrl(target.baseUrl);
       } catch (error) {
         throw new InvalidInputError(`baseUrl: ${(error as Error).message}`);
       }
