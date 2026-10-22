@@ -20,7 +20,7 @@ directly.
 | Deletion | blocked | blocked |
 | Force push (`non_fast_forward`) | blocked | blocked |
 | Pull request | required; squash only; **0 approvals** (single maintainer, D-24); stale reviews dismissed; review threads must be resolved | same |
-| Required status checks | see below | same |
+| Required status checks | see below; **branch must be up to date with `main` before merging** (since 2026-10-22) | see below; up-to-date not required |
 
 Raise the required approvals to 1 and add CODEOWNERS when a second maintainer joins (D-24, before 1.0 at the latest).
 
