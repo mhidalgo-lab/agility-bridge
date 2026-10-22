@@ -67,6 +67,31 @@ keeps two runs off the same batch. Progress shows in the Worker's log (`key rota
 count). Keep `AB_MASTER_KEY_PREVIOUS` set until the rotation is done; checking the remaining count and retiring the old
 version through the admin API arrive with P3-13 ([secrets](secrets.md)).
 
+## Move a self-hosted deployment to the Worker
+
+Moves everything a self-hosted `agility-bridge serve` holds — users, instances, credentials (still encrypted),
+workspaces, grants, device tokens, settings, audit — so nobody re-enters an Agility token and existing device tokens
+keep working at the new address. One-way, into an **empty** deployment (L-078):
+
+1. Make a backup on the server: `agility-bridge backup ./agility-bridge-backup.db` (the live database is never read).
+2. Create the Worker with `pnpm cf:setup --name <worker> …` and give it the **server's master key**: with wrangler,
+   put the content of the server's key file into `AB_MASTER_KEY` (stdin), replacing the generated one. To move to a
+   new key at the same time, set the new key as `AB_MASTER_KEY` and the server's as `AB_MASTER_KEY_PREVIOUS`; the
+   cron then re-encrypts every credential ([housekeeping](#housekeeping-and-key-rotation)).
+3. Open `https://<address>/health` once (the Worker migrates its empty database and records the key).
+4. Copy the backup in:
+
+   ```sh
+   pnpm cf:migrate --name <worker> --from ./agility-bridge-backup.db
+   ```
+
+   It refuses, before writing anything, a target that has any row, a different schema version (upgrade the server and
+   the Worker to the same release first), or a Worker without the server's master key. It writes the rows as SQL
+   (`0600`, deleted afterwards; it holds ciphertext and token hashes), imports it with `wrangler d1 execute --remote`,
+   and checks the row counts. Rate-limit counters and other transient state are not copied.
+5. Point the devices at `https://<address>/w/<slug>/mcp` (their tokens are unchanged), then stop the old server and
+   delete the backup.
+
 ## First setup of a workspace
 
 With the admin token from the secrets file, create the instance, credential, workspace, grant and device token

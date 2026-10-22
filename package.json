@@ -27,7 +27,8 @@
     "docs:cli": "node --conditions=source scripts/cli-reference.ts",
     "version-packages": "changeset version && node scripts/release.ts sync-version",
     "check:package": "node scripts/check-package.ts",
-    "cf:setup": "node --conditions=source scripts/cf-setup.ts"
+    "cf:setup": "node --conditions=source scripts/cf-setup.ts",
+    "cf:migrate": "node --conditions=source scripts/cf-migrate.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

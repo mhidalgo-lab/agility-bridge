@@ -2,7 +2,7 @@
 id: P3-09
 title: Self-hosted to Worker migration
 phase: 3
-status: todo
+status: review
 priority: low
 depends_on: [P3-02]
 adr: ["0006"]
@@ -36,10 +36,10 @@ Move a self-hosted deployment to Cloudflare without re-entering every token.
 - Sessions and OAuth devices do not exist yet; when they do (Phase 4/5), they stay out of the migration.
 
 ## Acceptance criteria
-- [ ] Round-trip test: a SQLite deployment with every kind of row exported and imported into local D1 equals the
+- [x] Round-trip test: a SQLite deployment with every kind of row exported and imported into local D1 equals the
       source row for row; the Worker then serves a migrated device token with the same master key.
-- [ ] Refusals tested before any write: a non-empty target, another schema version, a different master key.
-- [ ] The script's wrangler calls tested with a fake wrangler; `docs/guide/cloudflare-deploy.md` (migration section)
+- [x] Refusals tested before any write: a non-empty target, another schema version, a different master key.
+- [x] The script's wrangler calls tested with a fake wrangler; `docs/guide/cloudflare-deploy.md` (migration section)
       lists the commands.
 
 ## Security notes
