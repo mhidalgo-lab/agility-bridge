@@ -144,7 +144,9 @@ filesystem and the database on the `/data` volume. It listens on port `8787` of 
 the image) and has a built-in healthcheck (`GET /health`). CI builds it, runs a smoke test against a synthetic Agility
 and scans it on every change (`scripts/docker-smoke.ts`).
 
-Until a published image exists (P2-18), build it from a checkout:
+Releases from v0.2 publish it as `ghcr.io/mhidalgo-lab/agility-bridge:<version>` (also `:<major.minor>` and
+`:latest`), with provenance and SBOM attestations; [verify it](verify-release.md#the-docker-image) and pin its digest.
+To build it from a checkout instead:
 
 ```sh
 docker build -f docker/Dockerfile -t agility-bridge:local .

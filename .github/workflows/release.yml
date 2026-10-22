@@ -15,9 +15,14 @@
 #
 # Safety rails (THREAT_MODEL T18): never runs on pull requests; build/publish run only on `main` or `release/*`, only
 # when the repository variable AB_RELEASE_ENABLED is 'true', and publish only after a reviewer approves the protected `release`
-# environment. The version goes live only after a second approval with 2FA on npmjs.com. Only the `publish` job can
-# mint an OIDC token, and it never checks out the repository, installs dependencies or runs project code
-# (scripts/test/release.test.ts asserts this). `plan` and `publish` refuse a `v<version>` tag that points at another
+# environment. The version goes live only after a second approval with 2FA on npmjs.com. Only the `publish` and `image`
+# jobs can mint an OIDC token, and they never check out the repository, install dependencies or run project code
+# (scripts/test/release.test.ts asserts this).
+#
+# Image (P2-18, D-25): `image-build` builds the linux/amd64 + linux/arm64 image as an OCI archive and smoke-tests and
+# scans the archived amd64 image; `image` (same `release` approval) pushes it to ghcr.io/mhidalgo-lab/agility-bridge
+# once the version is live on npm, tags X.Y.Z, X.Y and latest (never backwards, never latest from a backport) and
+# attests provenance and SBOM to the registry. `plan` and `publish` refuse a `v<version>` tag that points at another
 # commit.
 name: Release
 
@@ -351,3 +356,211 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "v${VERSION}" \
             --notes-file dist-release/release-meta/release-notes.md
+
+  # The release image (P2-18, D-25): built from the release commit as one multi-architecture OCI archive, then the
+  # linux/amd64 image from that archive is smoke-tested and scanned like CI does. No registry credentials and no
+  # id-token here; pushing is the `image` job's only task.
+  image-build:
+    name: Build the release image
+    needs: plan
+    if: >-
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')) &&
+      vars.AB_RELEASE_ENABLED == 'true' &&
+      (needs.plan.outputs.mode == 'publish' || needs.plan.outputs.mode == 'release')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      image-sha256: ${{ steps.archive.outputs.image-sha256 }}
+      tags: ${{ steps.tags.outputs.tags }}
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      # renovate: datasource=github-releases depName=aquasecurity/trivy
+      TRIVY_VERSION: 0.75.0
+      # sha256 of the Linux-64bit tarball, pinned here so a tampered release cannot also replace its checksums file.
+      TRIVY_SHA256: c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f
+    steps:
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Re-check the planned version
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "::error::bad version"; exit 1; }
+          test "$(node -p 'require("./apps/cli/package.json").version')" = "$VERSION"
+      - run: pnpm install --frozen-lockfile
+      # X.Y and latest never move backwards (L-128): computed from the versions on npm, tested in release.test.ts.
+      - id: tags
+        name: Image tags
+        shell: bash
+        run: node scripts/release.ts image-tags "$VERSION" | tee -a "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - id: archive
+        name: Build linux/amd64 and linux/arm64 as one OCI archive
+        run: |
+          mkdir -p dist-image
+          docker buildx build --platform linux/amd64,linux/arm64 -f docker/Dockerfile \
+            --build-arg "VERSION=${VERSION}" --build-arg "REVISION=${GITHUB_SHA}" \
+            --output "type=oci,dest=dist-image/agility-bridge-${VERSION}.oci.tar" .
+          cd dist-image && sha256sum -- * > IMAGE_SHA256SUMS && cat IMAGE_SHA256SUMS
+          echo "image-sha256=$(sha256sum IMAGE_SHA256SUMS | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      # The image that is pushed, not a rebuild: linux/amd64 out of the archive into the local daemon.
+      - name: Smoke test and scan the archived linux/amd64 image
+        run: |
+          skopeo copy --override-os linux --override-arch amd64 \
+            "oci-archive:dist-image/agility-bridge-${VERSION}.oci.tar" docker-daemon:agility-bridge:release
+          node --conditions=source scripts/docker-smoke.ts agility-bridge:release
+          file="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSLO "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$file"
+          echo "${TRIVY_SHA256}  $file" | sha256sum -c --strict -
+          tar xzf "$file" trivy
+          ./trivy image --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 agility-bridge:release
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-${{ needs.plan.outputs.version }}
+          path: dist-image/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Pushes the verified archive to GHCR and attests it (P2-18, D-25). Like `publish`: no checkout, no install, no
+  # project code. It waits for the same `release` environment as `publish` (both wait together, so one approval covers
+  # both) and pushes only once the version is live on npm, so the image never runs ahead of the package: in the run
+  # that stages the version it stops with a notice, and the run after the npm approval (mode `release`) pushes it.
+  # Reruns are idempotent: an existing X.Y.Z tag is kept (never pushed over) and only re-tagged and attested.
+  image:
+    name: Publish the image to GHCR
+    needs: [plan, build, image-build]
+    if: >-
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')) &&
+      vars.AB_RELEASE_ENABLED == 'true' &&
+      (needs.plan.outputs.mode == 'publish' || needs.plan.outputs.mode == 'release')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: release
+      url: https://github.com/mhidalgo-lab/agility-bridge/pkgs/container/agility-bridge
+    permissions:
+      packages: write # push to ghcr.io/mhidalgo-lab/agility-bridge and its attestations
+      id-token: write # Sigstore attestations
+      attestations: write
+      artifact-metadata: write
+    env:
+      IMAGE: ghcr.io/mhidalgo-lab/agility-bridge
+      VERSION: ${{ needs.plan.outputs.version }}
+      TAGS: ${{ needs.image-build.outputs.tags }}
+      IMAGE_ARTIFACT_ID: ${{ needs.image-build.outputs.artifact-id }}
+      IMAGE_SHA256: ${{ needs.image-build.outputs.image-sha256 }}
+      ARTIFACT_ID: ${{ needs.build.outputs.artifact-id }}
+      SUMS_SHA256: ${{ needs.build.outputs.sums-sha256 }}
+    steps:
+      # Egress blocked like `publish`. Classes: GitHub API (api); GHCR and its blob storage (ghcr.io,
+      # pkg-containers.githubusercontent.com); OIDC token (token.actions); npm (registry, `npm view`); Sigstore (fulcio,
+      # rekor). A blocked call fails the job and shows in the harden-runner log (docs/dev/releasing.md).
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+            token.actions.githubusercontent.com:443
+            registry.npmjs.org:443
+            fulcio.sigstore.dev:443
+            rekor.sigstore.dev:443
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Check the inputs
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "::error::bad version"; exit 1; }
+          [[ "$ARTIFACT_ID" =~ ^[0-9]+$ && "$IMAGE_ARTIFACT_ID" =~ ^[0-9]+$ ]] || { echo "::error::bad artifact id"; exit 1; }
+          [[ "$SUMS_SHA256" =~ ^[0-9a-f]{64}$ && "$IMAGE_SHA256" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::bad digest"; exit 1; }
+          IFS=, read -ra refs <<<"$TAGS"
+          [[ "${refs[0]:-}" == "${IMAGE}:${VERSION}" ]] || { echo "::error::the first tag must be ${IMAGE}:${VERSION}"; exit 1; }
+          for r in "${refs[@]}"; do
+            [[ "$r" =~ ^ghcr\.io/mhidalgo-lab/agility-bridge:([0-9]+\.[0-9]+(\.[0-9]+(-[0-9A-Za-z.-]+)?)?|latest)$ ]] || {
+              echo "::error::unexpected image reference ${r}"; exit 1
+            }
+            # A backport never moves latest (L-128).
+            [[ "$r" != "${IMAGE}:latest" || "$GITHUB_REF" == refs/heads/main ]] || { echo "::error::latest only from main"; exit 1; }
+          done
+      - id: npm
+        name: Live on npm? (the image never runs ahead of the package)
+        run: |
+          if npm view "agility-bridge@${VERSION}" version >"$RUNNER_TEMP/npm-out.txt" 2>"$RUNNER_TEMP/npm-err.txt" \
+            && [[ -s "$RUNNER_TEMP/npm-out.txt" ]]; then
+            echo "live=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          grep -q E404 "$RUNNER_TEMP/npm-err.txt" 2>/dev/null || [[ ! -s "$RUNNER_TEMP/npm-err.txt" ]] || {
+            cat "$RUNNER_TEMP/npm-err.txt" >&2; exit 1
+          }
+          echo "::notice::agility-bridge@${VERSION} is not live on npm yet; the run after its approval publishes the image"
+          echo "live=false" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.npm.outputs.live == 'true'
+        with:
+          artifact-ids: ${{ needs.image-build.outputs.artifact-id }},${{ needs.build.outputs.artifact-id }}
+          path: dist-release
+          merge-multiple: true
+      - name: Verify the checksums
+        if: steps.npm.outputs.live == 'true'
+        working-directory: dist-release
+        run: |
+          echo "${IMAGE_SHA256}  IMAGE_SHA256SUMS" | sha256sum -c --strict -
+          sha256sum -c --strict IMAGE_SHA256SUMS
+          test -f "agility-bridge-${VERSION}.oci.tar"
+          cd release
+          echo "${SUMS_SHA256}  SHA256SUMS" | sha256sum -c --strict -
+          sha256sum -c --strict SHA256SUMS
+          test -f "agility-bridge-${VERSION}.cdx.json"
+      - id: push
+        name: Push to GHCR (an existing version tag is never overwritten)
+        if: steps.npm.outputs.live == 'true'
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          raw="$RUNNER_TEMP/manifest.json"
+          if skopeo inspect --raw "docker://${IMAGE}:${VERSION}" >"$raw" 2>"$RUNNER_TEMP/skopeo-err.txt"; then
+            digest="sha256:$(sha256sum "$raw" | cut -d' ' -f1)"
+            echo "::notice::${IMAGE}:${VERSION} already exists (${digest}); not pushed again"
+          else
+            grep -Eqi 'manifest unknown|not found|name unknown' "$RUNNER_TEMP/skopeo-err.txt" || {
+              cat "$RUNNER_TEMP/skopeo-err.txt" >&2; exit 1
+            }
+            skopeo copy --all --digestfile "$RUNNER_TEMP/digest" \
+              "oci-archive:dist-release/agility-bridge-${VERSION}.oci.tar" "docker://${IMAGE}:${VERSION}"
+            digest="$(cat "$RUNNER_TEMP/digest")"
+          fi
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::unexpected digest"; exit 1; }
+          IFS=, read -ra refs <<<"$TAGS"
+          for r in "${refs[@]:1}"; do skopeo copy --all "docker://${IMAGE}@${digest}" "docker://${r}"; done
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "Pushed \`${IMAGE}@${digest}\` as ${TAGS}." >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+      - name: Attest build provenance (image)
+        if: steps.npm.outputs.live == 'true'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ghcr.io/mhidalgo-lab/agility-bridge
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+      # The application SBOM (the npm package's production dependencies, which is what /app holds).
+      - name: Attest SBOM (image)
+        if: steps.npm.outputs.live == 'true'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ghcr.io/mhidalgo-lab/agility-bridge
+          subject-digest: ${{ steps.push.outputs.digest }}
+          sbom-path: dist-release/release/agility-bridge-${{ needs.plan.outputs.version }}.cdx.json
+          push-to-registry: true

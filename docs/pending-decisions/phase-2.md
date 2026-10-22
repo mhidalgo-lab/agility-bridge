@@ -4,9 +4,11 @@
 
 ## Owner steps
 
-1. **Required checks**: the CI job **"Docker image (build, smoke test, scan)"** (P2-11) is new. Add it to the
-   ruleset's required checks if it should block merges (`docs/security/repo-settings.md`); until then it runs on every
-   PR but does not block.
+1. ~~**Required checks**: add **"Docker image (build, smoke test, scan)"** (P2-11) to the rulesets.~~ Done
+   2026-10-22 (both rulesets, `docs/security/repo-settings.md`).
+4. **First image release** (P2-18): after the first run that pushes the image, make the GHCR package
+   `agility-bridge` public and check the `image` job's harden-runner log ([releasing](../dev/releasing.md)); then
+   `docker/compose.yaml` can switch to the published image.
 2. **Client runs over HTTP** (P2-17): connect VS Code, JetBrains, Copilot CLI, Claude Code and Cursor to
    `agility-bridge serve` (`https://<host>/w/<slug>/mcp`, a device token in the `Authorization` header, as in
    [devices](../guide/multi-device.md)) and record the versions in the
@@ -28,6 +30,7 @@
 - **Recommendation:** (a): one approval publishes npm and the image, GitHub attestations verify with
   `gh attestation verify` like the npm tarball, and no extra signing tool enters the pipeline. P2-18 implements it once
   you agree.
+- **Owner (2026-10-22):** Decided: (a), the release job. Implemented in P2-18.
 
 ### D-26 — Go for Phase 3 *(P2-17)*
 - **Context:** the [Phase 2 review](../reviews/phase-2-review.md) found one high, four medium and five low issues; all

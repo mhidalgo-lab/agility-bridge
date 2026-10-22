@@ -41,6 +41,10 @@ From `.github/workflows/security.yml` (P0-04):
 - `Dependency audit`
 - `Dependency review`
 
+From `.github/workflows/ci.yml` (P2-11, required since 2026-10-22, D-25):
+
+- `Docker image (build, smoke test, scan)`
+
 To be added when its job exists: `Authorization suite` (P2-12). The macOS and Windows jobs (`SQLite and CLI (…)`) run on every PR but are not
 required, as in relic-bridge.
 

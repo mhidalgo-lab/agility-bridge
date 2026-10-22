@@ -2,7 +2,7 @@
 id: P2-17
 title: Phase 2 review and live verification
 phase: 2
-status: review
+status: done
 priority: high
 depends_on: [P2-02, P2-07, P2-10, P2-12, P2-13, P2-14, P2-15, P2-16]
 adr: []

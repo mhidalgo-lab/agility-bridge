@@ -177,8 +177,8 @@ Status lives in each task file.
 | P2-14 | [Pass-through workspaces (optional, off by default)](tasks/phase-2-access-http/P2-14-passthrough-mode.md) | low | P2-06, P2-08 | done |
 | P2-15 | [Security inventories (cryptography, logging, data protection)](tasks/phase-2-access-http/P2-15-security-inventories.md) | medium | P2-03, P2-08 | done |
 | P2-16 | [Self-hosting docs and executable-docs check](tasks/phase-2-access-http/P2-16-self-hosting-docs.md) | medium | P2-11 | done |
-| P2-17 | [Phase 2 review and live verification](tasks/phase-2-access-http/P2-17-phase-2-review.md) | high | P2-02, P2-07, P2-10, P2-12, P2-13, P2-14, P2-15, P2-16 | review |
-| P2-18 | [Publish the Docker image (signed, provenance, latest never backwards)](tasks/phase-2-access-http/P2-18-image-publishing.md) | medium | P2-11 | blocked |
+| P2-17 | [Phase 2 review and live verification](tasks/phase-2-access-http/P2-17-phase-2-review.md) | high | P2-02, P2-07, P2-10, P2-12, P2-13, P2-14, P2-15, P2-16 | done |
+| P2-18 | [Publish the Docker image (signed, provenance, latest never backwards)](tasks/phase-2-access-http/P2-18-image-publishing.md) | medium | P2-11 | review |
 | P2-19 | [Instance URL policy for servers (no plain HTTP, optional private-address refusal)](tasks/phase-2-access-http/P2-19-instance-url-policy.md) | medium | P2-13 | todo |
 
 ### Phase 3
