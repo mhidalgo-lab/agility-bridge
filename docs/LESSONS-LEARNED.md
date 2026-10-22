@@ -742,8 +742,10 @@ lazily on its first request (the MCP SDK's protocol schemas) stays in that reque
 **L-097 — Design for the Free plan's limits, not its tolerance.**
 About 10 ms CPU per request, 50 external subrequests and 6 simultaneous outbound connections on the Free plan *(re-verify)*.
 Small responses fit, and short CPU overruns may be tolerated, but never rely on that: enforce response caps (start with
-512 KiB on Free and 8 MiB on Paid *(re-measure)*) and per-call budgets.
-*Applied in:* ADR-0010, P0-09, P3-03.
+512 KiB on Free and 8 MiB on Paid *(re-measure)*) and per-call budgets. The one exception is the first request of a
+new isolate, which a library's lazy setup keeps over budget: cut what you control, measure it, and record the rest as
+an owner-accepted risk with the Paid plan as the way out (D-27).
+*Applied in:* ADR-0010, P0-09, P3-03, P3-14.
 
 **L-098 — The Cache API is local and sometimes a no-op.**
 It is per data centre, may not work on `workers.dev`, and may be unavailable behind some access products *(verify)*. Validate by
