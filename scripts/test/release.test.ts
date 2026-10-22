@@ -12,6 +12,8 @@ import {
   decideMode,
   decidePlan,
   extractNotes,
+  IMAGE_REPOSITORY,
+  imageTags,
   pendingChangesets,
   type ReleaseState,
   readVersionConst,
@@ -144,6 +146,31 @@ describe('version constant', () => {
   });
 });
 
+describe('imageTags (P2-18, L-128: never backwards)', () => {
+  it('tags the newest release X.Y.Z, X.Y and latest', () => {
+    expect(imageTags('0.2.0', ['0.1.0', '0.1.1'], false)).toEqual(['0.2.0', '0.2', 'latest']);
+    expect(imageTags('0.1.0', [], false)).toEqual(['0.1.0', '0.1', 'latest']);
+    // the version itself already on npm (the run after the npm approval)
+    expect(imageTags('0.2.0', ['0.1.0', '0.2.0'], false)).toEqual(['0.2.0', '0.2', 'latest']);
+  });
+
+  it('a patch of an older line moves its X.Y but never latest', () => {
+    expect(imageTags('0.1.2', ['0.1.1', '0.2.0'], false)).toEqual(['0.1.2', '0.1']);
+    expect(imageTags('0.1.2', ['0.1.1', '0.1.3', '0.2.0'], false)).toEqual(['0.1.2']);
+    expect(imageTags('1.9.0', ['1.10.0'], false)).toEqual(['1.9.0', '1.9']);
+  });
+
+  it('a backport never takes latest; a prerelease gets only its own tag', () => {
+    expect(imageTags('1.2.4', ['1.2.3', '1.1.0'], true)).toEqual(['1.2.4', '1.2']);
+    expect(imageTags('2.0.0-rc.1', ['1.2.3'], false)).toEqual(['2.0.0-rc.1']);
+    expect(imageTags('1.3.0', ['1.2.3', '2.0.0-rc.1'], false)).toEqual(['1.3.0', '1.3', 'latest']);
+  });
+
+  it('refuses non-SemVer input', () => {
+    expect(() => imageTags('latest', [], false)).toThrow(/SemVer/);
+  });
+});
+
 describe('decidePlan (idempotent reruns, tag safety)', () => {
   const head = 'a'.repeat(40);
   const other = 'b'.repeat(40);
@@ -226,6 +253,8 @@ describe('resolveTagCommit', () => {
 
 interface Step {
   id?: string;
+  name?: string;
+  with?: Record<string, unknown>;
   env?: Record<string, string>;
   uses?: string;
   run?: string;
@@ -259,8 +288,8 @@ describe('.github/workflows/release.yml (THREAT_MODEL T18, P1-16)', () => {
     expect(workflow.permissions).toEqual({});
   });
 
-  it('only the publish job can mint an OIDC token', () => {
-    expect(oidcJobs.map(([name]) => name)).toEqual(['publish']);
+  it('only the publish and image jobs can mint an OIDC token', () => {
+    expect(oidcJobs.map(([name]) => name)).toEqual(['publish', 'image']);
   });
 
   it('the OIDC job checks nothing out and runs no project or dependency code', () => {
@@ -306,7 +335,7 @@ describe('.github/workflows/release.yml (THREAT_MODEL T18, P1-16)', () => {
       'vars.AB_RELEASE_ENABLED': enabled,
       'needs.plan.outputs.mode': 'publish',
     });
-    const guarded = (['plan', 'build', 'publish'] as const).map((name) => {
+    const guarded = (['plan', 'build', 'publish', 'image-build', 'image'] as const).map((name) => {
       const guard = workflow.jobs[name]?.if;
       expect(guard, name).toBeTypeOf('string');
       return [name, guard as string] as const;
@@ -332,8 +361,8 @@ describe('.github/workflows/release.yml (THREAT_MODEL T18, P1-16)', () => {
       for (const [name, guard] of guarded) expect(evalGuard(guard, ctx(ref)), name).toBe(false);
     });
 
-    it('build and publish still need the opt-in variable on a release branch', () => {
-      for (const name of ['build', 'publish'] as const) {
+    it('build, publish and the image jobs still need the opt-in variable on a release branch', () => {
+      for (const name of ['build', 'publish', 'image-build', 'image'] as const) {
         expect(evalGuard(workflow.jobs[name]?.if as string, ctx('refs/heads/release/1.2', 'false'))).toBe(
           false,
         );
@@ -390,7 +419,7 @@ describe('.github/workflows/release.yml (THREAT_MODEL T18, P1-16)', () => {
     expect(release?.run).not.toContain('dist-release/release/agility-bridge-${VERSION}.intoto.jsonl');
     // nothing else got more permissions for it
     for (const [name, job] of jobs) {
-      if (name !== 'publish') expect(job.permissions?.['attestations']).toBeUndefined();
+      if (name !== 'publish' && name !== 'image') expect(job.permissions?.['attestations']).toBeUndefined();
     }
   });
 
@@ -411,6 +440,65 @@ describe('.github/workflows/release.yml (THREAT_MODEL T18, P1-16)', () => {
     const steps = workflow.jobs.publish?.steps ?? [];
     const release = steps.find((s) => /gh release create/.test(s.run ?? ''));
     expect(release?.if).toBe("steps.npm.outputs.published == 'true'");
+  });
+
+  describe('the image (P2-18, D-25)', () => {
+    const image = workflow.jobs['image'];
+    const build = workflow.jobs['image-build'];
+    const runs = (job: Job | undefined) => (job?.steps ?? []).map((s) => s.run ?? '').join('\n');
+
+    it('is built without credentials and pushed only by the image job, behind the release environment', () => {
+      expect(build?.permissions).toEqual({ contents: 'read' });
+      expect(image?.needs).toEqual(['plan', 'build', 'image-build']);
+      expect(image?.environment).toMatchObject({ name: 'release' });
+      expect(image?.permissions).toEqual({
+        packages: 'write',
+        'id-token': 'write',
+        attestations: 'write',
+        'artifact-metadata': 'write',
+      });
+      for (const [name, job] of jobs) {
+        if (name !== 'image') expect(job.permissions?.['packages'], name).toBeUndefined();
+      }
+    });
+
+    it('smoke-tests and scans the archived image that is pushed, not a rebuild', () => {
+      const r = runs(build);
+      expect(r).toContain('--output "type=oci,dest=dist-image/agility-bridge-${VERSION}.oci.tar"');
+      expect(r).toContain('docker-daemon:agility-bridge:release');
+      expect(r).toContain('scripts/docker-smoke.ts agility-bridge:release');
+      expect(r).toMatch(/trivy image [^\n]*--exit-code 1 agility-bridge:release/);
+    });
+
+    it('verifies the checksums, waits for npm, never overwrites a version tag, and attests the pushed digest', () => {
+      const steps = image?.steps ?? [];
+      const at = (re: RegExp) => steps.findIndex((s) => re.test(`${s.uses ?? ''} ${s.run ?? ''}`));
+      const npm = at(/npm view "agility-bridge@\$\{VERSION\}"/);
+      const verify = at(/sha256sum -c --strict IMAGE_SHA256SUMS/);
+      const push = at(/skopeo copy --all --digestfile/);
+      const attest = at(/actions\/attest@/);
+      expect(npm).toBeGreaterThan(-1);
+      expect(npm).toBeLessThan(verify);
+      expect(verify).toBeLessThan(push);
+      expect(push).toBeLessThan(attest);
+      for (const step of steps.slice(npm + 1))
+        expect(step.if, step.name).toBe("steps.npm.outputs.live == 'true'");
+      const pushRun = steps[push]?.run ?? '';
+      expect(pushRun.indexOf('skopeo inspect --raw "docker://${IMAGE}:${VERSION}"')).toBeLessThan(
+        pushRun.indexOf('skopeo copy --all --digestfile'),
+      );
+      expect(pushRun).not.toMatch(/docker push|--force/);
+      const attests = steps.filter((s) => /^actions\/attest@[0-9a-f]{40}$/.test(s.uses ?? ''));
+      expect(attests).toHaveLength(2);
+      for (const a of attests) {
+        expect(a.with).toMatchObject({
+          'subject-name': IMAGE_REPOSITORY,
+          'subject-digest': '${{ steps.push.outputs.digest }}',
+          'push-to-registry': true,
+        });
+      }
+      expect(runs(image)).toContain('latest only from main');
+    });
   });
 
   describe('stage step reruns (stub npm)', () => {

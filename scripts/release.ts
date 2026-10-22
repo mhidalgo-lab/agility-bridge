@@ -219,6 +219,50 @@ export function decidePlan(state: ReleaseState): ReleaseMode {
   return state.published ? 'release' : 'publish';
 }
 
+/** The published image repository (D-02, D-25). */
+export const IMAGE_REPOSITORY = 'ghcr.io/mhidalgo-lab/agility-bridge';
+
+function compareStable(a: string, b: string): number {
+  const [x, y] = [a, b].map((v) => v.split('.').map(Number)) as [number[], number[]];
+  for (let i = 0; i < 3; i++)
+    if ((x[i] as number) !== (y[i] as number)) return (x[i] as number) - (y[i] as number);
+  return 0;
+}
+
+/**
+ * The image tags for a release (P2-18, L-128): always `X.Y.Z`; `X.Y` only when no released `X.Y.*` is higher; `latest`
+ * only from `main` and when no released version is higher, so neither ever moves backwards. A prerelease gets its own
+ * tag only. `released` is every version on npm (prereleases are ignored for the comparison).
+ */
+export function imageTags(version: string, released: readonly string[], backport: boolean): string[] {
+  if (!SEMVER_RE.test(version)) throw new Error(`Not a SemVer version: ${version}`);
+  if (version.includes('-')) return [version];
+  const stable = released.filter((v) => SEMVER_RE.test(v) && !v.includes('-'));
+  const [major, minor] = version.split('.');
+  const line = `${major}.${minor}`;
+  const tags = [version];
+  if (stable.filter((v) => v.startsWith(`${line}.`)).every((v) => compareStable(v, version) <= 0))
+    tags.push(line);
+  if (!backport && stable.every((v) => compareStable(v, version) <= 0)) tags.push('latest');
+  return tags;
+}
+
+/** Every version of a package on npm (empty when the package does not exist yet). */
+function npmVersions(name: string): string[] {
+  try {
+    const out = execFileSync('npm', ['view', name, 'versions', '--json'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const parsed = JSON.parse(out) as unknown;
+    return (Array.isArray(parsed) ? parsed : [parsed]).filter((v): v is string => typeof v === 'string');
+  } catch (error) {
+    const stderr = String((error as { stderr?: unknown }).stderr ?? '');
+    if (/E404|404 Not Found/.test(stderr)) return [];
+    throw error;
+  }
+}
+
 /** The body of the `## <version>` section of a Changesets CHANGELOG, without the heading. */
 export function extractNotes(changelog: string, version: string): string | undefined {
   const lines = changelog.split('\n');
@@ -430,13 +474,31 @@ function main(argv: readonly string[]): number {
       writeFileSync(serverFile, writeServerJsonVersion(serverText, version));
       return 0;
     }
+    case 'image-tags': {
+      // `image-tags <version>`: the image references to push, comma-separated, for GITHUB_REF (P2-18).
+      if (arg === undefined || !SEMVER_RE.test(arg)) {
+        console.error('usage: release.ts image-tags <version>');
+        return 2;
+      }
+      try {
+        const { backport } = releaseRef(process.env['GITHUB_REF'] ?? '', arg);
+        const tags = imageTags(arg, npmVersions(PACKAGE_NAME), backport);
+        process.stdout.write(`tags=${tags.map((t) => `${IMAGE_REPOSITORY}:${t}`).join(',')}\n`);
+        return 0;
+      } catch (error) {
+        console.error(`✗ image tags: ${(error as Error).message}`);
+        return 1;
+      }
+    }
     case 'check-changesets': {
       const { problems } = classifyChangesets(readChangesets(root), versionablePackages(root));
       for (const p of problems) console.error(`✗ .changeset/${p.file} ${p.message}`);
       return problems.length === 0 ? 0 : 1;
     }
     default:
-      console.error('usage: release.ts plan | notes <version> | sync-version [--check] | check-changesets');
+      console.error(
+        'usage: release.ts plan | notes <version> | image-tags <version> | sync-version [--check] | check-changesets',
+      );
       return 2;
   }
 }

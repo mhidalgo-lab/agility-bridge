@@ -27,6 +27,23 @@ gh attestation verify "agility-bridge-$V.tgz" -R mhidalgo-lab/agility-bridge \
   --bundle "agility-bridge-$V.intoto.jsonl"
 ```
 
+## The Docker image
+
+Releases from v0.2 also publish `ghcr.io/mhidalgo-lab/agility-bridge` (`linux/amd64`, `linux/arm64`) with tags
+`X.Y.Z`, `X.Y` and `latest`. Its build provenance and an SBOM attestation are stored in the registry, signed with
+GitHub OIDC and Sigstore by the same workflow. Pin the digest you verified:
+
+```bash
+V=0.2.0
+gh attestation verify "oci://ghcr.io/mhidalgo-lab/agility-bridge:$V" -R mhidalgo-lab/agility-bridge
+docker buildx imagetools inspect "ghcr.io/mhidalgo-lab/agility-bridge:$V" --format '{{json .Manifest.Digest}}'
+```
+
+The SBOM attestation lists the application's production dependencies (what `/app` holds); the base image is
+distroless Node 24, pinned by digest in `docker/Dockerfile`.
+
+## The npm package
+
 The npm package also carries npm provenance, linking it to the same workflow run: after installing, run
 `npm audit signatures`, or open the package page on npmjs.com (*Provenance*). The tarball on npm and the one on the
 GitHub Release are identical: compare `npm view agility-bridge@$V dist.integrity` with
