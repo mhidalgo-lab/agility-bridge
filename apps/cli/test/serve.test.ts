@@ -257,7 +257,7 @@ describe('admin API through serve', () => {
 
 describe('revalidation after repeated Agility refusals', () => {
   it('revalidates after 3 consecutive AB_AGILITY_AUTH errors, at most once per 10 minutes, and resets on success', async () => {
-    const { revalidateOnAuthErrors } = await import('../src/serve.ts');
+    const { revalidateOnAuthErrors } = await import('@agility-bridge/http-app');
     const validated: string[] = [];
     let t = 1_000_000;
     const services = {

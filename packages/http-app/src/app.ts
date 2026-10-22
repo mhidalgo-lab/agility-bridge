@@ -20,7 +20,7 @@ import {
   buildMcpServer,
   type CircuitBreakers,
   type Clock,
-  type CredentialLimiters,
+  CredentialLimiters,
   createBudget,
   type FetchLike,
   type Logger,
@@ -74,9 +74,10 @@ export interface ToolCallRecord extends ToolCallEvent {
 }
 
 /** Observers for audit (P2-08) and access logs. They must not throw; a throw is logged and ignored. */
+/** Observers may return work they started (an audit write); the app keeps it alive through `background`. */
 export interface HttpObserver {
-  request?(event: RequestEvent): void;
-  toolCall?(event: ToolCallRecord): void;
+  request?(event: RequestEvent): unknown;
+  toolCall?(event: ToolCallRecord): unknown;
 }
 
 export type LimitDecision =
@@ -142,11 +143,24 @@ export interface HttpAppOptions extends EdgeOptions {
   };
   /** The admin API at `/api/admin/v1` (P2-09); absent = the whole API answers 404. */
   readonly admin?: Pick<AdminApiOptions, 'services' | 'audit' | 'authenticate'>;
+  /**
+   * `process` (Node, default): one process serves every request. `request` (Workers, L-096): nothing in flight is shared
+   * between requests: a concurrency limiter per request and no shared pass-through validation. Pair it with a
+   * detached `AuditWriter`, `MetadataService({ shareInflight: false })` and `background`.
+   */
+  readonly isolation?: 'process' | 'request';
+  /** Keeps work started for a request alive after the response (Workers: `c.executionCtx.waitUntil`). */
+  readonly background?: (c: Context, work: Promise<unknown>) => void;
 }
 
 export interface HttpApp {
   readonly app: Hono;
-  readonly fetch: (request: Request, env?: unknown) => Response | Promise<Response>;
+  /** `executionCtx`: the Workers `ExecutionContext` (`waitUntil`); absent on Node. */
+  readonly fetch: (
+    request: Request,
+    env?: unknown,
+    executionCtx?: { waitUntil(promise: Promise<unknown>): void; passThroughOnException(): void },
+  ) => Response | Promise<Response>;
   /** Forget cached access decisions (call after local admin changes). */
   clearAccessCache(): void;
 }
@@ -228,12 +242,21 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
   for (const tool of options.tools) registry.register(tool);
   const clientIp = options.clientIp ?? (() => 'unknown');
 
+  const keepAlive = (c: Context, work: Promise<unknown>) => {
+    const settled = work.catch((error: unknown) => {
+      services.logger.warn('background work failed', { error: (error as Error).name });
+    });
+    options.background?.(c, settled);
+  };
+  const perRequest = options.isolation === 'request';
   const observe = <K extends keyof HttpObserver>(
+    c: Context,
     kind: K,
     event: Parameters<NonNullable<HttpObserver[K]>>[0],
   ) => {
     try {
-      (options.observer?.[kind] as ((e: typeof event) => void) | undefined)?.(event);
+      const work = (options.observer?.[kind] as ((e: typeof event) => unknown) | undefined)?.(event);
+      if (work instanceof Promise) keepAlive(c, work);
     } catch (error) {
       services.logger.warn('observer failed', { kind, error: (error as Error).name });
     }
@@ -287,6 +310,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         clientIp,
         logger: services.logger,
         clock: services.clock,
+        background: keepAlive,
       }),
     );
   }
@@ -303,7 +327,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     let mcp: ClassifiedRequest | null = null;
     let access: EffectiveAccess | null = null;
     const finish = (res: Response, refusal: RefusalReason | null): Response => {
-      observe('request', {
+      observe(c, 'request', {
         requestId,
         ip,
         slug: slug.slice(0, 63),
@@ -381,7 +405,8 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
             pending = pt.validator
               .validate(instance, credentialId, agilityToken)
               .finally(() => validating.delete(key));
-            validating.set(key, pending);
+            // Workers: never shared with another request (L-096); the map stays empty.
+            if (!perRequest) validating.set(key, pending);
           }
           const result = await pending;
           if (result.status === 'unavailable') {
@@ -482,7 +507,11 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       },
       limits: resolved.limits,
       budget: createBudget(resolved.limits.callBudget),
-      limiter: services.limiters.for(resolved.instance.id, resolved.credential.id),
+      // Workers: a limiter per request, never one another request releases (L-096).
+      limiter: (perRequest ? new CredentialLimiters() : services.limiters).for(
+        resolved.instance.id,
+        resolved.credential.id,
+      ),
       breaker: services.breakers.for(resolved.instance.id, resolved.credential.id),
       fetch: services.fetchFor(resolved.instance),
       metadata: services.metadata,
@@ -493,7 +522,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     const prepared: PreparedRequest = {
       tools,
       ctx,
-      onToolCall: (event) => observe('toolCall', { ...event, requestId, access: resolved }),
+      onToolCall: (event) => observe(c, 'toolCall', { ...event, requestId, access: resolved }),
     };
 
     const forward = new Request(c.req.url, { method: 'POST', headers: c.req.raw.headers, body: body.bytes });
@@ -534,7 +563,8 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
 
   return {
     app,
-    fetch: (request, env) => app.fetch(request, env),
+    fetch: (request, env, executionCtx) =>
+      executionCtx === undefined ? app.fetch(request, env) : app.fetch(request, env, executionCtx as never),
     clearAccessCache: () => cache.clear(),
   };
 }

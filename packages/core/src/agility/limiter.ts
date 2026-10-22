@@ -41,14 +41,23 @@ export class Semaphore implements Limiter {
 export class CredentialLimiters {
   readonly #size: number;
   readonly #maxKeys: number;
+  readonly #perCall: boolean;
   readonly #byKey = new Map<string, Semaphore>();
 
-  constructor(options: { readonly concurrency?: number; readonly maxKeys?: number } = {}) {
+  /**
+   * `perCall` (Workers, L-096): every `for()` returns a new semaphore, so a call never waits for a slot another request
+   * holds; concurrency is then bounded per call, and Workers bounds connections per request itself.
+   */
+  constructor(
+    options: { readonly concurrency?: number; readonly maxKeys?: number; readonly perCall?: boolean } = {},
+  ) {
     this.#size = options.concurrency ?? 5;
     this.#maxKeys = options.maxKeys ?? 10_000;
+    this.#perCall = options.perCall ?? false;
   }
 
   for(instanceId: string, credentialId: string): Limiter {
+    if (this.#perCall) return new Semaphore(this.#size);
     const key = `${instanceId}\u0000${credentialId}`;
     let sem = this.#byKey.get(key);
     if (sem === undefined) {

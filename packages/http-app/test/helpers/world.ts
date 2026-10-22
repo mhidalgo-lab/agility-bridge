@@ -18,6 +18,7 @@ import { FAKE_BASE_URL, FakeAgility } from '../../../core/test/harness/index.ts'
 import {
   AuditWriter,
   createHttpApp,
+  type HostServices,
   type HttpAppOptions,
   type RequestEvent,
   type ToolCallRecord,
@@ -79,6 +80,10 @@ export async function world(
     filters?: 'evaluate' | 'ignore-filters';
     /** Workspace B's projects (default Scope:2001). */
     projectsB?: string[];
+    /** A detached audit writer (Workers, L-096). */
+    detachedAudit?: boolean;
+    /** Host services replacing the defaults (limiters, metadata, …). */
+    services?: Partial<HostServices>;
   } = {},
 ): Promise<World> {
   const now = { t: Date.UTC(2026, 9, 21, 12) };
@@ -152,6 +157,7 @@ export async function world(
     logger,
     clock: { now: () => now.t },
     random: webCryptoRandom,
+    ...(options.detachedAudit === true ? { detached: true } : {}),
   });
   const app = createHttpApp({
     storage,
@@ -179,6 +185,7 @@ export async function world(
       logger,
       clock: { now: () => now.t },
       random: webCryptoRandom,
+      ...options.services,
     },
     ...(options.admin
       ? {
@@ -200,7 +207,14 @@ export async function world(
           },
         }
       : {}),
-    observer: audit.observer({ request: (e) => requests.push(e), toolCall: (e) => toolCalls.push(e) }),
+    observer: audit.observer({
+      request: (e) => {
+        requests.push(e);
+      },
+      toolCall: (e) => {
+        toolCalls.push(e);
+      },
+    }),
     version: '0.0.0-test',
     ...over,
   });

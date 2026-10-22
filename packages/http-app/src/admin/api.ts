@@ -36,6 +36,8 @@ export interface AdminApiOptions {
   readonly clock: Clock;
   /** Recorded in admin audit rows: `api` (default) or `cli` for the in-process local client (P2-10). */
   readonly via?: string;
+  /** Keeps an audit write alive after the response (Workers: `waitUntil`, L-096). */
+  readonly background?: (c: Context, work: Promise<unknown>) => void;
 }
 
 /** The break-glass authenticator: `Authorization: Bearer ab_admin_…` matching `AB_ADMIN_TOKEN`. */
@@ -272,6 +274,9 @@ const ERROR_RESPONSES = Object.fromEntries(
 );
 
 export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
+  const keep = (c: Context, work: Promise<unknown> | undefined) => {
+    if (work !== undefined) options.background?.(c, work);
+  };
   const api = new OpenAPIHono({
     defaultHook: (result, c) => {
       if (!result.success) {
@@ -302,16 +307,19 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
         return c.json(errorBody('rate_limited', 'Too many failed attempts.'), 429, { 'retry-after': '300' });
       }
       await options.limits?.onAuthFailure?.(ip, now);
-      options.audit.request({
-        requestId: c.get('requestId' as never) ?? '',
-        ip,
-        slug: '(admin)',
-        status: 401,
-        durationMs: 0,
-        mcp: null,
-        access: null,
-        refusal: 'admin_unauthenticated',
-      });
+      keep(
+        c,
+        options.audit.request({
+          requestId: c.get('requestId' as never) ?? '',
+          ip,
+          slug: '(admin)',
+          status: 401,
+          durationMs: 0,
+          mcp: null,
+          access: null,
+          refusal: 'admin_unauthenticated',
+        }),
+      );
       return c.json(errorBody('unauthorized', 'Authentication required.'), 401, {
         'www-authenticate': 'Bearer',
       });
@@ -364,19 +372,22 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
   ) {
     if (spec.audit === undefined) return;
     const actor = c.get('actor' as never) as Actor;
-    options.audit.admin({
-      action: spec.audit.action,
-      status,
-      userId: actor.kind === 'user' ? actor.userId : null,
-      targetType: spec.audit.targetType,
-      targetId: targetId.slice(0, 128),
-      requestId: (c.get('requestId' as never) as string | undefined) ?? null,
-      via: options.via ?? 'api',
-      details: {
-        actor: actor.kind === 'user' ? actor.role : 'break_glass',
-        ...(extra as Record<string, never>),
-      },
-    });
+    keep(
+      c,
+      options.audit.admin({
+        action: spec.audit.action,
+        status,
+        userId: actor.kind === 'user' ? actor.userId : null,
+        targetType: spec.audit.targetType,
+        targetId: targetId.slice(0, 128),
+        requestId: (c.get('requestId' as never) as string | undefined) ?? null,
+        via: options.via ?? 'api',
+        details: {
+          actor: actor.kind === 'user' ? actor.role : 'break_glass',
+          ...(extra as Record<string, never>),
+        },
+      }),
+    );
   }
 
   function add(

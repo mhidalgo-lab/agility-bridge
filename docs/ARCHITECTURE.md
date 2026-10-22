@@ -90,6 +90,12 @@ Modes C and D share all code except the storage adapter and the entry point. Mod
 internet-reachable with publicly trusted certificates; on-premises instances behind a private network or private CA
 use modes A–C ([ADR-0014](adr/0014-supported-agility-installations.md)).
 
+Both read the shared `AB_*` settings with one parser and assemble the app with one function (`packages/http-app`
+`server.ts`, P3-01). On Workers the app runs with **request isolation** (L-096): no request awaits I/O another request
+started. Audit writes are detached and kept alive with `waitUntil`, each call gets its own concurrency limiter,
+metadata loads and pass-through validations are not shared in flight (completed values are), purpose keys are derived
+at boot, and the boot itself runs inside a request and is cached only once it completed.
+
 ## 4. Access model
 
 > **Terminology.** A **workspace** is agility-bridge's unit of access: what one MCP URL (`/w/{slug}/mcp`) exposes. An

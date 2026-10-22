@@ -2,7 +2,7 @@
 id: P3-01
 title: Worker entry, bindings and boot single-flight
 phase: 3
-status: todo
+status: review
 priority: high
 depends_on: [P2-17]
 adr: ["0004", "0006", "0007", "0010"]
@@ -41,15 +41,15 @@ with D1, secrets and bindings, without sharing in-flight I/O between requests.
 - No `nodejs_compat` (ADR-0004); no Node built-ins in the bundle (checked).
 
 ## Acceptance criteria
-- [ ] workerd integration tests (local, `wrangler`'s Miniflare with a local D1; no Cloudflare account) for: an MCP
+- [x] workerd integration tests (local, `wrangler`'s Miniflare with a local D1; no Cloudflare account) for: an MCP
       `tools/list` and tool call with a device token against the synthetic Agility, the admin API with the
       break-glass token, the uniform 401, `/health`, and boot failures (missing or malformed master key, wrong master
       key) with security headers and no detail in the body.
-- [ ] No module-level request state: the two-workspace concurrency test from P2-12 runs against the Worker too, and
+- [x] No module-level request state: the two-workspace concurrency test from P2-12 runs against the Worker too, and
       concurrent first requests each boot on their own (no request awaits another's boot).
-- [ ] Unit tests for the isolation mode: no shared audit chain, a limiter per request, no shared in-flight metadata
+- [x] Unit tests for the isolation mode: no shared audit chain, a limiter per request, no shared in-flight metadata
       load or pass-through validation; `serve` unchanged.
-- [ ] The Worker bundle builds with `wrangler deploy --dry-run` and contains no `node:` import.
+- [x] The Worker bundle builds with `wrangler deploy --dry-run` and contains no `node:` import.
 
 ## Security notes
 THREAT_MODEL T20, T21. Secrets only as Worker secrets, never `vars` (the setup script, P3-05, enforces it).
@@ -62,7 +62,14 @@ THREAT_MODEL T20, T21. Secrets only as Worker secrets, never `vars` (the setup s
 
 ## Docs to update
 - docs/ARCHITECTURE.md (deployment mode D: request isolation)
+- docs/THREAT_MODEL.md (T21), docs/security/logging.md, docs/LESSONS-LEARNED.md (L-179)
 - docs/guide/cloudflare-deploy.md (P3-07)
+
+## Notes
+- Local workerd does not flag a promise shared between requests (L-179), so the boot rule is tested on the handler
+  (`apps/worker/test/handler.test.ts`) and the app's isolation mode in `packages/http-app/test/isolation.test.ts`, each
+  mutation-checked; the workerd suite (`apps/worker/test/worker.test.ts`) covers the end-to-end paths.
+- The bundle is 1.98 MiB, 380 KiB gzipped (Free allows 3 MB compressed).
 
 ## Out of scope
 - D1 contract suite and migration concurrency (P3-02), Workers limits presets (P3-03), rate-limit bindings (P3-04),

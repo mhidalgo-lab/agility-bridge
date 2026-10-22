@@ -185,7 +185,7 @@ Status lives in each task file.
 
 | ID | Task | Priority | Depends on | Status |
 |---|---|---|---|---|
-| P3-01 | [Worker entry, bindings and boot single-flight](tasks/phase-3-cloudflare/P3-01-worker-entry.md) | high | P2-17 | todo |
+| P3-01 | [Worker entry, bindings and boot single-flight](tasks/phase-3-cloudflare/P3-01-worker-entry.md) | high | P2-17 | review |
 | P3-02 | [D1 adapter and shared migration runner](tasks/phase-3-cloudflare/P3-02-d1-adapter.md) | high | P3-01 | todo |
 | P3-03 | [Workers limits presets and per-call budgets](tasks/phase-3-cloudflare/P3-03-workers-limits.md) | high | P3-01 | todo |
 | P3-04 | [Rate limiting on Workers](tasks/phase-3-cloudflare/P3-04-workers-rate-limiting.md) | medium | P3-01 | todo |

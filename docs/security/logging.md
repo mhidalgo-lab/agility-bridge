@@ -8,7 +8,7 @@
 
 | Sink | Where | Format | Retention | Readers | Code · tests |
 |---|---|---|---|---|---|
-| Process log | **stderr** only (stdout is the stdio MCP channel); Workers Logs on Cloudflare later | One JSON object per line: `ts`, `level`, `msg`, fields | The operator's log collector (journald, Docker, …) | The operator | [logger.ts](../../packages/core/src/logger.ts) · [logger.test.ts](../../packages/core/test/logger.test.ts) |
+| Process log | **stderr** only (stdout is the stdio MCP channel); on Cloudflare, the Worker's log (`console.error`, Workers Logs) | One JSON object per line: `ts`, `level`, `msg`, fields | The operator's log collector (journald, Docker, …) | The operator | [logger.ts](../../packages/core/src/logger.ts) · [logger.test.ts](../../packages/core/test/logger.test.ts) |
 | Audit log | Table `audit_log` of the server database (not in stdio mode) | Rows, append-only (a trigger refuses updates) | `AB_AUDIT_RETENTION_DAYS` (default 90; 0 = forever), purged at start and hourly | Owners and admins (`GET /api/admin/v1/audit`, `agility-bridge audit tail`) | [audit.ts](../../packages/http-app/src/audit.ts) · [audit.test.ts](../../packages/http-app/test/audit.test.ts) |
 | CLI output | stdout (JSON results) and stderr (messages) of management commands | — | The terminal | The operator | [commands.ts](../../apps/cli/src/manage/commands.ts) · [manage.test.ts](../../apps/cli/test/manage.test.ts) |
 
@@ -28,13 +28,15 @@ No telemetry leaves the process (OpenTelemetry is P8-07, off by default).
 
 ## Process log messages
 
-Fields are listed per message; every message also carries `mode` (`stdio`, `serve`, `cli`) and request-scoped messages
+Fields are listed per message; every message also carries `mode` (`stdio`, `serve`, `cli`, `worker`) and request-scoped messages
 carry `requestId`.
 
 | Level | Message | Fields | Code |
 |---|---|---|---|
 | info | `serving` | `url`, `publicUrl`, `database`, `adminApi` (serve); `tools`, `source`, `workspace`, `projects` (stdio) | [serve.ts](../../apps/cli/src/serve.ts), [stdio.ts](../../apps/cli/src/stdio.ts) |
-| info | `request` | `requestId`, `workspace` (slug), `status`, `method`, `kind`, `tool`, `durationMs`, `refusal` | [serve.ts](../../apps/cli/src/serve.ts) |
+| info | `request` | `requestId`, `workspace` (slug), `status`, `method`, `kind`, `tool`, `durationMs`, `refusal` | [server.ts](../../packages/http-app/src/server.ts) |
+| info | `booted` | `adminApi`, `publicUrl` (Worker) | [boot.ts](../../apps/worker/src/boot.ts) |
+| error | `boot failed` | `error` (class), `reason` (names a setting, never a value) (Worker; written directly, the logger may not exist yet) | [index.ts](../../apps/worker/src/index.ts) |
 | debug | `tool ok` | `tool`, `ms`, `requests` | [server.ts](../../packages/core/src/server.ts) |
 | warn | `tool error` | `tool`, `ms`, `code`, `error` (class, redacted message) | [server.ts](../../packages/core/src/server.ts) |
 | debug | `agility request` | `endpoint`, `method`, `attempt`, `status`, `ms`, `bytes` (no body, no token) | [client.ts](../../packages/core/src/agility/client.ts) |
@@ -43,6 +45,7 @@ carry `requestId`.
 | error | `credential could not be decrypted` | `requestId`, `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
 | warn | `response stream hit the deadline` | `requestId` | [app.ts](../../packages/http-app/src/app.ts) |
 | warn | `observer failed` | `kind`, `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
+| warn | `background work failed` | `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
 | error | `unhandled error` | `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
 | error | `admin API error` | `path` (route template), `error` (class) | [api.ts](../../packages/http-app/src/admin/api.ts) |
 | warn | `rate limiter failed; allowing the request` | `limit`, `error` (class) | [rate-limit.ts](../../packages/http-app/src/rate-limit.ts) |
@@ -52,11 +55,11 @@ carry `requestId`.
 | error | `audit retention failed` | `error` (class) | [audit.ts](../../packages/http-app/src/audit.ts) |
 | warn | `credential validation failed` | `error` (class) | [validate.ts](../../packages/auth/src/access/validate.ts) |
 | info | `credentials revalidated` | `count` | [serve.ts](../../apps/cli/src/serve.ts) |
-| warn | `credential revalidated after Agility refused it` | `credential` (id), `status` | [serve.ts](../../apps/cli/src/serve.ts) |
-| error | `credential revalidation failed` | `error` (class) | [serve.ts](../../apps/cli/src/serve.ts) |
-| warn | `AB_WRITE_TOOLS is on, but this version has no write tools.` | — | [serve.ts](../../apps/cli/src/serve.ts) |
-| warn | `AB_RATE_LIMIT is off: no request, token or authentication-failure limits.` | — | [serve.ts](../../apps/cli/src/serve.ts) |
-| warn | `AB_PASSTHROUGH is on: pass-through workspaces accept any valid Agility token of their instance.` | — | [serve.ts](../../apps/cli/src/serve.ts) |
+| warn | `credential revalidated after Agility refused it` | `credential` (id), `status` | [server.ts](../../packages/http-app/src/server.ts) |
+| error | `credential revalidation failed` | `error` (class) | [serve.ts](../../apps/cli/src/serve.ts), [server.ts](../../packages/http-app/src/server.ts) |
+| warn | `AB_WRITE_TOOLS is on, but this version has no write tools.` | — | [server.ts](../../packages/http-app/src/server.ts) |
+| warn | `AB_RATE_LIMIT is off: no request, token or authentication-failure limits.` | — | [server.ts](../../packages/http-app/src/server.ts) |
+| warn | `AB_PASSTHROUGH is on: pass-through workspaces accept any valid Agility token of their instance.` | — | [server.ts](../../packages/http-app/src/server.ts) |
 | warn | `Not configured: tools are listed, and every call explains how to set AB_AGILITY_URL and AB_AGILITY_TOKEN.` | — | [stdio.ts](../../apps/cli/src/stdio.ts) |
 | warn | configuration and key warnings | the text only (data directory permissions, stranded or retired key versions, deprecated settings) | [serve.ts](../../apps/cli/src/serve.ts), [credentials.ts](../../packages/auth/src/secrets/credentials.ts) |
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Envelope encryption and master-key rotation (P2-03, ADR-0007, THREAT_MODEL T7).
 import { createMemoryStorage, type Storage } from '@agility-bridge/storage';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   generateMasterKey,
   KeyPurpose,
@@ -31,6 +31,17 @@ async function rejectsWith(promise: Promise<unknown>, code: string): Promise<voi
 }
 
 describe('master keys', () => {
+  it('warm() derives every purpose key once, so later uses share completed keys (Workers, L-096)', async () => {
+    const keyring = await Keyring.create(K2, K1);
+    const spy = vi.spyOn(crypto.subtle, 'deriveKey');
+    await keyring.warm();
+    const derived = spy.mock.calls.length;
+    expect(derived).toBe(2 * Object.values(KeyPurpose).length);
+    await keyring.mac(KeyPurpose.AuditIdentity, 'x');
+    expect(spy.mock.calls.length).toBe(derived);
+    spy.mockRestore();
+  });
+
   it('parses v<N>:<base64>, bare base64 as version 1, and generates random 32-byte keys', () => {
     const parsed = parseMasterKey(K2);
     expect(parsed.version).toBe(2);

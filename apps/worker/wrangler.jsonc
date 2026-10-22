@@ -1,5 +1,6 @@
-// agility-bridge on Cloudflare Workers. Placeholder from P0-01; bindings (D1, rate limits, secrets) arrive in Phase 3.
-// No account or resource ids are committed.
+// agility-bridge on Cloudflare Workers (P3-01). No account or resource ids are committed: the setup script (P3-05)
+// writes them to an ignored local config per environment. Secrets (AB_MASTER_KEY, AB_ADMIN_TOKEN) are Worker secrets,
+// never `vars`.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "agility-bridge",
@@ -7,5 +8,13 @@
   // No `nodejs_compat`: every package is web-standard (docs/adr/0004-typescript-runtime-agnostic-core.md).
   "compatibility_date": "2026-09-26",
   "workers_dev": false,
-  "send_metrics": false
+  "send_metrics": false,
+  // The workspace packages are bundled from their sources (no build of the packages first).
+  "alias": {
+    "@agility-bridge/auth": "../../packages/auth/src/index.ts",
+    "@agility-bridge/core": "../../packages/core/src/index.ts",
+    "@agility-bridge/http-app": "../../packages/http-app/src/index.ts",
+    "@agility-bridge/storage": "../../packages/storage/src/index.ts"
+  },
+  "d1_databases": [{ "binding": "DB", "database_name": "agility-bridge", "database_id": "local" }]
 }

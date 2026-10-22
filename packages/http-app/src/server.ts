@@ -1,0 +1,346 @@
+// SPDX-License-Identifier: Apache-2.0
+// What `agility-bridge serve` (Node) and the Cloudflare Worker share (P3-01): the `AB_*` settings with the same checks,
+// and the app assembled from storage, keyring and host services. Node-only settings (paths, host, port, proxy hops, CA
+// bundles) stay in the CLI; Workers-only ones (bindings, plan presets) in the Worker.
+import {
+  type AccessServices,
+  type AdminTokenVerifier,
+  accessServices,
+  credentialValidator,
+  type Keyring,
+} from '@agility-bridge/auth';
+import { CORE_TOOLS, DEFAULT_LIMITS, type Logger, type LogLevel } from '@agility-bridge/core';
+import type { Storage } from '@agility-bridge/storage';
+import type { Context } from 'hono';
+import { adminTokenAuthenticator } from './admin/api.ts';
+import { createHttpApp, type HostServices, type HttpApp } from './app.ts';
+import { AuditWriter } from './audit.ts';
+import {
+  createRequestLimits,
+  DEFAULT_RATE_LIMITS,
+  type RateLimitConfig,
+  type RateLimiter,
+} from './rate-limit.ts';
+
+/** A setting is missing or malformed; the message names the setting, never its value. */
+export class SettingsError extends Error {
+  override name = 'SettingsError';
+}
+
+type Env = Readonly<Record<string, string | undefined>>;
+
+/** The settings both hosts read (docs/guide/configuration.md). */
+export const SERVER_SETTING_NAMES: readonly string[] = Object.freeze([
+  'AB_LOG_LEVEL',
+  'AB_ENVIRONMENT',
+  'AB_PUBLIC_URL',
+  'AB_ALLOWED_HOSTS',
+  'AB_ALLOWED_ORIGINS',
+  'AB_ACCESS_CACHE_TTL',
+  'AB_CALL_BUDGET',
+  'AB_LIMITS_MAX_RESPONSE_BYTES',
+  'AB_RATE_LIMIT',
+  'AB_RATE_LIMIT_IP_PER_MINUTE',
+  'AB_RATE_LIMIT_AUTH_FAILURES',
+  'AB_RATE_LIMIT_TOKEN_PER_MINUTE',
+  'AB_RATE_LIMIT_GRANT_PER_MINUTE',
+  'AB_RATE_LIMIT_VALIDATIONS_PER_MINUTE',
+  'AB_AUDIT_RETENTION_DAYS',
+  'AB_CREDENTIAL_REVALIDATION_HOURS',
+  'AB_PASSTHROUGH',
+  'AB_WRITE_TOOLS',
+]);
+
+export interface ServerSettings {
+  readonly publicUrl?: string;
+  readonly allowedHosts: readonly string[];
+  readonly allowedOrigins: readonly string[];
+  readonly accessCacheTtlSeconds: number;
+  readonly environment: 'live' | 'test';
+  readonly callBudget: number;
+  readonly maxResponseBytes: number;
+  readonly logLevel: LogLevel;
+  readonly rateLimits: RateLimitConfig;
+  /** Days audit rows are kept (default 90; 0 keeps them forever). */
+  readonly auditRetentionDays: number;
+  /** Hours between credential revalidations (default 24; 0 = never). */
+  readonly revalidationHours: number;
+  /** `AB_PASSTHROUGH=on`: pass-through workspaces accept the caller's own Agility token (P2-14, off by default). */
+  readonly passthrough: boolean;
+}
+
+/** Host defaults: ADR-0010 presets (Node 1,000 requests and 8 MiB; Workers Free 45 and 512 KiB). */
+export interface SettingDefaults {
+  readonly callBudget: number;
+  readonly maxResponseBytes: number;
+}
+
+export function settingList(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '');
+}
+
+export function settingInteger(
+  name: string,
+  value: string | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (value === undefined || value === '') return fallback;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < min || n > max)
+    throw new SettingsError(`${name} must be an integer from ${min} to ${max}.`);
+  return n;
+}
+
+function onOff(name: string, value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined || value === '') return fallback;
+  if (value === 'on') return true;
+  if (value === 'off') return false;
+  throw new SettingsError(`${name} must be on or off.`);
+}
+
+/** Parses and checks the shared settings. Throws `SettingsError` naming the first bad one. */
+export function parseServerSettings(env: Env, defaults: SettingDefaults): ServerSettings {
+  const level = env['AB_LOG_LEVEL'] ?? 'info';
+  if (!['debug', 'info', 'warn', 'error'].includes(level))
+    throw new SettingsError('AB_LOG_LEVEL must be debug, info, warn or error.');
+  const environment = env['AB_ENVIRONMENT'] ?? 'production';
+  if (environment !== 'production' && environment !== 'test') {
+    throw new SettingsError(
+      'AB_ENVIRONMENT must be production (device tokens ab_live_…) or test (ab_test_…).',
+    );
+  }
+  let publicUrl: string | undefined;
+  if (env['AB_PUBLIC_URL'] !== undefined && env['AB_PUBLIC_URL'] !== '') {
+    try {
+      const u = new URL(env['AB_PUBLIC_URL']);
+      if (
+        (u.protocol !== 'https:' && u.protocol !== 'http:') ||
+        u.username !== '' ||
+        u.search !== '' ||
+        u.hash !== ''
+      ) {
+        throw new Error('bad');
+      }
+      publicUrl = u.origin;
+    } catch {
+      throw new SettingsError('AB_PUBLIC_URL must be the public origin, e.g. https://mcp.example.com.');
+    }
+  }
+  for (const o of settingList(env['AB_ALLOWED_ORIGINS'])) {
+    if (o === 'null' || !/^https?:\/\/[^/\s]+$/.test(o)) {
+      throw new SettingsError(`AB_ALLOWED_ORIGINS has an invalid origin: "${o.slice(0, 60)}".`);
+    }
+  }
+  const int = settingInteger;
+  return {
+    ...(publicUrl === undefined ? {} : { publicUrl }),
+    allowedHosts: settingList(env['AB_ALLOWED_HOSTS']),
+    allowedOrigins: settingList(env['AB_ALLOWED_ORIGINS']),
+    accessCacheTtlSeconds: int('AB_ACCESS_CACHE_TTL', env['AB_ACCESS_CACHE_TTL'], 30, 0, 60),
+    environment: environment === 'production' ? 'live' : 'test',
+    callBudget: int('AB_CALL_BUDGET', env['AB_CALL_BUDGET'], defaults.callBudget, 1, 10_000),
+    maxResponseBytes: int(
+      'AB_LIMITS_MAX_RESPONSE_BYTES',
+      env['AB_LIMITS_MAX_RESPONSE_BYTES'],
+      defaults.maxResponseBytes,
+      65_536,
+      64 * 1024 * 1024,
+    ),
+    logLevel: level as LogLevel,
+    rateLimits: {
+      enabled: onOff('AB_RATE_LIMIT', env['AB_RATE_LIMIT'], true),
+      ipPerMinute: int(
+        'AB_RATE_LIMIT_IP_PER_MINUTE',
+        env['AB_RATE_LIMIT_IP_PER_MINUTE'],
+        DEFAULT_RATE_LIMITS.ipPerMinute,
+        1,
+        1_000_000,
+      ),
+      authFailuresPer5Minutes: int(
+        'AB_RATE_LIMIT_AUTH_FAILURES',
+        env['AB_RATE_LIMIT_AUTH_FAILURES'],
+        DEFAULT_RATE_LIMITS.authFailuresPer5Minutes,
+        1,
+        10_000,
+      ),
+      tokenPerMinute: int(
+        'AB_RATE_LIMIT_TOKEN_PER_MINUTE',
+        env['AB_RATE_LIMIT_TOKEN_PER_MINUTE'],
+        DEFAULT_RATE_LIMITS.tokenPerMinute,
+        1,
+        100_000,
+      ),
+      grantPerMinute: int(
+        'AB_RATE_LIMIT_GRANT_PER_MINUTE',
+        env['AB_RATE_LIMIT_GRANT_PER_MINUTE'],
+        DEFAULT_RATE_LIMITS.grantPerMinute,
+        1,
+        100_000,
+      ),
+      validationsPerMinute: int(
+        'AB_RATE_LIMIT_VALIDATIONS_PER_MINUTE',
+        env['AB_RATE_LIMIT_VALIDATIONS_PER_MINUTE'],
+        DEFAULT_RATE_LIMITS.validationsPerMinute,
+        1,
+        10_000,
+      ),
+    },
+    auditRetentionDays: int('AB_AUDIT_RETENTION_DAYS', env['AB_AUDIT_RETENTION_DAYS'], 90, 0, 36_500),
+    revalidationHours: int(
+      'AB_CREDENTIAL_REVALIDATION_HOURS',
+      env['AB_CREDENTIAL_REVALIDATION_HOURS'],
+      24,
+      0,
+      8_760,
+    ),
+    passthrough: onOff('AB_PASSTHROUGH', env['AB_PASSTHROUGH'], false),
+  };
+}
+
+/** The warnings both hosts log at start for risky but valid settings. */
+export function settingWarnings(env: Env, settings: ServerSettings): string[] {
+  const warnings: string[] = [];
+  if (env['AB_WRITE_TOOLS'] === 'on')
+    warnings.push('AB_WRITE_TOOLS is on, but this version has no write tools.');
+  if (!settings.rateLimits.enabled) {
+    warnings.push('AB_RATE_LIMIT is off: no request, token or authentication-failure limits.');
+  }
+  if (settings.passthrough) {
+    warnings.push(
+      'AB_PASSTHROUGH is on: pass-through workspaces accept any valid Agility token of their instance.',
+    );
+  }
+  return warnings;
+}
+
+/**
+ * Revalidates a credential after 3 consecutive `AB_AGILITY_AUTH` errors (a revoked token), at most once per 10 minutes
+ * per credential, so a dead token is marked invalid instead of failing every call (P2-13, A10). Returns the
+ * revalidation it started, for the host to keep alive.
+ */
+export function revalidateOnAuthErrors(
+  services: AccessServices,
+  logger: Logger,
+  now: () => number = Date.now,
+): (credentialId: string, errorCode: string | null) => Promise<void> | undefined {
+  const streaks = new Map<string, number>();
+  const last = new Map<string, number>();
+  return (credentialId, errorCode) => {
+    if (errorCode !== 'AB_AGILITY_AUTH') {
+      streaks.delete(credentialId);
+      return undefined;
+    }
+    const n = (streaks.get(credentialId) ?? 0) + 1;
+    streaks.set(credentialId, n);
+    if (n < 3 || now() - (last.get(credentialId) ?? 0) < 600_000) return undefined;
+    last.set(credentialId, now());
+    streaks.delete(credentialId);
+    return services.credentials
+      .validate(credentialId)
+      .then((c) => {
+        logger.warn('credential revalidated after Agility refused it', {
+          credential: c.id,
+          status: c.validationStatus,
+        });
+      })
+      .catch((error: unknown) => {
+        logger.error('credential revalidation failed', { error: (error as Error).name });
+      });
+  };
+}
+
+export interface ServerParts {
+  readonly settings: ServerSettings;
+  readonly storage: Storage;
+  readonly keyring: Keyring;
+  readonly host: HostServices;
+  readonly logger: Logger;
+  /** The counters behind the rate limits (in memory on Node; P3-04 adds the Workers binding). */
+  readonly limiter: RateLimiter;
+  readonly version: string;
+  /** `process` on Node, `request` on Workers (L-096). */
+  readonly isolation: 'process' | 'request';
+  /** Keeps work alive after the response (Workers: `waitUntil`). */
+  readonly background?: (c: Context, work: Promise<unknown>) => void;
+  readonly clientIp: (c: Context) => string;
+  /** Whether a pass-through request reached the server over HTTPS (P2-14). */
+  readonly passthroughSecure: (c: Context) => boolean;
+  /** The break-glass admin token; absent = no admin API (404). */
+  readonly adminVerifier?: AdminTokenVerifier;
+}
+
+export interface AssembledServer {
+  readonly app: HttpApp;
+  readonly audit: AuditWriter;
+  readonly services: AccessServices;
+}
+
+/** The app both hosts serve, with audit, admin API, rate limits and pass-through as configured. */
+export function assembleServer(parts: ServerParts): AssembledServer {
+  const { settings, storage, keyring, host, logger } = parts;
+  const tools = new Map(CORE_TOOLS.map((t) => [t.name, { kind: t.kind, group: t.group }]));
+  const audit = new AuditWriter({
+    storage,
+    logger,
+    clock: host.clock,
+    random: host.random,
+    ...(parts.isolation === 'request' ? { detached: true } : {}),
+  });
+  const validator = credentialValidator(host);
+  const services = accessServices({ storage, keyring, tools, environment: settings.environment, validator });
+  const authErrors = revalidateOnAuthErrors(services, logger, () => host.clock.now());
+  const app = createHttpApp({
+    storage,
+    keyring,
+    access: {
+      tools,
+      writesEnabled: false,
+      environment: settings.environment,
+      limits: {
+        defaults: {
+          ...DEFAULT_LIMITS,
+          maxResponseBytes: settings.maxResponseBytes,
+          callBudget: settings.callBudget,
+          genericQuery: true,
+        },
+        ceilings: {},
+      },
+    },
+    tools: CORE_TOOLS,
+    services: host,
+    ...(settings.publicUrl === undefined ? {} : { publicUrl: settings.publicUrl }),
+    allowedHosts: settings.allowedHosts,
+    allowedOrigins: settings.allowedOrigins,
+    accessCacheTtlSeconds: settings.accessCacheTtlSeconds,
+    limits: createRequestLimits(parts.limiter, settings.rateLimits, logger),
+    ...(settings.passthrough ? { passthrough: { validator, secure: parts.passthroughSecure } } : {}),
+    ...(parts.adminVerifier === undefined
+      ? {}
+      : { admin: { services, audit, authenticate: adminTokenAuthenticator(parts.adminVerifier) } }),
+    clientIp: parts.clientIp,
+    observer: audit.observer({
+      toolCall: (e) => authErrors(e.access.credential.id, e.errorCode),
+      request: (e) => {
+        logger.info('request', {
+          requestId: e.requestId,
+          workspace: e.slug,
+          status: e.status,
+          method: e.mcp?.method ?? null,
+          kind: e.mcp?.kind ?? null,
+          tool: e.mcp?.tool ?? null,
+          durationMs: e.durationMs,
+          ...(e.refusal === null ? {} : { refusal: e.refusal }),
+        });
+      },
+    }),
+    isolation: parts.isolation,
+    ...(parts.background === undefined ? {} : { background: parts.background }),
+    version: parts.version,
+  });
+  return { app, audit, services };
+}
