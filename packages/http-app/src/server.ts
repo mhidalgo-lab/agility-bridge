@@ -6,13 +6,19 @@ import {
   type AccessServices,
   type AdminTokenVerifier,
   accessServices,
+  createIdentityProviders,
   credentialValidator,
   type DeploymentLimits,
+  IDENTITY_SETTING_NAMES,
+  IdentityConfigError,
+  type IdentitySettings,
+  identitySettingsFromEnv,
   type Keyring,
 } from '@agility-bridge/auth';
 import {
   CORE_TOOLS,
   DEFAULT_LIMITS,
+  type FetchLike,
   type Logger,
   type LogLevel,
   type ToolRegistry,
@@ -52,11 +58,13 @@ export const SERVER_SETTING_NAMES: readonly string[] = Object.freeze([
   'AB_RATE_LIMIT_TOKEN_PER_MINUTE',
   'AB_RATE_LIMIT_GRANT_PER_MINUTE',
   'AB_RATE_LIMIT_VALIDATIONS_PER_MINUTE',
+  'AB_RATE_LIMIT_SIGN_IN',
   'AB_AUDIT_RETENTION_DAYS',
   'AB_CREDENTIAL_REVALIDATION_HOURS',
   'AB_PASSTHROUGH',
   'AB_WRITE_TOOLS',
   'AB_ALLOW_HTTP_INSTANCES',
+  ...IDENTITY_SETTING_NAMES,
 ]);
 
 export interface ServerSettings {
@@ -77,6 +85,8 @@ export interface ServerSettings {
   readonly passthrough: boolean;
   /** `AB_ALLOW_HTTP_INSTANCES=on`: plain-HTTP loopback instance URLs, for tests and local fixtures (P2-19). */
   readonly allowHttpInstances: boolean;
+  /** Sign-in providers and the login policy (P4-01); absent = no `/auth` routes. */
+  readonly identity?: IdentitySettings;
 }
 
 /** Host defaults: ADR-0010 presets (Node 1,000 requests and 8 MiB; Workers Free 45 and 512 KiB). */
@@ -147,6 +157,14 @@ export function parseServerSettings(env: Env, defaults: SettingDefaults): Server
     }
   }
   const int = settingInteger;
+  let identity: IdentitySettings | null;
+  try {
+    identity = identitySettingsFromEnv(env);
+  } catch (error) {
+    // The message names the variable, never its value.
+    if (error instanceof IdentityConfigError) throw new SettingsError(error.message);
+    throw error;
+  }
   return {
     ...(publicUrl === undefined ? {} : { publicUrl }),
     allowedHosts: settingList(env['AB_ALLOWED_HOSTS']),
@@ -199,6 +217,13 @@ export function parseServerSettings(env: Env, defaults: SettingDefaults): Server
         1,
         10_000,
       ),
+      signInPer5Minutes: int(
+        'AB_RATE_LIMIT_SIGN_IN',
+        env['AB_RATE_LIMIT_SIGN_IN'],
+        DEFAULT_RATE_LIMITS.signInPer5Minutes,
+        1,
+        100_000,
+      ),
     },
     auditRetentionDays: int('AB_AUDIT_RETENTION_DAYS', env['AB_AUDIT_RETENTION_DAYS'], 90, 0, 36_500),
     revalidationHours: int(
@@ -210,6 +235,7 @@ export function parseServerSettings(env: Env, defaults: SettingDefaults): Server
     ),
     passthrough: onOff('AB_PASSTHROUGH', env['AB_PASSTHROUGH'], false),
     allowHttpInstances: onOff('AB_ALLOW_HTTP_INSTANCES', env['AB_ALLOW_HTTP_INSTANCES'], false),
+    ...(identity === null ? {} : { identity }),
   };
 }
 
@@ -231,6 +257,7 @@ export function settingWarnings(env: Env, settings: ServerSettings): string[] {
       'AB_PASSTHROUGH is on: pass-through workspaces accept any valid Agility token of their instance.',
     );
   }
+  warnings.push(...(settings.identity?.warnings ?? []));
   return warnings;
 }
 
@@ -290,6 +317,11 @@ export interface ServerParts {
   readonly adminVerifier?: AdminTokenVerifier;
   /** Limits no workspace or grant may exceed on this runtime (Workers Free, P3-03). */
   readonly ceilings?: DeploymentLimits['ceilings'];
+  /**
+   * The `fetch` for identity providers: discovery, keys, token and user lookups (P4-01). These are not Agility requests.
+   * Node pins it to public addresses at connect time; default: the global `fetch`.
+   */
+  readonly identityFetch?: FetchLike;
   /** Refuses an instance host by throwing (Node: one resolving to a private address, P2-19). */
   readonly checkInstanceHost?: (hostname: string) => Promise<void>;
   /** The tool registry built once (Workers: at module scope, P3-14). */
@@ -354,6 +386,19 @@ export function assembleServer(parts: ServerParts): AssembledServer {
     ...(parts.adminVerifier === undefined
       ? {}
       : { admin: { services, audit, authenticate: adminTokenAuthenticator(parts.adminVerifier) } }),
+    ...(settings.identity === undefined
+      ? {}
+      : {
+          identity: {
+            publicUrl: settings.identity.publicUrl,
+            providers: createIdentityProviders(settings.identity, {
+              ...(parts.identityFetch === undefined ? {} : { fetch: parts.identityFetch }),
+              clock: host.clock,
+            }),
+            policy: settings.identity.policy,
+            audit: (event) => audit.login(event),
+          },
+        }),
     clientIp: parts.clientIp,
     observer: audit.observer({
       toolCall: (e) => authErrors(e.access.credential.id, e.errorCode),

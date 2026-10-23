@@ -4,6 +4,7 @@
 // `${keychain:service/account}` references in YAML; never from flags (L-026, T23).
 import { execFileSync } from 'node:child_process';
 import { closeSync, fstatSync, openSync, readFileSync } from 'node:fs';
+import { IDENTITY_SECRET_NAMES, IDENTITY_SETTING_NAMES } from '@agility-bridge/auth';
 import { canonicalInstanceUrl, type LogLevel, Secret } from '@agility-bridge/core';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
@@ -72,6 +73,7 @@ const KNOWN_ENV = new Set([
   'AB_RATE_LIMIT_TOKEN_PER_MINUTE',
   'AB_RATE_LIMIT_GRANT_PER_MINUTE',
   'AB_RATE_LIMIT_VALIDATIONS_PER_MINUTE',
+  'AB_RATE_LIMIT_SIGN_IN',
   'AB_PORT',
   'AB_ENVIRONMENT',
   'AB_DB_PATH',
@@ -94,6 +96,10 @@ const KNOWN_ENV = new Set([
   'AB_INSTANCE_PRIVATE_ADDRESSES',
   'AB_OAUTH',
   'AB_PLAN',
+  // Sign-in (P4-01): the provider settings, their secrets as 0600 files, and the IdP address policy.
+  ...IDENTITY_SETTING_NAMES,
+  ...IDENTITY_SECRET_NAMES.map((n) => `${n}_FILE`),
+  'AB_IDENTITY_PRIVATE_ADDRESSES',
 ]);
 const KNOWN_PREFIXES = ['AB_LIVE_'];
 const ENV_MODE_ONLY = [

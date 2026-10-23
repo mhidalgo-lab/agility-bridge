@@ -13,6 +13,7 @@ import {
   type User,
   type Workspace,
 } from '@agility-bridge/storage';
+import { createSetupLink, type SetupLink } from '../identity/login.ts';
 import { type KeyVersionStatus, keyStatus, retireKeyVersion } from '../secrets/credentials.ts';
 import type { Keyring } from '../secrets/keyring.ts';
 import type { ToolInfo } from './resolve.ts';
@@ -317,7 +318,33 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     },
   };
 
-  return Object.freeze({ actor, users, instances, credentials, workspaces, grants, tokens, keys });
+  /**
+   * First-owner setup links (P4-01): owners only, with a recent sign-in. A link always means *owner*, so whoever can
+   * issue one can create an owner.
+   */
+  const setupLinks = {
+    /** Throws unless the actor may create a link; creates nothing. */
+    authorize(): void {
+      needOwner(actor, 'create an owner setup link');
+      need(actor.kind === 'break_glass' || actor.recentAuth, 'Sign in again before creating a setup link.');
+    },
+    async create(ttlMs: number, clock: { now(): number }): Promise<SetupLink> {
+      setupLinks.authorize();
+      return createSetupLink(storage.kv, ttlMs, clock);
+    },
+  };
+
+  return Object.freeze({
+    actor,
+    users,
+    instances,
+    credentials,
+    workspaces,
+    grants,
+    tokens,
+    keys,
+    setupLinks,
+  });
 }
 
 export type GuardedServices = ReturnType<typeof guardedServices>;

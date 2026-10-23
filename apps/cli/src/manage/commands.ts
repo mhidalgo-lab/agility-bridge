@@ -453,6 +453,20 @@ export const COMMANDS: readonly CommandSpec[] = [
     api: async (_r, p) => ({ method: 'POST', path: `/tokens/${enc(p.args[0] as string)}/revoke` }),
   },
   {
+    words: ['setup-link'],
+    summary:
+      'Issue a single-use link that makes whoever signs in with it the first owner (owner; needs AB_PUBLIC_URL and a sign-in provider)',
+    options: [
+      { name: 'ttl-minutes', kind: 'int', help: 'Minutes until it expires (default 60, at most 10080)' },
+    ],
+    api: async (_r, p) => ({
+      method: 'POST',
+      path: '/setup-links',
+      body: defined({ ttlMinutes: p.opts['ttl-minutes'] }),
+      note: 'Open the url in a browser and sign in. It works once and is shown only now; it makes that sign-in an owner, so share it with no one else.',
+    }),
+  },
+  {
     words: ['audit', 'tail'],
     summary: 'Show the newest audit rows (oldest first)',
     options: [

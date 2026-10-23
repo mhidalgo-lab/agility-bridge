@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Device tokens, the effective-permission resolver, identity providers and OAuth integration (ARCHITECTURE §2).
 export * from './access/index.ts';
+export * from './identity/index.ts';
 export {
   type KeyringCheck,
   type KeyVersionStatus,

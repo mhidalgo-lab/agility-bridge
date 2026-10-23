@@ -352,6 +352,17 @@ export function preparePatch<P>(table: TableName, patch: object): P {
   return out as P;
 }
 
+/** What a first sign-in may set besides the identity itself (`users.bind`, P4-01). */
+const BIND_FIELDS: readonly string[] = ['displayName', 'role'];
+
+/** The values of a `users.bind`: the identity plus the allowed extras, all validated. */
+export function prepareBind(patch: object, idp: string, idpSubject: string): Record<string, unknown> {
+  for (const key of Object.keys(patch)) {
+    if (!BIND_FIELDS.includes(key)) throw bad('users', key, 'cannot be set while binding an identity');
+  }
+  return preparePatch<Record<string, unknown>>('users', { ...patch, idp, idpSubject });
+}
+
 /** Checks a patched row's cross-column rules (the same ones `prepareCreate` checks). */
 export function checkRow(table: TableName, row: Record<string, unknown>): void {
   if (table === 'users' && (row['idp'] === null) !== (row['idpSubject'] === null)) {

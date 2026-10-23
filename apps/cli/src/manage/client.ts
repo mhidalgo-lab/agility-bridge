@@ -67,6 +67,7 @@ export async function localClient(
     clock: systemClock,
     via: 'cli',
     keyring,
+    ...(config.identity === undefined ? {} : { setupLinks: { publicUrl: config.identity.publicUrl } }),
   });
   return {
     mode: 'local',

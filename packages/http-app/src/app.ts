@@ -38,7 +38,9 @@ import { type Context, Hono } from 'hono';
 import { LinearRouter } from 'hono/router/linear-router';
 import { AccessCache } from './access-cache.ts';
 import { ADMIN_BASE, type AdminApiOptions, createAdminApi } from './admin/api.ts';
+import type { LoginEvent } from './audit.ts';
 import { createEdge, type EdgeOptions } from './edge.ts';
+import { createIdentityRoutes, IDENTITY_BASE, type IdentityOptions } from './identity.ts';
 import { type ClassifiedRequest, classifyMcpMessage, jsonRpcError, readMcpBody } from './mcp-request.ts';
 
 /** 1 MiB (ARCHITECTURE §5 step 1). */
@@ -91,6 +93,8 @@ export interface RequestLimits {
   beforeAuth?(ip: string, now: number): LimitDecision | Promise<LimitDecision>;
   /** Charged only when authentication fails (a valid token is never locked out by others' failures). */
   onAuthFailure?(ip: string, now: number): void | Promise<void>;
+  /** Per client IP on the sign-in routes (P4-01): each start writes a row and may call the identity provider. */
+  beforeSignIn?(ip: string, now: number): LimitDecision | Promise<LimitDecision>;
   /** Before an upstream validation of a new pass-through token (P2-14), per instance. */
   beforeValidation?(instanceId: string, now: number): LimitDecision | Promise<LimitDecision>;
   /** True when the IP has no failures left: a failed attempt then answers 429 instead of 401. */
@@ -144,6 +148,13 @@ export interface HttpAppOptions extends EdgeOptions {
   };
   /** The admin API at `/api/admin/v1` (P2-09); absent = the whole API answers 404. */
   readonly admin?: Pick<AdminApiOptions, 'services' | 'audit' | 'authenticate'>;
+  /**
+   * The sign-in routes at `/auth` (P4-01); absent = they answer 404. Needs the keyring (the `login` purpose key).
+   */
+  readonly identity?: Pick<IdentityOptions, 'publicUrl' | 'providers' | 'policy' | 'onLogin'> & {
+    /** Records sign-ins (`AuditWriter.login`). */
+    readonly audit?: (event: LoginEvent) => Promise<void> | undefined;
+  };
   /**
    * `process` (Node, default): one process serves every request. `request` (Workers, L-096): nothing in flight is shared
    * between requests: a concurrency limiter per request and no shared pass-through validation. Pair it with a
@@ -295,7 +306,11 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     else if (c.req.method === 'OPTIONS') refusal = c.body(null, 204);
     if (refusal === undefined) await next();
     const res = refusal ?? c.res;
-    for (const [k, v] of Object.entries(edge.securityHeaders)) res.headers.set(k, v);
+    for (const [k, v] of Object.entries(edge.securityHeaders)) {
+      // A page with its own policy (the sign-in pages: one same-origin script) keeps it.
+      if (k === 'content-security-policy' && res.headers.has(k)) continue;
+      res.headers.set(k, v);
+    }
     for (const [k, v] of Object.entries(edge.corsHeaders(origin))) res.headers.set(k, v);
     res.headers.set('x-request-id', requestId);
     if (refusal !== undefined) c.res = refusal;
@@ -321,6 +336,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         clock: services.clock,
         background: keepAlive,
         keyring: options.keyring,
+        ...(options.identity === undefined ? {} : { setupLinks: { publicUrl: options.identity.publicUrl } }),
         ...(perRequest ? { lightweightRouter: true } : {}),
       });
     if (!perRequest) {
@@ -360,6 +376,48 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
           : adminApp.fetch(forwarded, c.env, ctx as never);
       });
     }
+  }
+
+  if (options.identity !== undefined) {
+    const identity = options.identity;
+    const keyring = options.keyring;
+    const tooManySignIns = (retryAfterSeconds: number) =>
+      new Response('Too many sign-in attempts. Try again in a few minutes.', {
+        status: 429,
+        headers: {
+          'content-type': 'text/plain; charset=utf-8',
+          'retry-after': String(Math.max(1, Math.ceil(retryAfterSeconds))),
+        },
+      });
+    app.route(
+      IDENTITY_BASE,
+      createIdentityRoutes(
+        {
+          ...identity,
+          storage: options.storage,
+          keys: keyring,
+          ...(identity.audit === undefined ? {} : { audit: identity.audit }),
+          identityHash: async (idp, subject) =>
+            `v${keyring.currentVersion}.${(await keyring.mac(KeyPurpose.AuditIdentity, `login|${idp}|${subject}`)).slice(0, 32)}`,
+          ...(perRequest ? { lightweightRouter: true } : {}),
+        },
+        {
+          clock: services.clock,
+          logger: services.logger,
+          runInBackground: keepAlive,
+          // The general per-IP limit first, then the sign-in one: every start writes a row and may call the IdP.
+          async beforeSignIn(c) {
+            const ip = clientIp(c);
+            const now = services.clock.now();
+            const general = await options.limits?.beforeAuth?.(ip, now);
+            if (general !== undefined && !general.ok) return tooManySignIns(general.retryAfterSeconds);
+            const signIn = await options.limits?.beforeSignIn?.(ip, now);
+            if (signIn !== undefined && !signIn.ok) return tooManySignIns(signIn.retryAfterSeconds);
+            return undefined;
+          },
+        },
+      ),
+    );
   }
 
   // Liveness and version only (L-151).

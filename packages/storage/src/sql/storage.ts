@@ -10,6 +10,7 @@ import {
   checkSealedToken,
   checkSettingValue,
   clampLimit,
+  prepareBind,
   prepareCreate,
   preparePatch,
   type TableName,
@@ -151,6 +152,27 @@ export function createSqlStorage(driver: SqlDriver, options: SqlStorageOptions =
         .from(schema.users)
         .where(and(eq(schema.users.idp, idp), eq(schema.users.idpSubject, idpSubject)))
         .limit(1);
+      return rows[0] ?? null;
+    },
+    async bind(id, idp, idpSubject, patch = {}) {
+      checkId('users', id);
+      const values = prepareBind(patch, idp, idpSubject);
+      values['updatedAt'] = now();
+      // One conditional statement: it applies only to an enabled row with no identity, whoever else is binding it.
+      const rows = await guard('users', 'write', () =>
+        db
+          .update(schema.users)
+          .set(values)
+          .where(
+            and(
+              eq(schema.users.id, id),
+              isNull(schema.users.idp),
+              isNull(schema.users.idpSubject),
+              isNull(schema.users.disabledAt),
+            ),
+          )
+          .returning(),
+      );
       return rows[0] ?? null;
     },
     list: () => userRepo.list(),

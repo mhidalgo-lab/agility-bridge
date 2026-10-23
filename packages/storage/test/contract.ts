@@ -199,6 +199,60 @@ export function storageContract(name: string, factory: StorageFactory): void {
       });
     });
 
+    describe('binding a first identity (P4-01, L-185)', () => {
+      it('binds only an enabled user with no identity, once, and can promote and name it in the same step', async () => {
+        await s.users.create({ id: 'u1', email: 'a@example.test', role: 'member' });
+        const bound = await s.users.bind('u1', 'google', 'sub-1', { displayName: 'Ann', role: 'admin' });
+        expect(bound).toMatchObject({
+          id: 'u1',
+          idp: 'google',
+          idpSubject: 'sub-1',
+          displayName: 'Ann',
+          role: 'admin',
+        });
+        expect((await s.users.getByIdentity('google', 'sub-1'))?.id).toBe('u1');
+        // Already bound: nothing changes, not even to the same identity.
+        expect(await s.users.bind('u1', 'github', 'g-1')).toBeNull();
+        expect(await s.users.bind('u1', 'google', 'sub-1')).toBeNull();
+        expect(await s.users.get('u1')).toMatchObject({ idp: 'google', idpSubject: 'sub-1', role: 'admin' });
+        // Unknown and disabled users do not bind.
+        expect(await s.users.bind('nope', 'google', 'sub-2')).toBeNull();
+        await s.users.create({ id: 'u2', email: 'b@example.test', role: 'member', disabledAt: 5 });
+        expect(await s.users.bind('u2', 'google', 'sub-3')).toBeNull();
+        expect(await s.users.get('u2')).toMatchObject({ idp: null, idpSubject: null });
+      });
+
+      it('refuses an identity another user holds and unknown patch fields', async () => {
+        await s.users.create({ id: 'u1', email: 'a@example.test', role: 'member' });
+        await s.users.create({ id: 'u2', email: 'b@example.test', role: 'member' });
+        await s.users.bind('u1', 'google', 'sub-1');
+        await expect(s.users.bind('u2', 'google', 'sub-1')).rejects.toThrow(ConflictError);
+        expect(await s.users.get('u2')).toMatchObject({ idp: null });
+        await expect(
+          s.users.bind('u2', 'google', 'sub-2', { email: 'x@example.test' } as never),
+        ).rejects.toThrow(InvalidInputError);
+      });
+
+      it('lets exactly one of several concurrent first sign-ins win', async () => {
+        await s.users.create({ id: 'u1', email: 'a@example.test', role: 'member' });
+        const results = await Promise.all(
+          ['google', 'github', 'oidc:corp', 'cf-access'].map((idp) =>
+            s.users.bind('u1', idp, `subject-${idp}`).then(
+              (u) => (u === null ? 'lost' : 'won'),
+              () => 'error',
+            ),
+          ),
+        );
+        expect(results.filter((r) => r === 'won')).toHaveLength(1);
+        expect(results.filter((r) => r === 'error')).toHaveLength(0);
+        const row = await s.users.get('u1');
+        expect(row?.idp).not.toBeNull();
+        expect(await s.users.getByIdentity(row?.idp as string, row?.idpSubject as string)).toMatchObject({
+          id: 'u1',
+        });
+      });
+    });
+
     describe('owners and revocation (P2-17 review)', () => {
       it('never leaves zero active owners, even with concurrent changes', async () => {
         await s.users.create({ id: 'o1', email: 'o1@example.test', role: 'owner' });

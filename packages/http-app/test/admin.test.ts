@@ -62,6 +62,7 @@ function routes(w: World): [string, string, unknown?][] {
     ['DELETE', `/instances/${w.ids.instance}`],
     ['GET', '/keys'],
     ['POST', '/keys/1/retire', { reason: 'x' }],
+    ['POST', '/setup-links', {}],
     ['GET', '/credentials'],
     [
       'POST',
@@ -151,6 +152,7 @@ describe('negative authorization (every route)', () => {
       ['POST', `/instances/${w.ids.instance}/retarget`, { baseUrl: 'https://evil.example.test/x' }],
       ['GET', '/keys'],
       ['POST', '/keys/1/retire', { reason: 'x' }],
+      ['POST', '/setup-links', {}],
       ['POST', '/users', { email: 'boss@example.test', role: 'owner' }],
       ['POST', '/users', { email: 'adm@example.test', role: 'admin' }],
       ['PATCH', `/users/${w.ids.alice}`, { role: 'admin' }],

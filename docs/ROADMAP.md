@@ -198,13 +198,13 @@ Status lives in each task file.
 | P3-11 | [Phase 3 review and staging verification](tasks/phase-3-cloudflare/P3-11-phase-3-review.md) | high | P3-04, P3-06, P3-07, P3-08, P3-09, P3-10 | done |
 | P3-12 | [Optional exact rate limiter on a Durable Object](tasks/phase-3-cloudflare/P3-12-durable-object-limiter.md) | low | P3-04 | todo |
 | P3-13 | [Master-key status and retirement through the admin API; init --version](tasks/phase-3-cloudflare/P3-13-remote-key-admin.md) | medium | P3-08 | done |
-| P3-14 | [Cut the Worker's cold-start CPU under the Free plan's budget](tasks/phase-3-cloudflare/P3-14-cold-start-cpu.md) | high | P3-10 | review |
+| P3-14 | [Cut the Worker's cold-start CPU under the Free plan's budget](tasks/phase-3-cloudflare/P3-14-cold-start-cpu.md) | high | P3-10 | done |
 
 ### Phase 4
 
 | ID | Task | Priority | Depends on | Status |
 |---|---|---|---|---|
-| P4-01 | [Identity providers and owner bootstrap](tasks/phase-4-identity-admin/P4-01-identity-providers.md) | high | P3-11 | todo |
+| P4-01 | [Identity providers and owner bootstrap](tasks/phase-4-identity-admin/P4-01-identity-providers.md) | high | P3-11 | review |
 | P4-02 | [Admin sessions, roles, CSRF and re-authentication](tasks/phase-4-identity-admin/P4-02-admin-sessions.md) | high | P4-01 | todo |
 | P4-03 | [Admin UI scaffold](tasks/phase-4-identity-admin/P4-03-admin-ui-scaffold.md) | high | P4-02 | todo |
 | P4-04 | [Admin screens: instances, credentials, workspaces, grants, tokens, users](tasks/phase-4-identity-admin/P4-04-admin-screens.md) | high | P4-03 | todo |
@@ -215,6 +215,8 @@ Status lives in each task file.
 | P4-09 | [Admin security review (owner boundaries on every writer)](tasks/phase-4-identity-admin/P4-09-admin-security-review.md) | high | P4-04, P4-05, P4-06, P4-07 | todo |
 | P4-10 | [Admin documentation](tasks/phase-4-identity-admin/P4-10-admin-docs.md) | medium | P4-04 | todo |
 | P4-11 | [Phase 4 review](tasks/phase-4-identity-admin/P4-11-phase-4-review.md) | high | P4-08, P4-09, P4-10 | todo |
+| P4-12 | [Move a user to another identity on purpose (owner-only unbind)](tasks/phase-4-identity-admin/P4-12-unbind-identity.md) | medium | P4-02 | todo |
+| P4-13 | [pnpm cf:setup prompts for the sign-in settings](tasks/phase-4-identity-admin/P4-13-cf-setup-sign-in.md) | low | P4-01 | todo |
 
 ### Phase 5
 

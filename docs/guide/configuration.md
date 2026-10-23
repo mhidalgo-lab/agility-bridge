@@ -108,6 +108,8 @@ follows in the self-hosting guide.
 | `AB_PASSTHROUGH` | `off` | `on` lets [pass-through workspaces](self-hosting.md#pass-through-workspaces-optional) accept the caller's own Agility token (`X-Agility-Token`, HTTPS only, read-only) |
 | `AB_INSTANCE_PRIVATE_ADDRESSES` | `allow` | `refuse` accepts only instances at public addresses: a host that is, or resolves to, a loopback, private, link-local (cloud metadata) or reserved address is refused when the instance is added or retargeted, and again at every connection (so a DNS answer that changes later is refused too). Keep `allow` for on-premises instances on a private network |
 | `AB_ALLOW_HTTP_INSTANCES` | `off` | `on` accepts plain-HTTP loopback instance URLs (`http://127.0.0.1/…`), for tests and the local synthetic Agility only; logged as a warning |
+| `AB_GOOGLE_*`, `AB_GITHUB_*`, `AB_OIDC_*`, `AB_CF_ACCESS_*`, `AB_LOGIN_*` | unset | Admin sign-in providers, allowlists and auto-provisioning: see [sign-in providers](identity-providers.md#settings). Secrets may come from `<NAME>_FILE` (`0600`) |
+| `AB_IDENTITY_PRIVATE_ADDRESSES` | `refuse` | `allow` lets sign-in reach an identity provider on a private or loopback address; the default refuses non-public addresses at every connection |
 | `AB_ADMIN_URL` | unset | For the [management commands](cli.md): the server to manage through its admin API (HTTPS), instead of the local database |
 
 ### Rate limits
@@ -119,6 +121,7 @@ follows in the self-hosting guide.
 | `AB_RATE_LIMIT_TOKEN_PER_MINUTE` | `120` | Requests per device token (a `subscriptions/listen` stream does not count) |
 | `AB_RATE_LIMIT_GRANT_PER_MINUTE` | `300` | Requests per grant, all its devices together; a grant's own rate limit can lower it |
 | `AB_RATE_LIMIT_VALIDATIONS_PER_MINUTE` | `30` | Checks of new pass-through tokens against Agility, per instance ([pass-through](self-hosting.md#pass-through-workspaces-optional)); beyond it, new tokens get `429` while known ones keep working |
+| `AB_RATE_LIMIT_SIGN_IN` | `60` | Requests to the `/auth/*` sign-in routes per client address per 5 minutes ([sign-in providers](identity-providers.md)); beyond it, `429` |
 | `AB_RATE_LIMIT` | `on` | `off` turns every limit off (logged as a warning) |
 
 A limited request gets `429` with `Retry-After`. The counters live in each server process: several replicas each

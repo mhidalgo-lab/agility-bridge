@@ -2,7 +2,7 @@
 id: P3-14
 title: Cut the Worker's cold-start CPU under the Free plan's budget
 phase: 3
-status: review
+status: done
 priority: high
 depends_on: [P3-10]
 adr: ["0010"]

@@ -85,6 +85,8 @@ export interface RateLimitConfig {
   readonly grantPerMinute: number;
   /** Validations of new pass-through tokens per minute per instance, each costing Agility requests (default 30). */
   readonly validationsPerMinute: number;
+  /** Requests to the sign-in routes per IP per 5 minutes (default 60): each start writes a row and may call the IdP. */
+  readonly signInPer5Minutes: number;
 }
 
 export const DEFAULT_RATE_LIMITS: RateLimitConfig = Object.freeze({
@@ -94,6 +96,7 @@ export const DEFAULT_RATE_LIMITS: RateLimitConfig = Object.freeze({
   tokenPerMinute: 120,
   grantPerMinute: 300,
   validationsPerMinute: 30,
+  signInPer5Minutes: 60,
 });
 
 const MINUTE = 60_000;
@@ -133,6 +136,7 @@ export function createRequestLimits(
   failuresExhausted(ip: string, now: number): Promise<boolean>;
 } {
   const failures: Rate = { limit: config.authFailuresPer5Minutes, windowMs: 5 * MINUTE };
+  const signIn: Rate = { limit: config.signInPer5Minutes, windowMs: 5 * MINUTE };
   /** Fail open: a broken limiter must not take the server down (L-080). */
   const safely = async (
     what: string,
@@ -163,6 +167,10 @@ export function createRequestLimits(
       } catch {
         return false;
       }
+    },
+    beforeSignIn(ip, now) {
+      if (!config.enabled) return { ok: true };
+      return safely('sign_in', () => limiter.take(`signin:${addressKey(ip)}`, signIn, now));
     },
     beforeValidation(instanceId, now) {
       // Fail closed here: an unbounded stream of new tokens would spend the instance's Agility quota (A10).

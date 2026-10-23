@@ -32,8 +32,8 @@ How to use it:
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
-| [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164 |
+| [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188 |
 | [K. Admin UI](#k-admin-ui) | L-095 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -638,6 +638,19 @@ validations per instance, share one validation between concurrent requests with 
 by their /64 so address rotation does not reset the limits.
 *Applied in:* P2-14, P2-17, `packages/http-app/src/app.ts`, `rate-limit.ts`.
 
+**L-187 — An unauthenticated route that writes or calls out needs its own budget.**
+Every `GET /auth/login/:provider` stores a transaction row and may fetch discovery from the IdP; the only bound was the
+general per-IP limit, so one address could keep thousands of rows alive (relic-bridge Phase 4 review L4). Give the
+sign-in routes their own per-address rule (`AB_RATE_LIMIT_SIGN_IN`, default 60 per 5 minutes, IPv6 by /64), checked
+before any storage write or provider call, and expire the abandoned rows.
+*Applied in:* P4-01.
+
+**L-189 — A cookie named twice is no cookie.**
+A sibling subdomain or a script can add a second cookie of the same name (cookie tossing). A reader that takes the first
+value lets the attacker choose which one counts, so a header that names the cookie more than once is treated as having
+none (relic-bridge Phase 4 review Q9). Do it for the sign-in binding cookie and for the session cookie.
+*Applied in:* P4-01, P4-02.
+
 ## J. OAuth and identity
 
 **L-086 — OAuth state lives in shared storage.**
@@ -695,6 +708,35 @@ the last new refresh token works; a client that kept another one must sign in ag
 interval, so the one ADR-0009 promises is ours to build (a per-grant refresh family in storage) and to test with
 parallel refreshes.
 *Applied in:* [spikes/oauth](../spikes/oauth/RESULTS.md), ADR-0009, P5-05.
+
+**L-184 — Compare identities as printable ASCII, never as case-folded Unicode.**
+Lowercasing maps some characters onto ASCII letters (the Kelvin sign `\u212A` becomes `k`), so a verified address at an
+IdP that treats `\u212A` and `k` as different accounts could claim another user's row, because a verified email binds
+an unbound user. Accept only printable ASCII addresses from an IdP, lowercase them, and refuse the rest (relic-bridge
+Phase 4 review L2). Test with code points: a formatter turns an escape back into the raw character (L-166).
+*Applied in:* P4-01 (`canonicalEmail`).
+
+**L-185 — Bind an identity with one compare-and-set, not read-then-write.**
+Reading the user by email and then updating `(idp, idp_subject)` by id lets two concurrent first sign-ins at two
+providers both succeed, each with a session, and the last writer keeps the binding (relic-bridge Phase 4 review M1).
+`users.bind` is one conditional statement (`WHERE id = ? AND idp IS NULL AND idp_subject IS NULL AND disabled_at IS
+NULL`) whose outcome is read from its `RETURNING` row (L-072); no row means `identity_conflict`. Race it on every
+adapter (memory, SQLite with two connections, D1).
+*Applied in:* P4-01.
+
+**L-186 — Every answer from an identity provider goes through one size cap, the key set included.**
+A library that fetches the JWKS for you reads it whole. A hostile or broken `jwks_uri` taken from discovery could stream
+megabytes into an isolate on an unauthenticated route (relic-bridge Phase 4 review L1). Wrap the library's fetch so the
+key set passes the same timeout, no-redirect and byte cap as discovery, token and userinfo answers, and fail those with
+`idp_unavailable` and no body.
+*Applied in:* P4-01 (`remoteKeySource`, `idpJson`).
+
+**L-188 — Revoke a third-party token you needed for one lookup.**
+GitHub sign-in exchanges the code for a user token only to read the id, the primary email and the organizations. GitHub
+keeps such tokens valid until revoked, so call `DELETE /applications/{client_id}/token` as soon as the lookup is over, on
+success and on refusals, in the background where the platform has one (`waitUntil`), and log only a status class when it
+fails (relic-bridge Phase 4 task P4-13). A failed revocation never fails the sign-in.
+*Applied in:* P4-01.
 
 ## K. Admin UI
 

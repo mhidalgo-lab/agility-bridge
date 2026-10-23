@@ -3,7 +3,7 @@ import { ReadOnlyStorageError } from './errors.ts';
 import type { Storage } from './types.ts';
 
 const WRITES: Readonly<Record<string, readonly string[]>> = {
-  users: ['create', 'update', 'delete'],
+  users: ['create', 'update', 'delete', 'bind'],
   instances: ['create', 'update', 'delete'],
   credentials: ['create', 'update', 'delete', 'replaceSecret'],
   workspaces: ['create', 'update', 'delete'],

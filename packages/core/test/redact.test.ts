@@ -32,6 +32,12 @@ add('proxy authorization', fake(12), (s) => `Proxy-Authorization: Digest usernam
 add('device token', `${fake(43)}_${fake(6)}`, (s) => `token ${AB}live_${s}`);
 add('test device token', `${fake(43)}_${fake(6)}`, (s) => `${AB}test_${s}`);
 add('admin token', fake(40), (s) => `AB_ADMIN_TOKEN=${AB}admin_${s}`);
+add('owner setup code', fake(64, '0123456789abcdef'), (s) => `setup ${AB}setup_${s}`);
+add(
+  'owner setup URL',
+  fake(64, '0123456789abcdef'),
+  (s) => `https://bridge.example.test/auth/setup#${AB}setup_${s}`,
+);
 add('master key', fake(43, B64), (s) => `master v2:${s}=`);
 add('master key env', fake(43, B64), (s) => `AB_MASTER_KEY=${s}=`);
 add('agility token env', `1.${fake(28, B64)}`, (s) => `AB_AGILITY_TOKEN=${s}=`);

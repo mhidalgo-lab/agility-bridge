@@ -7,8 +7,8 @@ export const REDACTED = '[REDACTED]';
 
 /** Value patterns: each match is replaced; the replacer keeps a short, non-secret prefix for debugging. */
 const VALUE_PATTERNS: ReadonlyArray<[RegExp, (match: string, ...groups: string[]) => string]> = [
-  // agility-bridge device and admin tokens (ARCHITECTURE §4): ab_live_ / ab_test_ / ab_admin_ + random.
-  [/\bab_(live|test|admin)_[A-Za-z0-9_-]{8,}/g, (_m, kind) => `ab_${kind}_${REDACTED}`],
+  // agility-bridge device, admin and setup tokens (ARCHITECTURE §4): ab_live_ / ab_test_ / ab_admin_ / ab_setup_ + random.
+  [/\bab_(live|test|admin|setup)_[A-Za-z0-9_-]{8,}/g, (_m, kind) => `ab_${kind}_${REDACTED}`],
   // Bearer credentials in headers or messages (Agility access tokens travel this way).
   [/\b(Bearer)\s+[A-Za-z0-9._~+/=-]{8,}/gi, (_m, scheme) => `${scheme} ${REDACTED}`],
   // Authorization headers with any scheme (Basic, Token, Digest, custom): the scheme stays, the credential goes. A

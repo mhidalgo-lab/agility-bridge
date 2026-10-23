@@ -9,6 +9,7 @@ import {
   checkSealedToken,
   checkSettingValue,
   clampLimit,
+  prepareBind,
   prepareCreate,
   preparePatch,
   type TableName,
@@ -244,6 +245,23 @@ export function createMemoryStorage(options: MemoryStorageOptions = {}): Storage
     async getByIdentity(idp, idpSubject) {
       const row = [...tables.users.values()].find((u) => u.idp === idp && u.idpSubject === idpSubject);
       return row === undefined ? null : clone(row);
+    },
+    async bind(id, idp, idpSubject, patch = {}) {
+      checkId('users', id);
+      const values = prepareBind(patch, idp, idpSubject);
+      const current = tables.users.get(id);
+      if (
+        current === undefined ||
+        current.idp !== null ||
+        current.idpSubject !== null ||
+        current.disabledAt !== null
+      )
+        return null;
+      const next = { ...current, ...values, updatedAt: now() } as User & Row;
+      checkRow('users', next);
+      checkUnique('users', next);
+      tables.users.set(id, next);
+      return clone(next) as User;
     },
     list: () => userRepo.list(),
   };

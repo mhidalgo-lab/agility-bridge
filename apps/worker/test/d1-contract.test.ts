@@ -10,6 +10,7 @@ import {
 } from '@agility-bridge/storage';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { loginRace } from '../../../packages/auth/test/login-race.ts';
 import { storageContract } from '../../../packages/storage/test/contract.ts';
 
 let mf: Miniflare;
@@ -68,5 +69,13 @@ describe('migrations on D1', () => {
       .bind(999, 'from-the-future', 'x'.repeat(64), 0)
       .run();
     await expect(openSqlStorage(createD1Driver(db))).rejects.toThrow(/newer/i);
+  });
+});
+
+describe('sign-in binding on D1 (P4-01, L-185)', () => {
+  it('lets exactly one of three concurrent first sign-ins bind the user', async () => {
+    await emptyD1(db);
+    const storage = await openSqlStorage(createD1Driver(db));
+    expect(await loginRace(storage)).toEqual({ ok: 1, conflict: 2, bound: expect.any(String) });
   });
 });
