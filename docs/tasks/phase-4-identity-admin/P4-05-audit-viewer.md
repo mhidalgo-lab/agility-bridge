@@ -2,7 +2,7 @@
 id: P4-05
 title: Audit viewer and usage statistics
 phase: 4
-status: review
+status: done
 priority: medium
 depends_on: [P4-03]
 adr: ["0015"]

@@ -46,6 +46,11 @@ export interface AdminUiDeps {
   readonly now?: () => number;
   /** https public URL: `__Host-` cookie names and `Secure`. */
   readonly secureCookies: boolean;
+  /**
+   * `AB_PUBLIC_URL`'s origin: the only source of the addresses the Connect page and the token page show (never `Host`,
+   * `X-Forwarded-Host` or the request URL, T8).
+   */
+  readonly publicOrigin: string;
   /** Load and check the admin session of this request. Never looks at `Authorization`. */
   authenticate(c: Context): Promise<UiAuthResult>;
   /** Fetch-metadata and `Origin` checks for a cookie-authenticated request (null when fine). */

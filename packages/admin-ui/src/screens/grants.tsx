@@ -655,7 +655,12 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
             <h2 id="tokens-heading">Device tokens</h2>
             <div class="actions page-actions">
               {issuable ? (
-                <LinkButton href={`${self}/tokens/new`}>New device token</LinkButton>
+                <>
+                  <LinkButton href={`${self}/tokens/new`}>New device token</LinkButton>
+                  <LinkButton href={`${self}/connect`} variant="secondary">
+                    Connect a client
+                  </LinkButton>
+                </>
               ) : (
                 <p class="muted">
                   {g.revokedAt !== null || (g.expiresAt !== null && g.expiresAt <= t)

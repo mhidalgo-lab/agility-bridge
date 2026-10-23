@@ -34,7 +34,7 @@ How to use it:
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193 |
-| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208 |
+| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208, L-210 – L-214 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
@@ -858,6 +858,37 @@ would undo that pin and fall back to whatever the workspace default reaches. Goi
 currently uses a credential of the member's own (relic-bridge P4-18); switching to one of their own valid tokens never widens
 anything the workspace and grant limit.
 *Applied in:* P4-07, relic-bridge P4-18.
+
+**L-210 — A generated snippet is text that someone pastes into a shell or a config file: quote per format and test with the real interpreter.**
+The same workspace name or token is a JSON string in one snippet, a POSIX word in the next and a PowerShell string in a third;
+HTML escaping protects the page, not the shell. Each format has one quoting function, and the test runs hostile strings
+(quotes, `$(…)`, backticks, newlines, `${…}`) through a real `bash` with stub commands and asserts each value arrives as exactly
+one argument; JSON snippets are parsed back and compared (relic-bridge P4-06).
+*Applied in:* P4-06, `packages/admin-ui/test/snippets.test.ts`.
+
+**L-211 — A secret goes into a snippet only where the client has no prompt or variable, and the type says so.**
+Shell history and committed project files are the leaks. Snippets read the token from a prompt (VS Code) or an environment
+variable and keep the literal value out; the one client with neither (JetBrains) gets it, and only on the one-time render.
+`Snippet.literalToken` records whether a body holds the real token, and the tests check it against the text for every client
+with and without a token, so a new builder cannot add a second holder unnoticed.
+*Applied in:* P4-06.
+
+**L-212 — Clients expand `${…}` inside URLs: a name that reaches a config file must match the storage rule first.**
+VS Code, Claude Code, Cursor and Devin Desktop expand variables in `url` and `headers`. A slug containing `${input:x}` would be
+expanded by the client even though JSON quoting is correct. The snippet generator throws for a slug that does not match the
+storage rule (`[a-z0-9-]`), and the page shows an error instead of snippets.
+*Applied in:* P4-06.
+
+**L-213 — The guide's snippets are generated text: keep one source and test the copy (L-133 applied to configuration).**
+`docs/guide/clients.md` carries `<!-- snippet: id -->` blocks; a test compares each with the generator's output for placeholder
+values, so a changed format fails CI until the guide is regenerated, instead of drifting until a user pastes a stale form.
+*Applied in:* P4-06.
+
+**L-214 — A client's configuration format moves and its vendor page may be silent: record date, source and what was not seen.**
+Windsurf became Devin Desktop (new path, `serverUrl`), VS Code moved its reference page, and the Copilot CLI page does not say
+whether headers substitute variables. Snippets use the documented command or key, `docs/RESEARCH.md` records the page and the
+date, and anything the page did not show is marked *unverified* instead of being copied from memory.
+*Applied in:* P4-06.
 
 ## L. Cloudflare Workers
 

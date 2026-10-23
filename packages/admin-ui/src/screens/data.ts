@@ -254,7 +254,7 @@ export interface MyWorkspace {
   readonly disabledAt: number | null;
 }
 /** What the token pages need of a workspace. */
-export type WorkspaceName = Pick<Workspace, 'slug' | 'name'>;
+export type WorkspaceName = Pick<Workspace, 'slug' | 'name' | 'disabledAt'>;
 
 export interface MyGrant {
   readonly grant: Grant;

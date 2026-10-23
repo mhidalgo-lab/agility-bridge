@@ -126,3 +126,23 @@
 - **Recommendation:** (a): the numbers match relic-bridge, apply to every writer (API, panel, command line), and owners and
   admins are people too. Make them settings only if a team asks.
 - **Owner:** _pending_ (implemented as (a)).
+
+### D-41 — No third-party bridge for Claude Desktop and claude.ai *(P4-06)*
+- **Context:** Claude Desktop's config file starts stdio servers only, claude.ai and mobile need a connector (OAuth, Phase 5).
+  relic-bridge's connect page offered a Claude Desktop snippet that runs the third-party `mcp-remote` package through `npx` with
+  the token in the file's `env`.
+- **Options:** (a) no snippet until the OAuth connector exists (listed as "needs OAuth"); (b) the `mcp-remote` snippet; (c) a
+  first-party stdio-to-HTTP proxy mode in the CLI.
+- **Recommendation:** (a). (b) puts an unpinned third-party package, run on every start, between a person and a token that acts as
+  them in Agility; (c) is a feature of its own (a new task if a team needs Desktop before Phase 5).
+- **Owner:** _pending_ (implemented as (a)).
+
+### D-42 — Environment variable name and where the client keeps the token *(P4-06)*
+- **Context:** snippets read the device token from a variable instead of a command-line value. The server itself reads `AB_*`
+  variables, and Claude Code blanks credential-looking names such as `*_AUTH_TOKEN` in project files.
+- **Options:** (a) `AGILITY_BRIDGE_TOKEN` (outside the `AB_` namespace the server validates, not on Claude Code's list);
+  (b) `AB_DEVICE_TOKEN`; (c) no variable, literal values everywhere.
+- **Recommendation:** (a). `claude mcp add` and `copilot mcp add` still write the expanded value into the client's own file
+  (`~/.claude.json`, `~/.copilot/mcp-config.json`, plain text): the snippets say so, and short device-token lifetimes are the
+  mitigation (the default is 90 days).
+- **Owner:** _pending_ (implemented as (a)).

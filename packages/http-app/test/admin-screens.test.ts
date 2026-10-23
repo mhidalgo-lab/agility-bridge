@@ -872,7 +872,9 @@ describe('device tokens: shown once', () => {
     expect(issued.headers.getSetCookie().join(';')).not.toContain('ab_');
     const token = /<code id="token">([^<]+)<\/code>/.exec(html)?.[1] as string;
     expect(token).toMatch(/^ab_/);
-    expect(html.split(token).length - 1).toBe(1);
+    // The token box, and the one snippet (JetBrains) whose client can neither prompt for it nor read a variable (P4-06).
+    expect(html.split(token).length - 1).toBe(2);
+    expect(html.split(`Bearer ${token}`).length - 1).toBe(1);
     expect(await tokenCount(s)).toBe(before + 1);
     // The new token is a real one: it opens the workspace's MCP endpoint.
     const ok = await mcpPost(s.w, 'team-a', token, {

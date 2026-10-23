@@ -14,6 +14,7 @@
 //   GET  /admin/me/grants/:id                   my grant: credential choice, device tokens
 //   POST /admin/me/grants/:id/credential        use one of my tokens, or the workspace default
 //   .../me/grants/:id/tokens...                 device tokens (tokens.tsx, member area)
+//   GET  /admin/me/grants/:id/connect           endpoint and client snippets (tokens.tsx, connect.tsx; P4-06)
 import type { Context, Hono } from 'hono';
 import {
   Button,
@@ -788,6 +789,9 @@ export function registerMe(ui: Hono, kit: UiKit): void {
             {canIssueOn(grant, current, principal, t) ? (
               <div class="actions">
                 <LinkButton href={`${grantPage(id)}/tokens/new`}>New device token</LinkButton>
+                <LinkButton href={`${grantPage(id)}/connect`} variant="secondary">
+                  Connect a client
+                </LinkButton>
               </div>
             ) : (
               <p class="hint">This grant cannot get new device tokens: it is revoked or expired.</p>
