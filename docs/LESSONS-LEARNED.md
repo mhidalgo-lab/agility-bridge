@@ -953,7 +953,9 @@ so in words instead of promising an effect.
 `.table-wrap { overflow-x: auto }` kept the 320 px page from overflowing, but a keyboard user could not scroll it (WCAG
 2.1.1): axe-core's `scrollable-region-focusable` found it on the first audit-log run in Chromium, light and dark. A
 scrollable container is a focusable, named region (`tabindex="0"`, `role="region"`, `aria-label`). jsdom has no layout, so
-the contrast and scroll rules need a browser; `visit()` in the E2E harness runs axe on every page it opens.
+the contrast and scroll rules need a browser; `visit()` in the E2E harness runs axe on every page it opens. The same goes
+for a long path or address with no break opportunity: it overflowed only with CI's fonts, as text (not an element), so the
+overflow check names overflowing text nodes too and `main` has `overflow-wrap: break-word`.
 *Applied in:* P4-08.
 
 ## L. Cloudflare Workers

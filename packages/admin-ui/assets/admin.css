@@ -145,6 +145,8 @@ main {
   max-width: 64rem;
   margin: 0 auto;
   padding: var(--space);
+  /* A long path or address with no break opportunity wraps instead of widening a 320 px page (P4-08). */
+  overflow-wrap: break-word;
 }
 
 h1 {
