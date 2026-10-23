@@ -130,12 +130,15 @@ describe('client secrets from files', () => {
       withSecretFiles({ AB_GITHUB_CLIENT_SECRET: 'x', AB_GITHUB_CLIENT_SECRET_FILE: file }, data()),
     ).toThrow(/not both/);
     const open = secretFile('open.secret', 'value-bbb', 0o644);
-    expect(() => withSecretFiles({ AB_OIDC_CLIENT_SECRET_FILE: open }, data())).toThrow(
-      /AB_OIDC_CLIENT_SECRET_FILE: .*chmod 600/,
-    );
     const link = join(dir, 'link.secret');
-    symlinkSync(file, link);
-    expect(() => withSecretFiles({ AB_GOOGLE_CLIENT_SECRET_FILE: link }, data())).toThrow(/symbolic link/);
+    // Windows has no POSIX modes, and creating links needs a privilege the runners lack.
+    if (process.platform !== 'win32') {
+      expect(() => withSecretFiles({ AB_OIDC_CLIENT_SECRET_FILE: open }, data())).toThrow(
+        /AB_OIDC_CLIENT_SECRET_FILE: .*chmod 600/,
+      );
+      symlinkSync(file, link);
+      expect(() => withSecretFiles({ AB_GOOGLE_CLIENT_SECRET_FILE: link }, data())).toThrow(/symbolic link/);
+    }
     mkdirSync(data(), { recursive: true });
     const inside = join(data(), 'in.secret');
     writeFileSync(inside, 'value-ccc', { mode: 0o600 });
