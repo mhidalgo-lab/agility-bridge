@@ -20,6 +20,8 @@
     "skipLibCheck": true,
     "noEmit": true,
     "types": [],
-    "customConditions": ["source"]
+    "customConditions": ["source"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx"
   }
 }

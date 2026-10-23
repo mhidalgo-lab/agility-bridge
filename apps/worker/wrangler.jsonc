@@ -11,6 +11,7 @@
   "send_metrics": false,
   // The workspace packages are bundled from their sources (no build of the packages first).
   "alias": {
+    "@agility-bridge/admin-ui": "../../packages/admin-ui/src/index.ts",
     "@agility-bridge/auth": "../../packages/auth/src/index.ts",
     "@agility-bridge/core": "../../packages/core/src/index.ts",
     "@agility-bridge/http-app": "../../packages/http-app/src/index.ts",

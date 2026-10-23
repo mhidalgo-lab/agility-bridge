@@ -165,7 +165,7 @@ describe('the session cookie', () => {
     expect(attrs).toEqual(expect.arrayContaining(['Path=/', 'HttpOnly', 'SameSite=Lax', 'Secure']));
     expect(attrs.some((a) => /^domain=/i.test(a))).toBe(false);
     expect(attrs).toContain(`Max-Age=${12 * 3600}`);
-    expect(res.headers.get('location')).toBe('/auth/account');
+    expect(res.headers.get('location')).toBe('/admin');
     // The login binding cookie is cleared in the same response.
     expect(res.headers.getSetCookie().some((c) => /^__Host-ab_login=;.*Max-Age=0/.test(c))).toBe(true);
   });
@@ -739,20 +739,25 @@ describe('logout and the account page', () => {
   it('shows the CSRF token on the account page only to its own session, with no referrer loss', async () => {
     const s = await setup();
     const own = await s.session(OWNER);
-    const res = await s.send('GET', '/auth/account', { cookie: own.cookie, site: 'none' });
+    // The old address now leads to the panel's account page.
+    const old = await s.send('GET', '/auth/account', { cookie: own.cookie, site: 'none' });
+    expect(old.status).toBe(303);
+    expect(old.headers.get('location')).toBe('/admin/account');
+    const res = await s.send('GET', '/admin/account', { cookie: own.cookie, site: 'none' });
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain(own.csrf);
     expect(html).toContain('owner@example.test');
     expect(html).toContain('action="/auth/logout"');
-    expect(html).not.toMatch(/<script/i);
+    expect(html).not.toMatch(/<script[^>]*>[^<]+<\/script\s*>/i);
     expect(res.headers.get('referrer-policy')).toBe('same-origin');
     expect(res.headers.get('cache-control')).toBe('no-store');
     expect(res.headers.get('x-frame-options')).toBe('DENY');
-    const anon = await s.send('GET', '/auth/account', { site: 'none' });
+    const anon = await s.send('GET', '/admin/account', { site: 'none' });
     expect(anon.status).toBe(303);
+    expect(anon.headers.get('location')).toBe(`/auth/login?next=${encodeURIComponent('/admin/account')}`);
     expect(await anon.text()).not.toContain(own.csrf);
-    const cross = await s.send('GET', '/auth/account', {
+    const cross = await s.send('GET', '/admin/account', {
       cookie: own.cookie,
       site: 'cross-site',
       headers: { 'sec-fetch-mode': 'no-cors' },

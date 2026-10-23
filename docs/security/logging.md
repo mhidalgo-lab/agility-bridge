@@ -48,6 +48,7 @@ carry `requestId`.
 | warn | `background work failed` | `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
 | error | `unhandled error` | `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
 | error | `admin API error` | `path` (route template), `error` (class) | [api.ts](../../packages/http-app/src/admin/api.ts) |
+| error | `admin panel error` | `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
 | warn | `rate limiter failed; allowing the request` | `limit`, `error` (class) | [rate-limit.ts](../../packages/http-app/src/rate-limit.ts) |
 | info | `scheduled jobs` | `auditDeleted`, `kvPurged`, `rotated`, `revalidated`, `failed` (Worker cron) | [scheduled.ts](../../apps/worker/src/scheduled.ts) |
 | error | `scheduled job failed` | `job`, `error` (class) | [scheduled.ts](../../apps/worker/src/scheduled.ts) |

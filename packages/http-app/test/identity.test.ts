@@ -164,6 +164,10 @@ const loginRows = async (s: Setup) =>
 const reasons = async (s: Setup) =>
   (await loginRows(s)).map((r) => (r.details as { reason?: string })?.reason);
 
+/** The panel's policy, spelled out once here (not imported: a test that compares a header to the constant it was built from cannot fail). */
+const UI_CSP_LITERAL =
+  "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; require-trusted-types-for 'script'";
+
 describe('the chooser and the routes', () => {
   it('lists the providers with links, under a strict policy of its own', async () => {
     const s = await setup();
@@ -174,14 +178,14 @@ describe('the chooser and the routes', () => {
     expect(html).toContain('Continue with Corporate login');
     expect(html).toContain('/auth/login/github');
     expect(html).toContain('/auth/cf-access');
-    expect(html).not.toMatch(/<script/i);
-    expect(html).not.toMatch(/ style=|<style/i);
-    expect(res.headers.get('content-security-policy')).toBe(
-      "default-src 'none'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'",
-    );
+    // The panel's layout: its own stylesheet and optional script only (same origin, with SRI), nothing inline.
+    expect(html.match(/<script[^>]*>/gi)).toHaveLength(1);
+    expect(html).not.toMatch(/<script[^>]*>[^<]+<\/script\s*>/i);
+    expect(html).not.toMatch(/ style=|<style|\son[a-z]+=/i);
+    expect(res.headers.get('content-security-policy')).toBe(UI_CSP_LITERAL);
     expect(res.headers.get('cache-control')).toBe('no-store');
     expect(res.headers.get('x-frame-options')).toBe('DENY');
-    expect(res.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(res.headers.get('referrer-policy')).toBe('same-origin');
     expect(s.upstream).toEqual([]);
   });
 
@@ -667,17 +671,27 @@ describe('owner setup links (L-085)', () => {
     expect(page.status).toBe(200);
     expect(html).toMatch(/<form method="post" action="\/auth\/setup"/);
     expect(html).toContain('type="password"');
-    expect(html.match(/<script[^>]*>/gi)).toEqual(['<script src="/auth/setup.js">']);
     expect(html).not.toMatch(/<script[^>]*>[^<]+<\/script\s*>/i);
     expect(html).toContain('name="provider" value="oidc-corp"');
-    const script = await s.get('/auth/setup.js');
+    // The one script is the panel's asset (hashed, with SRI), which moves the fragment into the form.
+    const tags = html.match(/<script[^>]*>/gi) ?? [];
+    expect(tags).toHaveLength(1);
+    const src = /src="([^"]+)"/.exec(tags[0] as string)?.[1] as string;
+    expect(src).toMatch(/^\/admin\/assets\/admin\.[0-9a-f]{16}\.js$/);
+    expect(tags[0]).toMatch(/integrity="sha384-/);
+    const script = await s.get(src);
     expect(script.headers.get('content-type')).toMatch(/^text\/javascript/);
     const js = await script.text();
     expect(js).toContain('location.hash');
     expect(js).toContain('history.replaceState');
     // The script never sends the code anywhere itself: no network API.
     expect(js).not.toMatch(/fetch|XMLHttpRequest|sendBeacon|WebSocket|\.src\s*=/);
-    expect(page.headers.get('content-security-policy')).toContain("script-src 'self'");
+    // The old one-off script is gone.
+    expect((await s.get('/auth/setup.js')).status).toBe(404);
+    // Without `form-action` (the post is answered with a redirect to the IdP) and otherwise the panel's policy.
+    expect(page.headers.get('content-security-policy')).toBe(
+      UI_CSP_LITERAL.replace("form-action 'self'; ", ''),
+    );
   });
 
   it('makes the first sign-in an owner, once; the link is then used up', async () => {
@@ -941,8 +955,6 @@ describe('abuse limits', () => {
     expect((await s.post('/auth/setup', 'code=x&provider=oidc-corp')).status).toBe(429);
     expect((await s.w.storage.kv.list('login:')).length).toBe(before);
     expect(s.upstream.length).toBe(upstream);
-    // The setup script is a static file and stays reachable.
-    expect((await s.get('/auth/setup.js')).status).toBe(200);
   });
 
   it('counts starts per address with the real sign-in rule (default 60 per 5 minutes), by IPv6 /64', async () => {
@@ -1019,7 +1031,7 @@ describe('what never leaks', () => {
     const a = await s.get('/auth/callback/oidc-corp?code=a&state=b');
     const html = await a.text();
     expect(html).toContain('Sign-in failed');
-    expect(html).toMatch(/Request id: [0-9a-f-]{36}/);
+    expect(html).toMatch(/Request id: <code>[0-9a-f-]{36}<\/code>/);
     expect(a.headers.get('x-request-id')).toMatch(/^[0-9a-f-]{36}$/);
     expect(html).not.toMatch(/stack|Error:|at \w+ \(/);
   });

@@ -71,7 +71,7 @@
 | `packages/storage-sqlite` | `node:sqlite` adapter, file permissions, backups | Node only. |
 | `packages/auth` | Device tokens, effective-permission resolver, identity providers (Google, GitHub, Cloudflare Access, OIDC), admin sessions, OAuth 2.1 integration | WebCrypto only. |
 | `packages/http-app` | Hono app: routing, middleware (security headers, Host/Origin, body caps, auth, rate limits, audit), MCP handler per workspace, admin REST API | Runs on Workers and on Node through `@hono/node-server`. |
-| `packages/admin-ui` | Server-rendered admin panel (Hono JSX), static assets with hashes, mounted at `/admin` | No inline scripts or styles; strict CSP; auto-escaping only. |
+| `packages/admin-ui` | Server-rendered admin panel (Hono JSX), static assets with hashes, mounted at `/admin` | No inline scripts or styles; strict CSP; auto-escaping only; changes only through in-process admin API calls ([dev/admin-ui.md](dev/admin-ui.md)). |
 | `apps/cli` | `agility-bridge` binary: `stdio` (default), `serve`, `init`, `doctor`, management commands, keychain | Node 24 LTS. The only published npm package at first. |
 | `apps/worker` | Cloudflare entry, bindings, `wrangler` config, setup script | Workers runtime. |
 | `site/` | Documentation site (Phase 9) | Static. |

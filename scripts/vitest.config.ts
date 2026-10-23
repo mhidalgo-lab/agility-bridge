@@ -6,6 +6,9 @@ export default defineProject({
   // Scripts and their tests import the workspace packages from source (CI runs the tests before any build).
   resolve: {
     alias: {
+      '@agility-bridge/admin-ui': fileURLToPath(
+        new URL('../packages/admin-ui/src/index.ts', import.meta.url),
+      ),
       '@agility-bridge/auth': fileURLToPath(new URL('../packages/auth/src/index.ts', import.meta.url)),
       '@agility-bridge/http-app': fileURLToPath(
         new URL('../packages/http-app/src/index.ts', import.meta.url),

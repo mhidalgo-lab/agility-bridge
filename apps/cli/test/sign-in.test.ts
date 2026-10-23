@@ -257,11 +257,55 @@ describe('the first owner, end to end over sockets', () => {
     expect(done.status).toBe(303);
     const session = done.headers.getSetCookie().find((c) => c.startsWith('ab_session=')) as string;
     expect(session).toContain('HttpOnly');
+    expect(done.headers.get('location')).toBe('/admin');
+    const cookieHeader = session.split(';')[0] as string;
+    // The panel, on the real socket: pages, the edge's headers on them, and a form that changes the user through the
+    // admin API (the request body is forwarded to the panel's own app, P4-03).
+    const panel = await fetch(`${publicUrl}/admin`, {
+      redirect: 'manual',
+      headers: { cookie: cookieHeader },
+    });
+    const panelHtml = await panel.text();
+    expect(panel.status).toBe(200);
+    expect(panelHtml).toContain('first@example.test');
+    expect(panel.headers.get('content-security-policy')).toContain("default-src 'none'; script-src 'self'");
+    expect(panel.headers.get('x-frame-options')).toBe('DENY');
+    const accountPage = await fetch(`${publicUrl}/admin/account`, { headers: { cookie: cookieHeader } });
+    const csrf = /name="_csrf" value="([^"]+)"/.exec(await accountPage.text())?.[1] as string;
+    const formHeaders = {
+      cookie: cookieHeader,
+      origin: publicUrl,
+      'sec-fetch-site': 'same-origin',
+      'content-type': 'application/x-www-form-urlencoded',
+    };
+    const forged = await fetch(`${publicUrl}/admin/account/name`, {
+      method: 'POST',
+      redirect: 'manual',
+      headers: formHeaders,
+      body: 'displayName=Forged&_csrf=nope',
+    });
+    expect(forged.status).toBe(403);
+    const renamed = await fetch(`${publicUrl}/admin/account/name`, {
+      method: 'POST',
+      redirect: 'manual',
+      headers: formHeaders,
+      body: new URLSearchParams({ displayName: 'Panel Owner', _csrf: csrf }).toString(),
+    });
+    expect(renamed.status).toBe(303);
+    expect(renamed.headers.get('location')).toBe('/admin/account');
+    expect(
+      (await server?.storage.users.list())?.find((u) => u.email === 'first@example.test')?.displayName,
+    ).toBe('Panel Owner');
+    const css = /href="(\/admin\/assets\/[^"]+\.css)"/.exec(panelHtml)?.[1] as string;
+    const asset = await fetch(`${publicUrl}${css}`);
+    expect(asset.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+    // The old account address leads to the panel.
     const account = await fetch(`${publicUrl}/auth/account`, {
       redirect: 'manual',
-      headers: { cookie: session.split(';')[0] as string },
+      headers: { cookie: cookieHeader },
     });
-    expect(await account.text()).toContain('first@example.test');
+    expect(account.status).toBe(303);
+    expect(account.headers.get('location')).toBe('/admin/account');
     expect((await post(publicUrl, form(code))).status).toBe(400);
     const owners = (await server?.storage.users.list())?.filter((u) => u.role === 'owner');
     expect(owners).toMatchObject([{ email: 'first@example.test', idp: 'oidc:corp', idpSubject: 'first' }]);
@@ -271,22 +315,24 @@ describe('the first owner, end to end over sockets', () => {
     const ended = await cli(['user', 'end-sessions', ownerId], e);
     expect(ended.code).toBe(0);
     expect(JSON.parse(ended.out)).toEqual({ ok: true, revoked: 1 });
-    const after = await fetch(`${publicUrl}/auth/account`, {
+    const after = await fetch(`${publicUrl}/admin`, {
       redirect: 'manual',
-      headers: { cookie: session.split(';')[0] as string },
+      headers: { cookie: cookieHeader },
     });
     expect(after.status).toBe(303);
-    expect(after.headers.get('location')).toBe('/auth/login');
+    expect(after.headers.get('location')).toBe(`/auth/login?next=${encodeURIComponent('/admin')}`);
 
     await server?.audit.flush();
     const rows = await server?.storage.audit.query({ limit: 100 });
     // The sign-in, the issue of the link, and the refused replay of the spent link.
     expect(rows?.map((r) => r.action).sort()).toEqual([
+      'admin.forbidden',
       'login.denied',
       'login.ok',
       'session.create',
       'session.revoke_all',
       'setup_link.create',
+      'user.update',
     ]);
     const text = `${lines.join('\n')}${JSON.stringify(rows)}${issued.err}`;
     expect(text).not.toContain(code);

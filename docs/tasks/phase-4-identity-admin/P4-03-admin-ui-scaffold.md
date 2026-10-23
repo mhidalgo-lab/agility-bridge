@@ -2,7 +2,7 @@
 id: P4-03
 title: Admin UI scaffold
 phase: 4
-status: in-progress
+status: review
 priority: high
 depends_on: [P4-02]
 adr: ["0004"]
@@ -77,31 +77,69 @@ the admin API; the screens themselves are not part of it.
   by exactly the roles whose menu shows it.
 
 ## Acceptance criteria
-- [ ] The CSP (asserted as a literal string, once, and compared by exact match at the edge) has no `unsafe-inline` or
+- [x] The CSP (asserted as a literal string, once, and compared by exact match at the edge) has no `unsafe-inline` or
       `unsafe-eval`; the full header set is asserted on every panel route (overview, account, asset, 404, 403, error,
       sign-in redirect target, `/auth/*` pages) on Node (in-process) and in workerd.
-- [ ] Hostile strings (script tags, attribute breakouts, `javascript:` URLs, a user's email and display name coming from
+- [x] Hostile strings (script tags, attribute breakouts, `javascript:` URLs, a user's email and display name coming from
       storage) render inert through every component and both pages.
-- [ ] `scripts/check-ui-escaping.ts` is in `pnpm lint` and fails on a planted `raw(`, `dangerouslySetInnerHTML`,
+- [x] `scripts/check-ui-escaping.ts` is in `pnpm lint` and fails on a planted `raw(`, `dangerouslySetInnerHTML`,
       `hono/html`, `html` template with interpolation, `innerHTML =` and `eval(`; the scan covers `admin-ui` and
       `http-app` sources.
-- [ ] SRI hashes in the pages match the bytes served; names carry the content hash; assets are `immutable`; the
+- [x] SRI hashes in the pages match the bytes served; names carry the content hash; assets are `immutable`; the
       generator's `--check` detects a changed asset or a hand-edited generated file (in `pnpm lint`).
-- [ ] Unauthenticated, bearer-only, dead-cookie and disabled-user requests to `/admin` and `/admin/*` redirect to sign-in
+- [x] Unauthenticated, bearer-only, dead-cookie and disabled-user requests to `/admin` and `/admin/*` redirect to sign-in
       with a same-origin `next`, with no page content; cross-site subresource and `fetch` requests are refused.
-- [ ] Form refusals (missing, duplicate and wrong CSRF token, foreign and `null` `Origin`, cross-site fetch metadata,
+- [x] Form refusals (missing, duplicate and wrong CSRF token, foreign and `null` `Origin`, cross-site fetch metadata,
       wrong content type, oversized body, role too low) answer 403/413/415 and change nothing (no storage write, no
       audit row except `admin.forbidden`).
-- [ ] A change made in the panel goes through the admin API: its audit row equals the row of the same call made on the
+- [x] A change made in the panel goes through the admin API: its audit row equals the row of the same call made on the
       API (same action, actor role, fields, `via`), a role the API refuses is refused in the panel, and the UI package
       has no storage import.
-- [ ] Re-authentication round trip: an owner without a recent sign-in gets the prompt page (nothing changed), follows
+- [x] Re-authentication round trip: an owner without a recent sign-in gets the prompt page (nothing changed), follows
       `/auth/reauth`, returns to the page and the same form succeeds.
-- [ ] `/admin` renders on the Worker in workerd, and MCP requests do not load the panel (test on the lazy build).
-- [ ] The Worker cold start is not worse: bundle size delta recorded, the panel is not evaluated by an MCP request.
-- [ ] Key security tests are mutation-checked (L-121), recorded under Outcome.
-- [ ] `docs/dev/admin-ui.md`, THREAT_MODEL T13, `docs/guide/admin-access.md`, ARCHITECTURE, a changeset and new lessons
+- [x] `/admin` renders on the Worker in workerd, and MCP requests do not load the panel (test on the lazy build).
+- [x] The Worker cold start is not worse: bundle size delta recorded, the panel is not evaluated by an MCP request.
+- [x] Key security tests are mutation-checked (L-121), recorded under Outcome.
+- [x] `docs/dev/admin-ui.md`, THREAT_MODEL T13, `docs/guide/admin-access.md`, ARCHITECTURE, a changeset and new lessons
       are done; documented commands run (L-133).
+
+## Outcome
+- Built as scoped. `packages/admin-ui` (components, kit, pages, headers, flash, assets, `overview` and `account` screens),
+  `packages/http-app/src/admin-ui.ts` (the session and admin API as `AdminUiDeps`) and the mounting in `app.ts`; the
+  `/auth/*` pages now render through the panel's layout and `packages/http-app/src/identity-pages.ts` (string-built HTML) is
+  gone. `DEFAULT_LOGIN_NEXT` is `/admin`; `GET /auth/account` redirects to `/admin/account`; the one-off `/auth/setup.js` is
+  folded into the panel's script (`input[data-setup-code]`).
+- Tests added: admin-ui 137 (components and hostile strings, headers, assets, contrast, kit against a fake server), http-app
+  53 (`admin-panel.test.ts`, `admin-panel-lazy.test.ts`: headers on every route on Node and in the Workers configuration,
+  who gets in, 28 form-refusal cases that must change nothing, panel change equals API change, re-authentication round
+  trip, lazy loading), scripts 25 (escaping guard with a planted violation of each kind, generator `--check` drift), plus
+  workerd (`/admin`, asset, form with the in-process admin API on the Worker) and a real-socket `serve` run (the form body
+  reaches the panel through the forwarded request). Existing P4-01/P4-02 tests were updated where the page markup or the
+  landing page changed.
+- Worker bundle: the panel and `hono/jsx` are about 83 KB of 2.29 MB, inside a lazy initialiser that runs only on the first
+  panel or sign-in request (checked in `apps/worker/dist/index.js`); `pnpm bench:worker` cold boot is unchanged within its
+  noise. No Cloudflare measurement was made (no deploy in this task).
+- Mutation checks (L-121), 29 deliberate reversions that each fail a test: CSRF comparison removed, token accepted twice,
+  form `Origin`/fetch-metadata check removed, form role check removed, page role check removed, page fetch-metadata check
+  removed, content-type check removed, size cap removed, an unsafe admin call without the verified form, the
+  re-authentication prompt removed, dead cookie not cleared, `localHref` accepting anything, `adminPath` not encoding,
+  a flash cookie named twice accepted, a flash rendered with `dangerouslySetInnerHTML`, `unsafe-inline` in the CSP, assets
+  not immutable, the edge keeping any CSP, the CSRF header dropped from the in-process call, no audit row for a refused panel
+  request, the panel loaded eagerly, the request id not carried to the panel, the setup page keeping `form-action`, a dead
+  session not clearing the cookie, the forwarded request losing its body, the escaping guard without its `raw(` or
+  `html` template rule, SRI over the wrong digest, and `--check` always passing. Three survived their first test set and led
+  to a test or a better mutation: a flash cookie named twice (test added), a flash mutation that did not change what is
+  rendered (replaced by `dangerouslySetInnerHTML`), and an audit mutation that kept the write alive anyway (replaced by
+  dropping the call). Writing the edge mutation showed that no test served a loose policy through the edge, so a test now
+  adds routes with loose and near-miss policies to the app and checks that only the panel's two survive.
+- relic-bridge findings folded in: the CSP test compares against a literal (Q1, L-194); role ranks are tested against the
+  admin API's behaviour and every menu entry against the roles that may open it (Q4); the panel's `Referrer-Policy:
+  same-origin` (task text there said `no-referrer`); a flash cookie named twice is none; the single-use handle written on
+  every GET of a token form (L6) is not ported and is noted for P4-04. Not ported: jsdom/axe-core runs (jsdom has no layout:
+  the token contrast is computed instead; browser runs are P4-08), the once-store, the consent and member screens.
+- New: lessons L-194 to L-196, task P4-14 (benchmark scenarios for the panel), decision D-35.
+- Not exercised: a real browser (P4-08: the CSP, Trusted Types and `form-action` behaviour are per the specification only),
+  a real identity provider, and the Worker cold start on Cloudflare itself.
 
 ## Security notes
 THREAT_MODEL T13 (XSS, CSRF, clickjacking), T14 (session use on pages), T21 (no request data in module state: the kit

@@ -9,6 +9,7 @@ export default defineProject({
   // generate keys and tokens (see apps/cli/vitest.config.ts for the aliases).
   resolve: {
     alias: {
+      '@agility-bridge/admin-ui': src('admin-ui'),
       '@agility-bridge/auth': src('auth'),
       '@agility-bridge/core': src('core'),
       '@agility-bridge/http-app': src('http-app'),

@@ -72,3 +72,15 @@
 - **Recommendation:** (a) until a real run (owner step 1) shows what Google does with `prompt=login`: the session was
   already created by a fresh provider round trip, and (b) would lock Google- and GitHub-only teams out of key rotation.
 - **Owner:** _pending_ (implemented as (a)).
+
+### D-35 — The owner setup page's policy has no `form-action` *(P4-03)*
+- **Context:** the panel's CSP restricts `form-action` to `'self'`. The owner setup form posts to this server and is answered
+  with a redirect to the identity provider, and Chromium applies `form-action` to the redirects that follow a form post
+  ([L-195](../LESSONS-LEARNED.md)), so under the panel policy the first-owner sign-in would stop at the redirect. The setup
+  page alone (`UI_CSP_SETUP`) drops that one directive; everything else is unchanged.
+- **Options:** (a) keep: one page, one directive, tested as the panel policy minus `form-action`; (b) make the setup post
+  answer with a same-origin page that has a link to the provider (needs the login transaction to travel in a cookie or a
+  URL); (c) drop `form-action` from every page.
+- **Recommendation:** (a). The page holds no session and no secret except the code the visitor types, and (b) needs a design
+  of its own. Verify in a real browser in the P4-08 run (Chromium and Firefox treat redirects after form posts differently).
+- **Owner:** _pending_ (implemented as (a)).

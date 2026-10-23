@@ -39,6 +39,7 @@ import { type Context, Hono } from 'hono';
 import { LinearRouter } from 'hono/router/linear-router';
 import { AccessCache } from './access-cache.ts';
 import { ADMIN_BASE, type AdminApiOptions, adminAuthenticator, createAdminApi } from './admin/api.ts';
+import { ADMIN_UI_BASE, type AdminUiModule, adminUiDeps, loadAdminUiModule } from './admin-ui.ts';
 import type { LoginEvent } from './audit.ts';
 import { createEdge, type EdgeOptions } from './edge.ts';
 import { createIdentityRoutes, IDENTITY_BASE, type IdentityOptions } from './identity.ts';
@@ -201,6 +202,26 @@ const INTERNAL_REQUEST_ID = 'x-agility-bridge-internal-request-id';
 /** Pass-through identities kept at most (P2-14). */
 const MAX_IDENTITIES = 10_000;
 
+/** Runs an app mounted behind this one for `request`, with this request's environment and execution context. */
+function dispatch(target: Hono, request: Request, c: Context): Response | Promise<Response> {
+  let ctx: { waitUntil(p: Promise<unknown>): void; passThroughOnException(): void } | undefined;
+  try {
+    ctx = c.executionCtx;
+  } catch {
+    ctx = undefined;
+  }
+  return ctx === undefined ? target.fetch(request, c.env) : target.fetch(request, c.env, ctx as never);
+}
+
+/** A copy of the request for an app mounted behind this one, carrying the request id in the internal header. */
+function forwardRequest(c: Context): Request {
+  const headers = new Headers(c.req.raw.headers);
+  headers.set(INTERNAL_REQUEST_ID, (c.get('requestId' as never) as string | undefined) ?? '');
+  const method = c.req.method;
+  if (method === 'GET' || method === 'HEAD') return new Request(c.req.url, { method, headers });
+  return new Request(c.req.url, { method, headers, body: c.req.raw.body, duplex: 'half' } as RequestInit);
+}
+
 /** Ends a streamed body at the deadline. */
 function withDeadline(response: Response, ms: number, onTimeout: () => void): Response {
   if (response.body === null) return response;
@@ -275,6 +296,12 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     options.background?.(c, settled);
   };
   const perRequest = options.isolation === 'request';
+  /**
+   * The admin panel, imported the first time a panel or sign-in page is needed and never by an MCP request (P3-14,
+   * L-182). The module namespace holds no request data (L-013); a failed import is retried by the next request.
+   */
+  let uiModule: AdminUiModule | undefined;
+  const loadUi = async (): Promise<AdminUiModule> => (uiModule ??= await loadAdminUiModule());
   // Admin sessions exist when sign-in does (P4-02). Stateless: everything is read from storage per request (L-013).
   const sessions: SessionManager | undefined =
     options.identity === undefined
@@ -325,12 +352,24 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     else if (c.req.method === 'OPTIONS') refusal = c.body(null, 204);
     if (refusal === undefined) await next();
     const res = refusal ?? c.res;
+    // A panel page (or sign-in page) keeps its own policy when it is exactly one of the panel's; any other CSP a handler
+    // set is replaced, so a mistake in one page cannot loosen the response (P4-03).
+    const panelPage = uiModule?.isUiCsp(res.headers.get('content-security-policy')) === true;
     for (const [k, v] of Object.entries(edge.securityHeaders)) {
-      // A page with its own policy (the sign-in pages: one same-origin script) keeps it.
-      if (k === 'content-security-policy' && res.headers.has(k)) continue;
-      // The account page sends `same-origin`: under `no-referrer` a browser posts its forms with `Origin: null`, which
-      // the CSRF check (rightly) refuses. Nothing else may loosen it.
-      if (k === 'referrer-policy' && res.headers.get(k) === 'same-origin') continue;
+      if (k === 'content-security-policy' && panelPage) continue;
+      // Under `no-referrer` a browser posts its forms with `Origin: null`, which the CSRF check (rightly) refuses
+      // (L-191): panel pages say `same-origin`, and nothing else may loosen the app-wide policy.
+      if (k === 'referrer-policy' && panelPage) {
+        res.headers.set(k, uiModule?.UI_REFERRER_POLICY ?? v);
+        continue;
+      }
+      // The panel's hashed assets are immutable; every other response is `no-store`.
+      if (
+        k === 'cache-control' &&
+        uiModule !== undefined &&
+        res.headers.get(k) === uiModule.ASSET_CACHE_CONTROL
+      )
+        continue;
       res.headers.set(k, v);
     }
     for (const [k, v] of Object.entries(edge.corsHeaders(origin))) res.headers.set(k, v);
@@ -343,6 +382,9 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     return c.json({ error: 'internal error' }, 500);
   });
   app.notFound((c) => c.json({ error: 'not found' }, 404));
+
+  /** Enters the admin API app in-process (set when the admin API exists): the panel's changes use the API's own handlers. */
+  let adminInProcess: ((request: Request, c: Context) => Response | Promise<Response>) | undefined;
 
   if (options.admin !== undefined) {
     const admin = options.admin;
@@ -366,41 +408,42 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         ...(options.identity === undefined ? {} : { setupLinks: { publicUrl: options.identity.publicUrl } }),
         ...(perRequest ? { lightweightRouter: true } : {}),
       });
+    // The admin API app is built once, on first use. Workers: on the first admin request, not at every boot, so MCP
+    // requests never pay for it (P3-14); it is kept only once complete (L-096).
+    let api: ReturnType<typeof createAdminApi> | undefined;
+    const getApi = (): ReturnType<typeof createAdminApi> => (api ??= build());
+    let inner: Hono | undefined;
+    // The app the HTTP route (Workers) and the panel's in-process calls both enter: the API under its base path, with
+    // the outer request's id carried in an internal header the caller sets itself (any client copy is replaced).
+    const getInner = (): Hono => {
+      if (inner === undefined) {
+        const built = new Hono({ router: new LinearRouter() });
+        built.use(async (ic, next) => {
+          ic.set('requestId' as never, (ic.req.header(INTERNAL_REQUEST_ID) ?? '') as never);
+          await next();
+        });
+        built.route(ADMIN_BASE, getApi());
+        // The same JSON answers as the main app, and errors logged by name only (P3-11 review).
+        built.onError((error, ic) => {
+          services.logger.error('unhandled error', { error: error.name });
+          return ic.json({ error: 'internal error' }, 500);
+        });
+        built.notFound((ic) => ic.json({ error: 'not found' }, 404));
+        inner = built;
+      }
+      return inner;
+    };
+    adminInProcess = (request, c) => {
+      request.headers.set(INTERNAL_REQUEST_ID, (c.get('requestId' as never) as string | undefined) ?? '');
+      return dispatch(getInner(), request, c);
+    };
     if (!perRequest) {
-      app.route(ADMIN_BASE, build());
+      app.route(ADMIN_BASE, getApi());
     } else {
-      // Workers: the admin API (about 40 validated routes) is built on the first admin request, not at every boot,
-      // so MCP requests never pay for it (P3-14). Built synchronously and kept only once complete (L-096).
-      let adminApp: Hono | undefined;
       app.all(`${ADMIN_BASE}/*`, (c) => {
-        if (adminApp === undefined) {
-          const inner = new Hono({ router: new LinearRouter() });
-          // The outer app's request id travels in an internal header it sets itself (any client copy is replaced).
-          inner.use(async (ic, next) => {
-            ic.set('requestId' as never, (ic.req.header(INTERNAL_REQUEST_ID) ?? '') as never);
-            await next();
-          });
-          inner.route(ADMIN_BASE, build());
-          // The same JSON answers as the main app, and errors logged by name only (P3-11 review).
-          inner.onError((error, ic) => {
-            services.logger.error('unhandled error', { error: error.name });
-            return ic.json({ error: 'internal error' }, 500);
-          });
-          inner.notFound((ic) => ic.json({ error: 'not found' }, 404));
-          adminApp = inner;
-        }
         const headers = new Headers(c.req.raw.headers);
         headers.set(INTERNAL_REQUEST_ID, c.get('requestId' as never) as string);
-        const forwarded = new Request(c.req.raw, { headers });
-        let ctx: { waitUntil(p: Promise<unknown>): void; passThroughOnException(): void } | undefined;
-        try {
-          ctx = c.executionCtx;
-        } catch {
-          ctx = undefined;
-        }
-        return ctx === undefined
-          ? adminApp.fetch(forwarded, c.env)
-          : adminApp.fetch(forwarded, c.env, ctx as never);
+        return dispatch(getInner(), new Request(c.req.raw, { headers }), c);
       });
     }
   }
@@ -433,6 +476,14 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
           logger: services.logger,
           ...(sessions === undefined ? {} : { sessions }),
           runInBackground: keepAlive,
+          ui: {
+            load: loadUi,
+            get: () => {
+              if (uiModule === undefined)
+                throw new Error('unreachable: the sign-in routes load the panel first');
+              return uiModule;
+            },
+          },
           // The general per-IP limit first, then the sign-in one: every start writes a row and may call the IdP.
           async beforeSignIn(c) {
             const ip = clientIp(c);
@@ -446,6 +497,57 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         },
       ),
     );
+  }
+
+  // The admin panel at /admin (P4-03): on whenever sign-in is (it needs a session). Built on its first request, never by an
+  // MCP request, and shared by every later one (it holds no request data, L-013).
+  if (options.identity !== undefined && sessions !== undefined) {
+    const identity = options.identity;
+    const gate = sessions;
+    let panel: Hono | undefined;
+    const buildPanel = (mod: AdminUiModule): Hono => {
+      const publicOrigin = new URL(identity.publicUrl).origin;
+      const root = new Hono({ router: new LinearRouter() });
+      root.use(async (ic, next) => {
+        ic.set('requestId' as never, (ic.req.header(INTERNAL_REQUEST_ID) ?? '') as never);
+        await next();
+      });
+      root.route(
+        ADMIN_UI_BASE,
+        mod.createAdminUi(
+          adminUiDeps({
+            sessions: gate,
+            publicOrigin,
+            now: () => services.clock.now(),
+            ...(identity.auditAdmin === undefined ? {} : { audit: identity.auditAdmin }),
+            runInBackground: keepAlive,
+            async beforeAuth(ic) {
+              const decision = await options.limits?.beforeAuth?.(clientIp(ic), services.clock.now());
+              if (decision === undefined || decision.ok) return undefined;
+              const res = mod.errorPage(
+                429,
+                (ic.get('requestId' as never) as string | undefined) || undefined,
+              );
+              res.headers.set('retry-after', String(Math.max(1, Math.ceil(decision.retryAfterSeconds))));
+              return res;
+            },
+            onError: (_ic, error) =>
+              services.logger.error('admin panel error', {
+                error: error instanceof Error ? error.name : typeof error,
+              }),
+            ...(adminInProcess === undefined ? {} : { callApi: adminInProcess }),
+          }),
+        ),
+      );
+      return root;
+    };
+    const servePanel = async (c: Context): Promise<Response> => {
+      const mod = await loadUi();
+      panel ??= buildPanel(mod);
+      return dispatch(panel, forwardRequest(c), c);
+    };
+    app.all(ADMIN_UI_BASE, servePanel);
+    app.all(`${ADMIN_UI_BASE}/*`, servePanel);
   }
 
   // Liveness and version only (L-151).

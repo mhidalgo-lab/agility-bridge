@@ -20,7 +20,7 @@ Requirements: **Node.js 24 or later** (see `.nvmrc`) and **pnpm** through Corepa
 ```sh
 corepack enable
 pnpm install          # also installs the git hooks (lefthook)
-pnpm lint             # Biome, web-standard imports, SPDX headers, workflow rules, task files (pnpm tasks lint)
+pnpm lint             # Biome, web-standard imports, panel escaping and embedded assets, SPDX headers, workflow rules, task files (pnpm tasks lint)
 pnpm typecheck
 pnpm test
 pnpm build

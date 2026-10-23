@@ -2,7 +2,7 @@
 
 > Phase 4 (P4-01): who may sign in to the admin side of agility-bridge, and how the first owner is created. A finished
 > sign-in starts a browser session ([admin access](admin-access.md): cookie, roles, CSRF, re-authentication) and lands
-> on a small account page; the admin panel comes with P4-03 and later, and day-to-day administration is the
+> in the admin panel (`/admin`, P4-03; its screens follow in P4-04 and later), and day-to-day administration is the
 > [admin API](../reference/admin-api.md) and the [management commands](cli.md).
 >
 > Status of verification: every flow below is tested against **local fake providers**. A sign-in with a real Google,
