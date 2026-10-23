@@ -15,12 +15,14 @@ import { ASSET_CACHE_CONTROL, findAsset } from './assets.ts';
 import { type AdminUiDeps, createUiKit, requestIdOf, type UiKit } from './kit.ts';
 import { errorPage } from './pages.tsx';
 import { registerAccount } from './screens/account.tsx';
+import { registerAudit } from './screens/audit.tsx';
 import { registerCredentials } from './screens/credentials.tsx';
 import { registerGrants } from './screens/grants.tsx';
 import { registerInstances } from './screens/instances.tsx';
 import { registerMe } from './screens/me.tsx';
 import { registerOverview } from './screens/overview.tsx';
 import { registerTokens } from './screens/tokens.tsx';
+import { registerUsage } from './screens/usage.tsx';
 import { registerUsers } from './screens/users.tsx';
 import { registerWorkspaces } from './screens/workspaces.tsx';
 
@@ -38,6 +40,8 @@ function registerScreens(ui: Hono, kit: UiKit): void {
   registerGrants(ui, kit);
   registerTokens(ui, kit);
   registerUsers(ui, kit);
+  registerAudit(ui, kit);
+  registerUsage(ui, kit);
 }
 
 /** The panel's routes, relative to {@link ADMIN_UI_BASE} (mount it with `app.route(ADMIN_UI_BASE, createAdminUi(deps))`). */

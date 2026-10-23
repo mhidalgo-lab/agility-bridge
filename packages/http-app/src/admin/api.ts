@@ -317,12 +317,42 @@ const AuditQuery = z.object({
   userId: z.string().max(128).optional(),
   kind: z.enum(['tool_call', 'write', 'auth', 'admin']).optional(),
   status: z.enum(['ok', 'error', 'denied']).optional(),
+  /** Exact tool or action name. */
+  action: z
+    .string()
+    .regex(/^[A-Za-z0-9_.:-]{1,100}$/i, 'letters, digits and _ . : - only')
+    .optional(),
   from: z.coerce.number().int().min(0).optional(),
   to: z.coerce.number().int().min(0).optional(),
   limit: z.coerce.number().int().min(1).max(1_000).optional(),
   afterTs: z.coerce.number().int().min(0).optional(),
   afterId: z.string().max(128).optional(),
 });
+const AuditStatsQuery = z.object({
+  groupBy: z.enum(['tool', 'workspace', 'grant', 'user', 'day']),
+  workspaceId: z.string().max(128).optional(),
+  from: z.coerce.number().int().min(0).optional(),
+  to: z.coerce.number().int().min(0).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+const AuditStatsOut = z
+  .object({
+    data: z.array(
+      z.object({
+        key: z.string().nullable(),
+        calls: z.number(),
+        errors: z.number(),
+        denied: z.number(),
+        agilityRequests: z.number(),
+        durationSumMs: z.number(),
+        durationCount: z.number(),
+        maxDurationMs: z.number().nullable(),
+      }),
+    ),
+    scanned: z.number(),
+    truncated: z.boolean(),
+  })
+  .openapi('AuditStats');
 
 // ---- Output shaping: never a secret ----
 
@@ -1151,20 +1181,27 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       method: 'get',
       path: '/audit',
       tag: 'audit',
-      summary: 'Read the audit log (newest first)',
+      summary:
+        'Read the audit log, newest first (owner and admin: every row; a member: only their own rows, and another userId is refused)',
       query: AuditQuery,
       out: z.array(AuditOut),
     },
     async (c, { query }) => {
       const actor = c.get('actor' as never) as Actor;
-      if (actor.kind === 'user' && actor.role === 'member')
-        throw new AdminError('forbidden', 'This needs an owner or an admin.');
       const q = query as z.infer<typeof AuditQuery>;
+      // The reader's own id is the scope of a member (L-065): taken from the session, never from the query.
+      let userId = q.userId;
+      if (actor.kind === 'user' && actor.role === 'member') {
+        if (userId !== undefined && userId !== actor.userId)
+          throw new AdminError('forbidden', 'Members can read only their own audit rows.');
+        userId = actor.userId;
+      }
       return options.storage.audit.query({
         ...(q.workspaceId === undefined ? {} : { workspaceId: q.workspaceId }),
-        ...(q.userId === undefined ? {} : { userId: q.userId }),
+        ...(userId === undefined ? {} : { userId }),
         ...(q.kind === undefined ? {} : { kind: q.kind as AuditKind }),
         ...(q.status === undefined ? {} : { status: q.status as AuditStatus }),
+        ...(q.action === undefined ? {} : { action: q.action }),
         ...(q.from === undefined ? {} : { from: q.from }),
         ...(q.to === undefined ? {} : { to: q.to }),
         ...(q.limit === undefined ? {} : { limit: q.limit }),
@@ -1172,6 +1209,32 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
           ? { after: { ts: q.afterTs, id: q.afterId } }
           : {}),
       });
+    },
+  );
+
+  add(
+    {
+      method: 'get',
+      path: '/audit/stats',
+      tag: 'audit',
+      summary:
+        'Usage statistics from tool calls: calls, errors, denials, Agility requests and durations per tool, workspace, grant, user or day (owner, admin). Reads at most the newest 10,000 rows of the window and says when it stopped there.',
+      query: AuditStatsQuery,
+      out: AuditStatsOut,
+    },
+    async (c, { query }) => {
+      const actor = c.get('actor' as never) as Actor;
+      if (actor.kind === 'user' && actor.role === 'member')
+        throw new AdminError('forbidden', 'This needs an owner or an admin.');
+      const q = query as z.infer<typeof AuditStatsQuery>;
+      const stats = await options.storage.audit.stats({
+        groupBy: q.groupBy,
+        ...(q.workspaceId === undefined ? {} : { workspaceId: q.workspaceId }),
+        ...(q.from === undefined ? {} : { from: q.from }),
+        ...(q.to === undefined ? {} : { to: q.to }),
+        ...(q.limit === undefined ? {} : { limit: q.limit }),
+      });
+      return { data: stats.rows, scanned: stats.scanned, truncated: stats.truncated };
     },
   );
 

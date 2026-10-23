@@ -430,7 +430,7 @@ describe('roles through real sessions', () => {
     const list = await (await s.api('GET', '/users', m)).json();
     expect(list.map((u: { id: string }) => u.id)).toEqual([s.w.ids.alice]);
     expect((await s.api('GET', `/users/${s.w.ids.owner}`, m)).status).toBe(404);
-    expect((await s.api('GET', '/audit', m)).status).toBe(403);
+    expect((await s.api('GET', '/audit/stats?groupBy=tool', m)).status).toBe(403);
     expect((await s.api('GET', '/keys', m)).status).toBe(403);
     const before = (await s.w.storage.users.list()).length;
     const created = await s.api('POST', '/users', m, { email: 'new@example.test', role: 'member' });
@@ -507,9 +507,9 @@ describe('roles through real sessions', () => {
   it('a role change takes effect on the next request, with no stale role in the session', async () => {
     const s = await setup();
     const adm = await s.session(ADMIN);
-    expect((await s.api('GET', '/audit', adm)).status).toBe(200);
+    expect((await s.api('GET', '/audit/stats?groupBy=tool', adm)).status).toBe(200);
     await s.w.storage.users.update(s.w.ids.admin, { role: 'member' }); // behind the API: sessions not ended
-    expect((await s.api('GET', '/audit', adm)).status).toBe(403);
+    expect((await s.api('GET', '/audit/stats?groupBy=tool', adm)).status).toBe(403);
     expect(
       ((await (await s.api('GET', '/session', adm)).json()) as { user: { role: string } }).user.role,
     ).toBe('member');

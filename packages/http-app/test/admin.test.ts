@@ -94,6 +94,7 @@ function routes(w: World): [string, string, unknown?][] {
     ['POST', `/grants/${g}/tokens`, { label: 'device' }],
     ['POST', `/tokens/${w.ids.aliceToken}/revoke`],
     ['GET', '/audit'],
+    ['GET', '/audit/stats?groupBy=tool'],
     ['GET', '/openapi.json'],
   ];
 }
@@ -121,6 +122,7 @@ describe('negative authorization (every route)', () => {
       `GET /instances/${w.ids.instance}`,
       'GET /credentials', // only their own
       'GET /grants', // only their own
+      'GET /audit', // only their own rows
       `GET /grants/${w.ids.aliceGrant}`,
       `GET /grants/${w.ids.aliceGrant}/tokens`,
       `POST /grants/${w.ids.aliceGrant}/tokens`,

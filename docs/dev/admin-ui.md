@@ -179,6 +179,21 @@ through an `Area` (`ADMIN_AREA` for owners and admins on any grant, `MEMBER_AREA
   the default only while the grant uses the person's own token (the guard decides; the page mirrors it, L-197).
 - The add form lists only instances of the person's live grants in workspaces that use stored tokens (the guard enforces it too).
 
+## Audit viewer and usage (P4-05)
+
+`screens/audit.tsx` and `screens/usage.tsx`. Notes for the next screen that lists server records:
+
+- **Keyset paging through the API**: ask for page size + 1 rows (`limit=51`); a surplus row means a next page, whose cursor
+  (`after=<ts>.<id>`) is the last row *shown*. The cursor and every filter value are validated by regex or allowlist in the
+  panel before they reach the API or a link (the API validates again).
+- **Who may see what is the API's decision**: `GET /audit` scopes a member to their own user id from the session. The panel
+  does not send a `userId` for a member (the API would answer 403) and hides the owner filters; it never filters rows itself.
+- **Export is one API call** (`limit=1000`, the API ceiling), not a loop of pages: each in-process call costs several D1
+  queries and a Worker request has a small subrequest budget (L-097). `csvCell` is the only place that quotes and neutralises.
+- **Names are display-only lookups** (`/workspaces`, `/users`, admins only); a failed lookup shows ids.
+- Statistics come from `GET /audit/stats`, bounded in storage (`audit.stats`: newest 10,000 rows, 100 groups) and honest
+  about truncation.
+
 ## Not in the panel (yet)
 
-The audit viewer (P4-05), the connect page with client snippets (P4-06) and the owner-only unbind (P4-12). A browser run (axe-core, keyboard, 320 px, CSP violations in a real browser) is P4-08.
+The audit viewer is above; the connect page with client snippets (P4-06) and the owner-only unbind (P4-12) are still to do. A browser run (axe-core, keyboard, 320 px, CSP violations in a real browser) is P4-08.

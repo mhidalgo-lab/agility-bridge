@@ -334,6 +334,12 @@ button {
   align-items: center;
 }
 
+meter {
+  width: 5rem;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
 .table-wrap {
   overflow-x: auto;
   margin: 0 0 1rem;

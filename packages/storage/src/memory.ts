@@ -8,10 +8,13 @@ import {
   checkRow,
   checkSealedToken,
   checkSettingValue,
+  checkStatsQuery,
   clampLimit,
+  finishStats,
   prepareBind,
   prepareCreate,
   preparePatch,
+  statsKey,
   type TableName,
 } from './fields.ts';
 import { checkIncrement, checkKey, checkKvValue, checkPrefix, isLive } from './kv-rules.ts';
@@ -20,6 +23,7 @@ import type {
   AccessTokenRepository,
   AuditEntry,
   AuditRepository,
+  AuditStatsRow,
   Credential,
   CredentialRepository,
   Grant,
@@ -369,6 +373,7 @@ export function createMemoryStorage(options: MemoryStorageOptions = {}): Storage
             (q.userId === undefined || a.userId === q.userId) &&
             (q.kind === undefined || a.kind === q.kind) &&
             (q.status === undefined || a.status === q.status) &&
+            (q.action === undefined || a.action === q.action) &&
             (q.from === undefined || a.ts >= q.from) &&
             (q.to === undefined || a.ts < q.to) &&
             (q.after === undefined || a.ts < q.after.ts || (a.ts === q.after.ts && a.id < q.after.id)),
@@ -376,6 +381,47 @@ export function createMemoryStorage(options: MemoryStorageOptions = {}): Storage
         .sort(byNewest)
         .slice(0, limit)
         .map(clone);
+    },
+    async stats(q) {
+      const { groupBy, limit, cap } = checkStatsQuery(q);
+      const window = audit
+        .filter(
+          (a) =>
+            a.kind === 'tool_call' &&
+            (q.from === undefined || a.ts >= q.from) &&
+            (q.to === undefined || a.ts < q.to) &&
+            (q.workspaceId === undefined || a.workspaceId === q.workspaceId),
+        )
+        .sort(byNewest)
+        .slice(0, cap);
+      const groups = new Map<string | null, AuditStatsRow>();
+      for (const a of window) {
+        const key = statsKey(a, groupBy);
+        let g = groups.get(key);
+        if (g === undefined) {
+          g = {
+            key,
+            calls: 0,
+            errors: 0,
+            denied: 0,
+            agilityRequests: 0,
+            durationSumMs: 0,
+            durationCount: 0,
+            maxDurationMs: null,
+          };
+          groups.set(key, g);
+        }
+        g.calls++;
+        if (a.status === 'error') g.errors++;
+        if (a.status === 'denied') g.denied++;
+        g.agilityRequests += a.agilityRequests ?? 0;
+        if (a.durationMs !== null) {
+          g.durationSumMs += a.durationMs;
+          g.durationCount++;
+          g.maxDurationMs = Math.max(g.maxDurationMs ?? 0, a.durationMs);
+        }
+      }
+      return finishStats([...groups.values()], limit, cap);
     },
     async purge(before, limit) {
       const n = clampLimit(limit, 1_000, 10_000);

@@ -47,6 +47,8 @@ export const NAV_ITEMS: readonly NavItem[] = Object.freeze([
   { href: '/admin/workspaces', label: 'Workspaces', minRole: 'admin' },
   { href: '/admin/grants', label: 'Grants', minRole: 'admin' },
   { href: '/admin/users', label: 'Users', minRole: 'admin' },
+  { href: '/admin/audit', label: 'Audit log', minRole: 'member' },
+  { href: '/admin/usage', label: 'Usage', minRole: 'admin' },
   { href: '/admin/account', label: 'Account', minRole: 'member' },
 ]);
 
@@ -419,14 +421,23 @@ export function SecretOnce(props: {
 /** Previous and next links for a paged list (`href`s are same-origin URLs, or null at the ends). */
 export function Pager(props: {
   readonly label: string;
-  readonly prev: string | null;
+  readonly prev?: string | null;
   readonly next: string | null;
+  /** Keyset-paged lists: back to the newest page (there is no "previous" cursor). */
+  readonly first?: string | null;
 }): JSX.Element | null {
-  if (props.prev === null && props.next === null) return null;
+  const prev = props.prev ?? null;
+  const first = props.first ?? null;
+  if (prev === null && props.next === null && first === null) return null;
   return (
     <nav class="pager" aria-label={props.label}>
-      {props.prev === null ? null : (
-        <a class="button button-secondary" href={localHref(props.prev)}>
+      {first === null ? null : (
+        <a class="button button-secondary" href={localHref(first)}>
+          Newest entries
+        </a>
+      )}
+      {prev === null ? null : (
+        <a class="button button-secondary" href={localHref(prev)}>
           Previous page
         </a>
       )}

@@ -19,7 +19,8 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 
 | Method | Path | What | Body | Response |
 |---|---|---|---|---|
-| `GET` | `/audit` | Read the audit log (newest first) | — | 200 AuditEntry[] |
+| `GET` | `/audit` | Read the audit log, newest first (owner and admin: every row; a member: only their own rows, and another userId is refused) | — | 200 AuditEntry[] |
+| `GET` | `/audit/stats` | Usage statistics from tool calls: calls, errors, denials, Agility requests and durations per tool, workspace, grant, user or day (owner, admin). Reads at most the newest 10,000 rows of the window and says when it stopped there. | — | 200 AuditStats |
 
 ## credentials
 
@@ -116,6 +117,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 
 ## Objects
 
+- **AuditStats**: `data`: object[], `scanned`: number, `truncated`: boolean
 - **Credential**: `id`: string, `instanceId`: string, `ownerUserId`: string \| null, `label`: string, `tokenHint`: string, `keyVersion`: number, `validationStatus`: "unvalidated" \| "valid" \| "invalid", `validationErrorCode`: string \| null, `validatedAt`: number \| null, `memberOid`: string \| null, `memberName`: string \| null, `memberUsername`: string \| null, `reachableScopeIds`: array \| null, `createdAt`: number, `updatedAt`: number, `revokedAt`: number \| null
 - **DeviceToken**: `id`: string, `grantId`: string, `prefix`: string, `label`: string, `createdAt`: number, `expiresAt`: number \| null, `lastUsedAt`: number \| null, `revokedAt`: number \| null
 - **Grant**: `id`: string, `workspaceId`: string, `userId`: string \| null, `label`: string \| null, `credentialId`: string \| null, `tools`: array \| null, `scopeIds`: array \| null, `assetTypes`: object \| null, `limits`: object, `rateLimit`: object \| null, `createdAt`: number, `updatedAt`: number, `expiresAt`: number \| null, `revokedAt`: number \| null

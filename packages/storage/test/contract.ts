@@ -7,6 +7,7 @@ import {
   NotFoundError,
   ReadOnlyStorageError,
   readOnlyStorage,
+  STATS_SCAN_CAP,
   type Storage,
 } from '../src/index.ts';
 
@@ -745,6 +746,133 @@ export function storageContract(name: string, factory: StorageFactory): void {
         const last = page1[1] as { ts: number; id: string };
         const page2 = await s.audit.query({ limit: 2, after: { ts: last.ts, id: last.id } });
         expect(page2.map((a) => a.id)).toEqual(['a2', 'a1']);
+      });
+
+      it('filters by exact action and combines every filter', async () => {
+        await s.audit.append(
+          entry('a1', 100, { action: 'get_work_item', userId: 'u-1', workspaceId: 'w-1' }),
+        );
+        await s.audit.append(
+          entry('a2', 200, { action: 'get_work_item', userId: 'u-2', workspaceId: 'w-1' }),
+        );
+        await s.audit.append(
+          entry('a3', 300, { action: 'get_work_item_x', userId: 'u-1', workspaceId: 'w-1' }),
+        );
+        await s.audit.append(
+          entry('a4', 400, { action: 'get_work_item', userId: 'u-1', workspaceId: 'w-2', status: 'error' }),
+        );
+        const ids = async (q: Parameters<Storage['audit']['query']>[0]) =>
+          (await s.audit.query(q)).map((a) => a.id);
+        expect(await ids({ action: 'get_work_item' })).toEqual(['a4', 'a2', 'a1']);
+        expect(await ids({ action: 'get_work_item', userId: 'u-1' })).toEqual(['a4', 'a1']);
+        expect(await ids({ action: 'get_work_item', userId: 'u-1', workspaceId: 'w-1' })).toEqual(['a1']);
+        expect(await ids({ action: 'get_work_item', status: 'error', from: 300 })).toEqual(['a4']);
+        expect(await ids({ action: "get_work_item' OR '1'='1" })).toEqual([]);
+        expect(await ids({ action: 'get_work%' })).toEqual([]);
+      });
+
+      it('keyset paging neither repeats nor skips rows inserted between pages', async () => {
+        // Equal timestamps exercise the id tie-break; the new rows are the newest and must not shift the next page.
+        for (let i = 0; i < 6; i++) await s.audit.append(entry(`k${i}`, i < 4 ? 100 : 200 + i));
+        const seen: string[] = [];
+        let after: { ts: number; id: string } | undefined;
+        for (let round = 0; round < 10; round++) {
+          const page = await s.audit.query({ limit: 2, ...(after === undefined ? {} : { after }) });
+          if (page.length === 0) break;
+          seen.push(...page.map((a) => a.id));
+          const last = page[page.length - 1] as { ts: number; id: string };
+          after = { ts: last.ts, id: last.id };
+          await s.audit.append(entry(`new${round}`, 1_000 + round));
+        }
+        const old = seen.filter((id) => id.startsWith('k'));
+        expect(old).toEqual(['k5', 'k4', 'k3', 'k2', 'k1', 'k0']);
+        expect(new Set(seen).size).toBe(seen.length);
+      });
+
+      it('stats: aggregates tool calls per group, bounded to the window and the workspace', async () => {
+        const call = (id: string, ts: number, extra: Record<string, unknown> = {}) =>
+          s.audit.append(entry(id, ts, { workspaceId: 'w-1', grantId: 'g-1', userId: 'u-1', ...extra }));
+        const day = 86_400_000;
+        const d0 = 20_000 * day;
+        await call('s1', d0 + 1_000, { durationMs: 100, agilityRequests: 2 });
+        await call('s2', d0 + 2_000, { durationMs: 300, agilityRequests: 1, status: 'error' });
+        await call('s3', d0 + 3_000, { action: 'get_work_item', status: 'denied', grantId: 'g-2' });
+        await call('s4', d0 + day + 5, { workspaceId: 'w-2', userId: null, grantId: null, durationMs: 50 });
+        // Not tool calls: never counted.
+        await s.audit.append(entry('x1', d0 + 10, { kind: 'admin', action: 'grant.revoke' }));
+        await s.audit.append(
+          entry('x2', d0 + 11, { kind: 'auth', action: 'mcp.unauthenticated', status: 'denied' }),
+        );
+
+        const byTool = await s.audit.stats({ groupBy: 'tool' });
+        expect(byTool.truncated).toBe(false);
+        expect(byTool.scanned).toBe(4);
+        expect(byTool.rows).toEqual([
+          {
+            key: 'query_assets',
+            calls: 3,
+            errors: 1,
+            denied: 0,
+            agilityRequests: 3,
+            durationSumMs: 450,
+            durationCount: 3,
+            maxDurationMs: 300,
+          },
+          {
+            key: 'get_work_item',
+            calls: 1,
+            errors: 0,
+            denied: 1,
+            agilityRequests: 0,
+            durationSumMs: 0,
+            durationCount: 0,
+            maxDurationMs: null,
+          },
+        ]);
+        const byGrant = await s.audit.stats({ groupBy: 'grant' });
+        expect(byGrant.rows.map((r) => [r.key, r.calls])).toEqual([
+          ['g-1', 2],
+          ['g-2', 1],
+          [null, 1],
+        ]);
+        const byUser = await s.audit.stats({ groupBy: 'user' });
+        expect(byUser.rows.map((r) => [r.key, r.calls])).toEqual([
+          ['u-1', 3],
+          [null, 1],
+        ]);
+        const byWorkspace = await s.audit.stats({ groupBy: 'workspace', limit: 1 });
+        expect(byWorkspace.rows.map((r) => [r.key, r.calls])).toEqual([['w-1', 3]]);
+        const byDay = await s.audit.stats({ groupBy: 'day' });
+        expect(byDay.rows.map((r) => [r.key, r.calls])).toEqual([
+          [new Date(d0).toISOString().slice(0, 10), 3],
+          [new Date(d0 + day).toISOString().slice(0, 10), 1],
+        ]);
+        // The window is half open and the workspace filter narrows it.
+        expect((await s.audit.stats({ groupBy: 'tool', from: d0 + 2_000, to: d0 + 3_000 })).scanned).toBe(1);
+        expect((await s.audit.stats({ groupBy: 'tool', workspaceId: 'w-2' })).rows).toHaveLength(1);
+        expect((await s.audit.stats({ groupBy: 'tool', workspaceId: "w-1' OR '1'='1" })).rows).toEqual([]);
+        expect((await s.audit.stats({ groupBy: 'tool', from: d0 + 99 * day })).rows).toEqual([]);
+      });
+
+      it('stats: refuses unknown groups and bad bounds', async () => {
+        await expect(s.audit.stats({ groupBy: 'password' as never })).rejects.toThrow(InvalidInputError);
+        await expect(s.audit.stats({ groupBy: 'tool', from: -1 })).rejects.toThrow(InvalidInputError);
+        await expect(s.audit.stats({ groupBy: 'tool', limit: 0 })).rejects.toThrow(InvalidInputError);
+        expect((await s.audit.stats({ groupBy: 'tool', limit: 1_000_000 })).rows).toEqual([]);
+      });
+
+      it('stats: reads at most the newest scanCap rows and says so', async () => {
+        expect(STATS_SCAN_CAP).toBe(10_000);
+        for (let i = 0; i < 12; i++) await s.audit.append(entry(`c${String(i).padStart(2, '0')}`, 1_000 + i));
+        const stats = await s.audit.stats({ groupBy: 'tool', scanCap: 5 });
+        expect(stats.scanned).toBe(5);
+        expect(stats.truncated).toBe(true);
+        expect(stats.rows[0]?.calls).toBe(5);
+        // The oldest rows are the ones left out: the window below the newest five holds seven rows.
+        expect((await s.audit.stats({ groupBy: 'tool', to: 1_007, scanCap: 5 })).scanned).toBe(5);
+        expect((await s.audit.stats({ groupBy: 'tool', to: 1_003 })).truncated).toBe(false);
+        expect((await s.audit.stats({ groupBy: 'tool', scanCap: 10_000_000 })).scanned).toBe(12);
+        await expect(s.audit.stats({ groupBy: 'tool', scanCap: 0 })).rejects.toThrow(InvalidInputError);
       });
 
       it('is append-only, validates rows and purges by age in bounded batches', async () => {

@@ -823,6 +823,15 @@ lists or refused views), at most ten stay open per user (further pages reuse one
 gets a fresh handle and does not spend the old one.
 *Applied in:* P4-04, `packages/http-app/test/admin-screens.test.ts`, relic-bridge review L6.
 
+**L-200 — A list of server records needs a keyset cursor, a bounded scan and a role scope the API owns.**
+Page with `ts, id` (newest first) and fetch page size + 1 rows instead of counting or using OFFSET, so rows arriving
+between pages neither repeat nor skip. Aggregates read at most N newest rows and report `truncated` rather than a
+plausible total; an export is one call with the API's ceiling, not a loop of pages (each in-process call costs queries
+against a small subrequest budget). "Members see only their own rows" is decided in the admin API from the session, never
+by the panel, and a request for someone else's rows is a 403 that reads nothing. Do not add an index to an append-heavy
+table for a rare view: on D1 it costs a written row per append.
+*Applied in:* P4-05, `packages/http-app/test/admin-audit.test.ts`, relic-bridge P4-05.
+
 **L-205 — A "mine only" page is mine only for every role, not just the lowest.**
 The admin API is role-aware: an owner may read any credential or grant, a member only their own. A self-service page that
 simply loads `GET /credentials/{id}` therefore shows an owner another person's personal credential under "My access", and an

@@ -305,6 +305,8 @@ export interface AuditQuery {
   userId?: string;
   kind?: AuditKind;
   status?: AuditStatus;
+  /** Exact tool or action name (`search_assets`, `grant.revoke`). */
+  action?: string;
   /** Inclusive lower and exclusive upper bound on `ts`. */
   from?: number;
   to?: number;
@@ -314,10 +316,50 @@ export interface AuditQuery {
   limit?: number;
 }
 
+/** What `AuditRepository.stats` groups `tool_call` rows by. */
+export type AuditStatsGroup = 'tool' | 'workspace' | 'grant' | 'user' | 'day';
+
+export interface AuditStatsQuery {
+  groupBy: AuditStatsGroup;
+  /** Inclusive lower and exclusive upper bound on `ts` (epoch ms). */
+  from?: number;
+  to?: number;
+  workspaceId?: string;
+  /** Groups returned, most calls first. Default 50, at most 100. */
+  limit?: number;
+  /** Rows to read at most (newest first); default and ceiling `STATS_SCAN_CAP`. A lower value narrows the work. */
+  scanCap?: number;
+}
+
+/** One group of `tool_call` rows. `key` is null for rows without that field (a null grant, say). */
+export interface AuditStatsRow {
+  /** The tool name, an id, or a UTC day (`2026-10-23`). */
+  key: string | null;
+  calls: number;
+  errors: number;
+  denied: number;
+  /** Sum of `agilityRequests` over the group. */
+  agilityRequests: number;
+  /** Sum and count of the rows that have a duration, so the mean is `durationSumMs / durationCount`. */
+  durationSumMs: number;
+  durationCount: number;
+  maxDurationMs: number | null;
+}
+
+export interface AuditStats {
+  rows: AuditStatsRow[];
+  /** Rows read for the aggregate (at most the scan cap). */
+  scanned: number;
+  /** The window held at least as many rows as the cap: the newest `scanned` rows are what the numbers cover. */
+  truncated: boolean;
+}
+
 /** Append-only: rows are never updated, and deleted only by retention (THREAT_MODEL T17). */
 export interface AuditRepository {
   append(entry: NewAuditEntry): Promise<void>;
   query(query?: AuditQuery): Promise<AuditEntry[]>;
+  /** Aggregates `tool_call` rows of a window over at most `STATS_SCAN_CAP` newest rows; never an OFFSET scan. */
+  stats(query: AuditStatsQuery): Promise<AuditStats>;
   /** Deletes rows with `ts` before `before`, at most `limit` (default 1,000) per call; returns how many. */
   purge(before: number, limit?: number): Promise<number>;
 }
