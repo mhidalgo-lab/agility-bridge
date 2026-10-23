@@ -91,6 +91,21 @@ agility-bridge user disable <user-id>
 
 Local or remote.
 
+### `user unbind`
+
+Clear a user's sign-in identity so they can sign in with another provider (owner; the next verified sign-in with their email binds the account).
+
+```text
+agility-bridge user unbind <user-id> --confirm <value>
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `<user-id>` | argument | User id |
+| `--confirm` | string, required | The user's current email address, typed again. Anyone who signs in with that verified email afterwards takes the account |
+
+Local or remote.
+
 ### `user end-sessions`
 
 End all of a user's browser sessions (sign them out everywhere).

@@ -576,6 +576,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
               (result as { id?: string })?.id ??
               '');
           auditRow(c, spec, 'ok', target, {
+            ...(c.get('auditDetails' as never) as Record<string, unknown> | undefined),
             fields: Object.keys(body).filter((k) => k !== 'token'),
             ...Object.fromEntries(
               (spec.auditBody ?? []).map((k) => [
@@ -594,6 +595,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
         }
         if (spec.audit !== undefined) {
           auditRow(c, spec, mapped.status === 403 ? 'denied' : 'error', id || '-', {
+            ...(c.get('auditDetails' as never) as Record<string, unknown> | undefined),
             error: mapped.body.error.code,
           });
         }
@@ -744,6 +746,37 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       // The guard decides first and ends nothing; a refusal is audited by the generic denied row below.
       await services(c).users.authorizeEndSessions(id);
       return { ok: true as const, revoked: await endSessions(c, id, 'ended_by_request', false) };
+    },
+  );
+
+  add(
+    {
+      method: 'post',
+      path: '/users/{id}/unbind',
+      ...user,
+      params: true,
+      summary:
+        "Clear a user's sign-in identity so the next verified sign-in with their email binds again (owner, recent sign-in, never yourself through a session; the body repeats the user's email; ends their sessions)",
+      body: z.strictObject({
+        confirm: z.string().min(3).max(320).openapi({
+          description:
+            "The user's current email address, typed again. Anyone who then signs in with a provider that asserts this verified email takes over the account.",
+        }),
+      }),
+      out: UserOut,
+      audit: { action: 'user.unbind', targetType: 'user' },
+    },
+    async (c, { id, body }) => {
+      // The guard decides first and changes nothing on a refusal (a denied audit row is written by the generic path).
+      const { user: cleared, previousIdp } = await services(c).users.unbind(
+        id,
+        (body as { confirm: string }).confirm,
+      );
+      // Never the subject or the typed confirmation: the previous provider id only.
+      c.set('auditDetails' as never, { previousIdp } as never);
+      // After the compare-and-set: a session that existed at that moment is ended, and so is any created since.
+      await endSessions(c, id, 'unbind');
+      return cleared;
     },
   );
 

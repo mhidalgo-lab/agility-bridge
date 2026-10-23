@@ -216,4 +216,4 @@ through an `Area` (`ADMIN_AREA` for owners and admins on any grant, `MEMBER_AREA
 
 ## Not in the panel (yet)
 
-The audit viewer and the connect page are above; the owner-only unbind (P4-12) is still to do. A browser run (axe-core, keyboard, 320 px, CSP violations in a real browser) is P4-08.
+The audit viewer and the connect page are above; the owner-only unbind (P4-12) is the `/admin/users/{id}/unbind` pair in `screens/users.tsx`: a thin client of `POST /users/{id}/unbind` (owner-only `kit.page`/`kit.form`, the control offered by `canUnbind`, the typed email re-rendered never echoed). A browser run (axe-core, keyboard, 320 px, CSP violations in a real browser) is P4-08.

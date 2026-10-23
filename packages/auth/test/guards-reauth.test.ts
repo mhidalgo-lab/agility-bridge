@@ -87,6 +87,7 @@ const actions: Array<[string, (g: ReturnType<typeof guardedServices>) => Promise
   ['promote a member', (g) => g.users.update(ids.alice, { role: 'admin' })],
   ['demote an admin', (g) => g.users.update(ids.admin, { role: 'member' })],
   ['disable an admin', (g) => g.users.disable(ids.admin)],
+  ['clear a sign-in identity', (g) => g.users.unbind(ids.alice, 'm@example.test')],
   [
     'retarget an instance',
     (g) => g.instances.retarget(ids.instance, { baseUrl: 'https://other.example.test/X' }),

@@ -190,6 +190,41 @@ describe('local and remote management', () => {
     expect(help.out).toContain('agility-bridge token issue <grant-id> --label <value>');
   });
 
+  it('user unbind clears a binding after the typed email, and a wrong email changes nothing (P4-12)', async () => {
+    const env = { AB_DATA_DIR: join(dir, 'u'), AB_MASTER_KEY_FILE: keyFile('u.key') };
+    const added = (await cli(['user', 'add', 'ann@example.test'], env)).json as { id: string };
+    const db = await openSqliteStorage({ path: join(dir, 'u', 'agility-bridge.db') });
+    await db.users.bind(added.id, 'google', 'sub-ann');
+    await db.close();
+    const read = async () => {
+      const store = await openSqliteStorage({ path: join(dir, 'u', 'agility-bridge.db') });
+      const row = await store.users.get(added.id);
+      await store.close();
+      return row;
+    };
+    // --confirm is required; a wrong one is refused and nothing changes.
+    expect((await cli(['user', 'unbind', added.id], env)).code).toBe(2);
+    const wrong = await cli(['user', 'unbind', added.id, '--confirm', 'bob@example.test'], env);
+    expect(wrong.code).toBe(1);
+    expect(wrong.err).not.toContain('bob@example.test');
+    expect(await read()).toMatchObject({ idp: 'google', idpSubject: 'sub-ann' });
+    const ok = await cli(['user', 'unbind', added.id, '--confirm', 'ANN@example.test'], env);
+    expect(ok.code).toBe(0);
+    expect(ok.json).toMatchObject({ id: added.id, idp: null, idpSubject: null });
+    expect(await read()).toMatchObject({ idp: null, idpSubject: null });
+    // Nothing left to clear.
+    const again = await cli(['user', 'unbind', added.id, '--confirm', 'ann@example.test'], env);
+    expect(again.code).toBe(1);
+    expect(again.err).toContain('conflict');
+    const store = await openSqliteStorage({ path: join(dir, 'u', 'agility-bridge.db') });
+    const rows = (await store.audit.query({ kind: 'admin', limit: 50 })).filter(
+      (r) => r.action === 'user.unbind',
+    );
+    await store.close();
+    expect(rows.map((r) => r.status).sort()).toEqual(['error', 'error', 'ok']);
+    expect(JSON.stringify(rows)).not.toContain('sub-ann');
+  });
+
   it('keys status, rotate and retire on the local database; rotate stays local', async () => {
     const env = {
       AB_DATA_DIR: join(dir, 'd'),

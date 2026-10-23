@@ -254,6 +254,66 @@ export function storageContract(name: string, factory: StorageFactory): void {
       });
     });
 
+    describe('clearing an identity (P4-12, L-220)', () => {
+      it('clears only the identity the caller saw, once, and lets a new first sign-in bind again', async () => {
+        await s.users.create({ id: 'u1', email: 'a@example.test', role: 'member' });
+        await s.users.bind('u1', 'google', 'sub-1');
+        clock.advance(5);
+        // A stale or foreign expectation changes nothing.
+        expect(await s.users.unbind('u1', { idp: 'google', idpSubject: 'sub-2' })).toBeNull();
+        expect(await s.users.unbind('u1', { idp: 'github', idpSubject: 'sub-1' })).toBeNull();
+        expect(await s.users.unbind('nope', { idp: 'google', idpSubject: 'sub-1' })).toBeNull();
+        expect(await s.users.get('u1')).toMatchObject({ idp: 'google', idpSubject: 'sub-1' });
+        const cleared = await s.users.unbind('u1', { idp: 'google', idpSubject: 'sub-1' });
+        expect(cleared).toMatchObject({
+          id: 'u1',
+          idp: null,
+          idpSubject: null,
+          role: 'member',
+          email: 'a@example.test',
+        });
+        expect(await s.users.getByIdentity('google', 'sub-1')).toBeNull();
+        // Already clear: the same call no longer applies, and an unbound row never matches a null expectation.
+        expect(await s.users.unbind('u1', { idp: 'google', idpSubject: 'sub-1' })).toBeNull();
+        expect(await s.users.unbind('u1', { idp: null, idpSubject: null } as never)).toBeNull();
+        expect(await s.users.bind('u1', 'github', 'g-1')).toMatchObject({ idp: 'github' });
+      });
+
+      it('lets exactly one of several concurrent unbinds win, and a late unbind never undoes a new binding', async () => {
+        await s.users.create({ id: 'u1', email: 'a@example.test', role: 'member' });
+        await s.users.bind('u1', 'google', 'sub-1');
+        const results = await Promise.all(
+          [1, 2, 3, 4].map(() =>
+            s.users.unbind('u1', { idp: 'google', idpSubject: 'sub-1' }).then(
+              (u) => (u === null ? 'lost' : 'won'),
+              () => 'error',
+            ),
+          ),
+        );
+        expect(results.filter((r) => r === 'won')).toHaveLength(1);
+        expect(results.filter((r) => r === 'error')).toHaveLength(0);
+        await s.users.bind('u1', 'github', 'g-1');
+        // The owner's stale view (google) cannot clear the new binding.
+        expect(await s.users.unbind('u1', { idp: 'google', idpSubject: 'sub-1' })).toBeNull();
+        expect(await s.users.get('u1')).toMatchObject({ idp: 'github', idpSubject: 'g-1' });
+      });
+
+      it('races an unbind against a first sign-in: the row ends bound or clear, never half-set', async () => {
+        await s.users.create({ id: 'u1', email: 'a@example.test', role: 'member' });
+        await s.users.bind('u1', 'google', 'sub-1');
+        await Promise.all([
+          s.users.unbind('u1', { idp: 'google', idpSubject: 'sub-1' }),
+          s.users.bind('u1', 'github', 'g-1').catch(() => null),
+        ]);
+        const row = await s.users.get('u1');
+        expect([
+          ['google', 'sub-1'],
+          [null, null],
+          ['github', 'g-1'],
+        ]).toContainEqual([row?.idp, row?.idpSubject]);
+      });
+    });
+
     describe('owners and revocation (P2-17 review)', () => {
       it('never leaves zero active owners, even with concurrent changes', async () => {
         await s.users.create({ id: 'o1', email: 'o1@example.test', role: 'owner' });

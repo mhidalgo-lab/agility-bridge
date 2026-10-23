@@ -8,6 +8,7 @@ import {
   type Credential,
   type Grant,
   type Instance,
+  InvalidInputError,
   type JsonObject,
   NotFoundError,
   type Role,
@@ -143,6 +144,32 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
       const target = await load(storage.users.get(id), 'user');
       if (id !== self && target.role !== 'member') needOwner(actor, "end an owner's or an admin's sessions");
       return target;
+    },
+    /**
+     * Moves a user to another identity on purpose (P4-12, THREAT_MODEL T14): after this the next verified sign-in whose
+     * email matches binds the account, at whichever provider asserts it, so it is an account-takeover primitive by design.
+     * Owner only (the break-glass token counts), with a recent sign-in, never your own account through a session (ask
+     * another owner or use the admin token; this also keeps the last owner from locking themselves out), and the caller
+     * repeats the user's current email. The write is one compare-and-set on the binding read here. Ends nothing itself.
+     */
+    async unbind(id: string, confirmEmail: string): Promise<{ user: User; previousIdp: string }> {
+      needOwner(actor, "clear a user's sign-in identity");
+      needRecent(actor, "clearing a user's sign-in identity");
+      if (self !== null && id === self) {
+        throw new ForbiddenError(
+          'You cannot clear your own sign-in identity: ask another owner, or use the admin token.',
+        );
+      }
+      const target = await load(storage.users.get(id), 'user');
+      if (target.idp === null || target.idpSubject === null) {
+        throw new ConflictError('The user has no sign-in identity to clear.');
+      }
+      // Same normalisation as when the email was stored (trim, lowercase); never echoed back.
+      if (typeof confirmEmail !== 'string' || confirmEmail.trim().toLowerCase() !== target.email) {
+        throw new InvalidInputError("confirm: must repeat the user's email address");
+      }
+      const user = await services.users.unbind(id, { idp: target.idp, idpSubject: target.idpSubject });
+      return { user, previousIdp: target.idp };
     },
     async disable(id: string): Promise<User> {
       needManager(actor);

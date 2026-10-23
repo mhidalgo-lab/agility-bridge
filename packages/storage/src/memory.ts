@@ -267,6 +267,16 @@ export function createMemoryStorage(options: MemoryStorageOptions = {}): Storage
       tables.users.set(id, next);
       return clone(next) as User;
     },
+    async unbind(id, expected) {
+      checkId('users', id);
+      if (typeof expected.idp !== 'string' || typeof expected.idpSubject !== 'string') return null;
+      const current = tables.users.get(id);
+      if (current === undefined || current.idp !== expected.idp || current.idpSubject !== expected.idpSubject)
+        return null;
+      const next = { ...current, idp: null, idpSubject: null, updatedAt: now() } as User & Row;
+      tables.users.set(id, next);
+      return clone(next) as User;
+    },
     list: () => userRepo.list(),
   };
 

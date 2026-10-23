@@ -111,6 +111,10 @@ npx -y agility-bridge user end-sessions --help
 
   or `POST /api/admin/v1/users/{id}/sessions/revoke` (needs the CSRF token with a session).
 
+- **Move someone to another provider**: owners only (the break-glass token counts), a recent sign-in, never your own account
+  through a session, and a confirmation that repeats the user's email. It ends the user's sessions and is audited as
+  `user.unbind`; details in [identity providers](identity-providers.md#moving-a-user-to-another-provider).
+
 ## Using the admin API with a session
 
 Scripts should use the break-glass token. A browser (or a tool driving one) that holds a session first reads
@@ -132,6 +136,6 @@ when they are cross-site and not a page navigation. Nothing happens on a refusal
 ## Audit
 
 `session.create` (sign-in or re-authentication, whether it rotated a session, how many were evicted), `session.revoke`
-(sign-out), `session.revoke_all` (sign-out everywhere, role change, disable, end-sessions, with the reason) and
+(sign-out), `session.revoke_all` (sign-out everywhere, role change, disable, end-sessions, unbind, with the reason) and
 `admin.forbidden` (reason `csrf`, `cross_site`, `origin_mismatch`, `origin_missing`, and `role` for a panel form your role may not use) are recorded as admin rows. A session
 is named by a short hash prefix; cookies, secrets and CSRF tokens never reach the log or the audit table.

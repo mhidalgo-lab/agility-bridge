@@ -2,7 +2,7 @@
 id: P4-12
 title: "Move a user to another identity on purpose (owner-only unbind)"
 phase: 4
-status: in-progress
+status: review
 priority: medium
 depends_on: [P4-02, P4-04]
 adr: ["0009"]
@@ -51,12 +51,12 @@ whichever configured provider asserts it, without opening an account-takeover pa
   re-authentication page.
 
 ## Acceptance criteria
-- [ ] Owner-only, re-authenticated, confirmed, audited (previous provider id only), ends the user's sessions; negative
+- [x] Owner-only, re-authenticated, confirmed, audited (previous provider id only), ends the user's sessions; negative
   authorization tests for every other actor (admin, member, stale owner, stranger, yourself), each leaving no change.
-- [ ] The clear is a compare-and-set: concurrent unbinds yield exactly one winner and a stale confirmation never undoes a new
+- [x] The clear is a compare-and-set: concurrent unbinds yield exactly one winner and a stale confirmation never undoes a new
   binding, on memory, SQLite (two connections) and D1.
-- [ ] The panel control matches the API for every viewer and target, and the page never shows the subject or echoes input.
-- [ ] Documented in `docs/guide/identity-providers.md`, the admin panel and admin access guides, the CLI and admin API
+- [x] The panel control matches the API for every viewer and target, and the page never shows the subject or echoes input.
+- [x] Documented in `docs/guide/identity-providers.md`, the admin panel and admin access guides, the CLI and admin API
   references, and THREAT_MODEL T14.
 
 ## Security notes
@@ -78,3 +78,20 @@ a way to narrow it (bind to a named provider next) are in P4-24 and D-46.
 - Several identities per user, linking by email (pending decision D-30, recommended: one identity per user).
 - Choosing the provider the next sign-in must use (P4-24).
 - Ending OAuth grants of the user (Phase 5 adds them; its tasks must end them on unbind).
+
+## Outcome
+
+- **Built**: `UserRepository.unbind(id, expected)` (memory, SQL for SQLite and D1, read-only wrapper); `accessServices.users.unbind`;
+  `guardedServices.users.unbind(id, confirmEmail)`; `POST /users/{id}/unbind` (audit details via a per-request `auditDetails`,
+  also on the error row); CLI `user unbind <id> --confirm <email>`; panel pair `/admin/users/{id}/unbind` with `canUnbind`, flash
+  `identity_cleared`; guides (identity providers, admin panel, admin access, CLI), generated references, THREAT_MODEL T14, changeset.
+- **Tests**: `packages/http-app/test/owner-unbind.test.ts` (9: API through real sessions, panel, matrices), `packages/auth/test/guards-unbind.test.ts`
+  (5), contract tests on every adapter, `unbindRace` on memory and D1, a two-connection SQLite race, CLI test, route rows in the
+  admin and form-refusal matrices, and the reauth guard list.
+- **Mutation checks (L-121)**: 6 reversions each fail a test: owner check removed, recent sign-in removed, self check removed,
+  sessions not ended, compare-and-set without the subject on memory and on SQL.
+- **relic-bridge findings folded in**: P4-09/P4-14 rules (owner only, not yourself, retyped email, panel hidden controls, no echo); the
+  read-then-write update became a compare-and-set (relic P4-16); sessions ended after the write (L-221).
+- **Not done / notes**: no workerd smoke (no new route family: same Worker admin API; the D1 race runs in workerd's Miniflare); the
+  full suite shows only timeouts of offline `npx` doc tests and load-sensitive property tests, as on this machine before.
+- **New**: lessons L-220 to L-222, decisions D-45 and D-46, task P4-24, changeset.

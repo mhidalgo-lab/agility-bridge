@@ -11,7 +11,7 @@ import {
 } from '@agility-bridge/storage';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { loginRace } from '../../../packages/auth/test/login-race.ts';
+import { loginRace, unbindRace } from '../../../packages/auth/test/login-race.ts';
 import { storageContract } from '../../../packages/storage/test/contract.ts';
 
 let mf: Miniflare;
@@ -129,5 +129,17 @@ describe('sign-in binding on D1 (P4-01, L-185)', () => {
     await emptyD1(db);
     const storage = await openSqlStorage(createD1Driver(db));
     expect(await loginRace(storage)).toEqual({ ok: 1, conflict: 2, bound: expect.any(String) });
+  });
+
+  it('lets exactly one of four concurrent owner unbinds clear the binding (P4-12, L-220)', async () => {
+    await emptyD1(db);
+    const storage = await openSqlStorage(createD1Driver(db));
+    await storage.users.create({ id: 'u-un', email: 'un@example.test', role: 'member' });
+    await storage.users.bind('u-un', 'google', 'g-un');
+    expect(await unbindRace(storage, 'u-un', 'un@example.test')).toEqual({
+      ok: 1,
+      conflict: 3,
+      later: 'conflict',
+    });
   });
 });

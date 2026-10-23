@@ -59,6 +59,13 @@ export const canManage = (viewer: UiPrincipal, target: User): boolean =>
 export const canEndSessions = (viewer: UiPrincipal, target: User): boolean =>
   target.id === viewer.userId || canManage(viewer, target);
 
+/**
+ * May this viewer clear this person's sign-in identity (P4-12)? Owners only, never their own account, and only while the
+ * person is bound. The admin API (`guardedServices.users.unbind`) decides; this only decides whether to offer the button.
+ */
+export const canUnbind = (viewer: UiPrincipal, target: User): boolean =>
+  viewer.role === 'owner' && target.id !== viewer.userId && target.idp !== null;
+
 const roleTone = (r: Role) => (r === 'owner' ? 'info' : r === 'admin' ? 'ok' : 'muted');
 
 function NewUser(props: {
@@ -110,6 +117,47 @@ function NewUser(props: {
         <div class="actions">
           <Button>Add user</Button>
           <LinkButton href={USERS} variant="secondary">
+            Cancel
+          </LinkButton>
+        </div>
+      </Form>
+    </Layout>
+  );
+}
+
+function UnbindPage(props: {
+  readonly viewer: UiPrincipal;
+  readonly user: User;
+  readonly message?: string | undefined;
+}) {
+  const { viewer, user } = props;
+  const self = adminPath`/admin/users/${user.id}`;
+  return (
+    <Layout title={`Move ${personText(user)} to another provider?`} viewer={viewer} current={USERS}>
+      <p>
+        This clears the sign-in identity of {user.email} (now {user.idp ?? 'none'}) and ends their browser
+        sessions everywhere. Nothing else changes: their role, grants and device tokens stay.
+      </p>
+      <p>
+        <strong>Account takeover risk:</strong> the next verified sign-in whose email matches binds the
+        account, at any configured provider. Anyone who controls that email address at a provider you
+        configured gets the account. Do this only after checking with the person. It needs a recent sign-in.
+      </p>
+      <FormError message={props.message} />
+      <Form action={`${self}/unbind`} csrf={viewer.csrf} label="Move to another provider">
+        <input type="hidden" name="confirm" value="yes" />
+        <TextField
+          name="email"
+          label="Type the person's email address to confirm"
+          type="email"
+          autocomplete="off"
+          required
+          maxlength={MAX_EMAIL}
+          spellcheck={false}
+        />
+        <div class="actions">
+          <Button variant="danger">Clear the identity</Button>
+          <LinkButton href={self} variant="secondary">
             Cancel
           </LinkButton>
         </div>
@@ -280,7 +328,7 @@ export function registerUsers(ui: Hono, kit: UiKit): void {
               </Form>
             </section>
           ) : null}
-          {canEndSessions(principal, u) || (manage && u.disabledAt === null) ? (
+          {canEndSessions(principal, u) || (manage && u.disabledAt === null) || canUnbind(principal, u) ? (
             <section class="card" aria-labelledby="end-heading">
               <h2 id="end-heading">Access</h2>
               <div class="actions">
@@ -291,6 +339,11 @@ export function registerUsers(ui: Hono, kit: UiKit): void {
                     label="End their sessions…"
                     name={`End the sessions of ${u.email}`}
                   />
+                ) : null}
+                {canUnbind(principal, u) ? (
+                  <LinkButton href={`${self}/unbind`} variant="secondary">
+                    Move to another provider…
+                  </LinkButton>
                 ) : null}
                 {manage && u.disabledAt === null ? (
                   <RowAction
@@ -430,6 +483,54 @@ export function registerUsers(ui: Hono, kit: UiKit): void {
         return new Response(null, { status: 303, headers });
       }
       return kit.redirect(self, 'sessions_ended');
+    }),
+  );
+
+  ui.get(
+    `${ROUTE}/:id/unbind`,
+    kit.page('owner', async (c, page) => {
+      const { principal } = page;
+      const id = c.req.param('id');
+      if (!isId(id)) return errorPage(404, undefined, principal);
+      const u = await loadUser(c, principal, id);
+      if ('status' in u) return loadFailed(c, u, principal);
+      // The API refuses these as well; the page is not offered for them.
+      if (!canUnbind(principal, u)) return errorPage(404, undefined, principal);
+      return page.html(<UnbindPage viewer={principal} user={u} />);
+    }),
+  );
+
+  ui.post(
+    `${ROUTE}/:id/unbind`,
+    kit.form('owner', async (c, principal, form) => {
+      const id = c.req.param('id');
+      if (!isId(id)) return kit.redirect(USERS, 'not_found');
+      const self = adminPath`/admin/users/${id}`;
+      const u = await loadUser(c, principal, id);
+      if ('status' in u) return kit.fail(c, principal, u, USERS);
+      const email = field(form, 'email');
+      // Nothing changes without the confirmation and the retyped email; the typed value is never shown back.
+      if (!confirmed(form) || email === null || email.length > MAX_EMAIL) {
+        return htmlResponse(
+          <UnbindPage viewer={principal} user={u} message="Type the person's email address to confirm." />,
+          422,
+        );
+      }
+      const res = await kit.callAdmin(
+        c,
+        principal,
+        { method: 'POST', path: adminPath`/users/${id}/unbind`, body: { confirm: email } },
+        form,
+      );
+      if (isOk(res)) return kit.redirect(self, 'identity_cleared');
+      const problem = problemOf(res);
+      if (problem.status === 422) {
+        return htmlResponse(
+          <UnbindPage viewer={principal} user={u} message="That is not this person's email address." />,
+          422,
+        );
+      }
+      return kit.fail(c, principal, res, self);
     }),
   );
 }
