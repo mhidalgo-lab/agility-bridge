@@ -30,16 +30,16 @@ How to use it:
 | [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172 |
-| [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183 |
+| [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222 |
-| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236 |
+| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
-| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
+| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
-| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165 |
+| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136 |
@@ -532,6 +532,17 @@ Reject secret-like property names (`token`, `password`, `apiKey`, `secret`) in e
 management is never exposed as an MCP tool.
 *Applied in:* AGENTS.md, P1-01.
 
+**L-239 — Look again after the write, and tie every answer to what it was about.**
+Three races found by the Phase 4 review had one shape: a check passed, something changed, the write went ahead on the old
+picture. A device token was issued on a grant that a member pointed at their personal token between the guard's look and the
+insert (the switch revokes the tokens it can see, not one that did not exist yet): the guard now looks at the grant again once
+the token exists and revokes it on a change. A validation that started before a token replacement finished after it and marked
+the new, never-checked token valid: the answer is about the token that was opened, so it is dropped when the sealed token
+changed (a storage compare-and-swap would close the last milliseconds, P4-37). And a body cap that reads everything before it
+compares lengths is no cap: read at most the cap and cancel (and do not await the cancel of a `clone()`, whose promise waits
+for the other branch).
+*Applied in:* P4-09.
+
 ## H. Storage, migrations and secrets
 
 **L-071 — One schema, one migration history.**
@@ -798,6 +809,14 @@ break-glass token has no account and may move anyone; another owner may move an 
 owner, or use the admin token") and in the docs, and hide the control in the panel for the same cases.
 *Applied in:* P4-12.
 
+**L-236 — A standing credential needs a fresh sign-in, whoever asks for it.**
+A session older than ten minutes was enough to mint a device token that never expires: stolen cookies could turn into access
+that survives the session, the sign-out and the user's next password change. Anything that creates a credential outliving the
+session (a token past the default 90 days, a setup link, a pass-through workspace) asks for the sign-in of the last ten
+minutes, as GitHub's "sudo mode" does for access tokens; the ordinary, short-lived action stays frictionless. Decide the rule
+by what survives, not by who is asking, and put it in the guard, so the panel, the API and the command line share it.
+*Applied in:* P4-09.
+
 ## K. Admin UI
 
 **L-095 — Server-rendered, script-light, and calling its own API.**
@@ -966,6 +985,14 @@ for a long path or address with no break opportunity: it overflowed only with CI
 overflow check names overflowing text nodes too and `main` has `overflow-wrap: break-word`.
 *Applied in:* P4-08.
 
+**L-235 — If the panel says "owner only", the guard says it too.**
+The instance form refused a CA file for anyone but an owner ("Only an owner can set this"), while `POST /instances` accepted
+`tls: { caFile }` from an administrator: the rule lived in the form, and the API is the boundary (L-065). A CA file is read
+from the server's disk and decides whom stored member tokens are sent to (A14). Every restriction a screen shows is found by
+grepping the screens for owner-only conditions and checking that a guard says the same; a role-matrix row and a test through
+the API are the evidence.
+*Applied in:* P4-09.
+
 ## L. Cloudflare Workers
 
 **L-096 — Never share in-flight I/O between requests on Workers.**
@@ -1084,6 +1111,13 @@ Dry-run every write tool, apply one change per asset type, read it back, retry a
 again.
 *Applied in:* P7-07.
 
+**L-237 — What an owner switched on, the owner also bounds.**
+ADR-0013 says only owners enable writes, but the projects, asset types and end date of a workspace or grant that has write
+tools were an administrator's to widen: adding a project to a write-enabled workspace is a decision to allow writes there. The
+guard now compares the change with the stored record (a list is a set, no policy equals empty lists, narrowing is never a
+widening) and asks for an owner with a recent sign-in only when it widens, so ordinary edits stay with administrators.
+*Applied in:* P4-09.
+
 ## O. Caching, quotas and budgets
 
 **L-113 — Cache keys carry every scope dimension.**
@@ -1131,6 +1165,14 @@ pattern stopped at the first quote). Each case now carries the exact secret it m
 run time so gitleaks needs no allowlist for them. Header credentials are redacted to the end of the line, because
 schemes such as Digest hold quotes and commas.
 *Applied in:* `packages/core/test/redact.test.ts`, `packages/core/src/redact.ts`, P1-01.
+
+**L-238 — An audit row says what changed, not only which field.**
+`user.update` recorded `fields: ["role"]` and nothing else: nobody could tell a promotion to owner from a demotion, and a
+workspace row could not say which project had been added. A change of privilege records the new value and, for roles, the
+previous one; a token issue records the token id (every tool call carries it, so a call traces back to who issued the token)
+and its end; an instance row records the host, never the path or query. Values are limited to ids, roles, lists of projects
+and tools, switches and reasons; names, emails and labels stay out.
+*Applied in:* P4-09.
 
 ## Q. Testing, evals and live verification
 

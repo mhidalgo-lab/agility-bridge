@@ -163,7 +163,13 @@ describe('local and remote management', () => {
           action: r.action,
           status: r.status,
           targetType: r.targetType,
-          details: { ...r.details, via: 'X' },
+          // Ids and times differ between the two databases; what the row says otherwise must match.
+          details: Object.fromEntries(
+            Object.entries({ ...r.details, via: 'X' }).map(([k, v]) => [
+              k,
+              /Id$/.test(k) || /At$/.test(k) ? '<id>' : v,
+            ]),
+          ),
         }))
         .sort((a, b) => a.action.localeCompare(b.action));
     expect(shape(localRows)).toEqual(shape(remoteRows));

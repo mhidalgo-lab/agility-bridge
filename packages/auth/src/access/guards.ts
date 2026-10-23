@@ -19,6 +19,7 @@ import {
 import { createSetupLink, type SetupLink } from '../identity/login.ts';
 import { type KeyVersionStatus, keyStatus, retireKeyVersion } from '../secrets/credentials.ts';
 import type { Keyring } from '../secrets/keyring.ts';
+import { DEFAULT_TOKEN_DAYS } from '../tokens/device.ts';
 import type { ToolInfo } from './resolve.ts';
 import type {
   AccessServices,
@@ -70,6 +71,33 @@ const needOwner = (a: Actor, what: string) => need(isOwner(a), `Only an owner ca
 /** The break-glass token is exempt: it is not a browser session and re-signing in is meaningless for it. */
 function needRecent(a: Actor, what: string): void {
   if (a.kind === 'user' && !a.recentAuth) throw new ReauthRequiredError(`Sign in again before ${what}.`);
+}
+
+/**
+ * Does `next` name projects `current` does not? `null` means "every project of the workspace", which is wider than any list.
+ * Narrowing is never a widening.
+ */
+function widensNames(next: readonly string[] | null | undefined, current: readonly string[] | null): boolean {
+  if (next === undefined) return false;
+  if (next === null) return current !== null;
+  if (current === null) return false;
+  const have = new Set(current);
+  return next.some((n) => !have.has(n));
+}
+
+/**
+ * Does the asset-type policy `next` reach types `current` does not (a longer allow list, no allow list where there was one, a
+ * shorter deny list)? No policy and empty lists are the same; order and repeats are not a change.
+ */
+function widensAssetTypes(next: JsonObject | null | undefined, current: JsonObject | null): boolean {
+  if (next === undefined) return false;
+  const list = (p: JsonObject | null, key: string): readonly string[] | null => {
+    const v = p?.[key];
+    return Array.isArray(v) ? (v as string[]) : null;
+  };
+  if (widensNames(list(next, 'allow'), list(current, 'allow'))) return true;
+  const nextDeny = new Set(list(next, 'deny') ?? []);
+  return (list(current, 'deny') ?? []).some((t) => !nextDeny.has(t));
 }
 
 /** A device token with where it belongs, for the panel-wide list (P4-15). Never a hash or a token value. */
@@ -216,8 +244,17 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
   const instances = {
     list: (): Promise<Instance[]> => storage.instances.list(),
     get: (id: string): Promise<Instance | null> => storage.instances.get(id),
+    /**
+     * Owners and admins add instances. The TLS trust of an instance is the owners' (A14, the panel already says so): a CA file
+     * chosen here is read from the server's disk and decides whom stored member tokens are sent to, so setting one needs an
+     * owner with a recent sign-in, like a retarget (P4-09).
+     */
     async create(input: Parameters<AccessServices['instances']['create']>[0]): Promise<Instance> {
       needManager(actor);
+      if (input.tls !== undefined && input.tls !== null) {
+        needOwner(actor, 'set the TLS trust of an instance');
+        needRecent(actor, 'setting the TLS trust of an instance');
+      }
       return services.instances.create(input);
     },
     async update(id: string, patch: Parameters<AccessServices['instances']['update']>[1]): Promise<Instance> {
@@ -309,7 +346,10 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
       needRecent(actor, 'changing write settings');
     }
     // A pass-through workspace serves anyone with a token for its instance: owners decide that (P2-14).
-    if (input.credentialSource === 'passthrough') needOwner(actor, 'make a workspace pass-through');
+    if (input.credentialSource === 'passthrough') {
+      needOwner(actor, 'make a workspace pass-through');
+      needRecent(actor, 'making a workspace pass-through');
+    }
     if (writeTools(input.enabledTools).length > 0) {
       needOwner(actor, 'enable write tools');
       needRecent(actor, 'enabling write tools');
@@ -332,6 +372,26 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     async update(id: string, patch: WorkspacePatchInput): Promise<Workspace> {
       needManager(actor);
       checkWorkspaceWrites(patch);
+      // Where an owner has enabled writes, the owners also decide where they may land (ADR-0013, P4-09): another project or
+      // asset type is a change of that decision, not of an administrator's.
+      if (
+        patch.allowedScopeIds !== undefined ||
+        patch.includeChildScopes !== undefined ||
+        patch.assetTypes !== undefined
+      ) {
+        const current = await load(storage.workspaces.get(id), 'workspace');
+        const writes =
+          (current.writePolicy as { enabled?: unknown }).enabled === true ||
+          writeTools(current.enabledTools).length > 0;
+        const widens =
+          widensNames(patch.allowedScopeIds, current.allowedScopeIds) ||
+          (patch.includeChildScopes === true && !current.includeChildScopes) ||
+          widensAssetTypes(patch.assetTypes, current.assetTypes);
+        if (writes && widens) {
+          needOwner(actor, 'change the projects or asset types of a workspace that has write tools');
+          needRecent(actor, 'changing the projects or asset types of a workspace that has write tools');
+        }
+      }
       return services.workspaces.update(id, patch);
     },
     async disable(id: string): Promise<Workspace> {
@@ -371,6 +431,21 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
       const current = await load(storage.grants.get(id), 'grant');
       if (patch.credentialId !== undefined && patch.credentialId !== current.credentialId) {
         await needCredentialOwner(patch.credentialId, "put a grant on someone's personal Agility token");
+      }
+      // A grant an owner gave write tools keeps the projects, asset types and end date the owner chose (ADR-0013, P4-09).
+      if (writeTools(current.tools).length > 0) {
+        const later =
+          patch.expiresAt !== undefined &&
+          current.expiresAt !== null &&
+          (patch.expiresAt === null || patch.expiresAt > current.expiresAt);
+        if (
+          widensNames(patch.scopeIds, current.scopeIds) ||
+          widensAssetTypes(patch.assetTypes, current.assetTypes) ||
+          later
+        ) {
+          needOwner(actor, 'widen a grant that has write tools');
+          needRecent(actor, 'widening a grant that has write tools');
+        }
       }
       return services.grants.update(id, patch);
     },
@@ -461,7 +536,32 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     async issue(input: Parameters<AccessServices['tokens']['issue']>[0]) {
       const grant = await ownGrant(input.grantId);
       await needCredentialOwner(grant.credentialId, 'issue device tokens on this grant');
-      return services.tokens.issue(input);
+      // A token that outlives the default is a standing credential: it needs a recent sign-in, so a stolen older session
+      // cannot mint one that survives the session (P4-09, like GitHub's sudo mode for access tokens).
+      if (
+        input.expiresInDays === 'never' ||
+        (input.expiresInDays ?? DEFAULT_TOKEN_DAYS) > DEFAULT_TOKEN_DAYS
+      ) {
+        needRecent(actor, 'issuing a device token that lasts longer than 90 days');
+      }
+      const issued = await services.tokens.issue(input);
+      // The grant may have moved to someone's personal token between the check above and the insert; the switch revokes the
+      // tokens it can see, so look again now that this one exists (P4-09, L-065).
+      try {
+        const after = await load(storage.grants.get(grant.id), 'grant');
+        if (after.credentialId !== grant.credentialId) {
+          await needCredentialOwner(after.credentialId, 'issue device tokens on this grant');
+        }
+      } catch (error) {
+        await services.tokens.revoke(issued.record.id);
+        if (error instanceof ForbiddenError || error instanceof NotFoundError) {
+          throw new ConflictError(
+            'The grant changed while the token was issued; nothing was issued. Try again.',
+          );
+        }
+        throw error;
+      }
+      return issued;
     },
     async revoke(id: string): Promise<AccessToken> {
       const t = await load(storage.accessTokens.get(id), 'token');

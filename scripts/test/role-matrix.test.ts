@@ -34,6 +34,9 @@ interface Ids {
   readonly shared: string;
   readonly workspace: string;
   readonly bobGrant: string;
+  /** A workspace and a grant on it that an owner gave write tools (P4-09). */
+  readonly writeWorkspace: string;
+  readonly writeGrant: string;
 }
 
 async function world() {
@@ -66,7 +69,47 @@ async function world() {
   const bobGrant = (
     await svc.grants.create({ workspaceId: workspace, userId: bob, credentialId: shared, tools: ['whoami'] })
   ).record.id;
-  const ids: Ids = { owner, admin, member, admin2, bob, carol, instance, shared, workspace, bobGrant };
+  const writeWorkspace = (
+    await svc.workspaces.create({
+      slug: 'wr',
+      name: 'Writes',
+      instanceId: instance,
+      allowedScopeIds: ['Scope:1', 'Scope:2'],
+      enabledTools: ['whoami', 'add_comment'],
+      writePolicy: { enabled: true },
+    })
+  ).id;
+  const personal = (
+    await svc.credentials.create({
+      instanceId: instance,
+      ownerUserId: bob,
+      label: 'bob',
+      token: '1.BobTokenNotRealAbCdEfGhIjKlMnOpQrStUv0004',
+    })
+  ).id;
+  const writeGrant = (
+    await svc.grants.create({
+      workspaceId: writeWorkspace,
+      userId: bob,
+      credentialId: personal,
+      tools: ['whoami', 'add_comment'],
+      scopeIds: ['Scope:1'],
+    })
+  ).record.id;
+  const ids: Ids = {
+    owner,
+    admin,
+    member,
+    admin2,
+    bob,
+    carol,
+    instance,
+    shared,
+    workspace,
+    bobGrant,
+    writeWorkspace,
+    writeGrant,
+  };
   const actor = (role: Role, recentAuth: boolean): Actor => ({
     kind: 'user',
     userId: ids[role],
@@ -92,6 +135,12 @@ const PROBES: Record<string, (g: Guarded, i: Ids) => unknown> = {
   'Move a user to another provider': (g, i) => g.users.unbind(i.bob, 'bob@example.test'),
   'Add an instance': (g) =>
     g.instances.create({ label: 'Two', baseUrl: 'https://agility2.example.test/Main' }),
+  'Add an instance with its own TLS trust': (g) =>
+    g.instances.create({
+      label: 'Three',
+      baseUrl: 'https://agility3.example.test/Main',
+      tls: { caFile: '/etc/agility/ca.pem' },
+    }),
   "Change an instance's origin": (g, i) =>
     g.instances.retarget(i.instance, { baseUrl: 'https://other.example.test/X' }),
   'Add a shared credential': (g, i) =>
@@ -115,10 +164,16 @@ const PROBES: Record<string, (g: Guarded, i: Ids) => unknown> = {
       allowedScopeIds: ['Scope:1'],
       credentialSource: 'passthrough',
     }),
+  'Widen the projects of a workspace that has write tools': (g, i) =>
+    g.workspaces.update(i.writeWorkspace, { allowedScopeIds: ['Scope:1', 'Scope:2', 'Scope:3'] }),
   'Create a grant': (g, i) =>
     g.grants.create({ workspaceId: i.workspace, userId: null, label: 'ci', tools: ['whoami'] }),
   'Grant write tools': (g, i) =>
     g.grants.create({ workspaceId: i.workspace, userId: i.carol, tools: ['add_comment'] }),
+  'Widen a grant that has write tools': (g, i) =>
+    g.grants.update(i.writeGrant, { scopeIds: ['Scope:1', 'Scope:2'] }),
+  'Issue a device token that never expires': (g, i) =>
+    g.tokens.issue({ grantId: i.bobGrant, label: 'laptop', expiresInDays: 'never' }),
   "Issue a device token on someone else's grant": (g, i) =>
     g.tokens.issue({ grantId: i.bobGrant, label: 'laptop' }),
   'Create an owner setup link': (g) => g.setupLinks.authorize(),

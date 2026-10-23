@@ -202,3 +202,28 @@
 - **Recommendation:** (a): the validator and the form do not depend on the wiring, and P4-30 touches the access resolver and the
   metadata cache, which deserves its own review. Until then the prefixes are an inert, validated record.
 - **Owner:** _pending_ (implemented as (a)).
+
+
+### D-55 — Who may add an instance, and so choose where member tokens are sent *(P4-09)*
+- **Context:** ADR-0008 lets owners and admins define instances. A new instance is a new origin: a rogue or compromised admin who adds one at an address they control, gives a member a grant on a workspace there and asks them to "add your Agility token" receives that token when it is validated (the origin must only answer the tokenless probe like Agility, which a copy does). THREAT_MODEL A14 stops *changing* an origin (owner only, recent sign-in, revokes what depended on it), not adding one. The CA file (`tls`) of a new instance was settable by admins through the API although the panel said owners only; that is fixed in P4-09 (owner with a recent sign-in on every route).
+- **Options:** (a) keep ADR-0008: admins add instances, members see the address before they paste a token, the probe must pass, `AB_INSTANCE_PRIVATE_ADDRESSES=refuse` keeps it public, and every add is an audit row with the host; (b) adding an instance is owner only with a recent sign-in (task P4-34; a new ADR superseding that sentence of ADR-0008).
+- **Recommendation:** (a) for now: a deployment has one or two instances, set up by whoever installs it, and (a) is what the owner approved in ADR-0008. Choose (b) when administrators are not trusted as much as owners (the rogue admin is threat actor 5); it is a small guard, form and docs change.
+- **Owner:** _pending_ (implemented as (a)).
+
+### D-56 — An unused setup link cannot be listed or revoked *(P4-09)*
+- **Context:** `POST /setup-links` returns the link once; it lives in storage for 1 minute to 7 days (default 1 hour), is single use, and nothing lists or cancels it. An owner who pasted one in the wrong chat can only wait for it to expire; whoever opens it first becomes an owner.
+- **Options:** (a) keep, with the short default and the advice (documented) to issue links of the shortest lifetime and to check `login.ok` rows with outcome `owner_bootstrap`; (b) an owner-only list (id, expiry, issuer) and revoke, in the API, the CLI and the panel (task P4-35).
+- **Recommendation:** (a) now: the default is one hour and links are rare (first owner, or a replacement owner). Do (b) before anyone issues links routinely or sets the 7-day maximum.
+- **Owner:** _pending_ (implemented as (a)).
+
+### D-57 — Audit rows of admin changes are written after the change and may be lost *(P4-09)*
+- **Context:** the audit writer queues rows and writes them in the background; a failed write is logged, a full queue (10,000 rows) drops rows with an error log, and the row follows the change. The intent of an Agility write is written first and stops the write when it cannot be stored (ADR-0013, L-109); admin changes are not.
+- **Options:** (a) keep: an audit outage must not lock owners out of an incident response (the break-glass token and the CLI still work), and failures are loud in the logs; (b) write the row of every admin change first and refuse the change when it cannot be stored (task P4-36), except for the break-glass token.
+- **Recommendation:** (a) until storage failures are seen in practice: D1 and SQLite fail together with the change itself in the cases that matter, and (b) makes a degraded database a total admin outage.
+- **Owner:** _pending_ (implemented as (a)).
+
+### D-58 — What an old session may still do, and the lifetime of an ordinary device token *(P4-09)*
+- **Context:** a session lasts up to 12 hours and a sign-in is "recent" for 10 minutes. After the review, anything that creates a credential outliving the session (a token past 90 days or `never`, a setup link, a pass-through workspace, an owner or admin, write settings, a replaced token, an origin or CA change) needs the recent sign-in. An old session can still issue ordinary device tokens (up to 90 days, at most 20 live per grant), add a shared credential, create grants for read tools and add instances as an administrator.
+- **Options:** (a) as it is: tokens up to 90 days stay frictionless, they are listed, revocable and traced by id in the audit log; (b) every device token needs the recent sign-in (a prompt on most connects); (c) lower the default lifetime (30 days) and keep the rule.
+- **Recommendation:** (a): (b) makes connecting a second device a sign-in event for every member, and the standing-credential cases are covered. Revisit (c) with real usage.
+- **Owner:** _pending_ (implemented as (a)).
