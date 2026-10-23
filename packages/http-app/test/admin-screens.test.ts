@@ -1323,9 +1323,8 @@ describe('forms refuse what they must, and refuse it without any effect', () => 
         targetId: '',
         details: {},
       });
-      expect((first as { details: { actor: string } }).details.actor).toBe('admin');
+      expect(first?.details).toMatchObject({ actor: 'admin', via: 'api' });
       expect(first?.requestId).not.toBeNull();
-      expect((first as { details: { via: string } }).details.via).toBe('api');
     }
     expect(rows.filter((r) => r.action === 'instance.create' && r.userId === e.ids.admin)).toHaveLength(2);
   });
