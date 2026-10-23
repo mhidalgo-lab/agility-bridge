@@ -663,8 +663,8 @@ describe('owner setup links (L-085)', () => {
     expect(page.status).toBe(200);
     expect(html).toMatch(/<form method="post" action="\/auth\/setup"/);
     expect(html).toContain('type="password"');
-    expect(html.match(/<script[^>]*>/g)).toEqual(['<script src="/auth/setup.js">']);
-    expect(html).not.toMatch(/<script[^>]*>[^<]+<\/script>/);
+    expect(html.match(/<script[^>]*>/gi)).toEqual(['<script src="/auth/setup.js">']);
+    expect(html).not.toMatch(/<script[^>]*>[^<]+<\/script\s*>/i);
     expect(html).toContain('name="provider" value="oidc-corp"');
     const script = await s.get('/auth/setup.js');
     expect(script.headers.get('content-type')).toMatch(/^text\/javascript/);
