@@ -2,7 +2,7 @@
 id: P4-04
 title: "Admin screens: instances, credentials, workspaces, grants, tokens, users"
 phase: 4
-status: in-progress
+status: review
 priority: high
 depends_on: [P4-03]
 adr: ["0008"]
@@ -55,21 +55,21 @@ Left to the API and CLI on purpose: instance `numberPrefixes` (shown, not edited
 token (tokens are listed on their grant).
 
 ## Acceptance criteria
-- [ ] Reloads never mint a second token (test): re-sending the issue form, the back button, a forged or foreign handle.
-- [ ] Server-side guards tested for every owner-only action, including instance origin changes (API and panel, no
+- [x] Reloads never mint a second token (test): re-sending the issue form, the back button, a forged or foreign handle.
+- [x] Server-side guards tested for every owner-only action, including instance origin changes (API and panel, no
   upstream call and no data on denial).
-- [ ] Every screen renders for each role (owner, admin, member, disabled) as its role allows; the role matrix of the
+- [x] Every screen renders for each role (owner, admin, member, disabled) as its role allows; the role matrix of the
   buttons equals the API's answers.
-- [ ] Secrets are never shown after entry: not in the page, the validation re-render, a flash, a redirect or a log
+- [x] Secrets are never shown after entry: not in the page, the validation re-render, a flash, a redirect or a log
   (tests scan every response for the typed token).
-- [ ] Destructive actions need CSRF and a confirmation; CSRF, fetch-metadata and origin refusals change nothing.
-- [ ] Re-authentication flows tested for origin change, token replacement, write settings and owner changes.
-- [ ] A panel change equals an API change (same audit row, same actor).
-- [ ] Hostile strings (names, labels, emails, slugs, scope ids, asset types) are inert on every screen.
-- [ ] Last-owner refusals are explained; handles are capped and HEAD writes nothing.
-- [ ] A workerd smoke renders at least one screen with its form.
-- [ ] Key security tests are mutation-checked (L-121), recorded under Outcome.
-- [ ] `docs/guide/admin-panel.md` written, `docs/guide/admin-access.md`, `docs/dev/admin-ui.md`, the admin API reference and
+- [x] Destructive actions need CSRF and a confirmation; CSRF, fetch-metadata and origin refusals change nothing.
+- [x] Re-authentication flows tested for origin change, token replacement, write settings and owner changes.
+- [x] A panel change equals an API change (same audit row, same actor).
+- [x] Hostile strings (names, labels, emails, slugs, scope ids, asset types) are inert on every screen.
+- [x] Last-owner refusals are explained; handles are capped and HEAD writes nothing.
+- [x] A workerd smoke renders at least one screen with its form.
+- [x] Key security tests are mutation-checked (L-121), recorded under Outcome.
+- [x] `docs/guide/admin-panel.md` written, `docs/guide/admin-access.md`, `docs/dev/admin-ui.md`, the admin API reference and
   THREAT_MODEL updated; changeset added.
 
 ## Security notes
@@ -99,3 +99,32 @@ THREAT_MODEL T3, T8, T13, T14, A5, A14.
 ## Out of scope
 - Member self-service (P4-07), audit viewer (P4-05), connect page (P4-06), unbind (P4-12), benchmark scenarios (P4-14),
   browser end-to-end (P4-08).
+
+## Outcome
+
+- **Built**: six screens (`packages/admin-ui/src/screens/`: instances, credentials, workspaces, grants, tokens, users) with
+  shared helpers and parsers; `OnceStore` and `issueOnce` / `claimOnce` in the kit, wired to `kv` in `http-app`; `Pager` and
+  `SecretOnce` components; a password field that cannot carry a value; flash codes for the new outcomes; menu entries
+  (Instances, Credentials, Workspaces, Grants, Users; the device-token screens live on the grant page); stylesheet additions
+  and regenerated hashed assets. `docs/guide/admin-panel.md` is new.
+- **Admin API**: `GET /tools` (owner and admin, 403 for members, 401 without credentials) and `error.detail: "last_owner"` on
+  every last-owner refusal (guard 403 and storage-trigger 409).
+- **Tests**: `packages/http-app/test/admin-screens.test.ts` (35 tests: every screen per role, hostile strings, instances
+  incl. origin change and re-authentication, credentials and secret echo scans, workspaces and grants incl. owner-only
+  settings and write tools, device token shown once with reload, race, forged, foreign and capped handles, users role matrix
+  against the API and the last-owner rule, every POST route refused without effect on CSRF, origin, content type, size, role and
+  missing session, panel change == API change, paging, `/tools`), `packages/admin-ui/test/screens.test.tsx` (16 tests), and a
+  workerd smoke in `apps/worker/test/worker.test.ts` (screens render, one-time token page and re-sent form against D1).
+- **Mutation checks (L-121)**: 21 deliberate reversions each fail at least one test: single-use handle always accepted, handle
+  not bound to the user, HEAD writes a handle, no cap on open handles, token button for every grant, admins manage every user,
+  password field echoes its value, origin form open to admins, admin overwrites an owner's tool list, `reauth_required` not
+  recognised, no last-owner marker, no CSRF check, token replacement for any credential, token issued before the handle is
+  taken, token POST open to members, `/tools` open to members, admins offered disable on themselves (found surviving, a
+  self-disable assertion was added), error text shown for every status, write tools offered to admins, paging ignoring the
+  page, origin change without the confirmation box.
+- **relic-bridge findings folded in**: review L6 (handle written on every GET: now only for the form page, never HEAD, capped,
+  P4-19 behaviour), L9 (controls hidden instead of leading to a 403: L-197 and the role matrix test), H1's owner boundary mapped to
+  agility-bridge's owner-only rules, P4-23's grant-form limits (limits can only narrow; notes recomputed on the grant page),
+  P4-20 hygiene (role ranks tested against the API, CSP asserted against literals).
+- **New**: lessons L-197 to L-199, decision D-36, task P4-15 (enable a disabled user, a panel-wide device token list, editing number
+  prefixes: the API lacks them).

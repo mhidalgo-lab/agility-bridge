@@ -1078,6 +1078,8 @@ describe('users', () => {
         await page(s, `/admin/users/${viewerRole === 'owner' ? e.ids.owner : e.ids.admin}`, who)
       ).text();
       expect(self).toContain('End their sessions…');
+      // Disabling yourself follows the same rule as disabling anyone: an admin may not (the API refuses), an owner may.
+      expect(self.includes('Disable…'), `${viewerRole} disables self`).toBe(viewerRole === 'owner');
     }
   });
 

@@ -34,7 +34,7 @@ How to use it:
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193 |
-| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-196 |
+| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
@@ -799,6 +799,29 @@ a JSX transform. Cache the loaded module (a completed value), never the promise 
 The panel's in-process calls enter the admin API through the same lazily built app as the HTTP route, with the request id in
 an internal header the caller sets, so a panel change and an API call produce the same audit row.
 *Applied in:* P4-03, `packages/http-app/test/admin-panel-lazy.test.ts`.
+
+**L-197 — A button the API would refuse is a bug: show a control only when the API allows it, and test the page against the API.**
+The panel mirrors the guards (owners manage everyone, admins members, personal credentials belong to their person, a grant on
+someone else's personal token takes no device token) in small functions (`canManage`, `canIssueOn`, `canReplace`), and the
+role matrix test drives the page and the API for every viewer and target role and requires "offered" to equal "allowed". The
+API stays the authority: forged requests are refused there with no effect, which is tested separately. A mismatch is a
+broken button or a hidden feature, and neither shows in a render test.
+*Applied in:* P4-04, relic-bridge review L9.
+
+**L-198 — Send only what changed to a guard that keys on the field being present.**
+The workspace, grant and user guards ask for an owner and a recent sign-in whenever a patch *contains* a write tool, a write
+policy, a pass-through source or an owner/admin target, even when the value is unchanged. A form that always sends every
+field would ask for re-authentication on every save, and an admin saving a name would overwrite an owner's write-tool list.
+The forms compare with the stored row, send only changed fields, and leave a field they may not edit out entirely.
+*Applied in:* P4-04.
+
+**L-199 — A one-time page needs a single-use handle, taken before the side effect and written only for the page that shows the form.**
+Issuing a device token from the answer to a POST makes a reload or the back button re-send the form. The form carries a
+random handle stored in `kv` for its user; the POST takes it atomically (L-073) before calling the API, so a re-sent,
+forged, foreign or concurrent form issues nothing. Handles are written only by the GET that renders the form (never HEAD,
+lists or refused views), at most ten stay open per user (further pages reuse one), and they expire. A validation re-render
+gets a fresh handle and does not spend the old one.
+*Applied in:* P4-04, `packages/http-app/test/admin-screens.test.ts`, relic-bridge review L6.
 
 ## L. Cloudflare Workers
 
