@@ -52,3 +52,23 @@
 - **Recommendation:** (a): the issuer's discovery document chooses the other endpoints, so a compromised or mistyped
   issuer should not reach internal addresses by default.
 - **Owner:** _pending_ (implemented as (a)).
+
+### D-33 — `Clear-Site-Data: "cookies"` on logout *(P4-02)*
+- **Context:** the task asks logout to send `Clear-Site-Data`. The `"cookies"` directive clears the cookies of the whole
+  registered domain and its subdomains ([RESEARCH §9](../RESEARCH.md#sessions-clear-site-data-and-re-authentication-p4-02)),
+  so a server at `mcp.example.com` signs the user out of every sibling application on `example.com`.
+- **Options:** (a) send `"cookies"` by default and offer `AB_LOGOUT_CLEAR_SITE_DATA=off`; (b) off by default; (c) never.
+- **Recommendation:** (a): a dedicated host is the common case, the session cookie is cleared and deleted either way, and
+  the guide warns about shared domains.
+- **Owner:** _pending_ (implemented as (a)).
+
+### D-34 — Re-authentication strength at Google and GitHub *(P4-02)*
+- **Context:** a recent sign-in is required for high-impact changes. OIDC providers are asked for `prompt=login&max_age=0`
+  and their `auth_time` is checked when sent; Cloudflare Access must show an assertion issued in the last 10 minutes.
+  Google sends no `auth_time` (and documents no `prompt=login`), and GitHub has no way to ask: for them the proof is "the
+  browser still has a session at the provider and the same account answered", i.e. no new password prompt is guaranteed.
+- **Options:** (a) accept it for every provider, documented; (b) refuse re-authentication for providers that cannot show
+  recency, so those owners use the break-glass token for high-impact changes; (c) add a second factor of our own.
+- **Recommendation:** (a) until a real run (owner step 1) shows what Google does with `prompt=login`: the session was
+  already created by a fresh provider round trip, and (b) would lock Google- and GitHub-only teams out of key rotation.
+- **Owner:** _pending_ (implemented as (a)).

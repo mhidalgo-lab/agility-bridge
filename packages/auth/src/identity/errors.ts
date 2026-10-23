@@ -30,7 +30,11 @@ export type IdentityErrorCode =
   /** Google hosted-domain restriction: the `hd` claim is missing or another domain. */
   | 'hd_mismatch'
   /** The setup link is malformed, unknown, used or expired. */
-  | 'setup_invalid';
+  | 'setup_invalid'
+  /** Re-authentication (P4-02): the sign-in is for a different user than the session being re-authenticated. */
+  | 'reauth_mismatch'
+  /** Re-authentication: the IdP reports the user authenticated too long ago (or a header provider cannot say). */
+  | 'reauth_stale';
 
 export class IdentityError extends Error {
   readonly code: IdentityErrorCode;

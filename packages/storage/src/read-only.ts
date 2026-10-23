@@ -11,7 +11,7 @@ const WRITES: Readonly<Record<string, readonly string[]>> = {
   accessTokens: ['create', 'update', 'delete', 'touch'],
   audit: ['append', 'purge'],
   settings: ['set', 'delete'],
-  kv: ['set', 'setIfAbsent', 'take', 'delete', 'increment', 'purgeExpired'],
+  kv: ['set', 'setIfAbsent', 'take', 'delete', 'increment', 'purgeExpired', 'deletePrefix'],
 };
 
 /** A view of `storage` whose every write throws `ReadOnlyStorageError` (stdio configuration, diagnostics). */

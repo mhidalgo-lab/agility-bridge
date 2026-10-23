@@ -836,6 +836,19 @@ export function storageContract(name: string, factory: StorageFactory): void {
         expect(await s.kv.list('')).toEqual(['oauth:b', 'oauthx']);
       });
 
+      it('deletes a prefix in one call, live and expired alike, and refuses the empty prefix', async () => {
+        await s.kv.set('sess:u1:a', '1');
+        await s.kv.set('sess:u1:b', '1', { expiresAt: clock.now() + 5 });
+        await s.kv.set('sess:u10:a', '1');
+        await s.kv.set('sess-seen:u1:a', '1');
+        clock.advance(5);
+        expect(await s.kv.deletePrefix('sess:u1:')).toBe(2);
+        expect(await s.kv.list('')).toEqual(['sess-seen:u1:a', 'sess:u10:a']);
+        expect(await s.kv.deletePrefix('sess:u1:')).toBe(0);
+        await expect(s.kv.deletePrefix('')).rejects.toThrow(InvalidInputError);
+        await expect(s.kv.deletePrefix('has space')).rejects.toThrow(InvalidInputError);
+      });
+
       it('increments counters atomically with a cap and an expiry window', async () => {
         const window = { expiresAt: clock.now() + 1_000, max: 3 };
         expect(await s.kv.increment('rl', window)).toBe(1);

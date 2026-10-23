@@ -14,6 +14,7 @@ import {
   type IdentitySettings,
   identitySettingsFromEnv,
   type Keyring,
+  type SessionTimeouts,
 } from '@agility-bridge/auth';
 import {
   CORE_TOOLS,
@@ -34,6 +35,7 @@ import {
   type RateLimitConfig,
   type RateLimiter,
 } from './rate-limit.ts';
+import type { SessionOptions } from './session.ts';
 
 /** A setting is missing or malformed; the message names the setting, never its value. */
 export class SettingsError extends Error {
@@ -59,6 +61,10 @@ export const SERVER_SETTING_NAMES: readonly string[] = Object.freeze([
   'AB_RATE_LIMIT_GRANT_PER_MINUTE',
   'AB_RATE_LIMIT_VALIDATIONS_PER_MINUTE',
   'AB_RATE_LIMIT_SIGN_IN',
+  'AB_SESSION_IDLE_MINUTES',
+  'AB_SESSION_MAX_HOURS',
+  'AB_SESSION_MAX_PER_USER',
+  'AB_LOGOUT_CLEAR_SITE_DATA',
   'AB_AUDIT_RETENTION_DAYS',
   'AB_CREDENTIAL_REVALIDATION_HOURS',
   'AB_PASSTHROUGH',
@@ -87,6 +93,8 @@ export interface ServerSettings {
   readonly allowHttpInstances: boolean;
   /** Sign-in providers and the login policy (P4-01); absent = no `/auth` routes. */
   readonly identity?: IdentitySettings;
+  /** Admin session timeouts, cap and logout behaviour (P4-02); only used with sign-in. */
+  readonly session: SessionOptions;
 }
 
 /** Host defaults: ADR-0010 presets (Node 1,000 requests and 8 MiB; Workers Free 45 and 512 KiB). */
@@ -236,6 +244,25 @@ export function parseServerSettings(env: Env, defaults: SettingDefaults): Server
     passthrough: onOff('AB_PASSTHROUGH', env['AB_PASSTHROUGH'], false),
     allowHttpInstances: onOff('AB_ALLOW_HTTP_INSTANCES', env['AB_ALLOW_HTTP_INSTANCES'], false),
     ...(identity === null ? {} : { identity }),
+    session: parseSessionSettings(env),
+  };
+}
+
+/** `AB_SESSION_*` and `AB_LOGOUT_CLEAR_SITE_DATA` (P4-02). Bad values name the variable, never the value. */
+export function parseSessionSettings(env: Env): SessionOptions & { timeouts: SessionTimeouts } {
+  const idle = settingInteger('AB_SESSION_IDLE_MINUTES', env['AB_SESSION_IDLE_MINUTES'], 30, 5, 1_440);
+  const hours = settingInteger('AB_SESSION_MAX_HOURS', env['AB_SESSION_MAX_HOURS'], 12, 1, 168);
+  if (idle > hours * 60) {
+    throw new SettingsError('AB_SESSION_IDLE_MINUTES must not exceed AB_SESSION_MAX_HOURS.');
+  }
+  const clear = env['AB_LOGOUT_CLEAR_SITE_DATA'] ?? 'cookies';
+  if (clear !== '' && clear !== 'cookies' && clear !== 'off') {
+    throw new SettingsError('AB_LOGOUT_CLEAR_SITE_DATA must be cookies or off.');
+  }
+  return {
+    timeouts: { idleMs: idle * 60_000, absoluteMs: hours * 3_600_000 },
+    maxPerUser: settingInteger('AB_SESSION_MAX_PER_USER', env['AB_SESSION_MAX_PER_USER'], 20, 1, 100),
+    clearSiteData: clear !== 'off',
   };
 }
 
@@ -383,9 +410,20 @@ export function assembleServer(parts: ServerParts): AssembledServer {
     accessCacheTtlSeconds: settings.accessCacheTtlSeconds,
     limits: createRequestLimits(parts.limiter, settings.rateLimits, logger),
     ...(settings.passthrough ? { passthrough: { validator, secure: parts.passthroughSecure } } : {}),
-    ...(parts.adminVerifier === undefined
+    // The admin API exists with the break-glass token, with sign-in (browser sessions, P4-02), or both.
+    ...(parts.adminVerifier === undefined && settings.identity === undefined
       ? {}
-      : { admin: { services, audit, authenticate: adminTokenAuthenticator(parts.adminVerifier) } }),
+      : {
+          admin: {
+            services,
+            audit,
+            authenticate:
+              parts.adminVerifier === undefined
+                ? async () => null
+                : adminTokenAuthenticator(parts.adminVerifier),
+          },
+        }),
+    session: settings.session,
     ...(settings.identity === undefined
       ? {}
       : {
@@ -397,6 +435,7 @@ export function assembleServer(parts: ServerParts): AssembledServer {
             }),
             policy: settings.identity.policy,
             audit: (event) => audit.login(event),
+            auditAdmin: (change) => audit.admin(change),
           },
         }),
     clientIp: parts.clientIp,

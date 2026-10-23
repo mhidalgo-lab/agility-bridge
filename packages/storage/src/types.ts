@@ -355,6 +355,11 @@ export interface KvStore {
   increment(key: string, options?: KvIncrementOptions): Promise<number | null>;
   /** Live keys with this prefix, in key order, after `after`, at most `limit` (default 100, at most 1,000). */
   list(prefix: string, options?: { after?: string; limit?: number }): Promise<string[]>;
+  /**
+   * Deletes every entry (live or expired) whose key starts with `prefix` in one statement; returns how many. Ends all
+   * of a user's sessions in a constant number of calls (P4-02). An empty prefix is refused.
+   */
+  deletePrefix(prefix: string): Promise<number>;
   /** Deletes expired entries, at most `limit` (default 1,000) per call; returns how many. */
   purgeExpired(limit?: number): Promise<number>;
 }

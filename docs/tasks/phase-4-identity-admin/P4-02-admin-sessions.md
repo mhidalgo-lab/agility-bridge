@@ -6,7 +6,7 @@ status: in-progress
 priority: high
 depends_on: [P4-01]
 adr: ["0009"]
-lessons: [L-013, L-073, L-093, L-096, L-189]
+lessons: [L-013, L-073, L-093, L-096, L-189, L-190, L-191, L-192, L-193]
 owner: "claude-agent"
 ---
 
@@ -95,6 +95,8 @@ at the `Location` header (P4-01).
 - L-093 — Re-authenticate before high-impact actions.
 - L-096 — No shared in-flight I/O between requests on Workers (no module-level session or user cache).
 - L-189 — A cookie named twice is no cookie.
+- L-190 – L-193 — Added by this task (Clear-Site-Data scope, form referrer policy, cross-site navigations, re-authentication
+  never resolves users).
 
 ## Docs to update
 - docs/guide/admin-access.md (new)

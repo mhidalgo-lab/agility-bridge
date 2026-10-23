@@ -193,7 +193,7 @@ export async function boot(env: WorkerEnv, version: string): Promise<Booted> {
   logger.info('booted', {
     plan,
     callBudget: settings.callBudget,
-    adminApi: adminVerifier !== undefined,
+    adminApi: adminVerifier !== undefined || settings.identity !== undefined,
     publicUrl: settings.publicUrl ?? null,
   });
   return { app, logger, jobs: { storage, keyring, services, settings, logger } };

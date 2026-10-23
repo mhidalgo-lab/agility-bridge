@@ -37,13 +37,16 @@ async function code(p: Promise<unknown>): Promise<IdentityErrorCode | 'ok'> {
 describe('Cloudflare Access', () => {
   it('accepts a genuine assertion', async () => {
     const { access, verify } = await setup();
-    expect(await verify(withToken(await access.assertion()))).toEqual({
+    const identity = await verify(withToken(await access.assertion()));
+    expect(identity).toMatchObject({
       idp: 'cf-access',
       subject: 'access-subject-1',
       email: 'ann@example.test',
       emailVerified: true,
       displayName: null,
     });
+    // The assertion's issue time is the recency evidence a re-authentication checks (P4-02).
+    expect(identity.authenticatedAt).toBeTypeOf('number');
   });
 
   it('refuses a request without the header, with an empty one, or with only the cookie', async () => {

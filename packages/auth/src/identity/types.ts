@@ -15,6 +15,12 @@ export interface VerifiedIdentity {
   readonly displayName: string | null;
   /** GitHub only: the configured organizations the user is an active member of (lowercase). */
   readonly orgs?: readonly string[];
+  /**
+   * When the user last authenticated at the IdP (epoch ms), when the IdP says so: the ID token's `auth_time`, or the
+   * issue time of a Cloudflare Access assertion. Re-authentication (P4-02) checks it; absent for providers that do not
+   * report it (Google, GitHub).
+   */
+  readonly authenticatedAt?: number;
 }
 
 /** What the login route hands a redirect provider to build the authorization request. */
@@ -25,6 +31,8 @@ export interface AuthorizationRequest {
   readonly nonce: string;
   /** PKCE S256 challenge of the transaction's verifier. */
   readonly codeChallenge: string;
+  /** Re-authentication (P4-02): ask the IdP to prompt for credentials again (OIDC `prompt=login`, `max_age=0`). */
+  readonly reauth?: boolean;
 }
 
 /** What the callback route hands a redirect provider to finish the login. */

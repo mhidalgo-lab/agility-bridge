@@ -22,6 +22,7 @@ import type { Context } from 'hono';
 import { LinearRouter } from 'hono/router/linear-router';
 import type { RequestLimits } from '../app.ts';
 import type { AuditWriter } from '../audit.ts';
+import { CSRF_HEADER, isUnsafeMethod, type SessionManager } from '../session.ts';
 import { AdminError, errorBody, toAdminError } from './errors.ts';
 
 export const ADMIN_BASE = '/api/admin/v1';
@@ -34,8 +35,13 @@ export interface AdminApiOptions {
   readonly audit: AuditWriter;
   /** Called after every successful change (clears the access cache, L-068). */
   readonly onChange: () => void;
-  /** Who is calling; `null` = not authenticated. The break-glass token today, admin sessions from P4-02. */
-  readonly authenticate: (c: Context) => Promise<Actor | null>;
+  /**
+   * Who is calling: the break-glass token, or an admin session (`adminAuthenticator`). `null` = not authenticated;
+   * a refusal (cross-site, CSRF) is a 403 and writes an audit row.
+   */
+  readonly authenticate: (c: Context) => Promise<AdminAuthResult>;
+  /** Ends every session of a user (role change, disable, `POST /users/{id}/sessions/revoke`); absent = no sessions. */
+  readonly revokeUserSessions?: (userId: string) => Promise<number>;
   readonly limits?: RequestLimits;
   readonly clientIp: (c: Context) => string;
   readonly logger: Logger;
@@ -50,6 +56,74 @@ export interface AdminApiOptions {
   readonly lightweightRouter?: boolean;
   /** Sign-in is configured (P4-01): owner setup links point at this origin. Absent = `POST /setup-links` is refused. */
   readonly setupLinks?: { readonly publicUrl: string };
+}
+
+/** A request the admin API refuses before any handler (the reason is audited, never the token). */
+export interface AdminRefusal {
+  readonly kind: 'refused';
+  /** `cross_site`, `origin_mismatch`, `origin_missing`, `csrf`. */
+  readonly reason: string;
+  readonly userId?: string;
+}
+
+export type AdminAuthResult = Actor | AdminRefusal | null;
+
+/** The session the request was authenticated with (set by `adminAuthenticator`), for `GET /session`. */
+export type AdminSessionView = {
+  readonly user: { id: string; email: string; displayName: string | null; role: string };
+  readonly recentAuth: boolean;
+  readonly signedInAt: number;
+  readonly idleExpiresAt: number;
+  readonly expiresAt: number;
+  readonly csrfToken: string;
+};
+
+/**
+ * Break-glass token first, then the session cookie (P4-02). A request with an `Authorization` header is only ever
+ * judged as a token: a wrong token never falls back to a cookie. A cookie request passes the fetch-metadata and
+ * `Origin` checks, and on an unsafe method the CSRF token, before it is anyone.
+ */
+export function adminAuthenticator(parts: {
+  readonly token?: (c: Context) => Promise<Actor | null>;
+  readonly sessions?: SessionManager;
+}): (c: Context) => Promise<AdminAuthResult> {
+  return async (c) => {
+    if (c.req.header('authorization') !== undefined) return (await parts.token?.(c)) ?? null;
+    const sessions = parts.sessions;
+    // No session cookie (or no sessions): only the token authenticator is left, and it answers null without a token.
+    if (sessions === undefined || sessions.readCookie(c) === undefined)
+      return (await parts.token?.(c)) ?? null;
+    if (sessions.readCookie(c) === null) return null; // a cookie named twice is no cookie
+    const unsafe = isUnsafeMethod(c.req.method);
+    const problem = sessions.checkFetchOrigin(c, unsafe);
+    if (problem !== null) return { kind: 'refused', reason: problem };
+    const auth = await sessions.authenticate(c);
+    if (!auth.ok) return null;
+    const { principal } = auth;
+    if (unsafe && !sessions.csrfMatches(principal, c.req.header(CSRF_HEADER))) {
+      return { kind: 'refused', reason: 'csrf', userId: principal.user.id };
+    }
+    const view: AdminSessionView = {
+      user: {
+        id: principal.user.id,
+        email: principal.user.email,
+        displayName: principal.user.displayName,
+        role: principal.role,
+      },
+      recentAuth: principal.recentAuth,
+      signedInAt: principal.session.record.createdAt,
+      idleExpiresAt: principal.session.idleExpiresAt,
+      expiresAt: principal.session.record.expiresAt,
+      csrfToken: principal.session.record.csrf,
+    };
+    c.set('sessionView' as never, view as never);
+    return {
+      kind: 'user',
+      userId: principal.user.id,
+      role: principal.role,
+      recentAuth: principal.recentAuth,
+    };
+  };
 }
 
 /** The break-glass authenticator: `Authorization: Bearer ab_admin_…` matching `AB_ADMIN_TOKEN`. */
@@ -316,7 +390,31 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
         'retry-after': String(Math.ceil(before.retryAfterSeconds)),
       });
     }
-    const actor = await options.authenticate(c);
+    const result = await options.authenticate(c);
+    if (result !== null && result.kind === 'refused') {
+      keep(
+        c,
+        options.audit.admin({
+          action: 'admin.forbidden',
+          status: 'denied',
+          userId: result.userId ?? null,
+          targetType: 'session',
+          targetId: '-',
+          errorCode: 'forbidden',
+          requestId: (c.get('requestId' as never) as string | undefined) ?? null,
+          via: options.via ?? 'api',
+          details: {
+            reason: result.reason,
+            route: `${c.req.method} ${new URL(c.req.url).pathname}`.slice(0, 200),
+          },
+        }),
+      );
+      return c.json(
+        errorBody('forbidden', 'This request did not come from this site, or its CSRF token is missing.'),
+        403,
+      );
+    }
+    const actor = result;
     if (actor === null) {
       if ((await options.limits?.failuresExhausted?.(ip, now)) === true) {
         return c.json(errorBody('rate_limited', 'Too many failed attempts.'), 429, { 'retry-after': '300' });
@@ -421,7 +519,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       path: spec.path,
       tags: [spec.tag],
       summary: spec.summary,
-      security: [{ bearer: [] }],
+      security: [{ bearer: [] }, { sessionCookie: [] }],
       request: {
         ...(spec.params ? { params: IdParam } : {}),
         ...(spec.query === undefined ? {} : { query: spec.query as never }),
@@ -474,6 +572,77 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
     }) as never);
   }
 
+  /** Ends all of a user's sessions and records why; a failure here must not hide the change that caused it. */
+  async function endSessions(c: Context, userId: string, reason: string, record = true): Promise<number> {
+    if (options.revokeUserSessions === undefined) return 0;
+    const actor = c.get('actor' as never) as Actor;
+    const revoked = await options.revokeUserSessions(userId);
+    if (record) {
+      keep(
+        c,
+        options.audit.admin({
+          action: 'session.revoke_all',
+          userId: actor.kind === 'user' ? actor.userId : null,
+          targetType: 'user',
+          targetId: userId.slice(0, 128),
+          requestId: (c.get('requestId' as never) as string | undefined) ?? null,
+          via: options.via ?? 'api',
+          details: { reason, revoked, actor: actor.kind === 'user' ? actor.role : 'break_glass' },
+        }),
+      );
+    }
+    return revoked;
+  }
+
+  const SessionOut = z
+    .object({
+      actor: z.enum(['session', 'break_glass', 'user']),
+      user: z
+        .object({ id: z.string(), email: z.string(), displayName: z.string().nullable(), role: z.string() })
+        .nullable(),
+      recentAuth: z.boolean(),
+      signedInAt: z.number().nullable(),
+      idleExpiresAt: z.number().nullable(),
+      expiresAt: z.number().nullable(),
+      csrfToken: z.string().nullable().openapi({
+        description: 'Send as `X-CSRF-Token` on every POST, PATCH and DELETE made with the session cookie.',
+      }),
+    })
+    .openapi('Session');
+  add(
+    {
+      method: 'get',
+      path: '/session',
+      tag: 'session',
+      summary: 'The current session: user, role, whether the sign-in is recent, expiry and the CSRF token',
+      out: SessionOut,
+    },
+    async (c) => {
+      const view = c.get('sessionView' as never) as AdminSessionView | undefined;
+      const actor = c.get('actor' as never) as Actor;
+      if (view === undefined) {
+        return {
+          actor: actor.kind === 'user' ? 'user' : 'break_glass',
+          user: null,
+          recentAuth: actor.kind === 'break_glass' || actor.recentAuth,
+          signedInAt: null,
+          idleExpiresAt: null,
+          expiresAt: null,
+          csrfToken: null,
+        };
+      }
+      return {
+        actor: 'session',
+        user: view.user,
+        recentAuth: view.recentAuth,
+        signedInAt: view.signedInAt,
+        idleExpiresAt: view.idleExpiresAt,
+        expiresAt: view.expiresAt,
+        csrfToken: view.csrfToken,
+      };
+    },
+  );
+
   const user = { tag: 'users' };
   add({ method: 'get', path: '/users', ...user, summary: 'List users', out: z.array(UserOut) }, (c) =>
     services(c).users.list(),
@@ -506,7 +675,12 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       out: UserOut,
       audit: { action: 'user.update', targetType: 'user' },
     },
-    (c, { id, body }) => services(c).users.update(id, body as never),
+    async (c, { id, body }) => {
+      const updated = await services(c).users.update(id, body as never);
+      // A role change takes effect at once: the user's sessions end (the role is read per request anyway, P4-02).
+      if ((body as { role?: string }).role !== undefined) await endSessions(c, id, 'role_change');
+      return updated;
+    },
   );
   add(
     {
@@ -518,7 +692,29 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       out: UserOut,
       audit: { action: 'user.disable', targetType: 'user' },
     },
-    (c, { id }) => services(c).users.disable(id),
+    async (c, { id }) => {
+      const disabled = await services(c).users.disable(id);
+      await endSessions(c, id, 'disabled');
+      return disabled;
+    },
+  );
+
+  add(
+    {
+      method: 'post',
+      path: '/users/{id}/sessions/revoke',
+      ...user,
+      params: true,
+      summary:
+        "End all of a user's browser sessions (yourself; an owner anyone; an admin members; the break-glass token anyone)",
+      out: z.object({ ok: z.literal(true), revoked: z.number() }),
+      audit: { action: 'session.revoke_all', targetType: 'user' },
+    },
+    async (c, { id }) => {
+      // The guard decides first and ends nothing; a refusal is audited by the generic denied row below.
+      await services(c).users.authorizeEndSessions(id);
+      return { ok: true as const, revoked: await endSessions(c, id, 'ended_by_request', false) };
+    },
   );
 
   const inst = { tag: 'instances' };
@@ -1002,6 +1198,13 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
   );
 
   api.openAPIRegistry.registerComponent('securitySchemes', 'bearer', { type: 'http', scheme: 'bearer' });
+  api.openAPIRegistry.registerComponent('securitySchemes', 'sessionCookie', {
+    type: 'apiKey',
+    in: 'cookie',
+    name: '__Host-ab_session',
+    description:
+      'The browser session cookie set by /auth. Unsafe methods also need the CSRF token from GET /session in X-CSRF-Token.',
+  });
   api.doc31('/openapi.json', {
     openapi: '3.1.0',
     info: { title: 'agility-bridge admin API', version: '1' },

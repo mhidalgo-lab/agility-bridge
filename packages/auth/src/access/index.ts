@@ -5,6 +5,7 @@ export {
   type GuardContext,
   type GuardedServices,
   guardedServices,
+  ReauthRequiredError,
 } from './guards.ts';
 export { loadAccessRecords } from './load.ts';
 export {

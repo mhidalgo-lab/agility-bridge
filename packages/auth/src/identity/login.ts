@@ -65,6 +65,8 @@ export interface LoginTransaction {
   readonly setup: string | null;
   /** Validated same-origin path to continue to. */
   readonly next: string;
+  /** Re-authentication (P4-02): the id of the signed-in user this login must resolve to; null for a plain sign-in. */
+  readonly reauth: string | null;
   /** Master-key version that derived the verifier and nonce. */
   readonly keyVersion: number;
   readonly createdAt: number;
@@ -87,7 +89,12 @@ export interface StartedLogin {
 export async function startLogin(
   kv: Kv,
   keys: LoginKeys,
-  input: { readonly provider: string; readonly next: string; readonly setup: string | null },
+  input: {
+    readonly provider: string;
+    readonly next: string;
+    readonly setup: string | null;
+    readonly reauth?: string | null;
+  },
   clock: ClockLike,
 ): Promise<StartedLogin> {
   const state = randomValue();
@@ -99,6 +106,7 @@ export async function startLogin(
     binding: await sha256Hex(binding),
     setup: input.setup,
     next: input.next,
+    reauth: input.reauth ?? null,
     keyVersion,
     createdAt: clock.now(),
   };
@@ -114,6 +122,7 @@ function parseTransaction(raw: string): LoginTransaction | null {
     const s = (k: string) => typeof v[k] === 'string';
     if (!s('provider') || !s('binding') || !s('next')) return null;
     if (v['setup'] !== null && !s('setup')) return null;
+    if (v['reauth'] !== undefined && v['reauth'] !== null && !s('reauth')) return null;
     if (typeof v['createdAt'] !== 'number' || !Number.isSafeInteger(v['keyVersion'])) return null;
     return v as unknown as LoginTransaction;
   } catch {
@@ -158,7 +167,7 @@ export async function finishLogin(
     // The master key version that started this login is gone (retired mid-flight): start again.
     throw new IdentityError('unknown_state', 'unknown, used or expired login');
   }
-  return { ...tx, ...secrets };
+  return { ...tx, reauth: tx.reauth ?? null, ...secrets };
 }
 
 // ---------------------------------------------------------------------------------------------------------------

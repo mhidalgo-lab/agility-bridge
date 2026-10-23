@@ -193,6 +193,12 @@ export const COMMANDS: readonly CommandSpec[] = [
     api: async (_r, p) => ({ method: 'POST', path: `/users/${enc(p.args[0] as string)}/disable` }),
   },
   {
+    words: ['user', 'end-sessions'],
+    summary: "End all of a user's browser sessions (sign them out everywhere)",
+    args: [id('user-id', 'User id')],
+    api: async (_r, p) => ({ method: 'POST', path: `/users/${enc(p.args[0] as string)}/sessions/revoke` }),
+  },
+  {
     words: ['instance', 'list'],
     summary: 'List Agility instances',
     api: async () => ({ method: 'GET', path: '/instances' }),

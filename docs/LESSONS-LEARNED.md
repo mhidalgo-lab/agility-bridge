@@ -33,7 +33,7 @@ How to use it:
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193 |
 | [K. Admin UI](#k-admin-ui) | L-095 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -737,6 +737,36 @@ keeps such tokens valid until revoked, so call `DELETE /applications/{client_id}
 success and on refusals, in the background where the platform has one (`waitUntil`), and log only a status class when it
 fails (relic-bridge Phase 4 task P4-13). A failed revocation never fails the sign-in.
 *Applied in:* P4-01.
+
+**L-190 — `Clear-Site-Data: "cookies"` clears the whole registrable domain; keep it switchable.**
+Logout sends `Clear-Site-Data: "cookies"` (the value is a quoted string; an unquoted one is invalid), as the task asks, but
+per MDN it removes the cookies of the registered domain *and its subdomains*, so `mcp.example.com` signing out also
+signs the user out of `wiki.example.com`. The session cookie is also cleared with its own `Set-Cookie`, so the header is
+belt and braces: `AB_LOGOUT_CLEAR_SITE_DATA=off` drops it for deployments that share a domain. Send it on a 200 page, not a
+redirect (redirect handling is not documented). Browsers ignore it outside secure contexts.
+*Applied in:* P4-02.
+
+**L-191 — Forms need `Referrer-Policy: same-origin` when the CSRF check reads `Origin`.**
+Under the app-wide `no-referrer`, browsers post a same-origin form with `Origin: null`, which the Origin check must refuse.
+The pages that carry forms (the account page, later the panel) send `same-origin`, and the edge keeps that one value
+and no other (found in relic-bridge's `security.ts`).
+*Applied in:* P4-02.
+
+**L-192 — A link from elsewhere is a cross-site navigation, and so is the page after the IdP redirect.**
+`Sec-Fetch-Site` stays `cross-site` for the last request of a redirect chain that started on another site, so refusing every
+cross-site read would break the first page after sign-in and every link from chat. The read check allows exactly
+`GET` + `Sec-Fetch-Mode: navigate` + `Sec-Fetch-Dest: document` (its answer cannot be read by the other site) and refuses
+other cross-site and same-site reads; changes need `same-origin` (or an `Origin` equal to the public origin) and the CSRF
+token, whatever the cookie says (`SameSite=Lax` is not the defence).
+*Applied in:* P4-02.
+
+**L-193 — Re-authentication proves the same person again; it never resolves, creates or binds a user.**
+Re-running the login through `resolveLoginUser` would let a stranger the allowlist admits be provisioned, or an unbound
+user be bound, from inside someone else's session. The re-authentication transaction carries the user id; the callback
+only compares the verified `(idp, subject)` with that user's bound identity, checks recency (OIDC `prompt=login&max_age=0`
+and `auth_time` when reported, the Cloudflare Access assertion's `iat`), and rotates the session. Google and GitHub report no
+`auth_time`: for them the IdP's own prompt is the only evidence (decision D-34).
+*Applied in:* P4-02.
 
 ## K. Admin UI
 

@@ -95,7 +95,11 @@ async function setup(
         providers,
         policy,
         audit: (e) => w.audit.login(e),
-        ...(options.onLogin === undefined ? {} : { onLogin: options.onLogin }),
+        // These tests are about who gets in; the session a sign-in creates is tested in sessions.test.ts (P4-02).
+        onLogin:
+          options.onLogin ??
+          ((_c, login) =>
+            new Response(`Signed in as ${login.user.email} (${login.user.role}).`, { status: 200 })),
       },
       publicUrl,
       ...(options.limits === undefined ? {} : { limits: options.limits }),

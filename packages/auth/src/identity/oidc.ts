@@ -234,6 +234,11 @@ export function createOidcProvider(options: OidcProviderOptions): RedirectIdenti
       url.searchParams.set('nonce', request.nonce);
       url.searchParams.set('code_challenge', request.codeChallenge);
       url.searchParams.set('code_challenge_method', 'S256');
+      if (request.reauth === true) {
+        // OIDC Core 3.1.2.1: force a fresh authentication; `max_age=0` obliges the IdP to report `auth_time`.
+        url.searchParams.set('prompt', 'login');
+        url.searchParams.set('max_age', '0');
+      }
       return url;
     },
 
@@ -290,12 +295,16 @@ export function createOidcProvider(options: OidcProviderOptions): RedirectIdenti
           'the email address is not verified by the identity provider',
         );
       }
+      const authTime = (claims as Record<string, unknown>)['auth_time'];
       return Object.freeze({
         idp: options.idp,
         subject,
         email,
         emailVerified: true,
         displayName: displayNameOf(source) ?? displayNameOf(claims as Record<string, unknown>),
+        ...(typeof authTime === 'number' && Number.isFinite(authTime) && authTime > 0
+          ? { authenticatedAt: Math.round(authTime * 1000) }
+          : {}),
       });
     },
   };

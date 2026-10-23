@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // The admin API error envelope `{ error: { code, message, field?, detail? } }` and the status mapping of P2-09.
-import { ForbiddenError, SecretsError, UpstreamCheckError } from '@agility-bridge/auth';
+import { ForbiddenError, ReauthRequiredError, SecretsError, UpstreamCheckError } from '@agility-bridge/auth';
 import { StorageError } from '@agility-bridge/storage';
 
 export type AdminErrorCode =
   | 'bad_request'
   | 'unauthorized'
   | 'forbidden'
+  | 'reauth_required'
   | 'not_found'
   | 'conflict'
   | 'payload_too_large'
@@ -21,6 +22,7 @@ export const STATUS: Readonly<Record<AdminErrorCode, number>> = {
   bad_request: 400,
   unauthorized: 401,
   forbidden: 403,
+  reauth_required: 403,
   not_found: 404,
   conflict: 409,
   payload_too_large: 413,
@@ -61,6 +63,10 @@ export function toAdminError(error: unknown): { status: number; body: AdminError
     code = error.code;
     message = error.message;
     field = error.field;
+  } else if (error instanceof ReauthRequiredError) {
+    // The panel and API clients send the user through `/auth/reauth` (L-093).
+    code = 'reauth_required';
+    message = error.message;
   } else if (error instanceof ForbiddenError) {
     code = 'forbidden';
     message = error.message;
