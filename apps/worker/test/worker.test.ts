@@ -558,6 +558,42 @@ describe('sign-in on workerd (P4-01)', () => {
       ).json()) as unknown[];
       expect(tokens).toHaveLength(1);
 
+      // Panel follow-ups (P4-15) on D1: the panel-wide token list (keyset page, no hash), enabling a disabled user again, and
+      // number prefixes validated on the one path every writer uses.
+      const asAdmin = { authorization: `Bearer ${admin}`, 'content-type': 'application/json' };
+      const allTokens = (await (
+        await call(mf, '/api/admin/v1/tokens?limit=1', { headers: asAdmin })
+      ).json()) as {
+        data: { grantId: string; grantLabel: string | null; tokenHash?: string }[];
+        next: string | null;
+      };
+      expect(allTokens.data).toHaveLength(1);
+      expect(allTokens.data[0]).toMatchObject({ grantId: grant.record?.id, grantLabel: 'ci' });
+      expect(JSON.stringify(allTokens)).not.toContain('tokenHash');
+      expect(allTokens.next).toBeNull();
+      expect((await call(mf, '/api/admin/v1/tokens?after=garbage', { headers: asAdmin })).status).toBe(422);
+      expect((await screen('/admin/tokens')).status).toBe(200);
+      const person = (await viaApi('/users', { email: 'sleeper@example.test', role: 'member' })) as {
+        id?: string;
+      };
+      const post = (path: string) => call(mf, `/api/admin/v1${path}`, { method: 'POST', headers: asAdmin });
+      expect((await post(`/users/${person.id}/enable`)).status).toBe(409);
+      expect((await post(`/users/${person.id}/disable`)).status).toBe(200);
+      const enabled = await post(`/users/${person.id}/enable`);
+      expect(enabled.status).toBe(200);
+      expect(await enabled.json()).toMatchObject({ id: person.id, disabledAt: null });
+      const patchPrefixes = (numberPrefixes: unknown) =>
+        call(mf, `/api/admin/v1/instances/${instance.id}`, {
+          method: 'PATCH',
+          headers: asAdmin,
+          body: JSON.stringify({ numberPrefixes }),
+        });
+      expect((await patchPrefixes({ Story: 'B' })).status).toBe(200);
+      expect((await patchPrefixes({ Story: 'lower' })).status).toBe(422);
+      expect((await patchPrefixes({ 'Story"; drop': 'S' })).status).toBe(422);
+      const prefixPage = await (await screen(`/admin/instances/${instance.id}/prefixes`)).text();
+      expect(prefixPage).toContain('Story=B');
+
       // "My access" (P4-07) on the Worker: the signed-in person's grants, a personal token checked against the synthetic
       // Agility and stored in D1, and a grant moved to it; the token never comes back in a page.
       const ownerId = ((info as { user: { id?: string } }).user.id ?? '') as string;

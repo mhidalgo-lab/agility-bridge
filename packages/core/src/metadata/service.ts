@@ -12,6 +12,7 @@ import {
   ATTRIBUTE_NAME_RE,
   type AttributeKind,
   type AttributeMeta,
+  NUMBER_PREFIX_RE,
   parseAssetType,
 } from './model.ts';
 
@@ -434,7 +435,7 @@ export class InstanceMetadata {
     for (const [t, p] of Object.entries(
       this.#service.options.prefixOverrides?.[this.#ctx.instance.id] ?? {},
     )) {
-      if (/^[A-Z]{1,4}$/.test(p) && ASSET_TYPE_NAME_RE.test(t)) found.set(t, p);
+      if (NUMBER_PREFIX_RE.test(p) && ASSET_TYPE_NAME_RE.test(t)) found.set(t, p);
     }
     this.#cache.prefixes = { value: found, at: this.#service.now() };
     return found;

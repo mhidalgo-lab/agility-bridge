@@ -46,6 +46,7 @@ export const NAV_ITEMS: readonly NavItem[] = Object.freeze([
   { href: '/admin/credentials', label: 'Credentials', minRole: 'admin' },
   { href: '/admin/workspaces', label: 'Workspaces', minRole: 'admin' },
   { href: '/admin/grants', label: 'Grants', minRole: 'admin' },
+  { href: '/admin/tokens', label: 'Device tokens', minRole: 'admin' },
   { href: '/admin/users', label: 'Users', minRole: 'admin' },
   { href: '/admin/audit', label: 'Audit log', minRole: 'member' },
   { href: '/admin/usage', label: 'Usage', minRole: 'admin' },
@@ -259,6 +260,43 @@ export function TextField(props: FieldProps): JSX.Element {
         aria-invalid={props.error ? 'true' : undefined}
         aria-describedby={describedBy(props.name, props.hint, props.error)}
       />
+    </div>
+  );
+}
+
+export interface TextAreaFieldProps extends Omit<FieldProps, 'type' | 'inputmode' | 'min' | 'max' | 'value'> {
+  readonly value?: string | undefined;
+  readonly rows?: number;
+}
+
+/** A multi-line text field (a few short lines, e.g. `Type=PREFIX` pairs). */
+export function TextAreaField(props: TextAreaFieldProps): JSX.Element {
+  return (
+    <div class="field">
+      <label for={props.name}>{props.label}</label>
+      {props.hint ? (
+        <p class="hint" id={`${props.name}-hint`}>
+          {props.hint}
+        </p>
+      ) : null}
+      {props.error ? (
+        <p class="error" id={`${props.name}-error`}>
+          {props.error}
+        </p>
+      ) : null}
+      <textarea
+        id={props.name}
+        name={props.name}
+        rows={props.rows ?? 4}
+        required={props.required}
+        autocomplete={props.autocomplete}
+        maxlength={props.maxlength}
+        spellcheck={props.spellcheck}
+        aria-invalid={props.error ? 'true' : undefined}
+        aria-describedby={describedBy(props.name, props.hint, props.error)}
+      >
+        {props.value ?? ''}
+      </textarea>
     </div>
   );
 }

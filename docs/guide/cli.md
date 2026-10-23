@@ -51,6 +51,7 @@ only they can store it (the admin panel, Phase 4); nobody can store it for them.
 | Change a workspace | `agility-bridge workspace set <workspace-id> --name "New name" --max-rows 50` |
 | Give someone a role | `agility-bridge user set-role <user-id> admin` (owners only) |
 | Disable a user | `agility-bridge user disable <user-id>` |
+| Enable a disabled user | `agility-bridge user enable <user-id>` |
 | Move a user to another sign-in provider | `agility-bridge user unbind <user-id> --confirm <email>` (owners; [what it means](identity-providers.md#moving-a-user-to-another-provider)) |
 | Sign a user out everywhere | `agility-bridge user end-sessions <user-id>` ([browser sessions](admin-access.md)) |
 | Lost device | `agility-bridge token list <grant-id>`, then `agility-bridge token revoke <token-id>` |

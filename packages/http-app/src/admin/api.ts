@@ -13,6 +13,7 @@ import {
   MAX_SETUP_LINK_TTL_MS,
   MIN_SETUP_LINK_TTL_MS,
   setupCodeHash,
+  type TokenListItem,
   type ToolInfo,
 } from '@agility-bridge/auth';
 import type { Clock, Logger } from '@agility-bridge/core';
@@ -235,6 +236,21 @@ const TokenOut = z
     revokedAt: z.number().nullable(),
   })
   .openapi('DeviceToken');
+const TokenListItemOut = TokenOut.extend({
+  userId: z.string().nullable().openapi({ description: "The grant's user; null on a service grant." }),
+  workspaceId: z.string(),
+  grantLabel: z.string().nullable(),
+}).openapi('DeviceTokenListItem');
+const TokenListQuery = z.object({
+  grantId: z.string().max(128).optional(),
+  userId: z.string().max(128).optional(),
+  after: z
+    .string()
+    .max(160)
+    .optional()
+    .openapi({ description: 'The `next` of the previous page; anything else is a 422.' }),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+});
 const AuditOut = z.object({}).passthrough().openapi('AuditEntry');
 const Warnings = z.array(z.string());
 const ErrorOut = z
@@ -361,6 +377,11 @@ function credentialOut(c: Credential) {
   return rest;
 }
 function tokenOut(t: AccessToken) {
+  const { tokenHash: _h, ...rest } = t;
+  return rest;
+}
+
+function tokenListItem(t: TokenListItem) {
   const { tokenHash: _h, ...rest } = t;
   return rest;
 }
@@ -729,6 +750,20 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       await endSessions(c, id, 'disabled');
       return disabled;
     },
+  );
+
+  add(
+    {
+      method: 'post',
+      path: '/users/{id}/enable',
+      ...user,
+      params: true,
+      summary:
+        'Enable a disabled user again (owners for owners and admins, with a recent sign-in; admins for members; 409 when the user is not disabled). Restores nothing but the right to sign in: grants and device tokens that were not revoked work again',
+      out: UserOut,
+      audit: { action: 'user.enable', targetType: 'user' },
+    },
+    (c, { id }) => services(c).users.enable(id),
   );
 
   add(
@@ -1106,6 +1141,33 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       out: z.array(TokenOut),
     },
     async (c, { id }) => (await services(c).tokens.list(id)).map(tokenOut),
+  );
+  add(
+    {
+      method: 'get',
+      path: '/tokens',
+      ...tk,
+      summary:
+        'List the device tokens you may see, newest first, one page at a time (owners and admins: every token; others: the tokens of their own grants). Never a hash or a token value',
+      query: TokenListQuery,
+      out: z.object({
+        data: z.array(TokenListItemOut),
+        next: z
+          .string()
+          .nullable()
+          .openapi({ description: 'Pass as `after` for the next page; null on the last.' }),
+      }),
+    },
+    async (c, { query }) => {
+      const q = query as z.infer<typeof TokenListQuery>;
+      const page = await services(c).tokens.listAll({
+        ...(q.grantId === undefined ? {} : { grantId: q.grantId }),
+        ...(q.userId === undefined ? {} : { userId: q.userId }),
+        ...(q.after === undefined ? {} : { after: q.after }),
+        ...(q.limit === undefined ? {} : { limit: q.limit }),
+      });
+      return { data: page.data.map(tokenListItem), next: page.next };
+    },
   );
   add(
     {

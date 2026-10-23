@@ -7,7 +7,7 @@
 //   GET  /admin/users                list (owner, admin)
 //   GET  /admin/users/new            add form        POST /admin/users            add (admins: members only)
 //   GET  /admin/users/:id            detail
-//   POST /admin/users/:id            name and email  POST .../role (owners)   POST .../disable | sessions (confirmation first)
+//   POST /admin/users/:id            name and email  POST .../role (owners)   POST .../disable | enable | sessions (confirmation first)
 import type { Context, Hono } from 'hono';
 import {
   Button,
@@ -65,6 +65,14 @@ export const canEndSessions = (viewer: UiPrincipal, target: User): boolean =>
  */
 export const canUnbind = (viewer: UiPrincipal, target: User): boolean =>
   viewer.role === 'owner' && target.id !== viewer.userId && target.idp !== null;
+
+/**
+ * May this viewer enable this person again (P4-15)? The same people they may disable, and only while the person is disabled
+ * (the admin API answers 409 for anyone else). A recent sign-in for owners and admins is asked for on the way (re-authentication
+ * page), as for disabling them.
+ */
+export const canEnable = (viewer: UiPrincipal, target: User): boolean =>
+  canManage(viewer, target) && target.disabledAt !== null;
 
 const roleTone = (r: Role) => (r === 'owner' ? 'info' : r === 'admin' ? 'ok' : 'muted');
 
@@ -328,7 +336,7 @@ export function registerUsers(ui: Hono, kit: UiKit): void {
               </Form>
             </section>
           ) : null}
-          {canEndSessions(principal, u) || (manage && u.disabledAt === null) || canUnbind(principal, u) ? (
+          {canEndSessions(principal, u) || manage || canUnbind(principal, u) ? (
             <section class="card" aria-labelledby="end-heading">
               <h2 id="end-heading">Access</h2>
               <div class="actions">
@@ -353,10 +361,18 @@ export function registerUsers(ui: Hono, kit: UiKit): void {
                     name={`Disable ${u.email}`}
                   />
                 ) : null}
+                {canEnable(principal, u) ? (
+                  <RowAction
+                    action={`${self}/enable`}
+                    csrf={principal.csrf}
+                    label="Enable…"
+                    name={`Enable ${u.email}`}
+                  />
+                ) : null}
               </div>
               <p class="hint">
                 A disabled person cannot sign in and keeps no session. Their grants and device tokens are not
-                removed: revoke them on the grants page.
+                removed: revoke them on the grants page, or enable the person again here.
               </p>
             </section>
           ) : null}
@@ -429,7 +445,7 @@ export function registerUsers(ui: Hono, kit: UiKit): void {
           current: USERS,
           title: `Disable ${personText(u)}?`,
           paragraphs: [
-            'They cannot sign in any more and their browser sessions end now. There is no way to enable them again from here.',
+            'They cannot sign in any more and their browser sessions end now. You can enable them again from their page.',
             'Their grants and device tokens stay until you revoke them on the grants page.',
           ],
           action: `${self}/disable`,
@@ -444,6 +460,41 @@ export function registerUsers(ui: Hono, kit: UiKit): void {
         form,
       );
       return isOk(res) ? kit.redirect(self, 'disabled') : kit.fail(c, principal, res, self);
+    }),
+  );
+
+  ui.post(
+    `${ROUTE}/:id/enable`,
+    kit.form('admin', async (c, principal, form) => {
+      const id = c.req.param('id');
+      if (!isId(id)) return kit.redirect(USERS, 'not_found');
+      const self = adminPath`/admin/users/${id}`;
+      if (!confirmed(form)) {
+        const u = await loadUser(c, principal, id);
+        if ('status' in u) return kit.fail(c, principal, u, USERS);
+        // Not offered where the API refuses; a forged POST still reaches the API, which decides (and writes nothing).
+        if (!canEnable(principal, u))
+          return kit.redirect(self, u.disabledAt === null ? 'conflict' : 'not_allowed');
+        return confirmPage({
+          viewer: principal,
+          current: USERS,
+          title: `Enable ${personText(u)}?`,
+          paragraphs: [
+            'They can sign in again, with the same role as before. Nothing is created: they start a new session by signing in.',
+            'Every grant and device token of theirs that was not revoked works again. Check them on the grants page first if you are not sure.',
+          ],
+          action: `${self}/enable`,
+          confirm: 'Enable this person',
+          cancel: self,
+        });
+      }
+      const res = await kit.callAdmin(
+        c,
+        principal,
+        { method: 'POST', path: adminPath`/users/${id}/enable` },
+        form,
+      );
+      return isOk(res) ? kit.redirect(self, 'enabled') : kit.fail(c, principal, res, self);
     }),
   );
 

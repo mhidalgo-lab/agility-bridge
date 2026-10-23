@@ -2,7 +2,7 @@
 // Domain services over storage for instances, credentials, workspaces, grants and users (ADR-0008). Every writer — the
 // admin API, the CLI, a future import — goes through these, so the rules hold on every path (L-065). Owner/admin
 // guards on the actor are added with the admin API (P2-09).
-import { canonicalInstanceUrl } from '@agility-bridge/core';
+import { ASSET_TYPE_NAME_RE, canonicalInstanceUrl, NUMBER_PREFIX_RE } from '@agility-bridge/core';
 import {
   type AccessToken,
   ConflictError,
@@ -94,6 +94,36 @@ function checkAgilityToken(token: unknown): string {
     );
   }
   return token;
+}
+
+/** Most number prefixes one instance may configure (there are a few dozen numbered types). */
+export const MAX_NUMBER_PREFIXES = 64;
+
+/**
+ * The number prefixes an owner configures for an instance: `null` (learn them from Agility) or `{ "<AssetTypeName>":
+ * "<1-4 capital letters>" }`. The one validator for every writer (L-065); the metadata layer applies the same two patterns
+ * when it uses a value (ADR-0012: only identifiers that match them ever reach a query).
+ */
+export function checkNumberPrefixes(value: unknown, field = 'numberPrefixes'): JsonObject | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new InvalidInputError(`${field} must map asset type names to prefixes, or be empty.`);
+  }
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length > MAX_NUMBER_PREFIXES) {
+    throw new InvalidInputError(`${field} may name at most ${MAX_NUMBER_PREFIXES} asset types.`);
+  }
+  const out: Record<string, string> = {};
+  for (const [type, prefix] of entries) {
+    if (!ASSET_TYPE_NAME_RE.test(type)) {
+      throw new InvalidInputError(`${field}: an asset type name is letters, digits and _ (up to 64).`);
+    }
+    if (typeof prefix !== 'string' || !NUMBER_PREFIX_RE.test(prefix)) {
+      throw new InvalidInputError(`${field}.${type}: a prefix is one to four capital letters (A-Z).`);
+    }
+    out[type] = prefix;
+  }
+  return out;
 }
 
 export interface NewWorkspaceInput {
@@ -274,6 +304,8 @@ export function accessServices(options: AccessServicesOptions) {
       return storage.users.update(id, email === undefined ? patch : { ...patch, email });
     },
     disable: (id: string) => storage.users.update(id, { disabledAt: now() }),
+    /** Clears `disabledAt` (P4-15). Who may do it, and the "is it disabled" check, are the guards'. */
+    enable: (id: string) => storage.users.update(id, { disabledAt: null }),
     /**
      * Clears the user's `(idp, idpSubject)` in one compare-and-set step against the binding the caller saw (P4-12,
      * L-220). The next verified sign-in with the user's email binds again. A binding that changed in between, or none, is a
@@ -309,9 +341,11 @@ export function accessServices(options: AccessServicesOptions) {
       } catch (error) {
         throw new InvalidInputError(`baseUrl: ${(error as Error).message}`);
       }
+      const numberPrefixes = checkNumberPrefixes(input.numberPrefixes);
       const fingerprint = await probe({ id: 'new', baseUrl, tls: input.tls ?? null });
       return storage.instances.create({
         ...input,
+        numberPrefixes,
         id: newId('ins'),
         baseUrl,
         ...(fingerprint === undefined ? {} : { metaFingerprint: fingerprint }),
@@ -334,7 +368,12 @@ export function accessServices(options: AccessServicesOptions) {
           `${extra.join(', ')} cannot be changed here; the origin changes through a retarget.`,
         );
       }
-      return storage.instances.update(id, patch);
+      return storage.instances.update(
+        id,
+        patch.numberPrefixes === undefined
+          ? patch
+          : { ...patch, numberPrefixes: checkNumberPrefixes(patch.numberPrefixes) },
+      );
     },
     /**
      * Changes an instance's origin or TLS trust (THREAT_MODEL A14): every credential of the instance is revoked first,

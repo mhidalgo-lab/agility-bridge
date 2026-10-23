@@ -173,3 +173,22 @@
   (b) let the owner name the provider the next binding must come from, with an expiry (task P4-24).
 - **Recommendation:** (a) now, (b) when a deployment has providers of different strength; it is a small follow-up (P4-24).
 - **Owner:** _pending_ (implemented as (a)).
+
+### D-51 — How `GET /tokens` pages and who sees what *(P4-15)*
+- **Context:** the panel-wide device token list needs a stable page key and a rule for members. The storage lists tokens whole
+  (live tokens are capped at 20 per grant; revoked and expired rows accumulate).
+- **Options:** (a) keyset on `(createdAt, id)` computed in the service over the storage list, opaque `after` cursor, owners and
+  admins see every token and anyone else the tokens of their own grants; (b) the same with a storage-level keyset (task P4-31);
+  (c) owners and admins only (members keep the per-grant list).
+- **Recommendation:** (a) now, (b) when a deployment holds thousands of tokens. Members already see their own tokens per grant, so
+  the API answering the same set through one call costs nothing and the panel screen stays admin-only.
+- **Owner:** _pending_ (implemented as (a)).
+
+### D-52 — Number prefixes: edit now, apply later *(P4-15)*
+- **Context:** `instances.numberPrefixes` was stored and shown, never validated, and no host passes it to the metadata service,
+  so editing it has no effect on number lookups today.
+- **Options:** (a) validate on every writer, add the panel form, say in the form that the values are not applied yet, and make the
+  runtime use them in task P4-30; (b) wire them into the resolver in this task; (c) leave the field out of the panel until P4-30.
+- **Recommendation:** (a): the validator and the form do not depend on the wiring, and P4-30 touches the access resolver and the
+  metadata cache, which deserves its own review. Until then the prefixes are an inert, validated record.
+- **Owner:** _pending_ (implemented as (a)).

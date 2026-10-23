@@ -21,6 +21,7 @@ same audit row (`via: api`). A button appears only when the API would allow it f
 | Credentials | `/admin/credentials` | yes | yes | Agility access tokens: shared ones and your own personal one. Check, rename, replace the token, revoke, delete |
 | Workspaces | `/admin/workspaces` | yes | yes | One MCP endpoint each: projects, tools, asset types, limits. Write settings and pass-through: owner only |
 | Grants | `/admin/grants` | yes | yes | Who may use which workspace, with which credential, tools, projects, limits, rate and expiry; their device tokens |
+| Device tokens | `/admin/tokens` | yes | yes | Every device token of every grant in one list, filtered by person or grant; revoke a lost device |
 | Users | `/admin/users` | yes | yes | Who can sign in and as what; members for admins, everyone for owners |
 | Audit log | `/admin/audit` | yes | yes | Every tool call, refusal and change, filtered and paged; **members see their own rows** here |
 | Usage | `/admin/usage` | yes | yes | Calls, errors, denials, Agility requests and durations per tool, workspace, grant, user or day |
@@ -31,11 +32,15 @@ filtered by instance or workspace. Every address needs a signed-in browser; anyo
 ### Instances
 
 The list shows each instance's name, address and status. An instance's page shows its address, certificate authority,
-number prefixes (learned from Agility, shown but not edited here), its credentials and its workspaces.
+number prefixes, its credentials and its workspaces.
 
 - **Add** checks the address with a request that carries no token (it must answer like an Agility site) and stores it.
 - **Rename**, **Disable** (no new credentials; nothing is revoked) and **Delete** (refused while a workspace or credential
   uses it). Disabling and deleting ask first.
+- **Edit the prefixes** (owners and admins): the letters before the dash in an Agility number, one `Type=PREFIX` per line (for
+  example `Story=S`). A type name is letters, digits and underscores; a prefix is one to four capital letters. An empty box clears
+  them. The same rules apply to the admin API and the CLI, and a line the rules refuse is shown beside the form with nothing
+  saved. **They are stored but not yet applied**: number lookups still learn the prefixes from Agility (task P4-30).
 - **Change the origin** (owners): stored Agility tokens are sent to this address, so changing it or the CA file
   **revokes every credential of the instance and every grant that used them**. The page says so with the number of
   credentials in use, requires ticking a box, and needs a sign-in from the last 10 minutes.
@@ -89,6 +94,10 @@ revoked alone). The page that follows shows the token **once**:
 - There is no button for a grant that uses **someone else's personal Agility token**: such a token would act as that
   person in Agility, so only they can issue device tokens on it. Revoked and expired grants offer none either.
 - **Revoke** a token from the grant's page, after a confirmation. Revoking or deleting a grant stops all its tokens.
+- **Find a lost device** on **Device tokens** (`/admin/tokens`, owners and admins): every token of every grant, newest first, 50 to
+  a page (**Next page** follows the list by cursor, so tokens added or revoked meanwhile never repeat or skip an entry). Filter
+  by person or by grant; each row shows the device name, the first characters of the token, the grant it belongs to, its status,
+  when it was last used and when it expires, with **Revoke…** for live ones. Never a hash and never a token.
 
 ### Users
 
@@ -98,8 +107,10 @@ owners and admins read-only.
 - **Add** creates a user who can then sign in with that email through a configured provider. Adding an admin or owner needs
   an owner with a recent sign-in.
 - **Role** (owners): changes it, ends that person's sessions, needs a recent sign-in.
-- **Disable** ends their sessions and stops sign-in; there is no way to enable a user again from the panel. Their grants
-  and device tokens stay until you revoke them on the grants page.
+- **Disable** ends their sessions and stops sign-in. Their grants and device tokens stay until you revoke them on the grants page.
+- **Enable…** (shown only for a disabled person you may manage: owners for anyone, admins for members) lets them sign in again
+  with the role they had. It asks first, needs a recent sign-in for owners and admins, creates no session (they sign in
+  themselves) and brings back every grant and device token that was not revoked, so check those first if you are unsure.
 - **End their sessions** works for yourself (any role), anyone (owners) or members (admins); ending your own signs you out.
 - **Move to another provider…** (owners only, for a person who is signed in with a provider, never your own page): clears their
   sign-in identity so the next verified sign-in with their email binds again, and ends their sessions. The page warns about the

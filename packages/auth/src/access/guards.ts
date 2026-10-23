@@ -72,6 +72,17 @@ function needRecent(a: Actor, what: string): void {
   if (a.kind === 'user' && !a.recentAuth) throw new ReauthRequiredError(`Sign in again before ${what}.`);
 }
 
+/** A device token with where it belongs, for the panel-wide list (P4-15). Never a hash or a token value. */
+export type TokenListItem = AccessToken & {
+  readonly userId: string | null;
+  readonly workspaceId: string;
+  readonly grantLabel: string | null;
+};
+
+export const TOKEN_PAGE_DEFAULT = 50;
+export const TOKEN_PAGE_MAX = 200;
+const CURSOR = /^(\d{1,16}):([A-Za-z0-9_-]{1,128})$/;
+
 /** One line of "my recent changes" (P4-07). */
 export type MyAuditRow = Pick<AuditEntry, 'id' | 'ts' | 'action' | 'status' | 'targetType' | 'targetId'>;
 
@@ -170,6 +181,22 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
       }
       const user = await services.users.unbind(id, { idp: target.idp, idpSubject: target.idpSubject });
       return { user, previousIdp: target.idp };
+    },
+    /**
+     * Lets a disabled user sign in again (P4-15, THREAT_MODEL T14): everything they still hold (grants and device tokens not
+     * revoked) works again, so the rules are those of `disable`: an owner for owners and admins, with a recent sign-in for them
+     * (the break-glass token is exempt), an admin for members. Authorization comes before the state check, so a refusal never
+     * tells a caller whether the user is disabled. Creates no session: the person signs in again.
+     */
+    async enable(id: string): Promise<User> {
+      needManager(actor);
+      const target = await load(storage.users.get(id), 'user');
+      if (target.role !== 'member') {
+        needOwner(actor, 'enable owners or admins');
+        needRecent(actor, 'enabling an owner or an admin');
+      }
+      if (target.disabledAt === null) throw new ConflictError('The user is not disabled.');
+      return services.users.enable(id);
     },
     async disable(id: string): Promise<User> {
       needManager(actor);
@@ -379,6 +406,57 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     async list(grantId: string): Promise<AccessToken[]> {
       await ownGrant(grantId);
       return services.tokens.list(grantId);
+    },
+    /**
+     * Every device token the actor may see, newest first, one page at a time (P4-15). Owners and admins see all of them;
+     * anyone else only the tokens of their own grants. A grant that is not yours is "not found" (no existence oracle);
+     * a `userId` that is not yours matches nothing. Keyset paging on `(createdAt, id)`: a page never repeats or skips a token
+     * that exists throughout, whatever is added or revoked between two calls. `after` is the previous page's `next`.
+     */
+    async listAll(
+      query: { grantId?: string; userId?: string; after?: string; limit?: number } = {},
+    ): Promise<{ data: TokenListItem[]; next: string | null }> {
+      const limit = Math.max(1, Math.min(TOKEN_PAGE_MAX, Math.trunc(query.limit ?? TOKEN_PAGE_DEFAULT)));
+      let cursor: { createdAt: number; id: string } | null = null;
+      if (query.after !== undefined) {
+        const m = CURSOR.exec(query.after);
+        if (m === null) throw new InvalidInputError('after: not a cursor from a previous page.');
+        cursor = { createdAt: Number(m[1]), id: m[2] as string };
+      }
+      // The grants the actor may read, narrowed by the filters; the tokens of exactly these grants are listed.
+      let visible: Grant[];
+      if (query.grantId !== undefined) {
+        visible = [await ownGrant(query.grantId)];
+      } else if (isManager(actor)) {
+        visible = await storage.grants.list();
+      } else {
+        visible = self === null ? [] : await storage.grants.list({ userId: self });
+      }
+      if (query.userId !== undefined) visible = visible.filter((g) => g.userId === query.userId);
+      const byGrant = new Map(visible.map((g) => [g.id, g]));
+      let found: AccessToken[] = [];
+      if (byGrant.size > 0) {
+        found = await storage.accessTokens.list(
+          query.grantId === undefined ? {} : { grantId: query.grantId },
+        );
+      }
+      const newestFirst = found
+        .filter((t) => byGrant.has(t.grantId))
+        .sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+      const after =
+        cursor === null
+          ? newestFirst
+          : newestFirst.filter(
+              (t) => t.createdAt < cursor.createdAt || (t.createdAt === cursor.createdAt && t.id < cursor.id),
+            );
+      const page = after.slice(0, limit);
+      const last = page.at(-1);
+      const next = after.length > limit && last !== undefined ? `${last.createdAt}:${last.id}` : null;
+      const data = page.map((t) => {
+        const g = byGrant.get(t.grantId) as Grant;
+        return { ...t, userId: g.userId, workspaceId: g.workspaceId, grantLabel: g.label };
+      });
+      return { data, next };
     },
     async issue(input: Parameters<AccessServices['tokens']['issue']>[0]) {
       const grant = await ownGrant(input.grantId);

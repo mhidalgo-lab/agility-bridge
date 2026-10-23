@@ -84,6 +84,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 |---|---|---|---|---|
 | `GET` | `/grants/{id}/tokens` | List a grant's device tokens | — | 200 DeviceToken[] |
 | `POST` | `/grants/{id}/tokens` | Issue a device token (shown once) | `label`: string<br>`expiresInDays`?: integer \| "never" | 201 object |
+| `GET` | `/tokens` | List the device tokens you may see, newest first, one page at a time (owners and admins: every token; others: the tokens of their own grants). Never a hash or a token value | — | 200 object |
 | `POST` | `/tokens/{id}/revoke` | Revoke a device token | — | 200 DeviceToken |
 
 ## tools
@@ -101,6 +102,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | `GET` | `/users/{id}` | Get a user | — | 200 User |
 | `PATCH` | `/users/{id}` | Change a user | `email`?: string<br>`role`?: "owner" \| "admin" \| "member"<br>`displayName`?: string \| null | 200 User |
 | `POST` | `/users/{id}/disable` | Disable a user | — | 200 User |
+| `POST` | `/users/{id}/enable` | Enable a disabled user again (owners for owners and admins, with a recent sign-in; admins for members; 409 when the user is not disabled). Restores nothing but the right to sign in: grants and device tokens that were not revoked work again | — | 200 User |
 | `POST` | `/users/{id}/sessions/revoke` | End all of a user's browser sessions (yourself; an owner anyone; an admin members; the break-glass token anyone) | — | 200 object |
 | `POST` | `/users/{id}/unbind` | Clear a user's sign-in identity so the next verified sign-in with their email binds again (owner, recent sign-in, never yourself through a session; the body repeats the user's email; ends their sessions) | `confirm`: string | 200 User |
 | `POST` | `/setup-links` | Issue a single-use owner setup link (owner; the link makes whoever signs in with it an owner; recorded in the audit log) | `ttlMinutes`?: integer | 201 SetupLink |
@@ -121,6 +123,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 - **AuditStats**: `data`: object[], `scanned`: number, `truncated`: boolean
 - **Credential**: `id`: string, `instanceId`: string, `ownerUserId`: string \| null, `label`: string, `tokenHint`: string, `keyVersion`: number, `validationStatus`: "unvalidated" \| "valid" \| "invalid", `validationErrorCode`: string \| null, `validatedAt`: number \| null, `memberOid`: string \| null, `memberName`: string \| null, `memberUsername`: string \| null, `reachableScopeIds`: array \| null, `createdAt`: number, `updatedAt`: number, `revokedAt`: number \| null
 - **DeviceToken**: `id`: string, `grantId`: string, `prefix`: string, `label`: string, `createdAt`: number, `expiresAt`: number \| null, `lastUsedAt`: number \| null, `revokedAt`: number \| null
+- **DeviceTokenListItem**: —
 - **Grant**: `id`: string, `workspaceId`: string, `userId`: string \| null, `label`: string \| null, `credentialId`: string \| null, `tools`: array \| null, `scopeIds`: array \| null, `assetTypes`: object \| null, `limits`: object, `rateLimit`: object \| null, `createdAt`: number, `updatedAt`: number, `expiresAt`: number \| null, `revokedAt`: number \| null
 - **Instance**: `id`: string, `label`: string, `baseUrl`: string, `tls`: object \| null, `numberPrefixes`: object \| null, `metaFingerprint`: string \| null, `createdAt`: number, `updatedAt`: number, `disabledAt`: number \| null
 - **KeyVersion**: `version`: number, `credentials`: number, `loaded`: boolean, `current`: boolean, `retired`: boolean

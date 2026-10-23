@@ -243,6 +243,41 @@ export function parseToken(r: Row): Token | null {
   };
 }
 
+/** A device token of the panel-wide list: the token record and the grant it belongs to (P4-15). */
+export interface TokenListItem extends Token {
+  readonly userId: string | null;
+  readonly workspaceId: string;
+  readonly grantLabel: string | null;
+}
+
+/** One page of `GET /tokens`: the rows and the cursor of the next page (null on the last). */
+export interface TokenPage {
+  readonly data: TokenListItem[];
+  readonly next: string | null;
+}
+
+/** A cursor as the API makes it: the panel only forwards one that has this shape. */
+export const TOKEN_CURSOR_RE: RegExp = /^\d{1,16}:[A-Za-z0-9_-]{1,128}$/;
+
+export function parseTokenPage(body: unknown): TokenPage | null {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
+  const b = body as Row;
+  const list = rows(b['data'], (r) => {
+    const t = parseToken(r);
+    return t === null
+      ? null
+      : {
+          ...t,
+          userId: strOrNull(r['userId']),
+          workspaceId: str(r['workspaceId']),
+          grantLabel: strOrNull(r['grantLabel']),
+        };
+  });
+  if (list === null) return null;
+  const next = strOrNull(b['next']);
+  return { data: list, next: next !== null && TOKEN_CURSOR_RE.test(next) ? next : null };
+}
+
 /** The workspace fields "My access" has for one of my grants (members cannot read workspaces; `GET /me/grants`). */
 export interface MyWorkspace {
   readonly id: string;

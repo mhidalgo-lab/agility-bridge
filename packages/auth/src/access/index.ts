@@ -6,6 +6,9 @@ export {
   type GuardedServices,
   guardedServices,
   ReauthRequiredError,
+  TOKEN_PAGE_DEFAULT,
+  TOKEN_PAGE_MAX,
+  type TokenListItem,
 } from './guards.ts';
 export { loadAccessRecords } from './load.ts';
 export {
@@ -41,7 +44,9 @@ export {
   type AccessServices,
   type AccessServicesOptions,
   accessServices,
+  checkNumberPrefixes,
   type GrantPatchInput,
+  MAX_NUMBER_PREFIXES,
   type NewGrantInput,
   type NewWorkspaceInput,
   type WithWarnings,
