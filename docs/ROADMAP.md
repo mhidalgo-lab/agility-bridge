@@ -213,12 +213,12 @@ Status lives in each task file.
 | P4-07 | [Member self-service: bring your own Agility token](tasks/phase-4-identity-admin/P4-07-member-self-service.md) | high | P4-04 | done |
 | P4-08 | [Browser E2E and DAST baseline](tasks/phase-4-identity-admin/P4-08-e2e-dast.md) | medium | P4-04, P4-05, P4-07 | review |
 | P4-09 | [Admin security review (owner boundaries on every writer)](tasks/phase-4-identity-admin/P4-09-admin-security-review.md) | high | P4-04, P4-05, P4-06, P4-07 | todo |
-| P4-10 | [Admin documentation](tasks/phase-4-identity-admin/P4-10-admin-docs.md) | medium | P4-04 | todo |
+| P4-10 | [Admin documentation](tasks/phase-4-identity-admin/P4-10-admin-docs.md) | medium | P4-04 | in-progress |
 | P4-11 | [Phase 4 review](tasks/phase-4-identity-admin/P4-11-phase-4-review.md) | high | P4-08, P4-09, P4-10 | todo |
 | P4-12 | [Move a user to another identity on purpose (owner-only unbind)](tasks/phase-4-identity-admin/P4-12-unbind-identity.md) | medium | P4-02, P4-04 | done |
 | P4-13 | [pnpm cf:setup prompts for the sign-in settings](tasks/phase-4-identity-admin/P4-13-cf-setup-sign-in.md) | low | P4-01 | done |
-| P4-14 | [CPU benchmark scenarios for the panel](tasks/phase-4-identity-admin/P4-14-panel-benchmark-scenarios.md) | low | P4-03 | review |
-| P4-15 | [Panel follow-ups: enable a disabled user, list every device token, edit number prefixes](tasks/phase-4-identity-admin/P4-15-panel-follow-ups.md) | low | P4-04, P4-12 | review |
+| P4-14 | [CPU benchmark scenarios for the panel](tasks/phase-4-identity-admin/P4-14-panel-benchmark-scenarios.md) | low | P4-03 | done |
+| P4-15 | [Panel follow-ups: enable a disabled user, list every device token, edit number prefixes](tasks/phase-4-identity-admin/P4-15-panel-follow-ups.md) | low | P4-04, P4-12 | done |
 | P4-24 | [Unbind to a named provider: narrow who can claim the account](tasks/phase-4-identity-admin/P4-24-unbind-to-named-provider.md) | low | P4-12 | todo |
 | P4-28 | [Panel list screens: cost grows with the number of users](tasks/phase-4-identity-admin/P4-28-panel-list-screen-cost.md) | low | P4-14 | todo |
 | P4-30 | [Apply an instance's stored number prefixes when resolving numbers](tasks/phase-4-identity-admin/P4-30-apply-stored-number-prefixes.md) | low | P4-15 | todo |
