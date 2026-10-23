@@ -2,7 +2,7 @@
 id: P4-13
 title: "pnpm cf:setup prompts for the sign-in settings"
 phase: 4
-status: review
+status: done
 priority: low
 depends_on: [P4-01]
 adr: ["0009"]

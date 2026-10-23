@@ -2,7 +2,7 @@
 id: P4-12
 title: "Move a user to another identity on purpose (owner-only unbind)"
 phase: 4
-status: review
+status: done
 priority: medium
 depends_on: [P4-02, P4-04]
 adr: ["0009"]
