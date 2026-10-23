@@ -2,7 +2,7 @@
 id: P4-09
 title: Admin security review (owner boundaries on every writer)
 phase: 4
-status: review
+status: done
 priority: high
 depends_on: [P4-04, P4-05, P4-06, P4-07, P4-12, P4-13, P4-15]
 adr: ["0008", "0009", "0012", "0013"]
