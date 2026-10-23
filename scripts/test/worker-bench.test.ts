@@ -41,4 +41,27 @@ describe('worker-bench regressions', () => {
     expect(baseline.requests['search_work_items']).toBeGreaterThan(0);
     expect(median([3, 1, 2])).toBe(2);
   });
+
+  it('the baseline covers the panel: first and warm requests, none of them reaching Agility', () => {
+    expect(Object.keys(baseline.relative)).toEqual(
+      expect.arrayContaining([
+        'cold: first /admin',
+        'warm: admin: overview',
+        'warm: admin: users list',
+        'warm: admin: audit',
+        'warm: admin: asset',
+        'warm: admin: form POST',
+      ]),
+    );
+    for (const k of ['overview', 'users list', 'audit', 'asset', 'form POST'])
+      expect(baseline.requests[`admin: ${k}`], k).toBe(0);
+    const slowed: BenchResult = {
+      ...baseline,
+      relative: {
+        ...baseline.relative,
+        'cold: first /admin': (baseline.relative['cold: first /admin'] ?? 1) * 3,
+      },
+    };
+    expect(regressions(slowed, baseline)).toHaveLength(1);
+  });
 });

@@ -3,10 +3,13 @@
 // in fresh child processes, and warm MCP calls with request isolation against Agility-shaped fake responses. Costs are
 // also given as multiples of a calibration workload measured in the same run, so runners of different speed compare;
 // a path whose relative cost grows past 2× its baseline is flagged.
+// The panel (P4-14): the first signed-in /admin request of a fresh process (lazy import and build, P3-14) and warm pages
+// with a session (overview, a list, the audit page, an asset, a form POST through the in-process admin API).
 //   pnpm bench:worker            measure and compare with scripts/bench/worker-baseline.json
 //   pnpm bench:worker --update   rewrite the baseline
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { register } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const BASELINE = fileURLToPath(new URL('./bench/worker-baseline.json', import.meta.url));
@@ -150,9 +153,95 @@ async function warmCalls(): Promise<{ ms: Record<string, number>; requests: Reco
   return { ms, requests };
 }
 
+/** The panel's world as the Worker runs it (request isolation), signed in as the owner, with realistic row counts. */
+async function panelEnv() {
+  register('./bench/admin-ui-dist-hook.mjs', import.meta.url);
+  const { setup } = await import('../packages/http-app/test/helpers/panel.ts');
+  const s = await setup({ isolation: 'request' });
+  const owner = await s.session('owner@example.test');
+  for (let i = 0; i < 100; i++)
+    await s.w.storage.users.create({
+      id: `usr_b${String(i).padStart(3, '0')}`,
+      email: `b${i}@example.test`,
+      role: 'member',
+    });
+  for (let i = 0; i < 200; i++)
+    await s.w.storage.audit.append({
+      id: `row-${String(i).padStart(6, '0')}`,
+      ts: s.w.now.t - i * 1000,
+      kind: 'tool_call',
+      action: 'search_work_items',
+      status: 'ok',
+    });
+  await s.w.audit.flush();
+  return { s, owner };
+}
+type PanelEnv = Awaited<ReturnType<typeof panelEnv>>;
+
+const pageReq = (e: PanelEnv, path: string) =>
+  e.s.send('GET', path, { cookie: e.owner.cookie, site: 'none' });
+
+/** In a fresh process: the first panel page (imports the panel, builds its app), then the second for comparison. */
+async function coldPanel(): Promise<number> {
+  const e = await panelEnv();
+  (globalThis as { gc?: () => void }).gc?.();
+  const t = cpu();
+  const first = await pageReq(e, '/admin');
+  await first.text();
+  const firstMs = cpu() - t;
+  const t2 = cpu();
+  await (await pageReq(e, '/admin')).text();
+  if (first.status !== 200) throw new Error(`first panel page answered ${first.status}`);
+  process.stdout.write(JSON.stringify({ first: firstMs, second: cpu() - t2 }));
+  return 0;
+}
+
+async function warmPanel(): Promise<{ ms: Record<string, number>; requests: Record<string, number> }> {
+  const e = await panelEnv();
+  const css = /href="(\/admin\/assets\/[^"]+\.css)"/.exec(await (await pageReq(e, '/admin')).text())?.[1];
+  if (css === undefined) throw new Error('the overview links no stylesheet');
+  let n = 0;
+  const scenarios: Record<string, () => Promise<Response>> = {
+    'admin: overview': () => pageReq(e, '/admin'),
+    'admin: users list': () => pageReq(e, '/admin/users'),
+    'admin: audit': () => pageReq(e, '/admin/audit'),
+    'admin: asset': () => pageReq(e, css),
+    'admin: form POST': () =>
+      e.s.send('POST', '/admin/users', {
+        cookie: e.owner.cookie,
+        form: new URLSearchParams({
+          _csrf: e.owner.csrf,
+          email: `new${n++}@example.test`,
+          role: 'member',
+          displayName: '',
+        }).toString(),
+      }),
+  };
+  const ms: Record<string, number> = {};
+  const requests: Record<string, number> = {};
+  for (const [name, run] of Object.entries(scenarios)) {
+    for (let i = 0; i < 5; i++) await (await run()).text();
+    const before = e.s.w.fake.calls.length;
+    const samples: number[] = [];
+    for (let i = 0; i < 25; i++) {
+      const t = cpu();
+      const res = await run();
+      await res.text();
+      samples.push(cpu() - t);
+      if (res.status >= 400) throw new Error(`${name} answered ${res.status}`);
+    }
+    ms[name] = median(samples);
+    requests[name] = (e.s.w.fake.calls.length - before) / 25;
+  }
+  return { ms, requests };
+}
+
 async function main(argv: readonly string[]): Promise<number> {
   if (argv[0] === '--child-cold') return coldBoot();
+  if (argv[0] === '--child-panel') return coldPanel();
   const self = fileURLToPath(import.meta.url);
+  // The panel is JSX, which Node cannot run from source: build its bundle (what the Worker bundles) first.
+  execFileSync('pnpm', ['--filter', '@agility-bridge/admin-ui', 'build'], { stdio: 'ignore' });
   // Fastest of several fresh processes, like the calibration (medians of 5 swung 22-63× between CI runs).
   const cold = Array.from(
     { length: 9 },
@@ -166,16 +255,34 @@ async function main(argv: readonly string[]): Promise<number> {
         imports: number;
       },
   );
+  const coldPanels = Array.from(
+    { length: 9 },
+    () =>
+      JSON.parse(
+        execFileSync(process.execPath, ['--conditions=source', '--expose-gc', self, '--child-panel'], {
+          encoding: 'utf8',
+        }),
+      ) as { first: number; second: number },
+  );
   const calibrationMs = calibrate();
   const warm = await warmCalls();
+  const panel = await warmPanel();
   const ms: Record<string, number> = {
     'cold: boot': Math.min(...cold.map((c) => c.boot)),
     ...Object.fromEntries(Object.entries(warm.ms).map(([k, v]) => [`warm: ${k}`, v])),
+    'cold: first /admin': Math.min(...coldPanels.map((c) => c.first)),
+    'cold: second /admin': Math.min(...coldPanels.map((c) => c.second)),
+    ...Object.fromEntries(Object.entries(panel.ms).map(([k, v]) => [`warm: ${k}`, v])),
   };
   const relative = Object.fromEntries(
     Object.entries(ms).map(([k, v]) => [k, Number((v / calibrationMs).toFixed(3))]),
   );
-  const result: BenchResult = { calibrationMs, ms, relative, requests: warm.requests };
+  const result: BenchResult = {
+    calibrationMs,
+    ms,
+    relative,
+    requests: { ...warm.requests, ...panel.requests },
+  };
   console.log(JSON.stringify(result, null, 2));
   if (argv.includes('--update')) {
     writeFileSync(BASELINE, `${JSON.stringify(result, null, 2)}\n`);

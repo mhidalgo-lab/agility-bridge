@@ -126,7 +126,8 @@ export async function setup(options: Opts = {}) {
     const res = await signIn(email);
     const cookie = cookieOf(res);
     if (res.status !== 303 || cookie === undefined) throw new Error(`sign-in failed (${res.status})`);
-    const info = await (await send('GET', `${ADMIN_BASE}/session`, { cookie })).json();
+    // biome-ignore lint/suspicious/noExplicitAny: the tests read many fields of the session document
+    const info = (await (await send('GET', `${ADMIN_BASE}/session`, { cookie })).json()) as any;
     return { cookie, csrf: info.csrfToken as string, res, info };
   };
   const api = (
