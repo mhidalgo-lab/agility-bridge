@@ -63,7 +63,7 @@ shipped bundle also tests the bundling itself.
 |---|---|
 | `worker.test.ts` (P3-01, P3-03, P3-04) | MCP with a device token against the synthetic Agility, the admin API, the uniform `401`, two workspaces under 24 interleaved calls, boot failures (`503`, security headers, no detail), a wrong master key, plan presets and ceilings, rate-limit bindings, no `node:` import in the bundle |
 | `authz.test.ts` (P3-06) | The P2-12 denial matrix on workerd: 14 denied principals × `initialize`, `tools/list` and every tool — `401` with one body, **zero Agility requests** (the synthetic Agility counts them), no change to the database, `auth` audit rows with the reason and the `CF-Connecting-IP` address written through `waitUntil`, no `tool_call` row |
-| `d1-contract.test.ts` (P3-02) | The whole storage contract on local D1, concurrent first boots, newer-database refusal |
+| `d1-contract.test.ts` (P3-02) | The whole storage contract on local D1, concurrent first boots, newer-database refusal. Its D1 calls run inside workerd (a small Worker that holds the binding, reached with `dispatchFetch`): Miniflare's Node-side binding proxy sometimes drops its socket mid-response under concurrent calls (`other side closed`) |
 | `handler.test.ts`, `plan.test.ts`, `rate-limit.test.ts` | Unit tests of the boot rule (L-179), plan presets and the rate-limit backstop |
 
 Miniflare 5 (pinned by wrangler) takes `convertV4MiniflareOptions({...})`; persist with `resourcePersistencePath`.
