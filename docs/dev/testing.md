@@ -68,6 +68,59 @@ shipped bundle also tests the bundling itself.
 
 Miniflare 5 (pinned by wrangler) takes `convertV4MiniflareOptions({...})`; persist with `resourcePersistencePath`.
 
+## Browser E2E and ZAP (`e2e/`, Phase 4)
+
+The admin panel is also driven by a real browser (Playwright, Chromium) and scanned by OWASP ZAP. Neither is part of
+`pnpm test`; both run against the **built CLI** (`apps/cli/dist-e2e-browser`, built by the run, never the published
+`dist`) on a temporary SQLite database, with a fake OpenID Connect provider (`e2e/idp.ts`) and the synthetic Agility
+(`scripts/fixture-agility.ts`) on loopback. Every secret (master key, admin token, Agility tokens, certificate) is made at
+run time. Nothing touches a real tenant or the network.
+
+```sh
+pnpm exec playwright install chromium    # once (add --with-deps on a fresh Linux machine)
+pnpm test:e2e                            # desktop 1280 px and mobile 320 px; AB_E2E_BROWSERS=all adds Firefox and WebKit (smoke)
+pnpm exec playwright test -c e2e/playwright.config.ts --project=desktop security   # one spec
+pnpm scan:zap                            # needs Docker; pulls the ZAP image pinned by digest
+```
+
+| File | Proves |
+|---|---|
+| `admin.spec.ts` (both viewports) | the owner's setup link (once), sign-in, instance, shared credential (token never shown again), workspace, grant, device tokens (once; copy button; reload and back show nothing and make no second token; the token opens `/w/<slug>/mcp`; a revoked token stops), a member's own sign-in and personal token, 403 pages, the audit viewer and CSV, usage, rename, check, edit, disable and enable, the last-owner rule, and **every screen with data in light and dark**: no horizontal scroll, no axe-core WCAG 2.1 A/AA violation, no CSP or Trusted Types report, no console error |
+| `security.spec.ts` (desktop) | the exact CSP and companion headers on every page; Trusted Types, `img-src` and `style-src` as the browser enforces them; `form-action` against a re-pointed form; the panel in another site's frame; forged posts, scripted posts and image requests from a same-site other origin and from another site; the session cookie (not in `document.cookie`), logout, copied cookies, sign out everywhere, signed-out visitors, a provider that refuses, re-authentication (nothing changes, another person refused, `prompt=login`) |
+| `secure.spec.ts` (desktop, https) | `__Host-ab_session`, `__Host-ab_login`, `__Host-ab_flash`, `Secure`, no `Domain`, HSTS, `Clear-Site-Data` over a TLS proxy with a throw-away certificate |
+| `smoke.spec.ts` | the shortest path, in every configured browser |
+
+How the harness works, so a new spec is quick to write:
+
+- `startServer({ secure?, env? })` returns the public `base`, the fake provider (`idp.user` is who signs in next,
+  `idp.deny`, `idp.authorizations`), `setupLink()`, `api()` (the admin token, **for seeding and checking state only**: the
+  panel is what is under test), `seed()` (an instance, a validated shared credential and a workspace), `ageSessions(minutes)`
+  (moves the stored sign-in time back, to cross the 10-minute re-authentication window without waiting) and `logs()`.
+  `AB_ALLOW_HTTP_INSTANCES=on` lets the panel add the loopback `http://` instance.
+- `watch(page)` fails the test on any `securitypolicyviolation`, console error or warning, uncaught error or failed
+  request. A deliberate 403 or 422 is declared with `expectStatus(status)`.
+- `visit(page, server, path)` opens a page and checks the 320 px promise and the axe rules; use it for every page a flow
+  reaches. **A new screen adds its path to the "every screen with data" list in `admin.spec.ts`.**
+- Specs of one file share one server and run in order (`mode: 'serial'`); a test starts from the state the previous one
+  left, which the file header says. Waits are for events and visible text, never fixed sleeps as assertions (L-123).
+- Chromium's `page.evaluate` is exempt from the page's `unsafe-eval` rule, so `eval` cannot be tried that way; the absence
+  of `unsafe-eval` rests on the exact-header assertion. Trusted Types and the other directives are enforced for it.
+
+**ZAP** (`e2e/zap.ts`): three passive scans from `ghcr.io/zaproxy/zaproxy@sha256:…` (pinned by digest; refresh it
+deliberately with `docker pull ghcr.io/zaproxy/zaproxy:stable`, read the new digest and rerun): `/auth/login` signed out,
+`/admin` spidered with the owner's session on a database with data on every screen, and the admin API's OpenAPI document
+with the admin token (`-S`: no active attacks). The run fails on any alert of risk Medium or High that
+[`.zap/rules.tsv`](../../.zap/rules.tsv) does not ignore, fails when a report contains a secret value (and deletes it),
+and prints the Low and Informational alerts. **Every ignored rule has a reason in that file.** On Docker Desktop (also
+WSL) the container's `localhost` is a virtual machine's, so the script starts a small relay container that forwards the
+port to the host.
+
+**CI**: `.github/workflows/admin-e2e.yml` has two jobs, *Admin browser E2E (Chromium)* and *Admin ZAP baseline (loopback)*.
+They run on pull requests and pushes to `main` that touch the panel, sign-in, the admin API, the CLI, storage or `e2e/`, every
+Monday 04:47 UTC, and on demand. Neither is a required check, because a path-filtered workflow does not report on pull
+requests outside its paths; to require them the workflow would need to run on every pull request (an owner decision,
+[pending decisions, Phase 4](../pending-decisions/phase-4.md)). Reports and traces are uploaded as artifacts (14 days).
+
 ## Fixtures
 
 Synthetic Agility responses live in `packages/core/test/fixtures/agility/` (see its README); `meta-snapshot.json` is the

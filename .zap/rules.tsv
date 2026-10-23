@@ -1,0 +1,36 @@
+# P4-08: ZAP rules for `pnpm scan:zap` (zap-baseline.py -c format: <rule id> TAB <IGNORE|WARN|FAIL> TAB <name>).
+# Only IGNORE lines are accepted findings. The scan fails on any other alert of risk Medium or High; Low and
+# Informational alerts are printed. Every line below needs a reason. Review the list when ZAP is updated, and when a
+# line stops matching anything, delete it.
+#
+# 10049 (Non-Storable Content / Storable and Cacheable Content): informational. Pages and the API answer `Cache-Control:
+# no-store` on purpose (CSRF tokens, one-time device tokens, THREAT_MODEL T13); the hashed script and stylesheet are
+# immutable and cacheable on purpose (P4-03).
+10049	IGNORE	(Non-Storable Content / Storable and Cacheable Content)
+# 10112 (Session Management Response Identified): informational; it just notes the session cookie. Its attributes
+# (HttpOnly, SameSite=Lax, no Domain, __Host- over https) are asserted in a real browser by e2e/security.spec.ts and
+# e2e/secure.spec.ts.
+10112	IGNORE	(Session Management Response Identified)
+# 10027 (Suspicious Comments): fires on words such as "admin" and "address" in the two comments of the panel's own script
+# (`packages/admin-ui/assets/admin.js`, the optional enhancements). The asset is public by design and holds no secret.
+10027	IGNORE	(Information Disclosure - Suspicious Comments)
+# 10024 (Sensitive Information in URL): the audit and grant filters are named `user`, `token` and `grant`, and carry
+# opaque ids (`usr_...`, `grt_...`), never a secret. Credentials are never accepted in a query string (P2-12 matrix);
+# the device token appears only in the answer to a form post (`no-store`).
+10024	IGNORE	(Information Disclosure - Sensitive Information in URL)
+# 10031 (User Controllable HTML Element Attribute): the filter forms echo the query values into `value` attributes. All
+# output is escaped by the template layer (scripts/check-ui-escaping.ts), and the CSP forbids inline script with Trusted
+# Types, so a reflected value cannot execute. Covered by the escaping tests (P4-03 to P4-07) and by e2e/admin.spec.ts.
+10031	IGNORE	(User Controllable HTML Element Attribute (Potential XSS))
+# 10099 (Source Code Disclosure - SQL, risk Medium): a false positive on prose. The pattern is `REVOKE ... ON`, and the user
+# page says "Their grants and device tokens stay until you revoke them on the grants page." No SQL is served: the panel
+# renders fixed sentences and escaped values, and queries are never built from strings (ADR-0012). Re-check the evidence
+# of any new instance before keeping this line.
+10099	IGNORE	(Source Code Disclosure - SQL)
+# 10063 (Permissions Policy Header Not Set, risk Low): reported for the panel's script asset. Every HTML page carries a
+# closed `Permissions-Policy` (asserted by e2e/security.spec.ts); a script or stylesheet is not a document that can use
+# a browser feature.
+10063	IGNORE	(Permissions Policy Header Not Set)
+# 100000 (client error response code, API scan): ZAP's generated requests hit validation, authorization and 404 paths;
+# the admin API answers them with 4xx on purpose.
+100000	IGNORE	(A Client Error response code was returned by the server)

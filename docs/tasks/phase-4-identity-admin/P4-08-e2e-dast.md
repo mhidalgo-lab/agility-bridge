@@ -2,10 +2,10 @@
 id: P4-08
 title: Browser E2E and DAST baseline
 phase: 4
-status: in-progress
+status: review
 priority: medium
 depends_on: [P4-04, P4-05, P4-07]
-lessons: [L-121, L-123, L-126, L-194, L-195]
+lessons: [L-121, L-123, L-126, L-194, L-195, L-215, L-216, L-217, L-218, L-219]
 owner: "claude-agent"
 ---
 
@@ -74,17 +74,17 @@ before it.
   traces are uploaded as artifacts. Explicit step and job timeouts.
 
 ## Acceptance criteria
-- [ ] Browser E2E covers every screen delivered by P4-04, P4-05 and P4-07 (the connect page of P4-06 adds itself), at 1280 px
+- [x] Browser E2E covers every screen delivered by P4-04, P4-05 and P4-07 (the connect page of P4-06 adds itself), at 1280 px
       and 320 px, with zero CSP/Trusted Types violations, console errors and axe violations.
-- [ ] The CSP, Trusted Types, `form-action`, framing, cross-origin forgery, cookie, `__Host-`, `Clear-Site-Data`,
+- [x] The CSP, Trusted Types, `form-action`, framing, cross-origin forgery, cookie, `__Host-`, `Clear-Site-Data`,
       one-time-page, logout and re-authentication behaviours listed in the *Not exercised* notes of P4-02 and P4-03 are
       asserted in a real browser.
-- [ ] A ZAP baseline scan runs from a digest-pinned image against the local server, with a committed rules file in which
+- [x] A ZAP baseline scan runs from a digest-pinned image against the local server, with a committed rules file in which
       every ignored rule has a reason; a new Medium or High alert fails it.
-- [ ] Browser and ZAP jobs exist in CI with explicit timeouts, artifacts and no secrets; not required checks (an owner step
+- [x] Browser and ZAP jobs exist in CI with explicit timeouts, artifacts and no secrets; not required checks (an owner step
       says whether to require them).
 - [ ] Both workflows are green on `main` (**only CI can tick this, after the merge**).
-- [ ] `docs/dev/testing.md` describes how to run both; defects the browser found are fixed with regression tests or become
+- [x] `docs/dev/testing.md` describes how to run both; defects the browser found are fixed with regression tests or become
       task files.
 
 ## Security notes
@@ -104,3 +104,26 @@ run time; nothing is committed that gitleaks would flag. ZAP is pointed at loopb
 ## Out of scope
 - Screenshots for the guide (a follow-up if wanted), a real identity provider (owner step), load testing, active ZAP
   scans, the Cloudflare Worker in a browser (the staging smoke covers the Worker over HTTP).
+
+## Outcome
+
+- **Built**: `e2e/` (harness, fake OIDC provider with a browser-facing `/authorize`, TLS proxy mode, page watcher, axe helper,
+  four specs), `pnpm test:e2e`, `pnpm scan:zap` (`e2e/zap.ts`, `.zap/rules.tsv`, ZAP image pinned by digest), the
+  `Admin E2E and ZAP` workflow, docs (testing, admin-ui, admin guide, CONTRIBUTING, THREAT_MODEL T13), lessons L-215 to L-219,
+  decisions D-43 and D-44, changeset.
+- **Ran locally**: all 24 Playwright tests in Chromium (desktop 17, mobile 320 px 7) and the full ZAP scan (login, admin
+  with data, admin API with 45 generated requests): no unreviewed Medium or High alert. Not run: Firefox and WebKit (their
+  browsers are not installed here; `AB_E2E_BROWSERS=all` runs the smoke spec in them), the CI jobs themselves (only after
+  the push), and "green on `main`" (after the merge).
+- **Defects found and fixed**: a sideways-scrolling table was not keyboard reachable (axe `scrollable-region-focusable`;
+  now a focusable named `<section>`, unit test); an empty JSON body on the admin API answered `500` instead of `400`
+  (`onError` maps the validator's 400; regression test fails on the old code). The browser also confirmed the CSP, Trusted
+  Types, `form-action`, framing, `__Host-` cookies, `Clear-Site-Data`, same-site and cross-site forgery refusals, one-time
+  token pages and re-authentication behave as specified; the ZAP "SQL disclosure" is a false positive on prose (ignored,
+  explained).
+- **relic-bridge findings folded in**: the harness and ZAP script (relay for Docker Desktop, secret scan of reports, digest
+  pin), `Origin: null` is covered by every form flow, CSP assertions against a literal, console and CSP watching on every page.
+  Added beyond relic: axe, https mode, same-site forger, re-authentication flow, member flow, light and dark.
+- **Notes**: the connect page (P4-06) adds itself to the "every screen with data" list. Screenshots for the guide are not part
+  of this task. Specs run serially per file and share a server, so they are order dependent by design (documented).
+

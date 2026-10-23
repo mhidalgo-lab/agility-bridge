@@ -35,6 +35,9 @@ manager.
 - **Show fixed text.** Flash messages are codes (`kit.redirect(path, 'saved')`); error pages show fixed sentences and the
   request id. Text from the admin API's error body is never displayed (it can carry names), with one exception made in P4-04
   (decision D-36): the one-line message of a `422 invalid_input`, shown as escaped text beside the form it came from.
+- Every new screen is added to the "every screen with data" list of the browser test (`e2e/admin.spec.ts`: 320 px, desktop,
+  light and dark, axe-core, CSP and console watch) and, when it carries a flow, gets a step in that spec
+  ([testing](testing.md#browser-e2e-and-zap-e2e-phase-4)). A scrollable region is a focusable, named `<section>`.
 - Every new route is added to the tests that list the panel's routes (`packages/http-app/test/admin-panel.test.ts`:
   headers, sign-in redirect, role matrix, refusals) and to `NAV_ITEMS` when it has a menu entry.
 

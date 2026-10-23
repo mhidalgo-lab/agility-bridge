@@ -292,6 +292,18 @@ describe('flash, time and tables', () => {
     expect((html.match(/<th scope="col">/g) ?? []).length).toBe(2);
     expect(html).toContain('<td class="empty" colspan="2">Nobody.</td>');
   });
+
+  it('a table that scrolls sideways can be focused and has a name, so the keyboard reaches it (found by axe in P4-08)', () => {
+    const html = renderDocument(
+      <DataTable
+        caption="People"
+        empty="Nobody."
+        rows={[] as string[]}
+        columns={[{ header: 'A', cell: (r) => r }]}
+      />,
+    );
+    expect(html).toContain('<section class="table-wrap" aria-label="People" tabindex="0">');
+  });
 });
 
 describe('error and re-authentication pages', () => {
