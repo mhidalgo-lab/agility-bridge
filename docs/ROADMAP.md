@@ -212,9 +212,9 @@ Status lives in each task file.
 | P4-06 | [Connect page with client snippets](tasks/phase-4-identity-admin/P4-06-connect-page.md) | medium | P4-04, P4-07 | done |
 | P4-07 | [Member self-service: bring your own Agility token](tasks/phase-4-identity-admin/P4-07-member-self-service.md) | high | P4-04 | done |
 | P4-08 | [Browser E2E and DAST baseline](tasks/phase-4-identity-admin/P4-08-e2e-dast.md) | medium | P4-04, P4-05, P4-07 | done |
-| P4-09 | [Admin security review (owner boundaries on every writer)](tasks/phase-4-identity-admin/P4-09-admin-security-review.md) | high | P4-04, P4-05, P4-06, P4-07, P4-12, P4-13, P4-15 | review |
+| P4-09 | [Admin security review (owner boundaries on every writer)](tasks/phase-4-identity-admin/P4-09-admin-security-review.md) | high | P4-04, P4-05, P4-06, P4-07, P4-12, P4-13, P4-15 | done |
 | P4-10 | [Admin documentation](tasks/phase-4-identity-admin/P4-10-admin-docs.md) | medium | P4-04 | done |
-| P4-11 | [Phase 4 review](tasks/phase-4-identity-admin/P4-11-phase-4-review.md) | high | P4-08, P4-09, P4-10 | todo |
+| P4-11 | [Phase 4 review](tasks/phase-4-identity-admin/P4-11-phase-4-review.md) | high | P4-08, P4-09, P4-10 | review |
 | P4-12 | [Move a user to another identity on purpose (owner-only unbind)](tasks/phase-4-identity-admin/P4-12-unbind-identity.md) | medium | P4-02, P4-04 | done |
 | P4-13 | [pnpm cf:setup prompts for the sign-in settings](tasks/phase-4-identity-admin/P4-13-cf-setup-sign-in.md) | low | P4-01 | done |
 | P4-14 | [CPU benchmark scenarios for the panel](tasks/phase-4-identity-admin/P4-14-panel-benchmark-scenarios.md) | low | P4-03 | done |

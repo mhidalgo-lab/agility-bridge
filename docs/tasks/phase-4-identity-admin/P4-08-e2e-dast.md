@@ -83,7 +83,7 @@ before it.
       every ignored rule has a reason; a new Medium or High alert fails it.
 - [x] Browser and ZAP jobs exist in CI with explicit timeouts, artifacts and no secrets; not required checks (an owner step
       says whether to require them).
-- [ ] Both workflows are green on `main` (**only CI can tick this, after the merge**).
+- [x] Both workflows are green on `main` (ticked in P4-11: the *Admin E2E and ZAP* run 39945836093 and CI succeeded on `main`).
 - [x] `docs/dev/testing.md` describes how to run both; defects the browser found are fixed with regression tests or become
       task files.
 

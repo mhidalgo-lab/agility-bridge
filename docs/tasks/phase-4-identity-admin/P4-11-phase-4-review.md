@@ -2,7 +2,7 @@
 id: P4-11
 title: Phase 4 review
 phase: 4
-status: todo
+status: review
 priority: high
 depends_on: [P4-08, P4-09, P4-10]
 adr: []
@@ -31,10 +31,10 @@ live pass on staging, and a go or no-go for Phase 5.
 - P4-09 set from `review` to `done` (its PR #100 is merged).
 
 ## Acceptance criteria
-- [ ] `docs/reviews/phase-4-review.md`; every finding fixed or recorded, with tests.
-- [ ] Staging checks recorded (the coordinator ran them); owner steps listed.
-- [ ] Go for Phase 5 recorded as a decision with options and a recommendation.
-- [ ] Every Phase 4 task is `done` or an open follow-up; no unticked box left in a done task.
+- [x] `docs/reviews/phase-4-review.md`; every finding fixed or recorded, with tests.
+- [x] Staging checks recorded (the coordinator ran them); owner steps listed.
+- [x] Go for Phase 5 recorded as a decision with options and a recommendation.
+- [x] Every Phase 4 task is `done` or an open follow-up; no unticked box left in a done task.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.
