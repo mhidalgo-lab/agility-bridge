@@ -347,6 +347,36 @@ Summary only; the per-client matrix, configuration formats and verification stat
 - **Windsurf** became **Devin Desktop** (Cascade agent removed 2026-09-08; configuration moved from
   `~/.codeium/windsurf/mcp_config.json` to `~/.config/devin/mcp_config.json`).
 
+### Remote client configuration formats (P4-06)
+
+Read 2026-10-23 in the vendors' documentation; *docs* unless stated, none run by P4-06 itself (the per-client verification
+status is in [client-compatibility](reference/client-compatibility.md#remote-snippets-p4-06)).
+
+- **Claude Code**: `claude mcp add --transport http <name> <url> --header "Authorization: Bearer …"`; `--scope local|project|user`
+  (default `local`); `.mcp.json` `mcpServers.<name>` with `type: "http"`, `url`, `headers`, and `${VAR}` / `${VAR:-default}`
+  expansion in `url` and `headers`. Variables named like credentials (`ANTHROPIC_AUTH_TOKEN`, `NPM_TOKEN`, …) read as empty in
+  remote `url` and `headers`; a configured `Authorization` header is not replaced by OAuth; `claude mcp add` does not check the
+  credential. Source: https://code.claude.com/docs/en/mcp
+- **VS Code**: `servers.<name>` with `type: "http"`, `url`, `headers`; `inputs` entries `{ type: "promptString", id, description,
+  password: true }` referenced as `${input:id}`, asked once and stored securely; input variables are not supported in portable
+  `.mcp.json` or Copilot `mcp-config.json` files. Source: https://code.visualstudio.com/docs/agents/reference/mcp-configuration
+- **Cursor**: `mcpServers.<name>` with `url` and `headers`; `${env:NAME}` resolves in `command`, `args`, `env`, `url` and
+  `headers`; files `~/.cursor/mcp.json` and `.cursor/mcp.json`. Source: https://cursor.com/docs/context/mcp
+- **Copilot CLI**: `~/.copilot/mcp-config.json` `mcpServers.<name>` with `type: "http"`, `url`, `headers`, `tools` (default
+  `["*"]`); `copilot mcp add --transport http --header "H: V" <name> <url>` (transport defaults to stdio). Header variable
+  substitution is not documented on that page: *unverified*. Source:
+  https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers
+- **Copilot in JetBrains**: remote `servers.<name>` with `url` and `requestInit.headers`; no OAuth option described. Source:
+  https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp/extend-copilot-chat-with-mcp
+- **Windsurf / Devin Desktop**: legacy Cascade agent only: `mcpServers.<name>` with `serverUrl` (or `url`) and `headers`; `${env:VAR}`
+  (empty when unset) and `${file:/path}` interpolation in `command`, `args`, `env`, `serverUrl`, `url`, `headers`; file
+  `~/.config/devin/mcp_config.json` (`%APPDATA%\devin\mcp_config.json` on Windows). The Devin Local agent uses the Devin CLI
+  files instead (not covered). Source: https://docs.devin.ai/desktop/cascade/mcp
+- **MCP Inspector CLI**: `--cli <url> --transport http --header "Name: value" --method tools/list` as run in the P0-07 spike
+  (`spikes/mcp-sdk-v2/RESULTS.md`); the repository README does not document the flags (*live*, not *docs*).
+- **PowerShell**: `Read-Host -MaskInput` needs PowerShell 7.1+ (*unverified*, from memory of the cmdlet's release notes); the
+  Windows snippet is marked accordingly.
+
 ## 4. OAuth 2.1 for MCP
 
 - **Protected resource metadata** (RFC 9728): a 401 carries `WWW-Authenticate` with `resource_metadata`; otherwise

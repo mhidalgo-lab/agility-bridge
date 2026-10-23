@@ -123,7 +123,27 @@ owner or an admin sees the same pages, not other people's, and manages other peo
   Switching to a personal token revokes the device tokens already issued on that grant, so none keeps acting through a
   different token. Writes stay off: a personal token never enables write tools.
 - **My devices**: device tokens on the grant (up to 20 live ones): issue one per device (shown once), revoke one.
+- **Connect a client** (on the grant, also for owners and admins on any grant): the endpoint of the workspace and a copy-paste
+  configuration for each client, see [Connect a client](#connect-a-client).
 - **My recent changes**: your own last administrative changes (what and when, never a secret).
+
+### Connect a client
+
+On a grant's page (and on **My grant**), **Connect a client** shows the workspace's MCP endpoint, built from the server's
+configured public address (`AB_PUBLIC_URL`), and one configuration per client: GitHub Copilot in VS Code, in JetBrains and
+the Copilot CLI, Claude Code (command, PowerShell and `.mcp.json`), Cursor, Windsurf / Devin Desktop and the MCP Inspector
+CLI. They are the snippets of the [client setup guide](clients.md#remote-server-device-token) with your workspace filled in.
+
+- The page never contains a token: tokens are stored as hashes. Create one with **Create a device token**; the page that
+  shows it once repeats the snippets, and puts the token into the one that cannot read it from a prompt or an environment
+  variable (JetBrains). Reloading that page shows nothing.
+- Most snippets read the token from a password prompt (VS Code) or from the `AGILITY_BRIDGE_TOKEN` environment variable, so
+  it is never typed into a shell command line or committed into a project file.
+- Only the person who holds a grant opens its page under **My access**; someone else's grant is a "not found" page, for owners
+  and admins too. Owners and admins open any grant's page from the screens above.
+- A revoked or expired grant and a disabled workspace are said so on the page, and a grant that cannot issue tokens offers
+  no button.
+- claude.ai, Claude Desktop connectors and Claude mobile need OAuth and are listed without a snippet.
 
 ### Audit log and usage
 

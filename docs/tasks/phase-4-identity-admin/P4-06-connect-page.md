@@ -2,12 +2,12 @@
 id: P4-06
 title: Connect page with client snippets
 phase: 4
-status: todo
+status: review
 priority: medium
 depends_on: [P4-04, P4-07]
 adr: ["0016"]
 lessons: [L-023, L-026, L-085, L-121, L-133]
-owner: ""
+owner: "claude-agent"
 ---
 
 # P4-06 — Connect page with client snippets
@@ -51,19 +51,19 @@ ones, L-133); `client-compatibility.md` setup notes agree; `docs/guide/admin-pan
 the page.
 
 ## Acceptance criteria
-- [ ] Every primary client has a snippet in its currently documented format; formats and sources are recorded in
+- [x] Every primary client has a snippet in its currently documented format; formats and sources are recorded in
   `docs/RESEARCH.md` with date, unverified ones marked.
-- [ ] Endpoint comes from `AB_PUBLIC_URL`; a hostile `Host`/`X-Forwarded-Host` changes nothing.
-- [ ] Role and ownership matrix: member own grant ok; member/owner/admin on someone else's grant through the member area
+- [x] Endpoint comes from `AB_PUBLIC_URL`; a hostile `Host`/`X-Forwarded-Host` changes nothing.
+- [x] Role and ownership matrix: member own grant ok; member/owner/admin on someone else's grant through the member area
   404; admin area refuses members; signed-out redirects; revoked / expired / disabled shown honestly; no upstream call.
-- [ ] The Connect page (GET) never contains a token; the token appears only in the POST answer, only in the JetBrains
+- [x] The Connect page (GET) never contains a token; the token appears only in the POST answer, only in the JetBrains
   snippet and the token box; the reload answer, redirects, flash and URLs never contain it (tests scan).
-- [ ] Hostile slug, label, endpoint and token strings cannot break out of JSON, shell or PowerShell quoting (tests, with a
+- [x] Hostile slug, label, endpoint and token strings cannot break out of JSON, shell or PowerShell quoting (tests, with a
   real shell round trip where one exists) and are HTML-escaped.
-- [ ] The guide's remote snippets equal the generated ones (test).
-- [ ] A workerd smoke renders the Connect page.
-- [ ] Key security tests are mutation-checked (L-121), recorded under Outcome.
-- [ ] `docs/guide/clients.md`, `docs/guide/admin-panel.md`, `docs/dev/admin-ui.md`, `docs/reference/client-compatibility.md`,
+- [x] The guide's remote snippets equal the generated ones (test).
+- [x] A workerd smoke renders the Connect page.
+- [x] Key security tests are mutation-checked (L-121), recorded under Outcome.
+- [x] `docs/guide/clients.md`, `docs/guide/admin-panel.md`, `docs/dev/admin-ui.md`, `docs/reference/client-compatibility.md`,
   `docs/RESEARCH.md` updated; changeset added.
 
 ## Security notes
@@ -91,3 +91,32 @@ one-time page.
 - OAuth snippets and the claude.ai / Desktop / mobile connector walk-through (Phase 5).
 - Codex, Zed, Cline, Gemini CLI and other secondary clients (add a builder when verified).
 - Running every snippet in the real client: the owner's matrix runs do that (formats are checked against documentation).
+
+## Outcome
+
+- **Built**: `packages/admin-ui/src/snippets.ts` (typed `SnippetInput` with `auth: SnippetAuth`, one builder per client in
+  `CLIENT_BUILDERS`, `shellWord` / `powershellWord`, `endpointFor`, `OAUTH_ONLY_CLIENTS`), `screens/connect.tsx` (`SnippetList`,
+  `ConnectPage`), the routes `GET /admin/me/grants/:id/connect` and `GET /admin/grants/:id/connect` inside the shared token routes
+  (`tokens.tsx`, so both areas reuse `loadGrant`, `canIssueOn`), the snippets on the one-time token page, links from My grant and
+  the admin grant page, `AdminUiDeps.publicOrigin`, snippet styles (assets regenerated).
+- **Clients and formats** (vendor documentation read 2026-10-23, facts and sources in `docs/RESEARCH.md`; none run by this task):
+  VS Code (`inputs` password prompt, `servers.<name>`), JetBrains (`requestInit.headers`, the only literal token), Copilot CLI
+  (`copilot mcp add --transport http --header`), Claude Code (command, PowerShell 7, `.mcp.json` with `${VAR}`), Cursor
+  (`${env:VAR}`), Windsurf / Devin Desktop (`serverUrl`, `${env:VAR}`), MCP Inspector CLI (flags as run in the P0-07 spike).
+  Unverified: Copilot CLI header variable substitution (not used), `Read-Host -MaskInput` availability (PowerShell 7.1+).
+- **Tests**: `packages/admin-ui/test/snippets.test.ts` (slug rule, documented shapes, token holders, hostile strings through JSON
+  parse-back, a real bash round trip with stub commands and PowerShell quoting, pwsh round trip when installed (skipped here),
+  guide equals generated), `packages/admin-ui/test/connect-screens.test.tsx` (fake API: origin from configuration, hostile name
+  and slug, member area, HEAD), `packages/http-app/test/connect-page.test.ts` (real sessions and storage: role and ownership
+  matrix, revoked and disabled, `Host` / `X-Forwarded-*`, the one-time page, replay, scans of redirects, flash, logs and audit
+  rows) and a workerd smoke in `apps/worker/test/worker.test.ts` (Connect page on the Worker).
+- **Mutation checks (L-121)**: 9 deliberate reversions, each fails at least one test: shell quoting removed, slug rule removed
+  (generator and predicate), VS Code snippet with the literal token, member-area ownership check removed, issue link always shown,
+  one-time page without the token in JetBrains, Connect page passing a token, configured origin replaced.
+- **relic-bridge findings folded in**: its P4-06 port (project picker became a grant page; `read -rs` for shell snippets; no
+  literal token outside the one-time page; `data-copy` progressive enhancement; endpoint only from the public origin), its review
+  note that `docs/dev/admin-ui.md` omitted the snippet files (covered), and the decision not to port the `mcp-remote` Claude Desktop
+  snippet (D-41).
+- **Not done / notes**: no TOML snippet (no client of the matrix uses one); no Codex/Zed/Cline/Gemini snippets (out of scope);
+  claude.ai / Desktop / mobile wait for OAuth (Phase 5); formats are from documentation, the owner's matrix runs verify them.
+- **New**: lessons L-210 to L-214, decisions D-41 and D-42, changeset.

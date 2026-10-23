@@ -54,6 +54,7 @@ export function fakeDeps(over: Partial<AdminUiDeps> = {}): Fake {
     deps: {
       now: () => NOW,
       secureCookies: false,
+      publicOrigin: 'https://bridge.example.test',
       clearSessionCookie: 'ab_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
       async authenticate(c) {
         const who = c.req.header('x-test-session');

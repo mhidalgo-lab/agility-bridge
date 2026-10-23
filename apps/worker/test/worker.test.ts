@@ -604,6 +604,15 @@ describe('sign-in on workerd (P4-01)', () => {
       expect(myGrants.map((g) => g.grant.credentialId)).toContain(personalId);
       expect(await (await screen(`/admin/me/grants/${mine.record?.id}`)).text()).not.toContain(personal);
 
+      // The Connect page (P4-06) on the Worker: the address from the configured origin, every client, no token.
+      const connectPage = await screen(`/admin/me/grants/${mine.record?.id}/connect`);
+      expect(connectPage.status).toBe(200);
+      const connectHtml = await connectPage.text();
+      expect(connectHtml).toContain(`${ORIGIN}/w/panel/mcp`);
+      expect(connectHtml).toContain('GitHub Copilot in JetBrains IDEs');
+      expect(connectHtml).not.toContain(personal);
+      expect(connectHtml).not.toMatch(/ab_(live|test)_/);
+
       // The audit viewer, its CSV and the usage statistics render against D1 too (P4-05): bounded reads through the API.
       const auditPage = await screen('/admin/audit');
       expect(auditPage.status).toBe(200);

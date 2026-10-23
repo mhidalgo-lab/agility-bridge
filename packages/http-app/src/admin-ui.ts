@@ -68,6 +68,7 @@ export function adminUiDeps(w: AdminUiWiring): AdminUiDeps {
   return {
     now: w.now,
     secureCookies: w.publicOrigin.startsWith('https:'),
+    publicOrigin: w.publicOrigin,
     clearSessionCookie: sessions.clearCookie,
     ...(w.beforeAuth === undefined ? {} : { beforeAuth: w.beforeAuth }),
     onceStore: {

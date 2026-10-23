@@ -179,6 +179,26 @@ through an `Area` (`ADMIN_AREA` for owners and admins on any grant, `MEMBER_AREA
   the default only while the grant uses the person's own token (the guard decides; the page mirrors it, L-197).
 - The add form lists only instances of the person's live grants in workspaces that use stored tokens (the guard enforces it too).
 
+## Connect page (P4-06)
+
+`snippets.ts` (pure text, no JSX) and `screens/connect.tsx` (`SnippetList`, `ConnectPage`); the routes
+`GET /admin/grants/:id/connect` and `GET /admin/me/grants/:id/connect` are registered next to the token routes in
+`tokens.tsx`, so both areas share `loadGrant` (mine only, L-205), `loadWorkspace` and `canIssueOn`. Rules:
+
+- **Endpoint from configuration only**: `AdminUiDeps.publicOrigin` (`AB_PUBLIC_URL`'s origin) plus `/w/<slug>/mcp`; never `Host`,
+  `X-Forwarded-*` or the request URL. `endpointFor` and `clientSnippets` throw for a slug the storage would not hold (so no
+  `${…}` or quote reaches a client configuration), and the page shows an error instead of snippets.
+- **One builder per client** in `CLIENT_BUILDERS`; the input carries `auth: SnippetAuth` (today `{ kind: 'device-token', token? }`).
+  Phase 5 adds `{ kind: 'oauth' }` and the OAuth branch of each builder (no `Authorization` header, and `claude.ai`/Desktop
+  entries moving from `OAUTH_ONLY_CLIENTS` to snippets) without touching the page.
+- **Quote per format**: `JSON.stringify` for JSON, `shellWord` (POSIX single quotes) and `powershellWord` for commands; shell lines
+  that carry the token read `$AGILITY_BRIDGE_TOKEN` and never the literal value. `Snippet.literalToken` says whether a body holds
+  the real token; the only such client is JetBrains, and only when `SnippetAuth.token` is set, which only the one-time page does.
+- **Docs agree with the code**: `packages/admin-ui/test/snippets.test.ts` compares every `<!-- snippet: id -->` block of
+  `docs/guide/clients.md` with the generated placeholder snippets (slug `my-team`, `https://agility-bridge.example.com`); change a
+  builder and regenerate the guide block (copy the output) in the same commit.
+- **Copy buttons** are `button[data-copy]` revealed by `admin.js` when the clipboard API exists; without it the `<pre>` is selectable.
+
 ## Audit viewer and usage (P4-05)
 
 `screens/audit.tsx` and `screens/usage.tsx`. Notes for the next screen that lists server records:
@@ -196,4 +216,4 @@ through an `Area` (`ADMIN_AREA` for owners and admins on any grant, `MEMBER_AREA
 
 ## Not in the panel (yet)
 
-The audit viewer is above; the connect page with client snippets (P4-06) and the owner-only unbind (P4-12) are still to do. A browser run (axe-core, keyboard, 320 px, CSP violations in a real browser) is P4-08.
+The audit viewer and the connect page are above; the owner-only unbind (P4-12) is still to do. A browser run (axe-core, keyboard, 320 px, CSP violations in a real browser) is P4-08.

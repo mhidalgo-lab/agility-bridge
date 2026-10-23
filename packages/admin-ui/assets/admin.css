@@ -547,3 +547,24 @@ td > .badge:first-child,
 dd > .badge:first-child {
   margin-left: 0;
 }
+
+.snippet pre {
+  margin: 0 0 0.75rem;
+  padding: 0.75rem;
+  overflow-x: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+}
+
+.snippet pre code {
+  white-space: pre;
+  overflow-wrap: normal;
+  user-select: text;
+}
+
+.snippet .notes-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}

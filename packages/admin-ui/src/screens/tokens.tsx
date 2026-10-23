@@ -8,6 +8,7 @@
 //   GET  /admin/grants/:id/tokens/new           device name and lifetime form (writes one handle)
 //   POST /admin/grants/:id/tokens               issue -> the one-time page
 //   POST /admin/grants/:gid/tokens/:id/revoke   revoke (confirmation page first)
+//   GET  /admin/grants/:id/connect              the Connect page of the grant: endpoint and client snippets, no token (P4-06)
 // The same three routes exist for members under `/admin/me/grants/...` (P4-07): their own grants only, and the grant's
 // workspace comes from `GET /me/grants` (members cannot read workspaces). One implementation, two areas.
 import type { Context, Hono } from 'hono';
@@ -26,6 +27,8 @@ import {
 } from '../components.tsx';
 import { adminPath, ONCE_FIELD, type UiKit, type UiPrincipal } from '../kit.ts';
 import { errorPage, htmlResponse } from '../pages.tsx';
+import { endpointFor, isWorkspaceSlug } from '../snippets.ts';
+import { ConnectPage, SnippetList } from './connect.tsx';
 import {
   type Credential,
   type Grant,
@@ -210,6 +213,8 @@ function IssuedTokenPage(props: {
   readonly token: string;
   readonly warnings: readonly string[];
   readonly slug: string | null;
+  /** The workspace's MCP endpoint from the configured public origin, or null when it cannot be built. */
+  readonly endpoint: string | null;
   readonly done: string;
 }) {
   const { record, token } = props;
@@ -227,23 +232,31 @@ function IssuedTokenPage(props: {
         <h2 id="use-heading">Use it</h2>
         <Facts
           items={[
-            [
-              'MCP endpoint',
-              <code>{props.slug === null ? '/w/<workspace>/mcp' : `/w/${props.slug}/mcp`}</code>,
-            ],
+            ['MCP endpoint', <code>{props.endpoint ?? '/w/<workspace>/mcp'}</code>],
             ['Header', <code>{'Authorization: Bearer <the token above>'}</code>],
             ['Expires', <When at={record.expiresAt} none="never" />],
           ]}
         />
         <ul>
-          <li>
-            The endpoint is on this server's address. Paste the token only into that device's MCP client
-            configuration or its secret store.
-          </li>
+          <li>Paste the token only into that device's MCP client configuration or its secret store.</li>
           <li>Never paste it into a chat, a ticket, a shared document or a repository.</li>
           <li>This page is shown once: reloading it does not show the token again or create another one.</li>
         </ul>
       </section>
+      {props.endpoint === null || props.slug === null ? null : (
+        <section aria-labelledby="snippets-heading">
+          <h2 id="snippets-heading">Client configuration</h2>
+          <p>
+            Most snippets read the token from a prompt or an environment variable, so it is not written next
+            to the address. A client that has neither (JetBrains) holds it in its file, filled in below.
+          </p>
+          <SnippetList
+            endpoint={props.endpoint}
+            slug={props.slug}
+            auth={{ kind: 'device-token', token: props.token }}
+          />
+        </section>
+      )}
       <div class="actions">
         <LinkButton href={props.done}>Done</LinkButton>
       </div>
@@ -259,6 +272,9 @@ export function registerTokens(ui: Hono, kit: UiKit): void {
 function registerTokenRoutes(ui: Hono, kit: UiKit, area: Area): void {
   const now = () => (kit.deps.now ?? Date.now)();
   const ROUTE = `${area.rel}/:id/tokens`;
+  /** The endpoint for a workspace slug: only from the configured public origin, and only for a slug the storage allows. */
+  const endpointOf = (slug: string | undefined): string | null =>
+    slug === undefined || !isWorkspaceSlug(slug) ? null : endpointFor(kit.deps.publicOrigin, slug);
 
   /**
    * The grant, or the failed answer. The member area is "mine only", also for owners and admins who could read any grant
@@ -311,6 +327,47 @@ function registerTokenRoutes(ui: Hono, kit: UiKit, area: Area): void {
           values={{ label: '', lifetime: '90' }}
           errors={{}}
           once={await kit.issueOnce(principal)}
+        />,
+      );
+    }),
+  );
+
+  ui.get(
+    `${area.rel}/:id/connect`,
+    kit.page(area.minRole, async (c, page) => {
+      const { principal } = page;
+      const id = c.req.param('id');
+      if (!isId(id)) return errorPage(404, undefined, principal);
+      const grant = await loadGrant(c, principal, id);
+      if ('status' in grant) return loadFailed(c, grant, principal);
+      const workspace = await loadWorkspace(c, principal, grant.workspaceId);
+      const endpoint = endpointOf(workspace?.slug);
+      if (workspace === null || endpoint === null)
+        return page.html(
+          <Layout title="Connect a client" viewer={principal} current={area.current}>
+            <p class="flash flash-error" role="alert">
+              The workspace of this grant could not be loaded, so there is no address to show.
+            </p>
+            <LinkButton href={grantPage(area, id)} variant="secondary">
+              Back to the grant
+            </LinkButton>
+          </Layout>,
+          502,
+        );
+      const credential = await loadCredential(c, principal, grant.credentialId);
+      const t = now();
+      const usable = grant.revokedAt === null && (grant.expiresAt === null || grant.expiresAt > t);
+      return page.html(
+        <ConnectPage
+          viewer={principal}
+          current={area.current}
+          endpoint={endpoint}
+          slug={workspace.slug}
+          workspaceName={workspace.name}
+          workspaceDisabled={workspace.disabledAt !== null}
+          grantUsable={usable}
+          issueHref={canIssueOn(grant, credential, principal, t) ? `${grantPage(area, id)}/tokens/new` : null}
+          grantHref={grantPage(area, id)}
         />,
       );
     }),
@@ -394,6 +451,7 @@ function registerTokenRoutes(ui: Hono, kit: UiKit, area: Area): void {
           token={token}
           warnings={warnings}
           slug={workspace?.slug ?? null}
+          endpoint={endpointOf(workspace?.slug)}
           done={self}
         />,
       );

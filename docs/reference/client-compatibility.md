@@ -57,6 +57,27 @@ verified by the owner against v0.1 (version and date recorded above when done); 
 documented only. To try a client without a real instance, run `node scripts/fixture-agility.ts` and point
 `AB_AGILITY_URL` at the URL it prints.
 
+## Remote snippets (P4-06)
+
+The admin panel's Connect page and the [client setup guide](../guide/clients.md#remote-server-device-token) show these forms
+for `https://<host>/w/<workspace>/mcp` with a device token (a test keeps the guide equal to the generated text). Formats were
+read in each vendor's documentation on 2026-10-23; **none is verified against a real client by P4-06**, that stays with the
+owner's matrix runs (VS Code, JetBrains, Copilot CLI, Claude Code and MCP Inspector were run with a static header in P0-07 and
+P2-17, see above; Cursor and Windsurf are documentation only).
+
+| Client | Remote form | Token handling | Status |
+|---|---|---|---|
+| VS Code | `.vscode/mcp.json`: `inputs` (`promptString`, `password: true`) and `servers.<name>`: `type: http`, `url`, `headers` with `${input:id}` | prompt, secret storage | docs + **V** static header (P0-07) |
+| JetBrains | `mcp.json`: `servers.<name>.url` and `requestInit.headers` | literal in the file (no prompt, no expansion) | docs + **V** (P0-07) |
+| Copilot CLI | `copilot mcp add --transport http --header "Authorization: Bearer $VAR" <name> <url>` (writes `~/.copilot/mcp-config.json`) | shell variable at add time, stored in plain text | docs + **V** static header (1.0.87) |
+| Claude Code | `claude mcp add --transport http --scope user <name> <url> --header "…"`; `.mcp.json` with `type: http` and `${VAR}` in `headers` | shell variable, or `${VAR}` expanded at start | docs + **V** static header (2.1.304) |
+| Cursor | `mcp.json`: `mcpServers.<name>`: `url`, `headers` with `${env:VAR}` | environment variable | docs only |
+| Windsurf / Devin Desktop | `~/.config/devin/mcp_config.json`: `mcpServers.<name>`: `serverUrl`, `headers` with `${env:VAR}` | environment variable (unset becomes empty) | docs only |
+| MCP Inspector CLI | `npx @modelcontextprotocol/inspector --cli <url> --transport http --header "…" --method tools/list` | shell variable | **V** 2.11.0 (P2-17, spike) |
+
+claude.ai, Claude Desktop connectors and Claude mobile need OAuth (P5-06) and have no snippet; the Claude Desktop `mcp-remote`
+bridge (a third-party package) is deliberately not offered (D-41).
+
 ## How agility-bridge features map to each client
 
 | Client | Local (stdio) | Remote | Write approval channel (Phase 7) |
@@ -127,7 +148,7 @@ or OAuth.
   "servers": {
     "agility": {
       "url": "https://agility-bridge.example.com/w/my-team/mcp",
-      "requestInit": { "headers": { "Authorization": "Bearer <device token>" } }
+      "requestInit": { "headers": { "Authorization": "Bearer ab_<your device token>" } }
     }
   }
 }
@@ -136,8 +157,9 @@ or OAuth.
 ### GitHub Copilot CLI
 
 `copilot mcp add` or `~/.copilot/mcp-config.json` (`mcpServers`; `env` and `headers` support `$VAR` / `${VAR}`
-substitution; a `tools` allowlist is required). Remote servers are low-trust by default: every call asks for
-permission.
+substitution *(unverified: the vendor page shows literal header values only)*; a `tools` allowlist is required). Remote
+servers are low-trust by default: every call asks for permission. The remote snippet uses `copilot mcp add --transport http
+--header` (documented), which writes the header into that file.
 
 ### Claude Code
 
@@ -149,7 +171,8 @@ claude mcp add agility --scope user \
 ```
 
 Remote: `claude mcp add --transport http agility https://agility-bridge.example.com/w/my-team/mcp --header
-"Authorization: Bearer <device token>"`, or OAuth without a header. Quirk: credential-looking variables referenced from a
+"Authorization: Bearer $AGILITY_BRIDGE_TOKEN"` (the shell expands the variable; read it with `read -rs` so it stays out of the
+history), or OAuth without a header. Quirk: credential-looking variables referenced from a
 project `.mcp.json` resolve to empty for remote servers; keep tokens in user scope.
 
 ### Claude Desktop, claude.ai and Claude mobile
