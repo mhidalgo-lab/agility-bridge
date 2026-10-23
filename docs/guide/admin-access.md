@@ -2,8 +2,10 @@
 
 > Phase 4 (P4-02, P4-03). How people use the admin side of agility-bridge once they have signed in
 > ([sign-in providers](identity-providers.md)): the browser session, the panel at `/admin`, who may do what, the extra
-> sign-in that high-impact changes need, and how to end sessions. The panel's screens arrive with P4-04 to P4-07; today
-> it has an overview and an account page, and everything else is the [admin API](../reference/admin-api.md) and the CLI.
+> sign-in that high-impact changes need, and how to end sessions. The panel's screens for instances, credentials,
+> workspaces, grants, device tokens and users are in the [admin panel guide](admin-panel.md) (P4-04); the audit viewer, the
+> connect page and member self-service (P4-05 to P4-07) are still to come, and everything is also in the
+> [admin API](../reference/admin-api.md) and the CLI.
 >
 > Verification: all of it is tested against local fake providers and in-process requests, on Node and in workerd. No
 > real browser has driven it yet (the browser end-to-end task is P4-08).
@@ -19,6 +21,7 @@ re-authentication rule and the audit rows are exactly those of the API (`via: ap
 |---|---|---|
 | `/admin` | everyone signed in | Your session (email, role, expiry), sign-out buttons; admins also see the first users |
 | `/admin/account` | everyone signed in | Your details; *End all my sessions* (any role); owners can change their display name |
+| `/admin/instances`, `/credentials`, `/workspaces`, `/grants`, `/users` | owners and admins | The management screens ([admin panel guide](admin-panel.md)); members get a 403 page |
 
 Anyone who is not signed in is sent to `/auth/login?next=<page>` for every `/admin` address; signed-in people get a
 404 page for an address that does not exist. A change form that is refused (missing or wrong CSRF token, another site,

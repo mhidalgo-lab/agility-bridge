@@ -84,3 +84,12 @@
 - **Recommendation:** (a). The page holds no session and no secret except the code the visitor types, and (b) needs a design
   of its own. Verify in a real browser in the P4-08 run (Chromium and Firefox treat redirects after form posts differently).
 - **Owner:** _pending_ (implemented as (a)).
+
+### D-36 — Validation sentences from the admin API are shown beside panel forms *(P4-04)*
+- **Context:** P4-03 decided that no text from an admin API error body is displayed (it can carry names or upstream text). Forms
+  that only say "invalid" are hard to correct (which limit is out of range? which project id is malformed?).
+- **Options:** (a) show the message of a `422 invalid_input` only, as escaped text cut to 300 characters, beside the form, and fixed
+  sentences for every other status; (b) keep P4-03's rule and show only our own client-side messages; (c) show every message.
+- **Recommendation:** (a). A 422 message names the field and the rule from our own validators, never upstream text; the other
+  statuses (403, 404, 409, 502) are where names and Agility's words can appear, and they stay fixed.
+- **Owner:** _pending_ (implemented as (a)).

@@ -477,6 +477,87 @@ describe('sign-in on workerd (P4-01)', () => {
       expect(listed.find((u) => u.email === 'first@example.test')?.displayName).toBe('Panel Owner');
       expect(listed.some((u) => u.displayName === 'Forged')).toBe(false);
 
+      // The admin screens render on the Worker too (P4-04), and the one-time device token page uses D1 for its single-use
+      // form handle: a re-sent form issues nothing.
+      const bearer = { authorization: `Bearer ${admin}`, 'content-type': 'application/json' };
+      const viaApi = async (path: string, body: unknown) =>
+        (await (
+          await call(mf, `/api/admin/v1${path}`, {
+            method: 'POST',
+            headers: bearer,
+            body: JSON.stringify(body),
+          })
+        ).json()) as { id?: string; record?: { id: string } };
+      const instance = await viaApi('/instances', { label: 'Synthetic', baseUrl: agility.url });
+      const shared = await viaApi('/credentials', {
+        instanceId: instance.id,
+        ownerUserId: null,
+        label: 'service',
+        token: 'synthetic-service-token-any-value',
+      });
+      const workspace = await viaApi('/workspaces', {
+        slug: 'panel',
+        name: 'Panel workspace',
+        instanceId: instance.id,
+        allowedScopeIds: ['Scope:1001'],
+        defaultCredentialId: shared.id,
+      });
+      const grant = await viaApi('/grants', { workspaceId: workspace.id, userId: null, label: 'ci' });
+      const screen = (path: string) =>
+        call(mf, path, { headers: { cookie: session, 'sec-fetch-site': 'same-origin' } });
+      for (const path of [
+        '/admin/instances',
+        '/admin/credentials',
+        '/admin/workspaces',
+        '/admin/grants',
+        '/admin/users',
+      ]) {
+        const res = await screen(path);
+        expect(res.status, path).toBe(200);
+        expect(res.headers.get('content-security-policy')).toBe(PANEL_CSP);
+        expect(res.headers.get('cache-control')).toBe('no-store');
+      }
+      expect(await (await screen('/admin/instances')).text()).toContain('Synthetic');
+      expect(await (await screen(`/admin/grants/${grant.record?.id}`)).text()).toContain('New device token');
+      const newToken = await (await screen(`/admin/grants/${grant.record?.id}/tokens/new`)).text();
+      const once = /name="_once" value="([^"]+)"/.exec(newToken)?.[1] as string;
+      expect(once).toMatch(/^[A-Za-z0-9_-]{22}$/);
+      const issueForm = new URLSearchParams({
+        _csrf: info.csrfToken,
+        label: 'laptop',
+        lifetime: '30',
+        _once: once,
+      }).toString();
+      const issueHeaders = {
+        cookie: session,
+        'sec-fetch-site': 'same-origin',
+        origin: ORIGIN,
+        'content-type': 'application/x-www-form-urlencoded',
+      };
+      const shown = await call(mf, `/admin/grants/${grant.record?.id}/tokens`, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: issueHeaders,
+        body: issueForm,
+      });
+      expect(shown.status).toBe(200);
+      expect(shown.headers.get('cache-control')).toBe('no-store');
+      expect(await shown.text()).toMatch(/<code id="token">ab_[^<]+<\/code>/);
+      const resent = await call(mf, `/admin/grants/${grant.record?.id}/tokens`, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: issueHeaders,
+        body: issueForm,
+      });
+      expect(resent.status).toBe(303);
+      expect(resent.headers.get('location')).toBe(`/admin/grants/${grant.record?.id}`);
+      const tokens = (await (
+        await call(mf, `/api/admin/v1/grants/${grant.record?.id}/tokens`, {
+          headers: { authorization: `Bearer ${admin}` },
+        })
+      ).json()) as unknown[];
+      expect(tokens).toHaveLength(1);
+
       const bad = await call(mf, '/api/admin/v1/users', {
         headers: { cookie: 'ab_session=forged', 'sec-fetch-site': 'same-origin' },
       });

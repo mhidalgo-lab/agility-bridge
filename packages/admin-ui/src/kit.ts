@@ -64,6 +64,37 @@ export interface AdminUiDeps {
   onError?(c: Context, error: unknown): void;
   /** Largest form body. Default 16 KiB. */
   readonly maxFormBytes?: number;
+  /**
+   * Server-side store for single-use form handles (P4-04): a form whose effect must not repeat on a re-send (reload or back
+   * button on the one-time device token page) carries a handle stored here, and the post takes it.
+   */
+  readonly onceStore: OnceStore;
+}
+
+/** Single-use keys with a lifetime (`kv` with an atomic `take` on the server, L-073). */
+export interface OnceStore {
+  put(key: string, ttlSeconds: number): Promise<void>;
+  /** Resolves true for exactly one caller per stored key. */
+  take(key: string): Promise<boolean>;
+  /** Up to `limit` live keys that start with `prefix`. */
+  list(prefix: string, limit: number): Promise<readonly string[]>;
+}
+
+/** Form field carrying a single-use handle. */
+export const ONCE_FIELD = '_once';
+/** A handle lives as long as a form page may reasonably stay open. */
+export const ONCE_TTL_SECONDS: number = 2 * 60 * 60;
+/** Open handles per user: past this a page hands out one of them again instead of writing a row. */
+export const ONCE_MAX_OUTSTANDING = 10;
+const ONCE_RE = /^[A-Za-z0-9_-]{22}$/;
+const oncePrefix = (userId: string) => `ui-once:${userId}:`;
+const onceKey = (userId: string, handle: string) => `${oncePrefix(userId)}${handle}`;
+
+function randomHandle(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 /** A form body that passed the origin and CSRF checks, for this principal only. */
@@ -108,6 +139,10 @@ export interface UiKit {
    * chosen from the error code. Nothing from the response body is shown.
    */
   fail(c: Context, principal: UiPrincipal, result: AdminCallResult, back: string): Response;
+  /** A new single-use form handle for `principal` (put in the form as {@link ONCE_FIELD}). Writes nothing for HEAD. */
+  issueOnce(principal: UiPrincipal): Promise<string>;
+  /** Use up the form's handle: true once per issued handle of this principal, false for a re-sent or forged form. */
+  claimOnce(form: VerifiedForm): Promise<boolean>;
 }
 
 export const DEFAULT_MAX_FORM_BYTES: number = 16 * 1024;
@@ -187,6 +222,12 @@ function errorCodeOf(body: unknown): string | null {
   return typeof error?.code === 'string' ? error.code : null;
 }
 
+/** The `detail` marker of an admin API error (`last_owner`), or null. */
+function errorDetailOf(body: unknown): string | null {
+  const error = (body as { error?: { detail?: unknown } } | null)?.error;
+  return typeof error?.detail === 'string' ? error.detail : null;
+}
+
 const FLASH_BY_CODE: Readonly<Record<string, FlashCode>> = Object.freeze({
   forbidden: 'not_allowed',
   not_found: 'not_found',
@@ -206,6 +247,8 @@ export function createUiKit(deps: AdminUiDeps): UiKit {
   }
   // Forms verified by this kit. A WeakSet, not module state: entries die with their request.
   const verified = new WeakSet<VerifiedForm>();
+  // Principals of requests answered as HEAD: their pages are rendered and discarded, so no handle is stored.
+  const headRequests = new WeakSet<UiPrincipal>();
 
   const toLogin = (c: Context, presented: boolean): Response => {
     const target =
@@ -246,16 +289,22 @@ export function createUiKit(deps: AdminUiDeps): UiKit {
       const principal = entered;
       if (!allowed(principal, minRole)) return forbidden(c, principal, 'role');
       const flash = readFlash(c.req.header('cookie'), deps.secureCookies);
-      return handler(c, {
-        principal,
-        flash: flash.message,
-        html: (node, status = 200) =>
-          htmlResponse(
-            node,
-            status,
-            flash.present ? [['Set-Cookie', clearFlashCookie(deps.secureCookies)]] : [],
-          ),
-      });
+      const isHead = c.req.method === 'HEAD';
+      if (isHead) headRequests.add(principal);
+      try {
+        return await handler(c, {
+          principal,
+          flash: flash.message,
+          html: (node, status = 200) =>
+            htmlResponse(
+              node,
+              status,
+              flash.present ? [['Set-Cookie', clearFlashCookie(deps.secureCookies)]] : [],
+            ),
+        });
+      } finally {
+        if (isHead) headRequests.delete(principal);
+      }
     },
 
     form: (minRole, handler) => async (c) => {
@@ -293,6 +342,29 @@ export function createUiKit(deps: AdminUiDeps): UiKit {
       return deps.callAdmin(c, principal, call);
     },
 
+    async issueOnce(principal) {
+      const handle = randomHandle();
+      if (headRequests.has(principal)) return handle;
+      // Bounded writes: at the cap, hand out one of the user's open handles (a second tab then loses the race at submit
+      // time and sees the normal "already used" answer) instead of spending another row.
+      const prefix = oncePrefix(principal.userId);
+      const open = await deps.onceStore.list(prefix, ONCE_MAX_OUTSTANDING);
+      if (open.length >= ONCE_MAX_OUTSTANDING) {
+        const reuse = open[Math.floor(Math.random() * open.length)]?.slice(prefix.length) ?? '';
+        if (ONCE_RE.test(reuse)) return reuse;
+      }
+      await deps.onceStore.put(onceKey(principal.userId, handle), ONCE_TTL_SECONDS);
+      return handle;
+    },
+
+    async claimOnce(form) {
+      if (!verified.has(form)) return false;
+      const handles = form.fields.getAll(ONCE_FIELD);
+      const handle = handles[0];
+      if (handles.length !== 1 || handle === undefined || !ONCE_RE.test(handle)) return false;
+      return deps.onceStore.take(onceKey(form.principal.userId, handle));
+    },
+
     redirect(path, flash) {
       const headers = new Headers({ Location: localHref(path) });
       if (flash !== undefined) headers.append('Set-Cookie', flashCookie(flash, deps.secureCookies));
@@ -305,6 +377,7 @@ export function createUiKit(deps: AdminUiDeps): UiKit {
         return reauthPage(principal, back, requestIdOf(c));
       // The session ended between the page and the call (logout elsewhere, expiry).
       if (result.status === 401) return toLogin(c, true);
+      if (errorDetailOf(result.body) === 'last_owner') return kit.redirect(back, 'last_owner');
       return kit.redirect(back, (code === null ? undefined : FLASH_BY_CODE[code]) ?? 'failed');
     },
   };

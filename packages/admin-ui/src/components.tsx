@@ -41,6 +41,11 @@ export interface NavItem {
 
 export const NAV_ITEMS: readonly NavItem[] = Object.freeze([
   { href: '/admin', label: 'Overview', minRole: 'member' },
+  { href: '/admin/instances', label: 'Instances', minRole: 'admin' },
+  { href: '/admin/credentials', label: 'Credentials', minRole: 'admin' },
+  { href: '/admin/workspaces', label: 'Workspaces', minRole: 'admin' },
+  { href: '/admin/grants', label: 'Grants', minRole: 'admin' },
+  { href: '/admin/users', label: 'Users', minRole: 'admin' },
   { href: '/admin/account', label: 'Account', minRole: 'member' },
 ]);
 
@@ -238,14 +243,16 @@ export function TextField(props: FieldProps): JSX.Element {
         id={props.name}
         name={props.name}
         type={props.type ?? 'text'}
-        value={props.value === undefined ? undefined : String(props.value)}
+        // A password field is never given a value, whatever the caller passes: a secret is never put back in a page.
+        value={props.value === undefined || props.type === 'password' ? undefined : String(props.value)}
         required={props.required}
-        autocomplete={props.autocomplete}
+        autocomplete={props.type === 'password' ? 'off' : props.autocomplete}
         inputmode={props.inputmode}
         maxlength={props.maxlength}
         min={props.min}
         max={props.max}
-        spellcheck={props.spellcheck}
+        spellcheck={props.type === 'password' ? false : props.spellcheck}
+        autocapitalize={props.type === 'password' ? 'off' : undefined}
         aria-invalid={props.error ? 'true' : undefined}
         aria-describedby={describedBy(props.name, props.hint, props.error)}
       />
@@ -381,6 +388,53 @@ export function QueryForm(props: {
     <form method="get" action={localHref(props.action)} aria-label={props.label} class="query-form">
       {props.children}
     </form>
+  );
+}
+
+/**
+ * Text shown once (a new device token): selectable, with a copy button the optional script reveals when the clipboard API
+ * is there.
+ */
+export function SecretOnce(props: {
+  readonly id: string;
+  readonly label: string;
+  readonly value: string;
+}): JSX.Element {
+  return (
+    <div class="field">
+      <p>
+        <strong id={`${props.id}-label`}>{props.label}</strong>
+      </p>
+      <p>
+        <code id={props.id}>{props.value}</code>
+      </p>
+      <button type="button" class="button button-secondary" data-copy={props.id} hidden>
+        Copy
+      </button>
+    </div>
+  );
+}
+
+/** Previous and next links for a paged list (`href`s are same-origin URLs, or null at the ends). */
+export function Pager(props: {
+  readonly label: string;
+  readonly prev: string | null;
+  readonly next: string | null;
+}): JSX.Element | null {
+  if (props.prev === null && props.next === null) return null;
+  return (
+    <nav class="pager" aria-label={props.label}>
+      {props.prev === null ? null : (
+        <a class="button button-secondary" href={localHref(props.prev)}>
+          Previous page
+        </a>
+      )}
+      {props.next === null ? null : (
+        <a class="button button-secondary" href={localHref(props.next)}>
+          Next page
+        </a>
+      )}
+    </nav>
   );
 }
 

@@ -4,6 +4,7 @@
 //
 //   GET /admin                     overview (any signed-in role)
 //   GET /admin/account             the signed-in person's session and two small forms (any role; the name form: owners)
+//   /admin/instances, /credentials, /workspaces, /grants (with their device tokens) and /users: P4-04, owners and admins
 //   GET /admin/assets/:file        static assets (public, hashed names, immutable)
 //   ALL /admin/*                   signed-in 404 page (everyone else: sign-in redirect)
 //
@@ -13,7 +14,13 @@ import { ASSET_CACHE_CONTROL, findAsset } from './assets.ts';
 import { type AdminUiDeps, createUiKit, requestIdOf, type UiKit } from './kit.ts';
 import { errorPage } from './pages.tsx';
 import { registerAccount } from './screens/account.tsx';
+import { registerCredentials } from './screens/credentials.tsx';
+import { registerGrants } from './screens/grants.tsx';
+import { registerInstances } from './screens/instances.tsx';
 import { registerOverview } from './screens/overview.tsx';
+import { registerTokens } from './screens/tokens.tsx';
+import { registerUsers } from './screens/users.tsx';
+import { registerWorkspaces } from './screens/workspaces.tsx';
 
 /** Where the panel is mounted. */
 export const ADMIN_UI_BASE: '/admin' = '/admin';
@@ -22,6 +29,12 @@ export const ADMIN_UI_BASE: '/admin' = '/admin';
 function registerScreens(ui: Hono, kit: UiKit): void {
   registerOverview(ui, kit);
   registerAccount(ui, kit);
+  registerInstances(ui, kit);
+  registerCredentials(ui, kit);
+  registerWorkspaces(ui, kit);
+  registerGrants(ui, kit);
+  registerTokens(ui, kit);
+  registerUsers(ui, kit);
 }
 
 /** The panel's routes, relative to {@link ADMIN_UI_BASE} (mount it with `app.route(ADMIN_UI_BASE, createAdminUi(deps))`). */

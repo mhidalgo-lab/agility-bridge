@@ -1,7 +1,7 @@
 # Admin panel (`packages/admin-ui`)
 
 The server-rendered panel at `/admin` ([ADR-0004](../adr/0004-typescript-runtime-agnostic-core.md), L-095, THREAT_MODEL
-T13). P4-03 ships the frame and two small pages; the screens (P4-04 to P4-07) are built in it by the conventions below.
+T13). P4-03 ships the frame and two small pages; the management screens (P4-04) and the later ones (P4-05 to P4-07) are built in it by the conventions below.
 
 | Piece | Where | Notes |
 |---|---|---|
@@ -33,7 +33,8 @@ manager.
 - **Changes only through the admin API**: `kit.callAdmin(c, principal, { method, path: adminPath\`/users/${id}\`, body },
   form)`. Unsafe methods need the `VerifiedForm` the kit handed to the handler. Never import storage or auth here.
 - **Show fixed text.** Flash messages are codes (`kit.redirect(path, 'saved')`); error pages show fixed sentences and the
-  request id. Text from the admin API's error body is never displayed (it can carry names).
+  request id. Text from the admin API's error body is never displayed (it can carry names), with one exception made in P4-04
+  (decision D-36): the one-line message of a `422 invalid_input`, shown as escaped text beside the form it came from.
 - Every new route is added to the tests that list the panel's routes (`packages/http-app/test/admin-panel.test.ts`:
   headers, sign-in redirect, role matrix, refusals) and to `NAV_ITEMS` when it has a menu entry.
 
@@ -143,9 +144,29 @@ never need it, but a dev server run that way cannot open `/admin`: run the built
 `node apps/cli/dist/index.mjs serve`) or `wrangler dev` to see the panel. Tests and the Worker bundle alias the package to
 its sources.
 
+## Screens (P4-04)
+
+`src/screens/` holds one file per screen (`instances`, `credentials`, `workspaces`, `grants`, `tokens`, `users`) plus
+`data.ts` (parsers: only the fields a page shows, with safe defaults) and `shared.tsx` (paging, form readers, confirmation
+page, tool/limit/asset-type pickers, error text). Conventions:
+
+- **Load, then render**: `load(kit, c, principal, path, parse)` calls the admin API as the viewer; a failed load is
+  `loadFailed` (the status as a fixed error page). Lists are whole arrays; `paged()` shows 25 rows (`?page=`).
+- **Controls mirror the API** (L-197): `canManage`, `canIssueOn`, `canReplace` and the role checks decide what a page
+  offers; the http-app role matrix test compares them with the API's answers. Add a rule to the API and the test together.
+- **Send only what changed** (L-198) and leave out fields the viewer may not edit.
+- **Forms re-render on a 422** with the typed values (never a password field's) and the API's validation sentence beside
+  the field (`formErrors`); every other refusal is a fixed sentence (`formMessage`) or, for a 403/404/409 on an action, a
+  flash code through `kit.fail`. `reauth_required` is the sign-in-again page and `detail: last_owner` the last-owner flash.
+- **Destructive actions** post first without `confirm`, get `confirmPage`, then post with `confirm=yes`.
+- **Secrets**: `TextField type="password"` never renders a value and sets `autocomplete=off`; handlers pass the typed secret
+  only to `kit.callAdmin` and never to a redirect, flash, header or log.
+- **One-time pages** use `kit.issueOnce(principal)` when the GET renders the form and `kit.claimOnce(form)` before the API
+  call (L-199); the server provides the `OnceStore` (`kv`, `take` atomic).
+- The admin API gained `GET /tools` (name, kind, group; owner and admin) for the tool checklists, and every last-owner
+  refusal carries `error.detail = "last_owner"`.
+
 ## Not in the panel (yet)
 
-Single-use form handles for one-time pages (a new device token must not be minted twice by a reload) belong to P4-04, which
-needs them; relic-bridge keeps them in `kv` with a bounded number of open handles per user (its review finding L6: a handle
-written on every GET of a token form let any member spend D1 writes). A browser run (axe-core, keyboard, 320 px, CSP
-violations in a real browser) is P4-08.
+The audit viewer (P4-05), the connect page with client snippets (P4-06), member self-service (P4-07) and the owner-only
+unbind (P4-12). A browser run (axe-core, keyboard, 320 px, CSP violations in a real browser) is P4-08.
