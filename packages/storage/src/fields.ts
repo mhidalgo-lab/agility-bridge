@@ -3,6 +3,7 @@
 // SQLite and D1. The SQL schema repeats the essential checks as constraints (defence in depth); cross-row rules live
 // in the adapters (triggers in SQL).
 import { InvalidInputError } from './errors.ts';
+import type { AuditEntry, AuditStats, AuditStatsGroup, AuditStatsQuery, AuditStatsRow } from './types.ts';
 
 type Kind =
   | 'id'
@@ -375,6 +376,62 @@ export function checkRow(table: TableName, row: Record<string, unknown>): void {
 
 export function checkId(table: TableName, id: unknown): asserts id is string {
   checkText(table, 'id', id, LIMITS.id);
+}
+
+/** Rows one `audit.stats` call may read, newest first (L-097: bounded however long the window). */
+export const STATS_SCAN_CAP = 10_000;
+
+const STATS_GROUPS: readonly AuditStatsGroup[] = ['tool', 'workspace', 'grant', 'user', 'day'];
+
+/** Checks an `audit.stats` query and returns it with the group limit applied (default 50, at most 100). */
+export function checkStatsQuery(q: AuditStatsQuery): {
+  groupBy: AuditStatsGroup;
+  limit: number;
+  cap: number;
+} {
+  if (!STATS_GROUPS.includes(q.groupBy))
+    throw new InvalidInputError('groupBy must be tool, workspace, grant, user or day.');
+  for (const [name, v] of [
+    ['from', q.from],
+    ['to', q.to],
+  ] as const) {
+    if (v !== undefined && (!Number.isSafeInteger(v) || v < 0))
+      throw new InvalidInputError(`${name} must be a non-negative integer.`);
+  }
+  return {
+    groupBy: q.groupBy,
+    limit: clampLimit(q.limit, 50, 100),
+    cap: clampLimit(q.scanCap, STATS_SCAN_CAP, STATS_SCAN_CAP),
+  };
+}
+
+/** The group key of a `tool_call` row (UTC day for `day`). Mirrors the SQL expressions of the SQL adapter. */
+export function statsKey(row: AuditEntry, groupBy: AuditStatsGroup): string | null {
+  switch (groupBy) {
+    case 'tool':
+      return row.action;
+    case 'workspace':
+      return row.workspaceId;
+    case 'grant':
+      return row.grantId;
+    case 'user':
+      return row.userId;
+    case 'day':
+      return new Date(row.ts).toISOString().slice(0, 10);
+  }
+}
+
+/** Groups (all of them, any order) to the answer: most calls first, ties by key (null last), cut to `limit`. */
+export function finishStats(groups: readonly AuditStatsRow[], limit: number, cap: number): AuditStats {
+  const scanned = groups.reduce((n, g) => n + g.calls, 0);
+  const rows = [...groups]
+    .sort(
+      (a, b) =>
+        b.calls - a.calls ||
+        (a.key === b.key ? 0 : a.key === null ? 1 : b.key === null ? -1 : a.key < b.key ? -1 : 1),
+    )
+    .slice(0, limit);
+  return { rows, scanned, truncated: scanned >= cap };
 }
 
 export function clampLimit(limit: number | undefined, fallback: number, max: number): number {

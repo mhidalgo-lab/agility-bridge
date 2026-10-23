@@ -604,6 +604,24 @@ describe('sign-in on workerd (P4-01)', () => {
       expect(myGrants.map((g) => g.grant.credentialId)).toContain(personalId);
       expect(await (await screen(`/admin/me/grants/${mine.record?.id}`)).text()).not.toContain(personal);
 
+      // The audit viewer, its CSV and the usage statistics render against D1 too (P4-05): bounded reads through the API.
+      const auditPage = await screen('/admin/audit');
+      expect(auditPage.status).toBe(200);
+      expect(auditPage.headers.get('content-security-policy')).toBe(PANEL_CSP);
+      expect(await auditPage.text()).toContain('instance.create');
+      const csv = await screen('/admin/audit.csv');
+      expect(csv.status).toBe(200);
+      expect(csv.headers.get('content-type')).toBe('text/csv; charset=utf-8');
+      expect(await csv.text()).toContain('"instance.create"');
+      const usagePage = await screen('/admin/usage?by=day');
+      expect(usagePage.status).toBe(200);
+      expect(await usagePage.text()).toContain('Tool calls by day');
+      const stats = await call(mf, '/api/admin/v1/audit/stats?groupBy=tool', {
+        headers: { authorization: `Bearer ${admin}` },
+      });
+      expect(stats.status).toBe(200);
+      expect(await stats.json()).toMatchObject({ data: expect.any(Array), truncated: false });
+
       const bad = await call(mf, '/api/admin/v1/users', {
         headers: { cookie: 'ab_session=forged', 'sec-fetch-site': 'same-origin' },
       });

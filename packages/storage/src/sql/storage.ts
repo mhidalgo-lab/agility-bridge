@@ -9,7 +9,9 @@ import {
   checkId,
   checkSealedToken,
   checkSettingValue,
+  checkStatsQuery,
   clampLimit,
+  finishStats,
   prepareBind,
   prepareCreate,
   preparePatch,
@@ -348,6 +350,7 @@ export function createSqlStorage(driver: SqlDriver, options: SqlStorageOptions =
       if (q.userId !== undefined) where.push(eq(a.userId, q.userId));
       if (q.kind !== undefined) where.push(eq(a.kind, q.kind));
       if (q.status !== undefined) where.push(eq(a.status, q.status));
+      if (q.action !== undefined) where.push(eq(a.action, q.action));
       if (q.from !== undefined) where.push(gte(a.ts, q.from));
       if (q.to !== undefined) where.push(lt(a.ts, q.to));
       if (q.after !== undefined) {
@@ -359,6 +362,47 @@ export function createSqlStorage(driver: SqlDriver, options: SqlStorageOptions =
         .where(and(...where))
         .orderBy(desc(a.ts), desc(a.id))
         .limit(limit)) as AuditEntry[];
+    },
+    async stats(q) {
+      const { groupBy, limit, cap } = checkStatsQuery(q);
+      // The key is one of five constant expressions, never caller text; every value is a bound parameter. The inner
+      // select reads at most the scan cap of the window (newest first), so the work is bounded (L-097).
+      const key = {
+        tool: 'action',
+        workspace: 'workspace_id',
+        grant: 'grant_id',
+        user: 'user_id',
+        day: "strftime('%Y-%m-%d', ts / 1000, 'unixepoch')",
+      }[groupBy];
+      const params: unknown[] = [q.from ?? 0, q.to ?? Number.MAX_SAFE_INTEGER];
+      let workspace = '';
+      if (q.workspaceId !== undefined) {
+        workspace = ' AND workspace_id = ?';
+        params.push(q.workspaceId);
+      }
+      params.push(cap);
+      const rows = await raw(
+        `SELECT ${key} AS k, COUNT(*), SUM(status = 'error'), SUM(status = 'denied'), COALESCE(SUM(agility_requests), 0),
+  COALESCE(SUM(duration_ms), 0), COUNT(duration_ms), MAX(duration_ms)
+FROM (SELECT action, workspace_id, grant_id, user_id, ts, status, agility_requests, duration_ms FROM audit_log
+  WHERE kind = 'tool_call' AND ts >= ? AND ts < ?${workspace} ORDER BY ts DESC, id DESC LIMIT ?)
+GROUP BY k`,
+        params,
+      );
+      return finishStats(
+        rows.map((r) => ({
+          key: r[0] === null ? null : String(r[0]),
+          calls: Number(r[1]),
+          errors: Number(r[2]),
+          denied: Number(r[3]),
+          agilityRequests: Number(r[4]),
+          durationSumMs: Number(r[5]),
+          durationCount: Number(r[6]),
+          maxDurationMs: r[7] === null ? null : Number(r[7]),
+        })),
+        limit,
+        cap,
+      );
     },
     async purge(before, limit) {
       const n = clampLimit(limit, 1_000, 10_000);

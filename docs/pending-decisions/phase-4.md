@@ -94,6 +94,17 @@
   statuses (403, 404, 409, 502) are where names and Agility's words can appear, and they stay fixed.
 - **Owner:** _pending_ (implemented as (a)).
 
+### D-37 — No new index for the audit viewer; statistics read the newest 10,000 rows *(P4-05)*
+- **Context:** The viewer filters by user, workspace, kind, outcome and action; statistics group `tool_call` rows. The audit
+  table has `(ts, id)` and `(workspace_id, ts, id)` indexes. A member's view filters by user, which no index covers, and
+  every extra index costs a written row on every audit append (D1 Free caps writes far below reads, *re-verify*).
+- **Options:** (a) no new index; every list is a newest-first keyset scan bounded by the time range (default 7 days) and the
+  page size, and statistics read at most the newest 10,000 `tool_call` rows and say when they stopped; (b) add
+  `(user_id, ts, id)` (a migration, one more written row per audit row); (c) pre-aggregated daily counters (more writes, a
+  new table, retention to match).
+- **Recommendation:** (a). Reads are the plentiful quota; revisit (b) if the benchmark task (P4-14) or a live server shows
+  member views scanning a lot, and (c) only if windows beyond 10,000 calls matter in practice.
+
 ### D-39 — No per-workspace switch for personal tokens, and no member-created grants *(P4-07)*
 - **Context:** a member brings their own Agility token and chooses which of their grants uses it. Grants (scope, tools, limits)
   are assigned by administrators. Nothing lets a workspace say "personal tokens not allowed here", and a member cannot create

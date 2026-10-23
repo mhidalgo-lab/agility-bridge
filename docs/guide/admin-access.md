@@ -3,8 +3,8 @@
 > Phase 4 (P4-02, P4-03). How people use the admin side of agility-bridge once they have signed in
 > ([sign-in providers](identity-providers.md)): the browser session, the panel at `/admin`, who may do what, the extra
 > sign-in that high-impact changes need, and how to end sessions. The panel's screens for instances, credentials,
-> workspaces, grants, device tokens and users are in the [admin panel guide](admin-panel.md) (P4-04); the audit viewer, the
-> connect page and member self-service (P4-05 to P4-07) are still to come, and everything is also in the
+> workspaces, grants, device tokens and users are in the [admin panel guide](admin-panel.md) (P4-04); the audit viewer
+> and usage statistics (P4-05) are in the same guide; the connect page and member self-service (P4-06, P4-07) are still to come, and everything is also in the
 > [admin API](../reference/admin-api.md) and the CLI.
 >
 > Verification: all of it is tested against local fake providers and in-process requests, on Node and in workerd. No
@@ -65,7 +65,7 @@ session cookie came with it. The admin API exists when sign-in is configured, wh
 | Create, promote, demote, disable or end the sessions of **admins and owners** | no | no | yes |
 | Enable write tools and write policies, pass-through workspaces, master-key versions, setup links, instance origin changes | no | no | yes |
 | Demote or disable the last active owner | never | never | never |
-| Read the audit log | no | yes | yes |
+| Read the audit log and usage statistics | own rows only, no statistics | everything | everything |
 
 The rules live in the guards every writer shares (API, command line), not in the session; a session only says who is
 asking. The break-glass token acts as an owner, except on `/me/*` (it is nobody there).

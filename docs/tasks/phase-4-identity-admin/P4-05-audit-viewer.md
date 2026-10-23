@@ -2,7 +2,7 @@
 id: P4-05
 title: Audit viewer and usage statistics
 phase: 4
-status: todo
+status: review
 priority: medium
 depends_on: [P4-03]
 adr: ["0015"]
@@ -50,22 +50,22 @@ Panel (`packages/admin-ui/src/screens/audit.tsx`, `usage.tsx`):
   truncation notice; menu entries "Audit log" (everyone) and "Usage" (admins).
 
 ## Acceptance criteria
-- [ ] A member sees only their own rows: through the API and the panel, whatever `userId`, workspace, cursor or action they
+- [x] A member sees only their own rows: through the API and the panel, whatever `userId`, workspace, cursor or action they
       send; another `userId` is `403` and returns no row; role matrix of the screens equals the API's answers (test).
-- [ ] CSV export neutralises formulas (every leading trigger, after white space, inside quoted cells, quotes doubled,
+- [x] CSV export neutralises formulas (every leading trigger, after white space, inside quoted cells, quotes doubled,
       line breaks kept inside quotes) and carries the download headers; a cross-site navigation does not download (test).
-- [ ] Filters (time range, user, workspace, kind, status, action) narrow as stated on all three adapters, combine, and
+- [x] Filters (time range, user, workspace, kind, status, action) narrow as stated on all three adapters, combine, and
       never widen a member's scope.
-- [ ] Keyset paging is stable while rows are inserted between pages: no row repeated or skipped (test, panel and storage).
-- [ ] Hostile strings (action, error code, query, details, target id, names) are inert on the audit and usage screens and in
+- [x] Keyset paging is stable while rows are inserted between pages: no row repeated or skipped (test, panel and storage).
+- [x] Hostile strings (action, error code, query, details, target id, names) are inert on the audit and usage screens and in
       the CSV; the page never shows a secret the log does not hold (test scans for the planted token).
-- [ ] Bounded queries: page size capped, stats scan capped with `truncated`, `limit` and cursor validated; contract
+- [x] Bounded queries: page size capped, stats scan capped with `truncated`, `limit` and cursor validated; contract
       tests for the cap and the aggregates on memory, SQLite and D1 (workerd).
-- [ ] Negative authorization on every new route and screen: 401 without credentials, 403 for a member on usage and
+- [x] Negative authorization on every new route and screen: 401 without credentials, 403 for a member on usage and
       stats, no storage read on denial (test).
-- [ ] A workerd smoke renders the audit and usage screens against D1.
-- [ ] Key security tests are mutation-checked (L-121), recorded under Outcome.
-- [ ] `docs/guide/audit-log.md` and `docs/guide/admin-panel.md` updated, `docs/dev/admin-ui.md`, THREAT_MODEL (T13, T17),
+- [x] A workerd smoke renders the audit and usage screens against D1.
+- [x] Key security tests are mutation-checked (L-121), recorded under Outcome.
+- [x] `docs/guide/audit-log.md` and `docs/guide/admin-panel.md` updated, `docs/dev/admin-ui.md`, THREAT_MODEL (T13, T17),
       the admin API reference (generated) and a changeset.
 
 ## Security notes
@@ -85,3 +85,27 @@ and asset numbers, never secrets), T3 (a member's view is bound to their own id 
 ## Out of scope
 - Member self-service pages and "my audit" links (P4-07), quota usage (Phase 7), per-user statistics for members, an
   `audit.export` audit row, streaming or chunked exports beyond 1,000 rows, charts, alerting.
+
+## Outcome
+
+- **Built**: `GET /admin/audit` and `/admin/audit.csv` (all roles; members own rows) and `GET /admin/usage` (owner, admin) in
+  `packages/admin-ui/src/screens/{audit,usage}.tsx`, menu entries, `Pager` with a "Newest entries" link, `<meter>` style, parsers in
+  `data.ts`, regenerated assets.
+- **Admin API**: `GET /audit` open to members, scoped to their own user id by the server (another `userId` is 403), new `action`
+  filter; new `GET /audit/stats` (owner, admin; `{ data, scanned, truncated }`). The response of `/audit` stays an array.
+- **Storage**: `AuditQuery.action`; `audit.stats({ groupBy, from, to, workspaceId, limit, scanCap })` on memory and SQL (SQLite and
+  D1), `STATS_SCAN_CAP` = 10,000; no migration, no new index (D-37).
+- **Tests**: storage contract (action filter, keyset paging under inserts, aggregates, window, scan cap, validation) on memory, SQLite
+  and D1; `packages/http-app/test/admin-audit.test.ts` (18: role matrix, member scope, filters, paging stability across 3 pages
+  with rows arriving, hostile strings, secrets scan, CSV headers and formula neutralisation, 1,000-row cap, cross-site download,
+  usage, bounded reads, 401/403 reading nothing); `packages/admin-ui/test/audit-screens.test.tsx`; workerd smoke in
+  `apps/worker/test/worker.test.ts` (audit, CSV, usage and stats against D1).
+- **Mutation checks (L-121)**: 16 deliberate reversions each fail a test: member scope not forced, member may ask for another
+  userId, stats open to members, CSV not neutralised, neutralised only for a leading sign, cross-site CSV navigation downloads, next
+  cursor from the first row, panel sends the member's user filter, usage page open to members, page without the extra row, stats
+  count every kind, scan cap ignored, `action` filter ignored, workspace filter ignored (memory), details not cut, names looked up
+  for members.
+- **From relic-bridge's P4-05**: keyset paging with a validated cursor, formula-neutralising CSV, cross-site download redirect,
+  bounded aggregate with a group cap; adapted: no OFFSET, truncation reported, export a single bounded call (L-097), no per-id name
+  lookups beyond workspaces and users.
+- **Not done on purpose**: members' own statistics, an `audit.export` audit row, exports over 1,000 rows (see Out of scope).

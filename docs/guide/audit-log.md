@@ -19,6 +19,10 @@ Not recorded: the arguments of a tool call, search words and filter values, titl
 Agility content, tokens of any kind, the master key. A refused request's body is never read, so it is not recorded
 either.
 
+Statistics read at most the newest 10,000 `tool_call` rows of the chosen window, so a very busy server shows the newest
+part of a long window (and says so). No index was added for them: every extra index costs a written row per audit row, and
+the write quota is the tight one on Cloudflare's free plan.
+
 Rows are written in the background: a slow or failing audit store never slows down or fails a request; failures are
 logged to stderr.
 
@@ -29,8 +33,13 @@ in batches.
 
 ## Reading it
 
-Until the admin API (`/api/admin/v1/audit`) and `agility-bridge audit tail` arrive, query the database directly, read
-only, for example:
+- **In the panel**: *Audit log* and *Usage* in the menu ([admin panel](admin-panel.md#audit-log-and-usage)): filters, paging,
+  a CSV download (formula-safe), and per-tool, workspace, grant, user and day statistics. A member sees their own rows only.
+- **Admin API**: `GET /api/admin/v1/audit` (filters `workspaceId`, `userId`, `kind`, `status`, `action`, `from`, `to`;
+  newest first; keyset paging with `afterTs` and `afterId`; at most 1,000 rows) and `GET /api/admin/v1/audit/stats`
+  (owner and admin). See the [admin API reference](../reference/admin-api.md).
+- **Command line**: `agility-bridge audit tail`.
+- **The database**, read only, for example:
 
 ```sh
 sqlite3 -readonly ~/.local/share/agility-bridge/agility-bridge.db \

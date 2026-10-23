@@ -339,3 +339,99 @@ export function one<T>(body: unknown, parse: (r: Row) => T | null): T | null {
 /** An id the admin API could know (anything else is a 404 without asking). */
 export const isId = (v: unknown): v is string =>
   typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v) && v !== '.' && v !== '..';
+
+export type AuditKind = 'tool_call' | 'write' | 'auth' | 'admin';
+export type AuditStatus = 'ok' | 'error' | 'denied';
+
+export interface AuditRow {
+  readonly id: string;
+  readonly ts: number;
+  readonly kind: string;
+  readonly action: string;
+  readonly status: string;
+  readonly requestId: string | null;
+  readonly userId: string | null;
+  readonly grantId: string | null;
+  readonly tokenId: string | null;
+  readonly clientId: string | null;
+  readonly workspaceId: string | null;
+  readonly assetNumbers: string[] | null;
+  /** The compiled query with every bound value masked. Still untrusted text: always escaped. */
+  readonly query: string | null;
+  readonly durationMs: number | null;
+  readonly agilityRequests: number | null;
+  readonly errorCode: string | null;
+  readonly targetType: string | null;
+  readonly targetId: string | null;
+  readonly details: Readonly<Record<string, unknown>> | null;
+}
+
+export function parseAudit(r: Row): AuditRow | null {
+  const id = str(r['id']);
+  if (id === '') return null;
+  const details = r['details'];
+  return {
+    id,
+    // A timestamp a `Date` cannot show would throw while rendering: show it as the epoch instead.
+    ts: int(r['ts']) > 8_640_000_000_000_000 ? 0 : int(r['ts']),
+    kind: str(r['kind']),
+    action: str(r['action']),
+    status: str(r['status']),
+    requestId: strOrNull(r['requestId']),
+    userId: strOrNull(r['userId']),
+    grantId: strOrNull(r['grantId']),
+    tokenId: strOrNull(r['tokenId']),
+    clientId: strOrNull(r['clientId']),
+    workspaceId: strOrNull(r['workspaceId']),
+    assetNumbers: strsOrNull(r['assetNumbers']),
+    query: strOrNull(r['query']),
+    durationMs: intOrNull(r['durationMs']),
+    agilityRequests: intOrNull(r['agilityRequests']),
+    errorCode: strOrNull(r['errorCode']),
+    targetType: strOrNull(r['targetType']),
+    targetId: strOrNull(r['targetId']),
+    details:
+      typeof details === 'object' && details !== null && !Array.isArray(details) ? (details as Row) : null,
+  };
+}
+
+/** One group of `GET /audit/stats`. */
+export interface UsageRow {
+  readonly key: string | null;
+  readonly calls: number;
+  readonly errors: number;
+  readonly denied: number;
+  readonly agilityRequests: number;
+  readonly durationSumMs: number;
+  readonly durationCount: number;
+  readonly maxDurationMs: number | null;
+}
+
+export interface Usage {
+  readonly rows: UsageRow[];
+  readonly scanned: number;
+  readonly truncated: boolean;
+}
+
+export function parseUsage(body: unknown): Usage | null {
+  const o = obj(body);
+  const data = o['data'];
+  if (!Array.isArray(data)) return null;
+  return {
+    rows: data.map((d) => {
+      const r = obj(d);
+      return {
+        key: strOrNull(r['key']),
+        calls: int(r['calls']),
+        errors: int(r['errors']),
+        denied: int(r['denied']),
+        agilityRequests: int(r['agilityRequests']),
+        durationSumMs: int(r['durationSumMs']),
+        durationCount: int(r['durationCount']),
+        maxDurationMs: intOrNull(r['maxDurationMs']),
+      };
+    }),
+    scanned: int(o['scanned']),
+    truncated: o['truncated'] === true,
+  };
+}

@@ -48,7 +48,10 @@ Enforced by triggers in SQL, so raw SQL writers are held to them too, and mirror
 - A grant's credential belongs to the workspace's instance and is shared or **the grant user's own**; a service grant
   (no user, label required) can only use shared credentials (L-065).
 - An instance's `baseUrl` and `tls` cannot change while it has credentials that are not revoked (THREAT_MODEL A14).
-- `audit_log` rows are never updated (THREAT_MODEL T17); retention deletes whole rows.
+- `audit_log` rows are never updated (THREAT_MODEL T17); retention deletes whole rows. Reads are keyset pages (`query`
+  with `after`, newest first, 1,000 rows at most) and `stats`, one aggregate over at most the newest `STATS_SCAN_CAP`
+  (10,000) `tool_call` rows of a window (L-097; no OFFSET, no index beyond `(ts, id)` and `(workspace_id, ts, id)`: an
+  index costs a written row per audit append, D-37).
 
 ### Deletion rules
 

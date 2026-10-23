@@ -2,8 +2,8 @@
 
 > Phase 4 (P4-04). What an owner or an admin can do in the browser, screen by screen, and what each role sees. Signing in,
 > roles, re-authentication and sessions are in [admin access](admin-access.md); the panel's design rules for contributors
-> are in [admin panel (developer guide)](../dev/admin-ui.md). Members use their own pages ("My access", P4-07), the audit
-> viewer (P4-05) and the connect page with client snippets (P4-06) come next.
+> are in [admin panel (developer guide)](../dev/admin-ui.md). Members use their own pages ("My access", P4-07) and the
+> connect page with client snippets (P4-06) comes next; the audit viewer and usage statistics (P4-05) are below.
 >
 > Verification: every screen is tested against the real admin API, real sessions and the storage contract in-process, and
 > one screen flow runs in workerd. No real browser has driven it yet (P4-08).
@@ -22,8 +22,10 @@ same audit row (`via: api`). A button appears only when the API would allow it f
 | Workspaces | `/admin/workspaces` | yes | yes | One MCP endpoint each: projects, tools, asset types, limits. Write settings and pass-through: owner only |
 | Grants | `/admin/grants` | yes | yes | Who may use which workspace, with which credential, tools, projects, limits, rate and expiry; their device tokens |
 | Users | `/admin/users` | yes | yes | Who can sign in and as what; members for admins, everyone for owners |
+| Audit log | `/admin/audit` | yes | yes | Every tool call, refusal and change, filtered and paged; **members see their own rows** here |
+| Usage | `/admin/usage` | yes | yes | Calls, errors, denials, Agility requests and durations per tool, workspace, grant, user or day |
 
-Members get a 403 page on all of these. Lists show 25 rows a page (`?page=2`); the credential and grant lists can be
+Members get a 403 page on all of these except the audit log. Lists show 25 rows a page (`?page=2`); the credential and grant lists can be
 filtered by instance or workspace. Every address needs a signed-in browser; anyone else is sent to the sign-in page.
 
 ### Instances
@@ -122,6 +124,34 @@ owner or an admin sees the same pages, not other people's, and manages other peo
   different token. Writes stay off: a personal token never enables write tools.
 - **My devices**: device tokens on the grant (up to 20 live ones): issue one per device (shown once), revoke one.
 - **My recent changes**: your own last administrative changes (what and when, never a secret).
+
+### Audit log and usage
+
+**Audit log** (`/admin/audit`) lists what the server recorded, newest first, 50 rows a page. Filters: time (last hour to
+last 90 days, or everything retained; the default is 7 days), kind (`tool_call`, `write`, `auth`, `admin`), outcome (`ok`,
+`error`, `denied`), an exact tool or action name, and, for owners and admins, workspace and user. **Next page** continues
+after the last row you saw (a keyset cursor in the address), so new rows arriving while you read never repeat or skip a row,
+and *Newest entries* returns to the top. A **member** sees only rows with their own user id: the server decides that, so
+changing the address (`?user=…`) shows nothing more, and asking the API for another user is refused.
+
+Every value in a row is shown as plain text, including tool names, error codes, target ids and the stored queries (every
+literal value in a query is masked before it is stored; long ones are cut for display). Nothing secret is in the log
+([audit log](audit-log.md)).
+
+**Download CSV** exports the same filter as `audit-YYYY-MM-DD.csv`: the newest 1,000 matching rows (the response header
+`X-Export-Truncated: 1000` appears when more matched; narrow the time range and export again). Every text cell is quoted,
+and a cell a spreadsheet could run as a formula (it starts with `=`, `+`, `-`, `@`, a tab or a line break, or one of those
+signs after spaces) gets a leading apostrophe. A link from another site to the CSV lands on the audit page instead of
+downloading.
+
+**Usage** (`/admin/usage`, owners and admins) counts `tool_call` rows over the last 24 hours, 7 days or 30 days, grouped by
+tool, workspace, grant, user or UTC day: calls, errors (with the share of calls), denied, Agility requests, mean and
+slowest time. Refused requests and administrative changes are not tool calls and are not counted. To stay inside the free
+Cloudflare limits the statistics read at most the **newest 10,000 rows** of the window; when the window holds more, the page
+says so and the numbers cover only the newest rows (choose a shorter window for exact figures).
+
+Both pages call the admin API (`GET /api/admin/v1/audit`, `GET /api/admin/v1/audit/stats`), so the CLI
+(`agility-bridge audit tail`) and scripts see the same rows with the same rules.
 
 ## When the page asks you to sign in again
 
