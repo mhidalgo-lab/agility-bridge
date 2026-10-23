@@ -20,16 +20,31 @@ export async function expectNoHorizontalScroll(page: Page): Promise<void> {
       (e) => e.getBoundingClientRect().right > width + 0.5 && !clipped(e),
     );
     const innermost = wide.filter((e) => !wide.some((o) => o !== e && e.contains(o)));
+    // Text that runs past its box (a long unbreakable word) is not an element: look at text nodes too.
+    const texts: string[] = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n !== null && texts.length < 5; n = walker.nextNode()) {
+      const parent = n.parentElement;
+      if (parent === null || clipped(parent) || scrolls(parent)) continue;
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      if (range.getBoundingClientRect().right > width + 0.5) {
+        texts.push(`text "${(n.textContent ?? '').trim().slice(0, 40)}" in ${parent.tagName.toLowerCase()}`);
+      }
+    }
     const name = (e: Element): string =>
       `${e.tagName.toLowerCase()}${e.id ? `#${e.id}` : ''}${e.className ? `.${String(e.className).split(' ').join('.')}` : ''}`;
     return {
       overflow: document.documentElement.scrollWidth - width,
-      culprits: innermost
-        .slice(0, 5)
-        .map(
-          (e) =>
-            `${name(e)} in ${e.parentElement ? name(e.parentElement) : '?'} (right ${Math.round(e.getBoundingClientRect().right)} > ${width})`,
-        ),
+      culprits: [
+        ...texts,
+        ...innermost
+          .slice(0, 5)
+          .map(
+            (e) =>
+              `${name(e)} in ${e.parentElement ? name(e.parentElement) : '?'} (right ${Math.round(e.getBoundingClientRect().right)} > ${width})`,
+          ),
+      ],
     };
   });
   expect(overflow, `horizontal overflow on ${page.url()}: ${culprits.join('; ')}`).toBeLessThanOrEqual(0);
