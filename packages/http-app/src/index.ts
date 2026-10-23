@@ -21,10 +21,20 @@ export {
   type AdminChange,
   type AuditOptions,
   AuditWriter,
+  type LoginEvent,
   purgeAudit,
   scheduleAuditRetention,
 } from './audit.ts';
 export { createEdge, type Edge, type EdgeOptions } from './edge.ts';
+export {
+  type CompletedLogin,
+  createIdentityRoutes,
+  DEFAULT_LOGIN_NEXT,
+  IDENTITY_BASE,
+  type IdentityOptions,
+  isLocalPath,
+  safeNextPath,
+} from './identity.ts';
 export {
   type ClassifiedRequest,
   classifyMcpMessage,

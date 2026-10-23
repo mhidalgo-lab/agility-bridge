@@ -16,6 +16,7 @@ Contents:
 6. [Node.js, Docker, SQLite, npm and registries](#6-nodejs-docker-sqlite-npm-and-registries)
 7. [Prior art](#7-prior-art)
 8. [Open questions for the Phase 0 spikes](#8-open-questions-for-the-phase-0-spikes)
+9. [Admin sign-in providers](#9-admin-sign-in-providers-p4-01)
 
 Abbreviation: **DL** = `https://docs.digital.ai/agility/docs/developerlibrary/` (Agility developer library).
 
@@ -494,3 +495,32 @@ Checked 2026-10 in Cloudflare documentation; P0-09 measures with Agility-shaped 
     tokens.
 
 **P0-07 (SDK and clients)**, **P0-08 (OAuth)** and **P0-09 (Workers limits)**: see the task files.
+
+## 9. Admin sign-in providers (P4-01)
+
+Checked 2026-10-23 against the providers' documentation. Nothing here was run against a real Google, GitHub or
+Cloudflare Access application (they need OAuth apps and an Access application the autonomous run may not create):
+those flows are tested against local fake providers and stay **unverified** end to end until the owner runs them
+(`docs/pending-decisions/phase-4.md`).
+
+- **Google (OpenID Connect).** `iss` is `https://accounts.google.com` or `accounts.google.com`; the `hd` request
+  parameter only tunes the account chooser ("Don't rely on this UI optimization"), the signed `hd` claim is what to
+  check and exists only for Workspace or Cloud organization members; `email_verified` may be a string; use `sub`, not
+  the email, as the identifier.
+  Source: https://developers.google.com/identity/openid-connect/openid-connect
+- **GitHub OAuth app.** The web flow supports PKCE (`code_challenge`, `code_challenge_method=S256` only, `code_verifier`
+  at the token request) and `allow_signup=false`. Source:
+  https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps. Scopes `user:email` (for
+  `GET /user/emails`) and `read:org` (for `GET /user/memberships/orgs/{org}`, `state: active`) are from our knowledge of
+  the REST API, *unverified* here. Token revocation: `DELETE /applications/{client_id}/token`, Basic auth with the client
+  id and secret (a Bearer header would replace it), JSON body `{"access_token": …}`, `204` on success, `422` on
+  validation failure or when spammed. Source: https://docs.github.com/en/rest/apps/oauth-applications#delete-an-app-token
+- **Cloudflare Access.** The identity is the `Cf-Access-Jwt-Assertion` header (the `CF_Authorization` cookie "is not
+  guaranteed to be passed"); keys come from `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` and rotate about
+  every six weeks (never hard-code them); check `aud` against the application's AUD tag, `iss` against the team domain
+  and verify RS256. Source:
+  https://developers.cloudflare.com/cloudflare-one/identity/authorization-cookie/validating-json/. *Unverified:* that
+  the endpoint's `keys` array (a JWKS, which `jose` reads) is present next to the documented `public_certs`.
+- **Generic OIDC.** Discovery (`/.well-known/openid-configuration`, exact `issuer` match), PKCE S256, `nonce`, RFC 9207
+  `iss` on the authorization response when advertised (`authorization_response_iss_parameter_supported`), client
+  authentication by Basic (default) or body, `email_verified` required. Specification-level facts; no vendor was run.

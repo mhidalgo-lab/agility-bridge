@@ -61,6 +61,7 @@ only they can store it (the admin panel, Phase 4); nobody can store it for them.
 | Move an instance to a new address | `agility-bridge instance retarget <instance-id> https://new.example.com/Instance` (owners; revokes its credentials and grants) |
 | Remove a grant | `agility-bridge grant delete <grant-id>` |
 | Read the audit log | `agility-bridge audit tail --limit 50 --kind auth` |
+| Create the first owner (a single-use sign-in link; needs [sign-in providers](identity-providers.md)) | `agility-bridge setup-link --ttl-minutes 30` |
 | Back up while the server runs (local only) | `agility-bridge backup /backups/agility-bridge-2026-10-21.db` |
 | Restore (server stopped) | `agility-bridge restore /backups/agility-bridge-2026-10-21.db /srv/agility-bridge/restored.db` |
 | A new break-glass admin token | `agility-bridge admin-token` (put it in a `0600` file for `AB_ADMIN_TOKEN_FILE`) |

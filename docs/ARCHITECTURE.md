@@ -172,7 +172,7 @@ semantics, rules and migrations: [dev/storage.md](dev/storage.md).
 | `access_tokens` | id, grant_id, prefix, token_hash (SHA-256 hex, unique), label (device), created_at, expires_at, last_used_at, revoked_at |
 | `audit_log` | id, ts, kind (`tool_call` \| `write` \| `auth` \| `admin`), action, status (`ok` \| `error` \| `denied`), request_id, user_id, grant_id, token_id, client_id, workspace_id, instance_id, asset_numbers (json, bounded), query (values masked), duration_ms, agility_requests, error_code, target_type, target_id, details (json). No foreign keys. |
 | `settings` | key, value (json), updated_at |
-| `kv` | key, value, expires_at — OAuth provider records (`oauth:`; codes and tokens stored hash-only, grant properties encrypted), single-use markers taken atomically, sign-in transactions, setup links, write approvals and replay ledger, cached client metadata documents, task records |
+| `kv` | key, value, expires_at — OAuth provider records (`oauth:`; codes and tokens stored hash-only, grant properties encrypted), single-use markers taken atomically, sign-in transactions (`login:<sha-256 of state>`, no secret inside: the PKCE verifier and nonce are derived from `state`), setup links (`setup:<sha-256 of code>`), write approvals and replay ledger, cached client metadata documents, task records |
 | `schema_migrations` | version, name, checksum, applied_at |
 
 Deleting a workspace removes its grants and their tokens; deleting a grant removes its tokens; a credential, instance

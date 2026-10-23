@@ -54,6 +54,9 @@ carry `requestId`.
 | info | `key rotation continues` | `rotated`, `remaining`, `failed` (counts) | [scheduled.ts](../../apps/worker/src/scheduled.ts) |
 | warn | `rate limit binding failed; using per-isolate limits` | `error` (class) (Worker, at most once a minute) | [rate-limit.ts](../../apps/worker/src/rate-limit.ts) |
 | warn | `Rate limit bindings RL_IP and RL_AUTH are missing: limits count per isolate only.` | — (Worker) | [boot.ts](../../apps/worker/src/boot.ts) |
+| warn | `identity hash failed` | `event` | [identity.ts](../../packages/http-app/src/identity.ts) |
+| error | `login failed` | `requestId`, `provider`, `error` (class); never codes, tokens, cookies or the email | [identity.ts](../../packages/http-app/src/identity.ts) |
+| warn | `GitHub token revocation failed` | `requestId`, `provider`, `reason` (`status` or `network`), `status` (never the token) | [github.ts](../../packages/auth/src/identity/github.ts) |
 | error | `audit write failed` | `action`, `error` (class) | [audit.ts](../../packages/http-app/src/audit.ts) |
 | error | `audit queue full; rows dropped` | `dropped` | [audit.ts](../../packages/http-app/src/audit.ts) |
 | info | `audit retention` | `deleted`, `retentionDays` | [audit.ts](../../packages/http-app/src/audit.ts) |

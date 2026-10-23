@@ -139,7 +139,12 @@ export async function boot(env: WorkerEnv, version: string): Promise<Booted> {
   const keyring = await Keyring.create(current, previous === '' ? undefined : previous);
   // Only the purposes requests use today: each derivation costs CPU in the first request (P3-14). A purpose used by
   // later phases (approvals, tasks, cache ids) must be added here, or a first use could be shared in flight (L-096).
-  await keyring.warm([KeyPurpose.Credentials, KeyPurpose.KeyCheck, KeyPurpose.AuditIdentity]);
+  await keyring.warm([
+    KeyPurpose.Credentials,
+    KeyPurpose.KeyCheck,
+    KeyPurpose.AuditIdentity,
+    KeyPurpose.Login,
+  ]);
   const storage = await openSqlStorage(createD1Driver(env.DB));
   const check = await verifyKeyring(storage, keyring);
   for (const w of check.warnings) logger.warn(w);

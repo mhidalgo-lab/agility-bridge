@@ -40,6 +40,23 @@ export interface AdminChange {
   readonly requestId?: string | null;
 }
 
+/** One sign-in attempt that reached a provider (P4-01). Never the subject, email, code, token or setup code. */
+export interface LoginEvent {
+  readonly requestId: string;
+  readonly status: 'ok' | 'denied';
+  /** The URL key of the provider (`google`, `oidc-corp`, `cf-access`). */
+  readonly provider: string;
+  readonly idp: string | null;
+  readonly userId?: string | null;
+  /** The stable deny reason (`IdentityErrorCode` or `LoginDenyReason`). */
+  readonly reason?: string | null;
+  readonly outcome?: string | null;
+  /** Keyed hash of `(idp, subject)`: correlates repeated attempts by one identity without revealing it. */
+  readonly identityHash?: string | null;
+  /** A setup link made an existing user the owner: the role they had before. */
+  readonly previousRole?: string | null;
+}
+
 /** Refusals that are worth a row: authentication and limits, not malformed bodies from an authenticated caller. */
 const AUDITED_REFUSALS = new Set([401, 429]);
 
@@ -168,6 +185,28 @@ export class AuditWriter {
       },
     });
     return both(summary, row);
+  }
+
+  /** A sign-in attempt: `auth` / `login.ok` or `login.denied`. */
+  login(e: LoginEvent): Promise<void> | undefined {
+    return this.enqueue({
+      kind: 'auth',
+      action: e.status === 'ok' ? 'login.ok' : 'login.denied',
+      status: e.status,
+      requestId: e.requestId,
+      userId: e.userId ?? null,
+      errorCode: e.status === 'ok' ? null : (e.reason ?? null),
+      targetType: 'provider',
+      targetId: e.provider.slice(0, 64),
+      details: {
+        provider: e.provider.slice(0, 64),
+        idp: e.idp,
+        ...(e.reason == null ? {} : { reason: e.reason.slice(0, 64) }),
+        ...(e.outcome == null ? {} : { outcome: e.outcome }),
+        ...(e.identityHash == null ? {} : { identityHash: e.identityHash }),
+        ...(e.previousRole == null ? {} : { previousRole: e.previousRole }),
+      },
+    });
   }
 
   admin(change: AdminChange): Promise<void> | undefined {

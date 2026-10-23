@@ -12,6 +12,8 @@ export const KeyPurpose = {
   KeyCheck: 'key-check',
   /** Keyed hashes of identities in the audit log (pass-through token fingerprints). */
   AuditIdentity: 'audit-identity',
+  /** Sign-in transactions (P4-01): the PKCE verifier and nonce are derived from `state`, never stored. */
+  Login: 'login',
   /** Cache entry ids (P8-01). */
   CacheId: 'cache-id',
   /** Write approval records (P7-01). */

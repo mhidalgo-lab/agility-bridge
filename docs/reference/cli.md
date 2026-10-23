@@ -446,6 +446,22 @@ agility-bridge token revoke <token-id>
 
 Local or remote.
 
+## setup-link
+
+### `setup-link`
+
+Issue a single-use link that makes whoever signs in with it the first owner (owner; needs AB_PUBLIC_URL and a sign-in provider).
+
+```text
+agility-bridge setup-link [--ttl-minutes <n>]
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `--ttl-minutes` | int | Minutes until it expires (default 60, at most 10080) |
+
+Local or remote.
+
 ## audit
 
 ### `audit tail`

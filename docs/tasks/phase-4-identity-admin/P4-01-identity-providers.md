@@ -2,7 +2,7 @@
 id: P4-01
 title: Identity providers and owner bootstrap
 phase: 4
-status: in-progress
+status: review
 priority: high
 depends_on: [P3-11]
 adr: ["0009"]
@@ -68,29 +68,44 @@ panel) is P4-02, which plugs into the `onLogin` seam defined here; until then a 
   `admin` auto-provisioning, GitHub orgs without GitHub.
 
 ## Acceptance criteria
-- [ ] Each provider has a happy-path test and refusals against a local fake IdP (self-generated JWKS, no network): wrong
+- [x] Each provider has a happy-path test and refusals against a local fake IdP (self-generated JWKS, no network): wrong
   `iss`, `aud`, `azp`, `nonce`, signature, `alg: none`, an HS256 token signed with the public key, expired, JWKS refetch
   on key rotation, unverified or missing email, Google `hd` mismatch, GitHub without a verified primary email, pending
   organization invitation, Cloudflare Access wrong AUD / missing header / service token.
-- [ ] State replay, a foreign or missing binding cookie, a provider mix-up and an RFC 9207 `iss` mismatch are refused;
+- [x] State replay, a foreign or missing binding cookie, a provider mix-up and an RFC 9207 `iss` mismatch are refused;
   the transaction is consumed once under parallel callbacks.
-- [ ] Open-redirect attempts (`//host`, `/\host`, `/.//host`, `/a/..//host`, `/%2e//host`, absolute and `javascript:`
+- [x] Open-redirect attempts (`//host`, `/\host`, `/.//host`, `/a/..//host`, `/%2e//host`, absolute and `javascript:`
   URLs, CRLF, control characters) never reach a `Location` header.
-- [ ] Identity conflicts: an email already bound to another identity is refused; two concurrent first sign-ins give
+- [x] Identity conflicts: an email already bound to another identity is refused; two concurrent first sign-ins give
   one success and one `identity_conflict` (storage `bind` on memory and SQLite, and D1 on workerd); a non-ASCII (Kelvin
   sign) email cannot claim an ASCII row.
-- [ ] Allowlist and auto-provision combinations (`off` / `member` / `admin` × email / domain / org / none) behave as
+- [x] Allowlist and auto-provision combinations (`off` / `member` / `admin` × email / domain / org / none) behave as
   documented; `owner` is never auto-provisioned.
-- [ ] Setup link: single use, expires, makes the identity owner, is refused for disabled users and conflicts, never
+- [x] Setup link: single use, expires, makes the identity owner, is refused for disabled users and conflicts, never
   appears in a URL the server sees, a log line, an audit row or a response, and is owner-only to create.
-- [ ] Negative authorization tests: a refused sign-in creates no user, sends no session, and the IdP is not called for
+- [x] Negative authorization tests: a refused sign-in creates no user, sends no session, and the IdP is not called for
   malformed callbacks; provider fetches are bounded (timeout, size cap, redirect refusal).
-- [ ] Key security tests are mutation-checked (the fix reverted, the test fails; L-121), recorded in the PR.
-- [ ] Settings are parsed on both hosts, a bad value names its variable, and the sign-in routes boot on workerd.
-- [ ] `docs/guide/identity-providers.md`, THREAT_MODEL T11 and T14, RESEARCH.md and the configuration reference are
+- [x] Key security tests are mutation-checked (the fix reverted, the test fails; L-121), recorded in the PR.
+- [x] Settings are parsed on both hosts, a bad value names its variable, and the sign-in routes boot on workerd.
+- [x] `docs/guide/identity-providers.md`, THREAT_MODEL T11 and T14, RESEARCH.md and the configuration reference are
   updated; the commands in the guide run (L-133); a changeset is included.
-- [ ] Real Google, GitHub and Cloudflare Access applications are **not** exercised (they need OAuth apps the autonomous
+- [x] Real Google, GitHub and Cloudflare Access applications are **not** exercised (they need OAuth apps the autonomous
   run may not create); the steps are in `docs/pending-decisions/phase-4.md`.
+
+## Outcome
+- Built as scoped. Two additions beyond the first draft: the PKCE verifier and nonce are *derived* from `state` with a
+  new master-key purpose (`login`) so the transaction row holds no recoverable secret (ADR-0009), and `users.bind` is a
+  new storage operation (compare-and-set, contract-tested on memory, SQLite and D1).
+- Sessions were not needed: sign-in ends in `onLogin` (default: a page naming the user).
+- Mutation checks (L-121): 39 deliberate reversions of the security fixes (redirect re-check, atomic `take`, binding
+  cookie, provider mix-up, nonce, audience, issuer, `azp`, `hd`, verified email, GitHub primary and organization state
+  and revocation, JWKS and IdP size caps, redirects, ASCII emails, Access AUD and service tokens, RFC 9207, exact
+  issuer, compare-and-set bind on SQL and memory, setup link single use, owner and recent-auth guards, cross-site setup
+  form, duplicate cookies, fragment, sign-in limit, auto-provision, cookie flags, redaction, CSP) each fail a test;
+  two survivors were examined: the setup-link expiry check in code is shadowed by the `kv` expiry (equivalent mutant,
+  kept as defence in depth) and a constant verifier was not caught until a test required distinct challenges per login.
+- Follow-ups: P4-12 (unbind), P4-13 (`cf:setup` sign-in prompts); decisions D-29 – D-32 in
+  `docs/pending-decisions/phase-4.md`.
 
 ## Security notes
 THREAT_MODEL T11 (provider fetches), T14 (account takeover), T8 (no secrets in logs and audit), T24 (callback URL from

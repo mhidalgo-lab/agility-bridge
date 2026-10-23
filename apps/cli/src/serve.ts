@@ -3,7 +3,13 @@
 // tokens and per-workspace MCP endpoints. Configuration only from the environment, never flags (L-026).
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { type AccessServices, AdminTokenVerifier, Keyring, verifyKeyring } from '@agility-bridge/auth';
+import {
+  type AccessServices,
+  AdminTokenVerifier,
+  IDENTITY_SECRET_NAMES,
+  Keyring,
+  verifyKeyring,
+} from '@agility-bridge/auth';
 import {
   CircuitBreakers,
   CredentialLimiters,
@@ -50,6 +56,8 @@ export interface ServeConfig extends ServerSettings {
   readonly trustedProxyHops: number;
   /** `AB_INSTANCE_PRIVATE_ADDRESSES`: `refuse` limits instances to public addresses (P2-19; default `allow`). */
   readonly privateAddresses: 'allow' | 'refuse';
+  /** `AB_IDENTITY_PRIVATE_ADDRESSES`: `allow` lets sign-in reach an identity provider on a private network (P4-01; default `refuse`). */
+  readonly identityPrivateAddresses: 'allow' | 'refuse';
 }
 
 /** The default data directory (`$XDG_DATA_HOME` or `~/.local/share`; `%LOCALAPPDATA%` on Windows). */
@@ -71,12 +79,46 @@ function privateAddressPolicy(value: string | undefined): 'allow' | 'refuse' {
   throw new ConfigError('AB_INSTANCE_PRIVATE_ADDRESSES must be allow or refuse.');
 }
 
+function identityAddressPolicy(value: string | undefined): 'allow' | 'refuse' {
+  if (value === undefined || value === '' || value === 'refuse') return 'refuse';
+  if (value === 'allow') return 'allow';
+  throw new ConfigError('AB_IDENTITY_PRIVATE_ADDRESSES must be allow or refuse.');
+}
+
+/**
+ * The environment with each `<SECRET>_FILE` read into `<SECRET>` (a 0600 file outside the data directory, symbolic links
+ * refused), so identity client secrets need not sit in the environment (P4-01). Both forms are refused; no message
+ * carries a value.
+ */
+export function withSecretFiles(env: Env, dir: string): Env {
+  const out: Record<string, string | undefined> = { ...env };
+  for (const name of IDENTITY_SECRET_NAMES) {
+    const file = env[`${name}_FILE`];
+    if (file === undefined || file === '') continue;
+    if (env[name] !== undefined && env[name] !== '') {
+      throw new ConfigError(`Set ${name} or ${name}_FILE, not both.`);
+    }
+    if (isInside(file, dir)) {
+      throw new ConfigError(
+        `${name}_FILE is inside the data directory; keep it away from the database and its backups.`,
+      );
+    }
+    try {
+      out[name] = readSecretFile(file).trim();
+    } catch (error) {
+      if (error instanceof UnsafeFileError) throw new ConfigError(`${name}_FILE: ${error.message}`);
+      throw error;
+    }
+  }
+  return out;
+}
+
 /** The shared settings (checked by `parseServerSettings`, P3-01) plus the Node-only ones. */
 export function loadServeConfig(env: Env): ServeConfig {
   checkEnvNames(env);
   try {
-    const settings = parseServerSettings(env, DEFAULTS);
     const dbPath = env['AB_DB_PATH'] || join(env['AB_DATA_DIR'] || dataDir(env), 'agility-bridge.db');
+    const settings = parseServerSettings(withSecretFiles(env, dirname(dbPath)), DEFAULTS);
     return {
       ...settings,
       dbPath,
@@ -84,6 +126,7 @@ export function loadServeConfig(env: Env): ServeConfig {
       port: settingInteger('AB_PORT', env['AB_PORT'], 8787, 0, 65_535),
       trustedProxyHops: settingInteger('AB_TRUSTED_PROXY_HOPS', env['AB_TRUSTED_PROXY_HOPS'], 0, 0, 10),
       privateAddresses: privateAddressPolicy(env['AB_INSTANCE_PRIVATE_ADDRESSES']),
+      identityPrivateAddresses: identityAddressPolicy(env['AB_IDENTITY_PRIVATE_ADDRESSES']),
     };
   } catch (error) {
     if (error instanceof SettingsError) throw new ConfigError(error.message);
@@ -144,6 +187,8 @@ export async function startServe(
     isolation: 'process',
     ...(adminVerifier === undefined ? {} : { adminVerifier }),
     ...(config.privateAddresses === 'refuse' ? { checkInstanceHost: checkPublicHost } : {}),
+    // Identity providers are reached over public addresses only, checked at connect time (THREAT_MODEL T11).
+    identityFetch: createNodeFetch({ publicOnly: config.identityPrivateAddresses === 'refuse' }),
     clientIp: (c) =>
       clientAddress(
         (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming?.socket

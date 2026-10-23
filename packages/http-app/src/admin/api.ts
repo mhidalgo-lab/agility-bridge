@@ -7,8 +7,12 @@ import {
   type Actor,
   type AdminTokenVerifier,
   bearerToken,
+  DEFAULT_SETUP_LINK_TTL_MS,
   guardedServices,
   type Keyring,
+  MAX_SETUP_LINK_TTL_MS,
+  MIN_SETUP_LINK_TTL_MS,
+  setupCodeHash,
   type ToolInfo,
 } from '@agility-bridge/auth';
 import type { Clock, Logger } from '@agility-bridge/core';
@@ -44,6 +48,8 @@ export interface AdminApiOptions {
   readonly keyring?: Keyring;
   /** A router without a compile step on the first match (Workers, P3-14). */
   readonly lightweightRouter?: boolean;
+  /** Sign-in is configured (P4-01): owner setup links point at this origin. Absent = `POST /setup-links` is refused. */
+  readonly setupLinks?: { readonly publicUrl: string };
 }
 
 /** The break-glass authenticator: `Authorization: Bearer ab_admin_…` matching `AB_ADMIN_TOKEN`. */
@@ -939,6 +945,59 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
         throw new AdminError('invalid_input', 'The key version is a whole number ≥ 1.', 'id');
       }
       return services(c).keys.retire(version, (body as { reason: string }).reason);
+    },
+  );
+
+  const SetupLinkOut = z
+    .object({
+      id: z.string(),
+      url: z.string().openapi({
+        description:
+          'Shown once. The code sits in the URL fragment: open it in a browser, never paste it where a server logs URLs.',
+      }),
+      expiresAt: z.number(),
+    })
+    .openapi('SetupLink');
+  add(
+    {
+      method: 'post',
+      path: '/setup-links',
+      tag: 'users',
+      summary:
+        'Issue a single-use owner setup link (owner; the link makes whoever signs in with it an owner; recorded in the audit log)',
+      body: z.strictObject({
+        ttlMinutes: z
+          .number()
+          .int()
+          .min(MIN_SETUP_LINK_TTL_MS / 60_000)
+          .max(MAX_SETUP_LINK_TTL_MS / 60_000)
+          .optional(),
+      }),
+      out: SetupLinkOut,
+      status: 201,
+      audit: { action: 'setup_link.create', targetType: 'setup_link' },
+    },
+    async (c, { body }) => {
+      // The guard comes first: a non-owner learns nothing about the configuration.
+      const guarded = services(c).setupLinks;
+      const settings = options.setupLinks;
+      const ttl =
+        ((body as { ttlMinutes?: number }).ttlMinutes ?? DEFAULT_SETUP_LINK_TTL_MS / 60_000) * 60_000;
+      guarded.authorize();
+      if (settings === undefined) {
+        throw new AdminError(
+          'conflict',
+          'Sign-in is not configured: set AB_PUBLIC_URL and an identity provider first.',
+        );
+      }
+      const link = await guarded.create(ttl, options.clock);
+      const hash = (await setupCodeHash(link.code)) as string;
+      return {
+        id: hash.slice(0, 12),
+        // In the fragment: it never reaches a server, a log or a Referer (L-085).
+        url: `${settings.publicUrl}/auth/setup#${link.code}`,
+        expiresAt: link.expiresAt,
+      };
     },
   );
 

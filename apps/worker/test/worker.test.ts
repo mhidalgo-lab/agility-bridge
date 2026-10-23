@@ -9,7 +9,9 @@ import { fileURLToPath } from 'node:url';
 import { generateAdminToken, generateMasterKey } from '@agility-bridge/auth';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { fakeOidc } from '../../../packages/auth/test/helpers/fake-idp.ts';
 import { type FixtureAgility, startFixtureAgility } from '../../../scripts/fixture-agility.ts';
+import { serveFetch } from '../../../scripts/serve-fetch.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPT = join(ROOT, 'dist', 'index.js');
@@ -322,5 +324,84 @@ describe('boot failures', () => {
     const res = await call(second, '/health');
     secured(res);
     expect(res.headers.get('strict-transport-security')).toBeNull();
+  });
+});
+
+describe('sign-in on workerd (P4-01)', () => {
+  it('boots the sign-in routes and takes the first owner through a setup link and a local fake IdP', async () => {
+    let handler: ((r: Request) => Promise<Response>) | undefined;
+    const srv = await serveFetch((r) =>
+      (handler ?? (async () => new Response('starting', { status: 503 })))(r),
+    );
+    try {
+      const idp = await fakeOidc({ issuer: srv.url });
+      handler = idp.fetch;
+      const admin = generateAdminToken();
+      const mf = worker({
+        AB_MASTER_KEY: generateMasterKey(1),
+        AB_ADMIN_TOKEN: admin,
+        AB_PUBLIC_URL: ORIGIN,
+        AB_OIDC_ISSUER: idp.issuer,
+        AB_OIDC_CLIENT_ID: idp.clientId,
+        AB_OIDC_CLIENT_SECRET: idp.clientSecret,
+        AB_OIDC_NAME: 'corp',
+      });
+      const page = await call(mf, '/auth/login');
+      expect(page.status).toBe(200);
+      expect(await page.text()).toContain('/auth/login/oidc-corp');
+      expect(page.headers.get('content-security-policy')).toContain("script-src 'self'");
+
+      const issued = await call(mf, '/api/admin/v1/setup-links', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${admin}`, 'content-type': 'application/json' },
+        body: '{}',
+      });
+      expect(issued.status).toBe(201);
+      const { url } = (await issued.json()) as { url: string };
+      const code = new URL(url).hash.slice(1);
+      expect(url).toBe(`${ORIGIN}/auth/setup#${code}`);
+
+      const start = await call(mf, '/auth/setup', {
+        method: 'POST',
+        redirect: 'manual',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
+        body: `code=${code}&provider=oidc-corp`,
+      });
+      expect(start.status).toBe(303);
+      const location = new URL(start.headers.get('location') as string);
+      expect(location.href).not.toContain(code);
+      const cookie = (start.headers.get('set-cookie') as string).split(';')[0] as string;
+      const { code: authCode, state } = idp.authorize(location, {
+        email: 'first@example.test',
+        sub: 'first',
+      });
+      const done = await call(mf, `/auth/callback/oidc-corp?code=${authCode}&state=${state}`, {
+        headers: { cookie },
+      });
+      expect(done.status).toBe(200);
+      expect(await done.text()).toContain('first@example.test (owner)');
+      // The one-time link is spent, and the owner exists with the identity bound (state in D1, not isolate memory).
+      const again = await call(mf, '/auth/setup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': 'same-origin' },
+        body: `code=${code}&provider=oidc-corp`,
+      });
+      expect(again.status).toBe(400);
+      const users = (await (
+        await call(mf, '/api/admin/v1/users', { headers: { authorization: `Bearer ${admin}` } })
+      ).json()) as { email: string; role: string; idp: string }[];
+      expect(users).toMatchObject([{ email: 'first@example.test', role: 'owner', idp: 'oidc:corp' }]);
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('answers /auth/* with 404 when no provider is configured, and refuses a half-configured one at boot', async () => {
+    const off = worker({ AB_MASTER_KEY: generateMasterKey(1) });
+    expect((await call(off, '/auth/login')).status).toBe(404);
+    const half = worker({ AB_MASTER_KEY: generateMasterKey(1), AB_GOOGLE_CLIENT_ID: 'gid' });
+    const res = await call(half, '/health');
+    expect(res.status).toBe(503);
+    expect(await res.text()).not.toContain('AB_GOOGLE');
   });
 });

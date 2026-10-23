@@ -235,9 +235,18 @@ export interface Repository<T, New, Patch> {
   delete(id: string): Promise<void>;
 }
 
+/** What a first sign-in may change on the user it binds (P4-01). */
+export type UserBindPatch = Partial<Pick<User, 'displayName' | 'role'>>;
+
 export interface UserRepository extends Repository<User, NewUser, UserPatch> {
   getByEmail(email: string): Promise<User | null>;
   getByIdentity(idp: string, idpSubject: string): Promise<User | null>;
+  /**
+   * Binds the identity to a user in one compare-and-set step: only while the row is enabled and has **no identity
+   * yet** (L-185). `null` when it did not apply (already bound, disabled or missing); `ConflictError` when another
+   * user already holds this `(idp, idpSubject)`. Two concurrent first sign-ins cannot both bind.
+   */
+  bind(id: string, idp: string, idpSubject: string, patch?: UserBindPatch): Promise<User | null>;
   list(): Promise<User[]>;
 }
 
