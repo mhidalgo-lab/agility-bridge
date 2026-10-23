@@ -5,6 +5,7 @@ import {
   appliedMigrations,
   createD1Driver,
   type D1Database,
+  type D1PreparedStatement,
   MIGRATIONS,
   openSqlStorage,
 } from '@agility-bridge/storage';
@@ -16,16 +17,67 @@ import { storageContract } from '../../../packages/storage/test/contract.ts';
 let mf: Miniflare;
 let db: D1Database;
 
+/**
+ * Runs each D1 call inside workerd and answers with its result. Miniflare's Node-side binding proxy sometimes drops
+ * its socket in the middle of a response under concurrent calls ("other side closed"), which made the concurrency
+ * tests flaky; a plain fetch to a Worker that holds the binding does not.
+ */
+const D1_RPC = `export default {
+  async fetch(request, env) {
+    const body = await request.json();
+    const prep = (s) => env.DB.prepare(s.sql).bind(...s.params);
+    try {
+      if (body.op === 'batch') return Response.json({ ok: await env.DB.batch(body.statements.map(prep)) });
+      const stmt = prep(body.statement);
+      return Response.json({ ok: body.op === 'run' ? await stmt.run() : await stmt.raw() });
+    } catch (error) {
+      return Response.json({ error: String(error && error.message ? error.message : error) });
+    }
+  },
+};`;
+
+interface Sent {
+  readonly sql: string;
+  readonly params: unknown[];
+}
+
+/** A `D1Database` whose calls run in workerd through `D1_RPC`. Errors come back with D1's message. */
+function remoteD1(m: Miniflare): D1Database {
+  const call = async (body: unknown): Promise<unknown> => {
+    const res = await m.dispatchFetch('http://d1.local/', { method: 'POST', body: JSON.stringify(body) });
+    const out = (await res.json()) as { ok?: unknown; error?: string };
+    if (out.error !== undefined) throw new Error(out.error);
+    return out.ok;
+  };
+  const sent = new WeakMap<D1PreparedStatement, Sent>();
+  const statement = (s: Sent): D1PreparedStatement => {
+    const stmt: D1PreparedStatement = {
+      bind: (...params) => statement({ sql: s.sql, params }),
+      run: () => call({ op: 'run', statement: s }),
+      raw: () => call({ op: 'raw', statement: s }) as Promise<unknown[][]>,
+    };
+    sent.set(stmt, s);
+    return stmt;
+  };
+  return {
+    prepare: (sql) => statement({ sql, params: [] }),
+    batch: (statements) =>
+      call({ op: 'batch', statements: statements.map((s) => sent.get(s)) }) as Promise<
+        { results?: unknown[] }[]
+      >,
+  };
+}
+
 beforeAll(async () => {
   mf = new Miniflare(
     convertV4MiniflareOptions({
       modules: true,
-      script: 'export default { fetch() { return new Response(null, { status: 404 }); } }',
+      script: D1_RPC,
       compatibilityDate: '2026-09-26',
       d1Databases: ['DB'],
     }),
   );
-  db = (await mf.getD1Database('DB')) as unknown as D1Database;
+  db = remoteD1(mf);
 });
 afterAll(() => mf.dispose());
 
