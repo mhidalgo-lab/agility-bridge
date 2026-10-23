@@ -2,7 +2,7 @@
 id: P4-01
 title: Identity providers and owner bootstrap
 phase: 4
-status: review
+status: done
 priority: high
 depends_on: [P3-11]
 adr: ["0009"]
