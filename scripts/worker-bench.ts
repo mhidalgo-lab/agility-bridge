@@ -17,18 +17,21 @@ const cpu = () => {
   return (u.user + u.system) / 1000;
 };
 
-/** A fixed workload: JSON round trips of a 50 KB document (the shape of work the server does). */
+/**
+ * A fixed workload: JSON round trips of a 50 KB document (the shape of work the server does). The fastest of several
+ * samples: noise (other processes, GC, frequency changes) only ever adds time, so the minimum is the stable figure.
+ */
 export function calibrate(): number {
   const doc = {
     rows: Array.from({ length: 300 }, (_, i) => ({ id: i, name: `Item ${i}`, description: 'x'.repeat(120) })),
   };
   const samples: number[] = [];
-  for (let r = 0; r < 7; r++) {
+  for (let r = 0; r < 15; r++) {
     const t = cpu();
     for (let i = 0; i < 20; i++) JSON.parse(JSON.stringify(doc));
     samples.push(cpu() - t);
   }
-  return median(samples);
+  return Math.min(...samples);
 }
 
 export function median(xs: readonly number[]): number {
@@ -38,7 +41,7 @@ export function median(xs: readonly number[]): number {
 
 export interface BenchResult {
   readonly calibrationMs: number;
-  /** CPU ms per path (median). */
+  /** CPU ms per path: the median of warm calls; the fastest cold boot. */
   readonly ms: Record<string, number>;
   /** Cost relative to the calibration workload. */
   readonly relative: Record<string, number>;
@@ -71,6 +74,9 @@ async function coldBoot(): Promise<number> {
   const registry = new core.ToolRegistry();
   for (const tool of core.CORE_TOOLS) registry.register(tool);
   core.prewarmToolSchemas(core.CORE_TOOLS);
+  // The imports allocate seconds' worth of CPU; collect now so their garbage is not collected inside the measured boot
+  // (that made boots of the same code take either about 110 or about 230 ms).
+  (globalThis as { gc?: () => void }).gc?.();
   const start = cpu();
   const settings = http.parseServerSettings({}, { callBudget: 45, maxResponseBytes: 524_288 });
   const keyring = await auth.Keyring.create(auth.generateMasterKey(1));
@@ -147,11 +153,14 @@ async function warmCalls(): Promise<{ ms: Record<string, number>; requests: Reco
 async function main(argv: readonly string[]): Promise<number> {
   if (argv[0] === '--child-cold') return coldBoot();
   const self = fileURLToPath(import.meta.url);
+  // Fastest of several fresh processes, like the calibration (medians of 5 swung 22-63× between CI runs).
   const cold = Array.from(
-    { length: 5 },
+    { length: 9 },
     () =>
       JSON.parse(
-        execFileSync(process.execPath, ['--conditions=source', self, '--child-cold'], { encoding: 'utf8' }),
+        execFileSync(process.execPath, ['--conditions=source', '--expose-gc', self, '--child-cold'], {
+          encoding: 'utf8',
+        }),
       ) as {
         boot: number;
         imports: number;
@@ -160,7 +169,7 @@ async function main(argv: readonly string[]): Promise<number> {
   const calibrationMs = calibrate();
   const warm = await warmCalls();
   const ms: Record<string, number> = {
-    'cold: boot': median(cold.map((c) => c.boot)),
+    'cold: boot': Math.min(...cold.map((c) => c.boot)),
     ...Object.fromEntries(Object.entries(warm.ms).map(([k, v]) => [`warm: ${k}`, v])),
   };
   const relative = Object.fromEntries(
