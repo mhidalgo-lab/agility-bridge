@@ -2,7 +2,7 @@
 id: P4-09
 title: Admin security review (owner boundaries on every writer)
 phase: 4
-status: in-progress
+status: review
 priority: high
 depends_on: [P4-04, P4-05, P4-06, P4-07, P4-12, P4-13, P4-15]
 adr: ["0008", "0009", "0012", "0013"]
@@ -50,13 +50,26 @@ is fixed with a regression test that fails with the fix reverted (L-121), or acc
 [pending decisions](../../pending-decisions/phase-4.md); a fix too large for this task becomes a new task.
 
 ## Acceptance criteria
-- [ ] `docs/reviews/phase-4-admin-security-review.md`: scope, method, a table of every writer (who may, checks verified,
+- [x] `docs/reviews/phase-4-admin-security-review.md`: scope, method, a table of every writer (who may, checks verified,
       evidence test), findings by severity, a "checked and sound" section.
-- [ ] Every finding is fixed with a mutation-checked regression test, or accepted as a decision (D-55 …) or a new task
+- [x] Every finding is fixed with a mutation-checked regression test, or accepted as a decision (D-55 …) or a new task
       (P4-34 …) with a reason.
-- [ ] THREAT_MODEL rows touched are updated; new lessons are recorded; the role matrix in the admin guide and its
+- [x] THREAT_MODEL rows touched are updated; new lessons are recorded; the role matrix in the admin guide and its
       executable test agree with the guards.
-- [ ] `pnpm lint && pnpm typecheck && pnpm test` are green and generated references are refreshed.
+- [x] `pnpm lint && pnpm typecheck && pnpm test` are green and generated references are refreshed.
+
+## Outcome
+- Review: [phase-4-admin-security-review.md](../../reviews/phase-4-admin-security-review.md): a table of every writer, two
+  medium and six low findings fixed with mutation-checked regression tests (`packages/auth/test/p4-review-guards.test.ts`,
+  `packages/http-app/test/p4-review-writers.test.ts`, four new role-matrix rows and a changed one), no high finding.
+- Fixed: an admin setting an instance CA file through the API (M1), an admin widening where writes are enabled (M2),
+  pass-through without a recent sign-in, standing device tokens from a stale session, a token issued during a credential switch,
+  a late validation answer vouching for a replaced token, audit rows without the changed values, and the admin API buffering a
+  body before its cap.
+- Decisions D-55 … D-58 (implemented as the recommended defaults); open tasks P4-34 (owner-only instance creation), P4-35
+  (list and revoke setup links), P4-36 (audit before admin changes), P4-37 (validation compare-and-swap).
+- Lessons L-235 … L-239; THREAT_MODEL T14, T20, T31, A5, A14 updated; role matrix, admin access guide and admin API reference
+  updated; changeset `admin-security-review`.
 
 ## Security notes
 THREAT_MODEL T3, T11, T13, T14, T21, T23, A5, A14; ADR-0008, ADR-0009, ADR-0012, ADR-0013.
