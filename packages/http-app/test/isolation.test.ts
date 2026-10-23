@@ -5,7 +5,7 @@
 import type { CredentialValidator, ValidationResult } from '@agility-bridge/auth';
 import { CredentialLimiters, silentLogger, webCryptoRandom } from '@agility-bridge/core';
 import { createMemoryStorage, type Storage } from '@agility-bridge/storage';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AuditWriter } from '../src/index.ts';
 import { post, world } from './helpers/world.ts';
 
@@ -136,7 +136,9 @@ describe("isolation: 'request' over HTTP", () => {
     const headers = { 'x-agility-token': '1.CallerOwnAgilityTokenNotReal0001' };
     const LIST = { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} };
     const pending = [1, 2, 3].map(() => post(w, 'team-a', null, LIST, headers));
-    await new Promise((r) => setTimeout(r, 20));
+    // Release only once all three are inside the validator: a request that arrived after the first finished would
+    // read the cached identity, and a fixed delay was not always long enough on a busy machine.
+    await vi.waitFor(() => expect(calls).toBe(3), { timeout: 5_000 });
     release();
     expect((await Promise.all(pending)).map((r) => r.status)).toEqual([200, 200, 200]);
     expect(calls).toBe(3);
