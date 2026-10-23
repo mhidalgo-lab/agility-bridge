@@ -2,11 +2,11 @@
 id: P4-13
 title: "pnpm cf:setup prompts for the sign-in settings"
 phase: 4
-status: todo
+status: review
 priority: low
 depends_on: [P4-01]
 adr: ["0009"]
-lessons: [L-026]
+lessons: [L-026, L-223]
 owner: ""
 ---
 
@@ -46,11 +46,20 @@ not at the first request.
   wrangler only through stdin.
 - [x] `docs/guide/cloudflare-deploy.md` and `docs/guide/identity-providers.md` updated.
 
+## Outcome
+- Built as scoped, in `scripts/cf-setup-sign-in.ts` (collection and validation) and `scripts/cf-setup.ts` (wiring).
+  Validation runs `identitySettingsFromEnv` before the first Cloudflare call that creates anything; a stored secret counts
+  as present when no new one is given.
+- Decision D-47 (allowlists asked too; client secrets never copied to `--secrets-file`). Lesson L-223.
+- Not done: removing a provider from the script (edit the local config, delete the secret in the dashboard); reading
+  secrets from a `_FILE` path (the environment or the terminal only).
+
 ## Security notes
 THREAT_MODEL T7, T8.
 
 ## Lessons applied
 - L-026 — Configure secrets through the environment, never through flags.
+- L-223 — Added by this task (validate with the server parser; one destination for a secret).
 
 ## Docs to update
 - docs/guide/cloudflare-deploy.md, docs/guide/identity-providers.md

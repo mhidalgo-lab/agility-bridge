@@ -4,6 +4,8 @@
 // after --name, so staging and production never share a resource. wrangler must be logged in (`wrangler login`); no
 // Cloudflare token is read here.
 //   pnpm cf:setup --name agility-bridge-staging --secrets-file ~/.config/agility-bridge/staging.secrets [--plan free]
+//   add --sign-in to set the identity providers (P4-13): AB_* from the environment, else prompts; client secrets reach
+//   wrangler only on stdin
 import { spawnSync } from 'node:child_process';
 import {
   closeSync,
@@ -21,6 +23,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { generateAdminToken, generateMasterKey } from '../packages/auth/src/index.ts';
+import { collectSignIn, identityVars, SignInError, ttyPrompt } from './cf-setup-sign-in.ts';
 
 const WORKER_DIR = fileURLToPath(new URL('../apps/worker/', import.meta.url));
 export const NAME_RE = /^agility-bridge(?:-[a-z0-9]+)*$/;
@@ -49,6 +52,14 @@ export interface SetupOptions {
   readonly secretsFile?: string | undefined;
   readonly showSecrets: boolean;
   readonly dryRun: boolean;
+  /** `--sign-in` (P4-13): set the identity provider settings; a plain run keeps whatever is there. */
+  readonly signIn?: boolean;
+  /** Environment for `--sign-in` (the non-interactive mode); defaults to none. */
+  readonly env?: Readonly<Record<string, string | undefined>>;
+  /** Terminal questions for `--sign-in`; present only when stdin is a terminal. */
+  readonly prompt?: (question: string) => Promise<string>;
+  /** As `prompt`, without echo (client secrets). */
+  readonly promptSecret?: (question: string) => Promise<string>;
   /** `AB_PUBLIC_URL`; default: the deployment's workers.dev address, learnt from the first deploy. */
   readonly publicUrl?: string;
   /** A Workers custom domain (P3-07): the only address; `AB_PUBLIC_URL` becomes `https://<domain>`. */
@@ -114,6 +125,7 @@ export function localConfig(
   plan: string,
   publicUrl?: string,
   domain?: string,
+  signInVars: Readonly<Record<string, string>> = {},
 ) {
   const d1 = (base['d1_databases'] as Record<string, unknown>[] | undefined) ?? [];
   return {
@@ -133,6 +145,8 @@ export function localConfig(
       AB_ENVIRONMENT: name === 'agility-bridge' ? 'production' : 'test',
       // The server answers only its public host (DNS rebinding, T24): without it, workers.dev gets 403.
       ...(publicUrl === undefined ? {} : { AB_PUBLIC_URL: publicUrl }),
+      // Sign-in settings of earlier runs and of this one (P4-13); client secrets are never variables.
+      ...signInVars,
     },
     d1_databases: d1.map((d) =>
       d['binding'] === 'DB' ? { ...d, database_name: name, database_id: databaseId } : d,
@@ -176,6 +190,48 @@ export async function setup(o: SetupOptions): Promise<{ created: string[]; url: 
     );
   }
   must(o.wrangler(['whoami']), 'wrangler whoami (run `wrangler login`)');
+  const base = readJsonc(readFileSync(join(o.workerDir, 'wrangler.jsonc'), 'utf8'));
+  const previousVars = existingText === undefined ? undefined : readJsonc(existingText)['vars'];
+  const previous = (previousVars as Record<string, string> | undefined)?.['AB_PUBLIC_URL'];
+  // The sign-in variables of earlier runs stay (idempotent); --sign-in changes them (P4-13).
+  let signInVars: Record<string, string> = identityVars(previousVars as Record<string, unknown> | undefined);
+  let signInSecrets: Record<string, string> = {};
+  let routeIds: readonly string[] = [];
+  const knownUrl = o.domain === undefined ? (o.publicUrl ?? previous) : `https://${o.domain}`;
+  if (o.signIn === true) {
+    if (o.dryRun) o.log('ask for the sign-in settings (nothing is asked in a dry run)');
+    else {
+      // Secrets already on the Worker are known only once a local config exists (an earlier run).
+      const listed =
+        existingText === undefined
+          ? undefined
+          : o.wrangler(['secret', 'list', '--config', configPath, '--format', 'json']);
+      // A config without a deployed Worker (an interrupted first run) simply has no secrets yet.
+      const haveSecrets = new Set<string>(
+        listed === undefined || listed.code !== 0
+          ? []
+          : (JSON.parse(listed.stdout) as { name: string }[]).map((s) => s.name),
+      );
+      try {
+        const collected = await collectSignIn(
+          { env: o.env ?? {}, prompt: o.prompt, promptSecret: o.promptSecret },
+          {
+            existingVars: signInVars,
+            haveSecrets,
+            publicUrl: knownUrl,
+            placeholderUrl: `https://${o.name}.workers.dev`,
+          },
+        );
+        signInVars = { ...collected.merged };
+        signInSecrets = { ...collected.secrets };
+        routeIds = collected.routeIds;
+        for (const w of collected.warnings) o.log(`warning: ${w}`);
+      } catch (error) {
+        if (error instanceof SignInError) throw new SetupError(error.message);
+        throw error;
+      }
+    }
+  }
 
   // D1 database of the same name.
   const list = (): { name: string; uuid: string }[] =>
@@ -200,21 +256,24 @@ export async function setup(o: SetupOptions): Promise<{ created: string[]; url: 
       created.push('database');
     }
   }
-  const base = readJsonc(readFileSync(join(o.workerDir, 'wrangler.jsonc'), 'utf8'));
-  const previous =
-    existingText === undefined
-      ? undefined
-      : (readJsonc(existingText)['vars'] as Record<string, string> | undefined)?.['AB_PUBLIC_URL'];
   /** Writes the local config when it changed; true when it did. */
   const writeConfig = (publicUrl: string | undefined): boolean => {
-    const config = localConfig(base, o.name, database?.uuid ?? 'dry-run', o.plan, publicUrl, o.domain);
+    const config = localConfig(
+      base,
+      o.name,
+      database?.uuid ?? 'dry-run',
+      o.plan,
+      publicUrl,
+      o.domain,
+      signInVars,
+    );
     const text = `// Generated by scripts/cf-setup.ts for ${o.name}; ignored by git (it holds the D1 database id).\n${JSON.stringify(config, null, 2)}\n`;
     if (readIfPresent(configPath) === text) return false;
     o.log(`write ${configPath}`);
     if (!o.dryRun) writeFileSync(configPath, text, { mode: 0o600 });
     return true;
   };
-  let publicUrl = o.domain === undefined ? (o.publicUrl ?? previous) : `https://${o.domain}`;
+  let publicUrl = knownUrl;
   writeConfig(publicUrl);
 
   o.log(`deploy ${o.name}`);
@@ -276,6 +335,24 @@ export async function setup(o: SetupOptions): Promise<{ created: string[]; url: 
     }
   }
 
+  // Client secrets given now: through stdin only, after the Worker exists.
+  for (const [secret, value] of Object.entries(signInSecrets)) {
+    must(
+      o.wrangler(['secret', 'put', secret, '--config', configPath], { input: value }),
+      `wrangler secret put ${secret}`,
+    );
+    created.push(secret);
+  }
+  if (routeIds.length > 0 && url !== null) {
+    o.log('Register these redirect URIs with the identity providers:');
+    for (const id of routeIds) o.log(`  ${new URL(url).origin}/auth/callback/${id}`);
+    if (o.domain === undefined && o.publicUrl === undefined && previous === undefined) {
+      o.log(
+        '  (a workers.dev address: use --domain for one you keep; a changed address needs new registrations)',
+      );
+    }
+  }
+
   if (url !== null) {
     const status = await o.fetchHealth(`${url}/health`);
     if (status !== 200) throw new SetupError(`${url}/health answered ${status}.`);
@@ -295,7 +372,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const name = arg(argv, '--name');
   if (name === undefined || (plan !== 'free' && plan !== 'paid')) {
     console.error(
-      'usage: pnpm cf:setup --name <worker> [--plan free|paid] [--domain <host> | --public-url <origin>] [--secrets-file <new file>] [--show-secrets] [--dry-run]',
+      'usage: pnpm cf:setup --name <worker> [--plan free|paid] [--domain <host> | --public-url <origin>] [--secrets-file <new file>] [--show-secrets] [--sign-in] [--dry-run]',
     );
     process.exit(2);
   }
@@ -310,6 +387,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     ...(arg(argv, '--public-url') === undefined ? {} : { publicUrl: arg(argv, '--public-url') as string }),
     ...(arg(argv, '--domain') === undefined ? {} : { domain: arg(argv, '--domain') as string }),
     dryRun: argv.includes('--dry-run'),
+    signIn: argv.includes('--sign-in'),
+    env: process.env,
+    ...(process.stdin.isTTY ? { prompt: ttyPrompt(false), promptSecret: ttyPrompt(true) } : {}),
     workerDir: WORKER_DIR,
     wrangler: (args, options = {}) => {
       const r = spawnSync(bin, args, {
