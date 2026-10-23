@@ -47,7 +47,9 @@ session cookie came with it. The admin API exists when sign-in is configured, wh
   of the database is not a session.
 - The cookie is `__Host-ab_session` (`ab_session` on `http://localhost`), `Secure`, `HttpOnly`, `SameSite=Lax`,
   `Path=/`, no `Domain`. `Lax` rather than `Strict` because sign-in ends in a redirect from the provider; changes are
-  protected by the CSRF token and the origin checks, not by the cookie attribute.
+  protected by the CSRF token and the origin checks, not by the cookie attribute. On `http://localhost` (trials on your own
+  machine; `serve` refuses plain http for any other address) browsers do not allow the `__Host-` prefix, and cookies are not
+  separated by port, so another program on another local port could plant a session cookie: use https for anything shared.
 - A session ends after **30 idle minutes** or **12 hours** in all, whichever comes first; activity never extends the 12
   hours (`AB_SESSION_IDLE_MINUTES`, `AB_SESSION_MAX_HOURS`).
 - Every sign-in starts a **new** session and ends the one the browser presented (so a cookie planted before sign-in is
@@ -63,7 +65,8 @@ session cookie came with it. The admin API exists when sign-in is configured, wh
 | See and use their own credentials, grants and tokens ("My access" in the panel: add, check, replace, revoke and delete their personal Agility token, choose it on their grants, issue and revoke their device tokens) | yes | yes | yes |
 | Manage instances, shared credentials, workspaces, grants, members | no | yes | yes |
 | Create, promote, demote, disable or end the sessions of **admins and owners** | no | no | yes |
-| Enable write tools and write policies, pass-through workspaces, master-key versions, setup links, instance origin changes | no | no | yes |
+| Enable write tools and write policies, pass-through workspaces, master-key versions, setup links, instance origin changes, an instance's CA file | no | no | yes |
+| Add projects or asset types to a workspace or grant that has write tools, or extend such a grant | no | no | yes |
 | Demote or disable the last active owner | never | never | never |
 | Read the audit log and usage statistics | own rows only, no statistics | everything | everything |
 
@@ -84,7 +87,11 @@ These changes need a sign-in from the **last 10 minutes** (an old session is fin
 - changing an instance's origin or TLS trust; retiring a master-key version; creating an owner setup link;
 - creating an owner or admin, changing the role of an owner or admin or promoting a member, disabling an owner or admin;
 - replacing a credential's token;
-- enabling write tools or a write policy (workspaces, grants).
+- enabling write tools or a write policy (workspaces, grants), and adding projects, asset types or a later end date to a
+  workspace or grant that already has write tools (the owners decide where writes may land);
+- making a workspace pass-through, or setting an instance's CA file when adding it;
+- issuing a device token that lasts longer than 90 days (or never expires): a token is a standing credential, so a stolen
+  older session cannot mint one that outlives it. Ordinary tokens (up to 90 days, the default) need nothing extra.
 
 Without it the API answers `403` with the error code `reauth_required`. Send the browser to
 `/auth/reauth?next=<path to return to>`: it signs the same user in again at the same provider (OIDC providers are asked

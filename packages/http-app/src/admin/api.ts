@@ -29,6 +29,35 @@ import { AdminError, errorBody, toAdminError } from './errors.ts';
 export const ADMIN_BASE = '/api/admin/v1';
 const MAX_ADMIN_BODY_BYTES = 64 * 1024;
 
+/**
+ * The body as text, read at most `max` bytes deep: a request that goes past the cap is cancelled where it stands (`null`),
+ * not buffered whole first (T20, P4-09). Any signed-in member can reach this code.
+ */
+async function readCapped(request: Request, max: number): Promise<string | null> {
+  if (request.body === null) return '';
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      // Not awaited: on the branch of a `clone()` the promise settles only when the other branch is cancelled too.
+      void reader.cancel().catch(() => undefined);
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const chunk of chunks) {
+    all.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  return new TextDecoder().decode(all);
+}
+
 export interface AdminApiOptions {
   readonly services: AccessServices;
   readonly storage: Storage;
@@ -381,6 +410,15 @@ function tokenOut(t: AccessToken) {
   return rest;
 }
 
+/**
+ * One body value as it goes into an audit row: text as it is, lists and objects as JSON, at most 200 characters. Only for
+ * the fields a route names in `auditBody`: roles, ids, project and tool lists, switches and reasons (P4-09).
+ */
+function auditValue(value: unknown): string {
+  if (value === undefined) return '';
+  return (typeof value === 'string' ? value : JSON.stringify(value)).slice(0, 200);
+}
+
 function tokenListItem(t: TokenListItem) {
   const { tokenHash: _h, ...rest } = t;
   return rest;
@@ -401,7 +439,10 @@ interface RouteSpec {
   status?: 200 | 201;
   /** For the audit row; undefined = a read (not audited). */
   audit?: { action: string; targetType: string };
-  /** Body values recorded with the audit row (operator reasons only; never secrets or names, P3-11 review). */
+  /**
+   * Body values recorded with the audit row: roles, ids, project and tool lists, switches and operator reasons, never
+   * secrets or names typed by people (P3-11 review, P4-09).
+   */
   auditBody?: readonly string[];
 }
 
@@ -497,8 +538,8 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
           413,
         );
       }
-      const text = await c.req.raw.clone().text();
-      if (new TextEncoder().encode(text).length > MAX_ADMIN_BODY_BYTES) {
+      const text = await readCapped(c.req.raw.clone(), MAX_ADMIN_BODY_BYTES);
+      if (text === null) {
         return c.json(
           errorBody('payload_too_large', `The body is larger than ${MAX_ADMIN_BODY_BYTES} bytes.`),
           413,
@@ -600,10 +641,9 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
             ...(c.get('auditDetails' as never) as Record<string, unknown> | undefined),
             fields: Object.keys(body).filter((k) => k !== 'token'),
             ...Object.fromEntries(
-              (spec.auditBody ?? []).map((k) => [
-                k,
-                String((body as Record<string, unknown>)[k] ?? '').slice(0, 200),
-              ]),
+              (spec.auditBody ?? [])
+                .filter((k) => k in body)
+                .map((k) => [k, auditValue((body as Record<string, unknown>)[k])]),
             ),
           });
           options.onChange();
@@ -710,6 +750,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       out: UserOut,
       status: 201,
       audit: { action: 'user.create', targetType: 'user' },
+      auditBody: ['role'],
     },
     (c, { body }) => services(c).users.create(body as never),
   );
@@ -727,9 +768,13 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       body: UserPatch,
       out: UserOut,
       audit: { action: 'user.update', targetType: 'user' },
+      auditBody: ['role'],
     },
     async (c, { id, body }) => {
+      // The role before the change, so a promotion can be told from a demotion in the audit log (P4-09).
+      const before = (body as { role?: string }).role === undefined ? null : await services(c).users.get(id);
       const updated = await services(c).users.update(id, body as never);
+      if (before !== null) c.set('auditDetails' as never, { previousRole: before.role } as never);
       // A role change takes effect at once: the user's sessions end (the role is read per request anyway, P4-02).
       if ((body as { role?: string }).role !== undefined) await endSessions(c, id, 'role_change');
       return updated;
@@ -825,13 +870,19 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       method: 'post',
       path: '/instances',
       ...inst,
-      summary: 'Add an Agility instance',
+      summary:
+        'Add an Agility instance (owners and admins; a CA file in `tls` is an owner with a recent sign-in)',
       body: NewInstance,
       out: InstanceOut,
       status: 201,
       audit: { action: 'instance.create', targetType: 'instance' },
     },
-    (c, { body }) => services(c).instances.create(body as never),
+    async (c, { body }) => {
+      const created = await services(c).instances.create(body as never);
+      // Where member tokens will be sent: the host only (never a path or a query), P4-09.
+      c.set('auditDetails' as never, { host: hostOf(created.baseUrl) } as never);
+      return created;
+    },
   );
   add(
     {
@@ -868,7 +919,20 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       out: z.object({ instance: InstanceOut, revokedCredentials: z.number(), revokedGrants: z.number() }),
       audit: { action: 'instance.retarget', targetType: 'instance' },
     },
-    (c, { id, body }) => services(c).instances.retarget(id, body as never),
+    async (c, { id, body }) => {
+      const before = await services(c).instances.get(id);
+      const result = await services(c).instances.retarget(id, body as never);
+      c.set(
+        'auditDetails' as never,
+        {
+          host: hostOf(result.instance.baseUrl),
+          ...(before === null ? {} : { previousHost: hostOf(before.baseUrl) }),
+          revokedCredentials: result.revokedCredentials,
+          revokedGrants: result.revokedGrants,
+        } as never,
+      );
+      return result;
+    },
   );
   add(
     {
@@ -908,6 +972,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       out: CredentialOut,
       status: 201,
       audit: { action: 'credential.create', targetType: 'credential' },
+      auditBody: ['instanceId', 'ownerUserId'],
     },
     async (c, { body }) => credentialOut(await services(c).credentials.create(body as never)),
   );
@@ -1004,6 +1069,15 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       out: WorkspaceOut,
       status: 201,
       audit: { action: 'workspace.create', targetType: 'workspace' },
+      auditBody: [
+        'allowedScopeIds',
+        'includeChildScopes',
+        'assetTypes',
+        'enabledTools',
+        'writePolicy',
+        'credentialSource',
+        'defaultCredentialId',
+      ],
     },
     (c, { body }) => services(c).workspaces.create(body as never),
   );
@@ -1024,10 +1098,20 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       path: '/workspaces/{id}',
       ...ws,
       params: true,
-      summary: 'Change a workspace',
+      summary:
+        'Change a workspace (owners and admins; write settings and pass-through: an owner with a recent sign-in; so is adding projects or asset types to a workspace that has write tools)',
       body: WorkspacePatch,
       out: WorkspaceOut,
       audit: { action: 'workspace.update', targetType: 'workspace' },
+      auditBody: [
+        'allowedScopeIds',
+        'includeChildScopes',
+        'assetTypes',
+        'enabledTools',
+        'writePolicy',
+        'credentialSource',
+        'defaultCredentialId',
+      ],
     },
     (c, { id, body }) => services(c).workspaces.update(id, body as never),
   );
@@ -1082,6 +1166,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       out: GrantWithWarnings,
       status: 201,
       audit: { action: 'grant.create', targetType: 'grant' },
+      auditBody: ['userId', 'credentialId', 'tools', 'scopeIds', 'assetTypes', 'expiresAt'],
     },
     (c, { body }) => services(c).grants.create(body as never),
   );
@@ -1095,10 +1180,12 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       path: '/grants/{id}',
       ...gr,
       params: true,
-      summary: 'Change a grant',
+      summary:
+        'Change a grant (owners and admins; write tools, and widening the projects, asset types or end date of a grant that has them: an owner with a recent sign-in)',
       body: GrantPatch,
       out: GrantWithWarnings,
       audit: { action: 'grant.update', targetType: 'grant' },
+      auditBody: ['credentialId', 'tools', 'scopeIds', 'assetTypes', 'expiresAt'],
     },
     (c, { id, body }) => services(c).grants.update(id, body as never),
   );
@@ -1175,14 +1262,21 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       path: '/grants/{id}/tokens',
       ...tk,
       params: true,
-      summary: 'Issue a device token (shown once)',
+      summary:
+        'Issue a device token (shown once; your own grants, or any for owners and admins). A lifetime over 90 days or `never` needs a sign-in from the last 10 minutes',
       body: NewToken,
       out: z.object({ token: z.string(), record: TokenOut, warnings: Warnings }),
       status: 201,
       audit: { action: 'token.issue', targetType: 'grant' },
+      auditBody: ['expiresInDays'],
     },
     async (c, { id, body }) => {
       const issued = await services(c).tokens.issue({ grantId: id, ...(body as { label: string }) });
+      // Which token, and until when: a tool call carries the token id, so it can be traced back to who issued it (P4-09).
+      c.set(
+        'auditDetails' as never,
+        { tokenId: issued.record.id, tokenExpiresAt: issued.record.expiresAt } as never,
+      );
       return { token: issued.token, record: tokenOut(issued.record), warnings: issued.warnings };
     },
   );
@@ -1463,6 +1557,15 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
     servers: [{ url: ADMIN_BASE }],
   });
   return api;
+}
+
+/** The host of an instance address, for audit rows (never the path or query); empty when it does not parse. */
+function hostOf(baseUrl: string): string {
+  try {
+    return new URL(baseUrl).host;
+  } catch {
+    return '';
+  }
 }
 
 function found<T>(row: T | null, what: string): T {

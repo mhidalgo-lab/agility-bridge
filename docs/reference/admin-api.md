@@ -42,7 +42,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | `GET` | `/grants` | List grants | — | 200 Grant[] |
 | `POST` | `/grants` | Grant a user or service access to a workspace | `workspaceId`: string<br>`userId`: string \| null<br>`label`?: string \| null<br>`credentialId`?: string \| null<br>`tools`?: array \| null<br>`scopeIds`?: array \| null<br>`assetTypes`?: object \| null<br>`limits`?: object<br>`rateLimit`?: object \| null<br>`expiresAt`?: integer \| null | 201 object |
 | `GET` | `/grants/{id}` | Get a grant | — | 200 Grant |
-| `PATCH` | `/grants/{id}` | Change a grant | `label`?: string \| null<br>`credentialId`?: string \| null<br>`tools`?: array \| null<br>`scopeIds`?: array \| null<br>`assetTypes`?: object \| null<br>`limits`?: object<br>`rateLimit`?: object \| null<br>`expiresAt`?: integer \| null | 200 object |
+| `PATCH` | `/grants/{id}` | Change a grant (owners and admins; write tools, and widening the projects, asset types or end date of a grant that has them: an owner with a recent sign-in) | `label`?: string \| null<br>`credentialId`?: string \| null<br>`tools`?: array \| null<br>`scopeIds`?: array \| null<br>`assetTypes`?: object \| null<br>`limits`?: object<br>`rateLimit`?: object \| null<br>`expiresAt`?: integer \| null | 200 object |
 | `DELETE` | `/grants/{id}` | Delete a grant and its tokens | — | 200 object |
 | `POST` | `/grants/{id}/revoke` | Revoke a grant | — | 200 Grant |
 
@@ -51,7 +51,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | Method | Path | What | Body | Response |
 |---|---|---|---|---|
 | `GET` | `/instances` | List instances | — | 200 Instance[] |
-| `POST` | `/instances` | Add an Agility instance | `label`: string<br>`baseUrl`: string<br>`tls`?: object \| null<br>`numberPrefixes`?: object \| null | 201 Instance |
+| `POST` | `/instances` | Add an Agility instance (owners and admins; a CA file in `tls` is an owner with a recent sign-in) | `label`: string<br>`baseUrl`: string<br>`tls`?: object \| null<br>`numberPrefixes`?: object \| null | 201 Instance |
 | `GET` | `/instances/{id}` | Get an instance | — | 200 Instance |
 | `PATCH` | `/instances/{id}` | Change label, number prefixes or disabled state | `label`?: string<br>`numberPrefixes`?: object \| null<br>`disabledAt`?: integer \| null | 200 Instance |
 | `DELETE` | `/instances/{id}` | Delete an unused instance | — | 200 object |
@@ -83,7 +83,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | Method | Path | What | Body | Response |
 |---|---|---|---|---|
 | `GET` | `/grants/{id}/tokens` | List a grant's device tokens | — | 200 DeviceToken[] |
-| `POST` | `/grants/{id}/tokens` | Issue a device token (shown once) | `label`: string<br>`expiresInDays`?: integer \| "never" | 201 object |
+| `POST` | `/grants/{id}/tokens` | Issue a device token (shown once; your own grants, or any for owners and admins). A lifetime over 90 days or `never` needs a sign-in from the last 10 minutes | `label`: string<br>`expiresInDays`?: integer \| "never" | 201 object |
 | `GET` | `/tokens` | List the device tokens you may see, newest first, one page at a time (owners and admins: every token; others: the tokens of their own grants). Never a hash or a token value | — | 200 object |
 | `POST` | `/tokens/{id}/revoke` | Revoke a device token | — | 200 DeviceToken |
 
@@ -114,7 +114,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | `GET` | `/workspaces` | List workspaces | — | 200 Workspace[] |
 | `POST` | `/workspaces` | Create a workspace | `slug`: string<br>`name`: string<br>`instanceId`: string<br>`allowedScopeIds`: string[]<br>`includeChildScopes`?: boolean<br>`assetTypes`?: object \| null<br>`enabledTools`?: array \| null<br>`limits`?: object<br>`defaultCredentialId`?: string \| null<br>`writePolicy`?: object<br>`credentialSource`?: "stored" \| "passthrough" | 201 Workspace |
 | `GET` | `/workspaces/{id}` | Get a workspace | — | 200 Workspace |
-| `PATCH` | `/workspaces/{id}` | Change a workspace | `slug`?: string<br>`name`?: string<br>`allowedScopeIds`?: string[]<br>`includeChildScopes`?: boolean<br>`assetTypes`?: object \| null<br>`enabledTools`?: array \| null<br>`limits`?: object<br>`defaultCredentialId`?: string \| null<br>`writePolicy`?: object<br>`credentialSource`?: "stored" \| "passthrough"<br>`disabledAt`?: integer \| null | 200 Workspace |
+| `PATCH` | `/workspaces/{id}` | Change a workspace (owners and admins; write settings and pass-through: an owner with a recent sign-in; so is adding projects or asset types to a workspace that has write tools) | `slug`?: string<br>`name`?: string<br>`allowedScopeIds`?: string[]<br>`includeChildScopes`?: boolean<br>`assetTypes`?: object \| null<br>`enabledTools`?: array \| null<br>`limits`?: object<br>`defaultCredentialId`?: string \| null<br>`writePolicy`?: object<br>`credentialSource`?: "stored" \| "passthrough"<br>`disabledAt`?: integer \| null | 200 Workspace |
 | `DELETE` | `/workspaces/{id}` | Delete a workspace, its grants and their tokens | — | 200 object |
 | `POST` | `/workspaces/{id}/disable` | Disable a workspace | — | 200 Workspace |
 

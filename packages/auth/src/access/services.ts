@@ -285,7 +285,19 @@ export function accessServices(options: AccessServicesOptions) {
     if (keyring === undefined) throw new Error('A keyring is required to validate Agility tokens.');
     const instance = await mustGet(storage.instances.get(c.instanceId), 'instance');
     const token = await openCredentialToken(keyring, c);
-    return record(id, await options.validator.validate(instance, id, token));
+    const result = await options.validator.validate(instance, id, token);
+    // The answer is about the token opened above. A replacement (or a re-encryption) that landed while Agility was answering
+    // makes it someone else's answer: keep what the credential now says instead of vouching for a token nobody checked
+    // (P4-09). A write between this read and `record` is not covered; a compare-and-swap in storage would close it.
+    const now = await mustGet(storage.credentials.get(id), 'credential');
+    if (
+      now.tokenCiphertext !== c.tokenCiphertext ||
+      now.tokenIv !== c.tokenIv ||
+      now.keyVersion !== c.keyVersion
+    ) {
+      return now;
+    }
+    return record(id, result);
   }
 
   const users = {

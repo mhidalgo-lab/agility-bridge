@@ -70,14 +70,18 @@ pass-through, owner accounts, keys). The break-glass admin token acts as an owne
 | End an admin's sessions | no | no | yes |
 | Move a user to another provider | no | no | recent |
 | Add an instance | no | yes | yes |
+| Add an instance with its own TLS trust | no | no | recent |
 | Change an instance's origin | no | no | recent |
 | Add a shared credential | no | yes | yes |
 | Replace a shared credential's token | no | recent | recent |
 | Create a workspace | no | yes | yes |
 | Enable write settings on a workspace | no | no | recent |
-| Make a workspace pass-through | no | no | yes |
+| Make a workspace pass-through | no | no | recent |
+| Widen the projects of a workspace that has write tools | no | no | recent |
 | Create a grant | no | yes | yes |
 | Grant write tools | no | no | recent |
+| Widen a grant that has write tools | no | no | recent |
+| Issue a device token that never expires | no | recent | recent |
 | Issue a device token on someone else's grant | no | yes | yes |
 | Create an owner setup link | no | no | recent |
 | Retire a master-key version | no | no | recent |
@@ -95,7 +99,15 @@ guard that changes without this page (or the other way round) fails CI (L-133). 
 - **Admins and owners.** Admins manage members only; owners manage everyone. Nobody can demote or disable the last active
   owner. Through a session you cannot move your own account to another provider.
 - **Write tools** are off by default, need an owner, a recent sign-in and an explicit name on both workspace and grant, and
-  never apply to a shared or someone else's personal token ([access model](access-model.md#the-token-policy)).
+  never apply to a shared or someone else's personal token ([access model](access-model.md#the-token-policy)). Once an
+  owner has enabled them, the owners also decide where they may land: an administrator can narrow a workspace or grant that
+  has write tools, rename it or change its limits, but adding projects, child projects or asset types, or a later end date,
+  needs an owner with a recent sign-in.
+- **A CA file is the owners'.** An instance's TLS trust (the CA file) decides whom stored member tokens are sent to, so setting
+  it needs an owner with a recent sign-in, in the panel and through the API alike. Adding an instance without one stays with
+  administrators ([decision D-55](../pending-decisions/phase-4.md)).
+- **Long-lived device tokens.** A token that never expires, or lasts more than 90 days, needs a sign-in from the last 10
+  minutes.
 
 What the guards do not decide, because it is not a change to a record:
 
