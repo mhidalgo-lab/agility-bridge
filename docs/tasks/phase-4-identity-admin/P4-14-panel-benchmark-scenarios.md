@@ -2,7 +2,7 @@
 id: P4-14
 title: CPU benchmark scenarios for the panel
 phase: 4
-status: todo
+status: review
 priority: low
 depends_on: [P4-03]
 adr: ["0010"]
@@ -33,12 +33,20 @@ the Free plan's CPU budget is flagged like a slow MCP path.
   recorded with its cause; a larger fix becomes its own task.
 
 ## Acceptance criteria
-- [ ] The scenarios run in `pnpm bench:worker` and appear in the baseline.
-- [ ] The first-request cost of the panel is documented, with the Paid-plan note if it does not fit the Free budget.
-- [ ] Every panel scenario reports 0 Agility requests; the regression test covers the new keys.
+- [x] The scenarios run in `pnpm bench:worker` and appear in the baseline.
+- [x] The first-request cost of the panel is documented, with the Paid-plan note if it does not fit the Free budget.
+- [x] Every panel scenario reports 0 Agility requests; the regression test covers the new keys.
 
 ## Docs to update
 - docs/guide/cloudflare-limits.md, docs/dev/admin-ui.md
 
 ## Out of scope
 - Measuring on Cloudflare itself (`wrangler tail`, L-182): that needs a deploy and stays an owner-approved step.
+
+## Outcome
+- Built as scoped, plus a stylesheet scenario. The panel is JSX, which Node cannot load from source, so the benchmark builds
+  `packages/admin-ui` and resolves it to the bundle with a resolution hook. The new baseline keys were estimated on a busy
+  machine (load 13); refresh them from the PR's CI run.
+- Findings: the first `/admin` page of a new isolate is about 10x the calibration workload (about 35 ms), above the Free
+  budget like the first MCP request (D-27 tolerance, documented). Warm: overview about 1.6x, form POST 0.7x, asset 0.06x; the
+  users list (100 users) and audit page (200 rows) about 3.5x (about 12 ms), above 10 ms: follow-up P4-28. Agility requests: 0.

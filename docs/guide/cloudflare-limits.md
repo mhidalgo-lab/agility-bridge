@@ -55,6 +55,12 @@ isolation as on Workers, Agility-shaped fake responses. *Staging*: `agility-brid
 | `whoami`, warm | about 2.5 ms | — | 1 |
 | `search_work_items` (25 rows), warm | about 4 ms | — | 1 |
 | `get_work_item`, warm | about 3 ms | — | 2 |
+| First `/admin` page of a new isolate (the panel's import and app build, signed in, after the boot) | about 35 ms | — | 0 |
+| `/admin` overview, warm | about 5 ms | — | 0 |
+| `/admin/users` (100 users, 25 shown), warm | about 12 ms | — | 0 |
+| `/admin/audit` (200 rows, 50 shown), warm | about 13 ms | — | 0 |
+| `/admin/assets/<css>`, warm | < 1 ms | — | 0 |
+| Form POST (create a user through the in-process admin API), warm | about 2.5 ms | — | 0 |
 
 Warm calls fit the Free plan's 10 ms. **The first request of every new isolate does not.** P3-14 moved what does not
 depend on the environment to module scope (Workers run it at startup, under a separate limit; startup is about
@@ -67,6 +73,16 @@ are tolerated). The project accepts that on Free (decision D-27 in
 enforces the limit strictly, the first request of a new isolate fails (error 1102, `exceededCpu`) and the client's
 retry, served by a warm isolate, succeeds. A deployment that cannot accept that runs on the Paid plan (30 s of CPU),
 where it does not matter.
+
+The panel (P4-14) is measured in the same run, signed in as the owner. Its first page of a new isolate (about 35 ms
+on top of the boot, which a panel request also pays) imports the panel and builds its app; like the first MCP request it
+does not fit the Free plan's 10 ms, and the same tolerance and the Paid-plan answer apply (D-27). Only an operator opening
+the panel pays it, never an MCP call (`admin-panel-lazy.test.ts`). Warm, the overview, the form POST and the assets fit
+10 ms; the two list screens do not at these row counts: each makes admin API calls that parse the whole user list (the audit
+page also loads every workspace and user to show names), so their cost grows with the number of users (about 12 ms at 100).
+That is accepted for a screen an operator opens now and then, and recorded as a follow-up (P4-28). The local figures were
+measured on a busy machine and rounded; the benchmark's baseline compares ratios to its calibration, and the table's panel
+rows are estimates from them. No Cloudflare measurement of the panel was made (no deploy, L-182).
 
 A non-required CI job runs the benchmark on every pull request, keeps the numbers as an artifact and flags a path
 whose cost, relative to a calibration workload in the same run, more than doubles against

@@ -229,3 +229,11 @@ The audit viewer and the connect page are above; the owner-only unbind (P4-12) i
 - **Number prefixes**: `GET/POST /admin/instances/{id}/prefixes` in `screens/instances.tsx`; `parsePrefixText` checks only the
   shape (one `=`, no repeated type, at most 64 lines), the rules (`ASSET_TYPE_NAME_RE`, `NUMBER_PREFIX_RE`) are the admin API's
   and shown as its 422 sentence. Only a changed value is sent, empty clears (`null`). `TextAreaField` is the multi-line field.
+
+## CPU benchmark (P4-14)
+
+`pnpm bench:worker` measures the first signed-in `/admin` page of a fresh process (nine of them, the fastest, after a forced
+garbage collection) and warm pages (overview, users list with 100 users, audit page with 200 rows, the stylesheet, a form
+POST that creates a user through the in-process admin API), in the Workers configuration, and counts Agility requests (0).
+The panel is JSX, so the script builds `packages/admin-ui` first and resolves the package to its bundle with a resolution
+hook (`scripts/bench/admin-ui-dist-hook.mjs`); everything else runs from source. Numbers: [Cloudflare limits](../guide/cloudflare-limits.md#measured-cost).

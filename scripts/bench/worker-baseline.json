@@ -5,18 +5,37 @@
     "warm: tools/list": 2.1800000000000637,
     "warm: whoami": 2.7719999999999345,
     "warm: search_work_items": 3.6089999999999236,
-    "warm: get_work_item": 2.8239999999998417
+    "warm: get_work_item": 2.8239999999998417,
+    "cold: first /admin": 34.1,
+    "cold: second /admin": 2.858,
+    "warm: admin: overview": 5.343,
+    "warm: admin: users list": 11.649,
+    "warm: admin: audit": 12.653,
+    "warm: admin: asset": 0.212,
+    "warm: admin: form POST": 2.283
   },
   "relative": {
     "cold: boot": 20.981,
     "warm: tools/list": 0.649,
     "warm: whoami": 0.825,
     "warm: search_work_items": 1.075,
-    "warm: get_work_item": 0.841
+    "warm: get_work_item": 0.841,
+    "cold: first /admin": 10.155,
+    "cold: second /admin": 0.851,
+    "warm: admin: overview": 1.591,
+    "warm: admin: users list": 3.469,
+    "warm: admin: audit": 3.768,
+    "warm: admin: asset": 0.063,
+    "warm: admin: form POST": 0.68
   },
   "requests": {
     "whoami": 1,
     "search_work_items": 1,
-    "get_work_item": 2
+    "get_work_item": 2,
+    "admin: overview": 0,
+    "admin: users list": 0,
+    "admin: audit": 0,
+    "admin: asset": 0,
+    "admin: form POST": 0
   }
 }
