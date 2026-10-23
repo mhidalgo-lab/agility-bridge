@@ -19,5 +19,8 @@ tokens are always redacted.
 | New tools or arguments are missing after an upgrade | The client cached the old tool list | Restart or reconnect the server in the client (L-027). |
 | `npx` is slow or fails behind a proxy | npm cannot reach the registry | Configure npm's proxy, or install once with `npm install -g agility-bridge` and use `agility-bridge` as the command. |
 
+The admin panel, sign-in and device-token problems of a team server (`403 reauth_required`, sign-in refused, cookies,
+`Clear-Site-Data`, a lost device) are in the [admin guide](admin-guide.md#troubleshooting).
+
 Still stuck? Open an issue with the error code, the client and its version, and the agility-bridge version
 (`npx -y agility-bridge --version`); never include your token or Agility content.

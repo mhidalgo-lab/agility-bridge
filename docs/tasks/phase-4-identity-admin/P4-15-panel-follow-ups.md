@@ -2,7 +2,7 @@
 id: P4-15
 title: "Panel follow-ups: enable a disabled user, list every device token, edit number prefixes"
 phase: 4
-status: review
+status: done
 priority: low
 depends_on: [P4-04, P4-12]
 adr: ["0008"]

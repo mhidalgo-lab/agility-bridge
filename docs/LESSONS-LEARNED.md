@@ -34,7 +34,7 @@ How to use it:
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222 |
-| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-231 |
+| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
@@ -948,6 +948,14 @@ service: a form would have edited a value nothing used. The validator went into 
 share it and the metadata layer's own patterns are the same constants), the missing consumer became task P4-30, and the form says
 so in words instead of promising an effect.
 *Applied in:* P4-15.
+
+**L-232 — A role matrix in the docs is a test, not prose; and a CI-measured figure beats a local one.**
+The admin guide's "who can do what" table is parsed by `scripts/test/role-matrix.test.ts`, which runs every row as each role
+against the real guards (denied, allowed, or allowed only with a sign-in from the last 10 minutes) and fails when a row has no
+probe, so neither a guard nor a sentence can change alone. In the same task the panel's local CPU figures (taken on a loaded
+machine) overstated the warm pages about threefold against the benchmark's ratios on CI: published numbers come from the run
+that is repeatable, stated with its date and its calibration, not from a developer's machine.
+*Applied in:* P4-10.
 
 **L-218 — A table that scrolls sideways must be reachable by keyboard, and only a real layout shows it.**
 `.table-wrap { overflow-x: auto }` kept the 320 px page from overflowing, but a keyboard user could not scroll it (WCAG

@@ -2,7 +2,7 @@
 id: P4-14
 title: CPU benchmark scenarios for the panel
 phase: 4
-status: review
+status: done
 priority: low
 depends_on: [P4-03]
 adr: ["0010"]

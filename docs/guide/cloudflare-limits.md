@@ -41,7 +41,7 @@ tools fit the Free budget today (the largest declares 24); a workspace or grant 
 
 ## Measured cost
 
-CPU per request, 2026-10-22. *Local*: Node 24 (the same V8 as workerd), `pnpm bench:worker` (medians of warm calls; the
+CPU per request, 2026-10-22 (the panel rows: CI, 2026-10-23, see note 1). *Local*: Node 24 (the same V8 as workerd), `pnpm bench:worker` (medians of warm calls; the
 fastest of nine cold boots, after a garbage collection, against the fastest calibration sample), request
 isolation as on Workers, Agility-shaped fake responses. *Staging*: `agility-bridge-staging` on the Free plan,
 `wrangler tail` CPU time, a synthetic deployment migrated in (no Agility reachable, so no tool call there, D-01).
@@ -55,12 +55,16 @@ isolation as on Workers, Agility-shaped fake responses. *Staging*: `agility-brid
 | `whoami`, warm | about 2.5 ms | — | 1 |
 | `search_work_items` (25 rows), warm | about 4 ms | — | 1 |
 | `get_work_item`, warm | about 3 ms | — | 2 |
-| First `/admin` page of a new isolate (the panel's import and app build, signed in, after the boot) | about 35 ms | — | 0 |
-| `/admin` overview, warm | about 5 ms | — | 0 |
-| `/admin/users` (100 users, 25 shown), warm | about 12 ms | — | 0 |
-| `/admin/audit` (200 rows, 50 shown), warm | about 13 ms | — | 0 |
-| `/admin/assets/<css>`, warm | < 1 ms | — | 0 |
-| Form POST (create a user through the in-process admin API), warm | about 2.5 ms | — | 0 |
+| First `/admin` page of a new isolate (the panel's import and app build, signed in, after the boot) | about 17 ms (6.5×) ¹ | — | 0 |
+| `/admin` overview, warm | about 1.3 ms (0.48×) ¹ | — | 0 |
+| `/admin/users` (100 users, 25 shown), warm | about 3.7 ms (1.44×) ¹ | — | 0 |
+| `/admin/audit` (200 rows, 50 shown), warm | about 3.1 ms (1.18×) ¹ | — | 0 |
+| `/admin/assets/<css>`, warm | < 0.1 ms (0.03×) ¹ | — | 0 |
+| Form POST (create a user through the in-process admin API), warm | about 0.8 ms (0.3×) ¹ | — | 0 |
+
+¹ Panel rows: CPU as measured by the benchmark job on CI (2026-10-23), the same workload on a GitHub-hosted runner, in
+milliseconds from the ratio to the run's calibration workload (about 2.6 ms) in brackets. Not the local column: the first
+local panel numbers (P4-14) were taken on a loaded machine and overstated the warm pages about threefold.
 
 Warm calls fit the Free plan's 10 ms. **The first request of every new isolate does not.** P3-14 moved what does not
 depend on the environment to module scope (Workers run it at startup, under a separate limit; startup is about
@@ -74,15 +78,16 @@ enforces the limit strictly, the first request of a new isolate fails (error 110
 retry, served by a warm isolate, succeeds. A deployment that cannot accept that runs on the Paid plan (30 s of CPU),
 where it does not matter.
 
-The panel (P4-14) is measured in the same run, signed in as the owner. Its first page of a new isolate (about 35 ms
-on top of the boot, which a panel request also pays) imports the panel and builds its app; like the first MCP request it
-does not fit the Free plan's 10 ms, and the same tolerance and the Paid-plan answer apply (D-27). Only an operator opening
-the panel pays it, never an MCP call (`admin-panel-lazy.test.ts`). Warm, the overview, the form POST and the assets fit
-10 ms; the two list screens do not at these row counts: each makes admin API calls that parse the whole user list (the audit
-page also loads every workspace and user to show names), so their cost grows with the number of users (about 12 ms at 100).
-That is accepted for a screen an operator opens now and then, and recorded as a follow-up (P4-28). The local figures were
-measured on a busy machine and rounded; the benchmark's baseline compares ratios to its calibration, and the table's panel
-rows are estimates from them. No Cloudflare measurement of the panel was made (no deploy, L-182).
+The panel (P4-14) is measured in the same run, signed in as the owner. Its first page of a new isolate (about 17 ms on
+CI, 6.5 times the calibration, on top of the boot, which a panel request also pays) imports the panel and builds its app;
+like the first MCP request it does not fit the Free plan's 10 ms, and the same tolerance and the Paid-plan answer apply
+(D-27). Only an operator opening the panel pays it, never an MCP call (`admin-panel-lazy.test.ts`). A second panel page in
+the same isolate costs about 1.1 times the calibration (about 3 ms). **Warm panel pages cost about 1 to 4 ms** and fit the
+Free plan's 10 ms: the overview 0.48 times the calibration, the users list 1.44, the audit viewer 1.18, an asset 0.03 and a
+form POST 0.3. The two list screens grow with the number of users (each makes admin API calls that parse the whole user
+list, and the audit page also loads every workspace and user to show names): the figures are for 100 users and 200 audit
+rows, and the follow-up is P4-28. The benchmark's baseline (`scripts/bench/worker-baseline.json`) compares ratios, not
+milliseconds, so a busy machine does not move it. No Cloudflare measurement of the panel was made (no deploy, L-182).
 
 A non-required CI job runs the benchmark on every pull request, keeps the numbers as an artifact and flags a path
 whose cost, relative to a calibration workload in the same run, more than doubles against

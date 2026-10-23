@@ -1,7 +1,9 @@
 # Access model: who can use what
 
 > Applies to the server (`agility-bridge serve`, v0.2, and later the Cloudflare Worker). The local stdio mode has one
-> workspace, configured by its environment ([configuration](configuration.md)).
+> workspace, configured by its environment ([configuration](configuration.md)). Running a team server: the
+> [admin guide](admin-guide.md) (who can do what, with a tested role matrix) and the
+> [remote quickstart](quickstart-remote.md).
 
 agility-bridge never gives anyone more than Agility gives the member behind the token, and narrows that further per
 workspace and per grant ([ADR-0008](../adr/0008-access-model.md)).

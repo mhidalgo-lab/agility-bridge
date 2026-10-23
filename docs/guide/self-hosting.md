@@ -5,6 +5,9 @@
 > [access model](access-model.md), [secrets](secrets.md), [CLI](cli.md), [configuration](configuration.md),
 > [audit log](audit-log.md), [devices](multi-device.md).
 >
+> Want the whole path in one page, with sign-in and the admin panel? Follow the [remote quickstart](quickstart-remote.md);
+> day-to-day administration is in the [admin guide](admin-guide.md).
+>
 > The blocks marked for the walkthrough run in CI on a fresh machine from the package built from this repository
 > (`scripts/walkthrough.ts`, L-133), so they stay correct.
 
