@@ -2,7 +2,7 @@
 id: P4-08
 title: Browser E2E and DAST baseline
 phase: 4
-status: review
+status: done
 priority: medium
 depends_on: [P4-04, P4-05, P4-07]
 lessons: [L-121, L-123, L-126, L-194, L-195, L-215, L-216, L-217, L-218, L-219]

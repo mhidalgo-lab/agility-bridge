@@ -2,7 +2,7 @@
 id: P4-10
 title: Admin documentation
 phase: 4
-status: review
+status: done
 priority: medium
 depends_on: [P4-04]
 adr: []
