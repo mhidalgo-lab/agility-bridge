@@ -188,7 +188,9 @@ describe('tokens.listAll', () => {
     }
     const mine = await guard(user('alice', 'member')).tokens.listAll();
     expect(mine.data.map((t) => t.label)).toEqual(['a1']);
-    expect(JSON.stringify(mine)).not.toContain('b1');
+    // Bob's token and grant by id (a bare 'b1' also matches random hex ids now and then).
+    expect(JSON.stringify(mine)).not.toContain('"tok_b1"');
+    expect(JSON.stringify(mine)).not.toContain(w.grants['bob'] as string);
     const none = await guard(user('alice', 'member')).tokens.listAll({ userId: ids['bob'] as string });
     expect(none.data).toEqual([]);
     const foreign = await guard(user('alice', 'member'))
