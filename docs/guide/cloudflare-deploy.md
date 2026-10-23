@@ -55,6 +55,33 @@ Keep the secrets file like the master key of a self-hosted server: away from the
 - **Instances on private addresses** cannot be reached from Workers at all, so the `AB_INSTANCE_PRIVATE_ADDRESSES`
   setting of `serve` does not exist here.
 
+## Sign-in settings
+
+Add `--sign-in` to set the identity providers ([identity providers](identity-providers.md)) in the same run:
+
+```sh
+pnpm cf:setup --name agility-bridge --domain mcp.example.com --secrets-file ~/.config/agility-bridge/prod.secrets --sign-in
+```
+
+- **Where the values come from.** The environment first (the non-interactive mode, for CI): `AB_GOOGLE_CLIENT_ID` and
+  `AB_GOOGLE_CLIENT_SECRET`, `AB_GITHUB_*`, `AB_OIDC_*`, `AB_CF_ACCESS_TEAM` and `AB_CF_ACCESS_AUD`, and the
+  `AB_LOGIN_ALLOW_*` allowlists with `AB_LOGIN_AUTO_PROVISION`. A provider whose client id (or Access team) is in the
+  environment is configured; otherwise, in a terminal, the script asks which providers and then each value. Client
+  secrets are read without echo. Without `--sign-in` nothing is asked and nothing about sign-in changes.
+- **Where they go.** Client ids, the issuer, the allowlists and the rest are variables in the ignored
+  `wrangler.<name>.local.jsonc`. Client secrets go to `wrangler secret put` on stdin, never an argument, a variable, a log
+  line or a file (not even `--secrets-file`: the identity provider holds them, so lose one and you rotate it there).
+- **Checked before anything is created.** The values go through the parser the server boots with, so a half-configured
+  provider, a bad issuer or an unknown auto-provision mode stops the run with the variable's name (never its value). The
+  server's warnings are printed too, for example an allowlist while `AB_LOGIN_AUTO_PROVISION=off`.
+- **Run again.** Variables of earlier runs are kept. In a terminal an empty answer keeps the shown value and the stored
+  secret, and `-` clears an optional variable. A secret is sent only when you give one. To remove a provider, edit the
+  local config and delete its secret in the dashboard.
+- **Callback URLs.** The end of the run lists the redirect URIs to register at each provider
+  (`https://<public URL>/auth/callback/<provider>`; Cloudflare Access has none). They derive from the public URL, so
+  give `--domain` (or `--public-url`) first: a `workers.dev` address learnt from the first deploy works, but the
+  registrations break if the address changes. `--dry-run` asks nothing.
+
 ## Staging and production stay apart
 
 Every resource is named after `--name`: `agility-bridge` is production, `agility-bridge-staging` (or any

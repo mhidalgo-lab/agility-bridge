@@ -156,8 +156,9 @@ Owners are made only through a setup link or by another owner.
   `AB_GOOGLE_CLIENT_SECRET_FILE`, `AB_GITHUB_CLIENT_SECRET_FILE` or `AB_OIDC_CLIENT_SECRET_FILE` at them (a Docker
   secret at `/run/secrets/...` works); setting both forms is refused.
 - **Cloudflare Workers:** client ids, the issuer, the allowlists and `AB_PUBLIC_URL` are variables; the three client
-  secrets are Worker **secrets** (`wrangler secret put`, or the dashboard), never `vars`. `pnpm cf:setup` does not ask for
-  them yet: set them after the deployment exists ([deploy guide](cloudflare-deploy.md)). The setup link is issued by the
+  secrets are Worker **secrets** (`wrangler secret put`, or the dashboard), never `vars`. `pnpm cf:setup --sign-in` asks
+  for all of it and sets the secrets through stdin ([deploy guide](cloudflare-deploy.md#sign-in-settings)); it validates
+  the values with the server's own parser and prints the callback URLs to register. The setup link is issued by the
   Worker's admin API and works across isolates, because the transaction and the link live in D1.
 
 ## When sign-in fails

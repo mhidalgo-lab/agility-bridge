@@ -146,3 +146,14 @@
   (`~/.claude.json`, `~/.copilot/mcp-config.json`, plain text): the snippets say so, and short device-token lifetimes are the
   mitigation (the default is 90 days).
 - **Owner:** _pending_ (implemented as (a)).
+
+### D-47 — What `cf:setup --sign-in` asks and where client secrets go *(P4-13)*
+- **Context:** the first task draft kept the allowlists as dashboard variables and said nothing about `--secrets-file`.
+  Setting providers without the policy leaves a Worker that refuses every unknown identity until someone edits variables
+  by hand, and the server warns about exactly that combination.
+- **Options:** (a) ask for the providers and also the `AB_LOGIN_ALLOW_*` allowlists and `AB_LOGIN_AUTO_PROVISION`, send
+  client secrets only to `wrangler secret put` (stdin), never to `--secrets-file`; (b) providers only, policy in the
+  dashboard; (c) also write client secrets to `--secrets-file`.
+- **Recommendation:** (a). The identity provider keeps the client secret (rotating it is one click there), while the
+  secrets file exists for values only Cloudflare would hold; a second copy of a client secret is one more place to leak.
+- **Owner:** _pending_ (implemented as (a)).

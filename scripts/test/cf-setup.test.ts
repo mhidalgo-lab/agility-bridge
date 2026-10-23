@@ -217,4 +217,274 @@ describe('cf:setup', () => {
     expect(existsSync(localConfigPath(workerDir, 'agility-bridge-staging'))).toBe(false);
     expect(lines.join('\n')).toContain('create D1 database agility-bridge-staging');
   });
+
+  describe('--sign-in (P4-13)', () => {
+    // Built at runtime: no secret-shaped literal in the repository.
+    const secret = (label: string) =>
+      `${label}-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+    const GOOGLE_SECRET = secret('gsecret');
+    const OIDC_SECRET = secret('osecret');
+    const domain = 'mcp.example.test';
+
+    /** Answers by a fragment of the question; unanswered questions get an empty answer. */
+    function terminal(answers: Record<string, string>, asked: string[] = []) {
+      const find = (q: string) => Object.entries(answers).find(([k]) => q.includes(k))?.[1] ?? '';
+      return {
+        prompt: async (q: string) => (asked.push(q), find(q)),
+        promptSecret: async (q: string) => (asked.push(q), find(q)),
+      };
+    }
+
+    /** Everything an observer could see: arguments, logs, the local config, the secrets file. */
+    function observed(state: { calls: string[] }, lines: string[]): string {
+      const files = [localConfigPath(workerDir, 'agility-bridge-staging'), join(dir, 'staging.secrets')]
+        .filter((f) => existsSync(f))
+        .map((f) => readFileSync(f, 'utf8'));
+      return [...state.calls, ...lines, ...files].join('\n');
+    }
+
+    const varsOf = () =>
+      readJsonc(readFileSync(localConfigPath(workerDir, 'agility-bridge-staging'), 'utf8'))['vars'];
+
+    it('environment path: variables in the local config, secrets only on stdin, callback URLs printed', async () => {
+      const { state, wrangler } = fakeWrangler();
+      const lines: string[] = [];
+      const env = {
+        AB_GOOGLE_CLIENT_ID: 'google-client.apps.example',
+        AB_GOOGLE_CLIENT_SECRET: GOOGLE_SECRET,
+        AB_GOOGLE_HOSTED_DOMAIN: 'example.test',
+        AB_OIDC_ISSUER: 'https://idp.example.test',
+        AB_OIDC_CLIENT_ID: 'oidc-client',
+        AB_OIDC_CLIENT_SECRET: OIDC_SECRET,
+        AB_OIDC_NAME: 'corp',
+        AB_LOGIN_ALLOW_DOMAINS: 'example.test',
+        AB_LOGIN_AUTO_PROVISION: 'member',
+      };
+      const result = await setup(options(wrangler, { signIn: true, env, domain, log: (l) => lines.push(l) }));
+      expect(result.created).toEqual([
+        'database',
+        'AB_MASTER_KEY',
+        'AB_ADMIN_TOKEN',
+        'AB_GOOGLE_CLIENT_SECRET',
+        'AB_OIDC_CLIENT_SECRET',
+      ]);
+      expect(varsOf()).toMatchObject({
+        AB_PUBLIC_URL: `https://${domain}`,
+        AB_GOOGLE_CLIENT_ID: 'google-client.apps.example',
+        AB_GOOGLE_HOSTED_DOMAIN: 'example.test',
+        AB_OIDC_ISSUER: 'https://idp.example.test',
+        AB_OIDC_NAME: 'corp',
+        AB_LOGIN_AUTO_PROVISION: 'member',
+      });
+      expect(JSON.stringify(varsOf())).not.toMatch(/CLIENT_SECRET/);
+      expect(state.puts.find((p) => p.name === 'AB_GOOGLE_CLIENT_SECRET')?.input).toBe(GOOGLE_SECRET);
+      expect(state.puts.find((p) => p.name === 'AB_OIDC_CLIENT_SECRET')?.input).toBe(OIDC_SECRET);
+      const seen = observed(state, lines);
+      expect(seen).not.toContain(GOOGLE_SECRET);
+      expect(seen).not.toContain(OIDC_SECRET);
+      expect(lines).toContain(`  https://${domain}/auth/callback/google`);
+      expect(lines).toContain(`  https://${domain}/auth/callback/oidc-corp`);
+    });
+
+    it('prompts: asks which providers, reads the secret hidden, never echoes it', async () => {
+      const { state, wrangler } = fakeWrangler();
+      const lines: string[] = [];
+      const asked: string[] = [];
+      const hidden: string[] = [];
+      const tty = terminal(
+        {
+          'providers to configure': 'github',
+          'GitHub client id': 'gh-client',
+          'GitHub client secret': GOOGLE_SECRET,
+          'GitHub organizations': 'example-org',
+          'Auto-provision': 'member',
+        },
+        asked,
+      );
+      await setup(
+        options(wrangler, {
+          signIn: true,
+          domain,
+          prompt: tty.prompt,
+          promptSecret: async (q) => (hidden.push(q), tty.promptSecret(q)),
+          log: (l) => lines.push(l),
+        }),
+      );
+      expect(hidden).toHaveLength(1);
+      expect(hidden[0]).toContain('GitHub client secret');
+      expect(asked.some((q) => q.includes('Google'))).toBe(false);
+      expect(varsOf()).toMatchObject({
+        AB_GITHUB_CLIENT_ID: 'gh-client',
+        AB_LOGIN_ALLOW_GITHUB_ORGS: 'example-org',
+        AB_LOGIN_AUTO_PROVISION: 'member',
+      });
+      expect(state.puts.map((p) => p.name)).toContain('AB_GITHUB_CLIENT_SECRET');
+      expect(observed(state, [...lines, ...asked])).not.toContain(GOOGLE_SECRET);
+      expect(lines).toContain(`  https://${domain}/auth/callback/github`);
+    });
+
+    it('idempotent: a plain re-run keeps the variables; empty answers keep variables and the stored secret', async () => {
+      const { state, wrangler } = fakeWrangler();
+      const env = {
+        AB_GOOGLE_CLIENT_ID: 'google-client',
+        AB_GOOGLE_CLIENT_SECRET: GOOGLE_SECRET,
+        AB_LOGIN_ALLOW_EMAILS: 'a@example.test',
+      };
+      await setup(options(wrangler, { signIn: true, env, domain }));
+      const putsAfterFirst = state.puts.length;
+      const path = localConfigPath(workerDir, 'agility-bridge-staging');
+      const first = readFileSync(path, 'utf8');
+      // No --sign-in: nothing is asked and nothing changes.
+      await setup(options(wrangler, { secretsFile: join(dir, 'b.secrets'), domain }));
+      expect(readFileSync(path, 'utf8')).toBe(first);
+      expect(state.puts.length).toBe(putsAfterFirst);
+      // --sign-in with empty answers: same values, the stored secret is kept.
+      const lines: string[] = [];
+      await setup(
+        options(wrangler, {
+          secretsFile: join(dir, 'c.secrets'),
+          signIn: true,
+          domain,
+          ...terminal({}),
+          log: (l) => lines.push(l),
+        }),
+      );
+      expect(readFileSync(path, 'utf8')).toBe(first);
+      expect(state.puts.length).toBe(putsAfterFirst);
+      expect(lines.join('\n')).toContain('warning: An AB_LOGIN_ALLOW_* allowlist is set');
+    });
+
+    it('changing a value re-puts only the secret given; "-" clears an optional variable', async () => {
+      const { state, wrangler } = fakeWrangler();
+      await setup(
+        options(wrangler, {
+          signIn: true,
+          domain,
+          env: {
+            AB_GITHUB_CLIENT_ID: 'gh-1',
+            AB_GITHUB_CLIENT_SECRET: GOOGLE_SECRET,
+            AB_LOGIN_ALLOW_DOMAINS: 'example.test',
+          },
+        }),
+      );
+      const rotated = secret('rotated');
+      await setup(
+        options(wrangler, {
+          secretsFile: join(dir, 'd.secrets'),
+          signIn: true,
+          domain,
+          env: { AB_GITHUB_CLIENT_ID: 'gh-2', AB_GITHUB_CLIENT_SECRET: rotated, AB_LOGIN_ALLOW_DOMAINS: '-' },
+        }),
+      );
+      expect(varsOf()).toMatchObject({ AB_GITHUB_CLIENT_ID: 'gh-2' });
+      expect(varsOf()).not.toHaveProperty('AB_LOGIN_ALLOW_DOMAINS');
+      expect(state.secrets.get('AB_GITHUB_CLIENT_SECRET')).toBe(rotated);
+    });
+
+    it('validates with the server parser: a bad value fails before anything is created', async () => {
+      const github = { AB_GITHUB_CLIENT_ID: 'c', AB_GITHUB_CLIENT_SECRET: 'x' };
+      const cases: [Record<string, string>, RegExp][] = [
+        [
+          { AB_OIDC_CLIENT_ID: 'c', AB_OIDC_CLIENT_SECRET: 'x', AB_OIDC_ISSUER: 'http://idp.example.test' },
+          /AB_OIDC_ISSUER/,
+        ],
+        [{ AB_GOOGLE_CLIENT_ID: 'c' }, /AB_GOOGLE_CLIENT_SECRET/],
+        [{ ...github, AB_LOGIN_AUTO_PROVISION: 'root' }, /AB_LOGIN_AUTO_PROVISION/],
+        [{ ...github, AB_LOGIN_ALLOW_EMAILS: 'nope' }, /AB_LOGIN_ALLOW_EMAILS/],
+        [{ AB_CF_ACCESS_TEAM: 'team', AB_CF_ACCESS_AUD: 'short' }, /AB_CF_ACCESS_AUD/],
+        [{}, /no provider/],
+      ];
+      for (const [env, message] of cases) {
+        const { state, wrangler } = fakeWrangler();
+        await expect(setup(options(wrangler, { signIn: true, domain, env }))).rejects.toThrow(message);
+        expect(state.databases).toEqual([]);
+        expect(state.deploys).toBe(0);
+        expect(state.puts).toEqual([]);
+      }
+      const { wrangler } = fakeWrangler();
+      await expect(
+        setup(options(wrangler, { signIn: true, publicUrl: 'http://bridge.example.test', env: github })),
+      ).rejects.toThrow(/public URL/);
+    });
+
+    it('a failed validation never repeats a secret', async () => {
+      const { state, wrangler } = fakeWrangler();
+      const env = {
+        AB_OIDC_CLIENT_ID: 'c',
+        AB_OIDC_CLIENT_SECRET: GOOGLE_SECRET,
+        AB_OIDC_ISSUER: 'http://idp.example.test',
+      };
+      const error = await setup(options(wrangler, { signIn: true, domain, env })).catch((e: Error) => e);
+      expect((error as Error).message).not.toContain(GOOGLE_SECRET);
+      expect(state.calls.join('\n')).not.toContain(GOOGLE_SECRET);
+    });
+
+    it('warns like the server: allowlist without auto-provisioning, and auto-provisioning as admin', async () => {
+      const github = {
+        AB_GITHUB_CLIENT_ID: 'c',
+        AB_GITHUB_CLIENT_SECRET: 'x',
+        AB_LOGIN_ALLOW_DOMAINS: 'example.test',
+      };
+      const first = fakeWrangler();
+      const lines: string[] = [];
+      await setup(options(first.wrangler, { signIn: true, domain, log: (l) => lines.push(l), env: github }));
+      expect(lines.join('\n')).toContain('AB_LOGIN_AUTO_PROVISION=off');
+      const second = fakeWrangler();
+      const adminLines: string[] = [];
+      await setup(
+        options(second.wrangler, {
+          secretsFile: join(dir, 'e.secrets'),
+          signIn: true,
+          domain,
+          log: (l) => adminLines.push(l),
+          env: { ...github, AB_LOGIN_AUTO_PROVISION: 'admin' },
+        }),
+      );
+      expect(adminLines.join('\n')).toContain('becomes an administrator');
+    });
+
+    it('without a domain the callback URLs use the workers.dev address learnt from the first deploy', async () => {
+      const { wrangler } = fakeWrangler();
+      const lines: string[] = [];
+      await setup(
+        options(wrangler, {
+          signIn: true,
+          log: (l) => lines.push(l),
+          env: { AB_GITHUB_CLIENT_ID: 'c', AB_GITHUB_CLIENT_SECRET: 'x' },
+        }),
+      );
+      expect(lines).toContain('  https://agility-bridge-staging.example.workers.dev/auth/callback/github');
+    });
+
+    it('Cloudflare Access needs no secret and no callback URL', async () => {
+      const { state, wrangler } = fakeWrangler();
+      const lines: string[] = [];
+      await setup(
+        options(wrangler, {
+          signIn: true,
+          domain,
+          log: (l) => lines.push(l),
+          env: { AB_CF_ACCESS_TEAM: 'acme', AB_CF_ACCESS_AUD: 'a'.repeat(64) },
+        }),
+      );
+      expect(state.puts.map((p) => p.name)).toEqual(['AB_MASTER_KEY', 'AB_ADMIN_TOKEN']);
+      expect(lines.join('\n')).not.toContain('/auth/callback');
+    });
+
+    it('a dry run asks nothing and sends nothing', async () => {
+      const { state, wrangler } = fakeWrangler();
+      const asked: string[] = [];
+      await setup(options(wrangler, { dryRun: true, signIn: true, ...terminal({}, asked) }));
+      expect(asked).toEqual([]);
+      expect(state.calls).toEqual(['whoami', 'd1 list --json']);
+    });
+
+    it('without --sign-in the environment is never read', async () => {
+      const { state, wrangler } = fakeWrangler();
+      await setup(
+        options(wrangler, { env: { AB_GITHUB_CLIENT_ID: 'c', AB_GITHUB_CLIENT_SECRET: GOOGLE_SECRET } }),
+      );
+      expect(state.puts.map((p) => p.name)).toEqual(['AB_MASTER_KEY', 'AB_ADMIN_TOKEN']);
+    });
+  });
 });

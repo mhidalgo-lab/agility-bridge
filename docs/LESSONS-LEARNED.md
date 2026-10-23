@@ -34,7 +34,7 @@ How to use it:
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193 |
-| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208, L-210 – L-214 |
+| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208, L-210 – L-214, L-223 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
@@ -889,6 +889,13 @@ Windsurf became Devin Desktop (new path, `serverUrl`), VS Code moved its referen
 whether headers substitute variables. Snippets use the documented command or key, `docs/RESEARCH.md` records the page and the
 date, and anything the page did not show is marked *unverified* instead of being copied from memory.
 *Applied in:* P4-06.
+
+**L-223 — A setup script validates with the server's parser, and a secret has one destination.**
+`cf:setup --sign-in` builds the environment the Worker will boot with and runs `identitySettingsFromEnv` on it before it
+creates or deploys anything, so a bad issuer fails at setup, not at the first request, and the server's warnings appear
+once, in one place. Client secrets are held in memory, sent on stdin and checked absent from arguments, logs, the local
+config and the secrets file by a test that looks at all four.
+*Applied in:* P4-13.
 
 ## L. Cloudflare Workers
 
