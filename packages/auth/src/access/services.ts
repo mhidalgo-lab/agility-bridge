@@ -274,6 +274,20 @@ export function accessServices(options: AccessServicesOptions) {
       return storage.users.update(id, email === undefined ? patch : { ...patch, email });
     },
     disable: (id: string) => storage.users.update(id, { disabledAt: now() }),
+    /**
+     * Clears the user's `(idp, idpSubject)` in one compare-and-set step against the binding the caller saw (P4-12,
+     * L-220). The next verified sign-in with the user's email binds again. A binding that changed in between, or none, is a
+     * conflict and nothing is written. Authorization, confirmation and ending sessions are the caller's (guards).
+     */
+    async unbind(id: string, expected: { idp: string; idpSubject: string }): Promise<User> {
+      const cleared = await storage.users.unbind(id, expected);
+      if (cleared === null) {
+        throw new ConflictError(
+          'The sign-in identity changed or was already cleared. Reload and check again.',
+        );
+      }
+      return cleared;
+    },
   };
 
   /** Canonical, and allowed by this deployment's policy (P2-19). */

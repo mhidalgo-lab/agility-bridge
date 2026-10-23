@@ -193,6 +193,25 @@ export const COMMANDS: readonly CommandSpec[] = [
     api: async (_r, p) => ({ method: 'POST', path: `/users/${enc(p.args[0] as string)}/disable` }),
   },
   {
+    words: ['user', 'unbind'],
+    summary:
+      "Clear a user's sign-in identity so they can sign in with another provider (owner; the next verified sign-in with their email binds the account)",
+    args: [id('user-id', 'User id')],
+    options: [
+      {
+        name: 'confirm',
+        kind: 'string',
+        required: true,
+        help: "The user's current email address, typed again. Anyone who signs in with that verified email afterwards takes the account",
+      },
+    ],
+    api: async (_r, p) => ({
+      method: 'POST',
+      path: `/users/${enc(p.args[0] as string)}/unbind`,
+      body: { confirm: p.opts['confirm'] },
+    }),
+  },
+  {
     words: ['user', 'end-sessions'],
     summary: "End all of a user's browser sessions (sign them out everywhere)",
     args: [id('user-id', 'User id')],

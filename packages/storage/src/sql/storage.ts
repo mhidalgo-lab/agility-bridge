@@ -177,6 +177,25 @@ export function createSqlStorage(driver: SqlDriver, options: SqlStorageOptions =
       );
       return rows[0] ?? null;
     },
+    async unbind(id, expected) {
+      checkId('users', id);
+      if (typeof expected.idp !== 'string' || typeof expected.idpSubject !== 'string') return null;
+      // One conditional statement: it applies only while the row still holds the identity the caller saw (L-220).
+      const rows = await guard('users', 'write', () =>
+        db
+          .update(schema.users)
+          .set({ idp: null, idpSubject: null, updatedAt: now() })
+          .where(
+            and(
+              eq(schema.users.id, id),
+              eq(schema.users.idp, expected.idp),
+              eq(schema.users.idpSubject, expected.idpSubject),
+            ),
+          )
+          .returning(),
+      );
+      return rows[0] ?? null;
+    },
     list: () => userRepo.list(),
   };
 

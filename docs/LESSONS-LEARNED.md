@@ -33,7 +33,7 @@ How to use it:
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208, L-210 – L-214, L-223 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -767,6 +767,28 @@ only compares the verified `(idp, subject)` with that user's bound identity, che
 and `auth_time` when reported, the Cloudflare Access assertion's `iat`), and rotates the session. Google and GitHub report no
 `auth_time`: for them the IdP's own prompt is the only evidence (decision D-34).
 *Applied in:* P4-02.
+
+**L-220 — Clear an identity against the binding the owner saw, in one statement.**
+An unbind that updates by user id alone can undo a newer binding: owner A reads Ann bound at Google, owner B unbinds her and
+she signs in at GitHub, then A's confirmation clears the GitHub binding too. `users.unbind(id, expected)` is one conditional
+statement (`WHERE id = ? AND idp = ? AND idp_subject = ?` with `RETURNING`, L-072) and no row means `409`; a null expectation
+never matches an unbound row. relic-bridge's version read the user and then updated it (Phase 4 review). Race it on memory,
+SQLite with two connections and D1, including an unbind against a first sign-in.
+*Applied in:* P4-12.
+
+**L-221 — End sessions after the write that changes who may sign in, never only before it.**
+Ending a user's sessions first and then clearing the binding leaves a window: the person signs in again with the old identity
+between the two and keeps a fresh session. Ending them after the compare-and-set closes it (anything open at that moment, and
+anything created since, is deleted) at the cost of one failure mode: if the revocation fails after the clear, the request is an
+error and the owner ends the sessions with `user end-sessions`. The audit row of the change carries the previous provider only.
+*Applied in:* P4-12.
+
+**L-222 — An account-takeover primitive refuses the easy self-inflicted cases with one plain rule.**
+"Never your own account through a session" is simpler and safer than counting owners: it keeps the only owner from locking
+themselves out, stops a stolen session from detaching the account it holds, and needs no extra branch for the last owner. The
+break-glass token has no account and may move anyone; another owner may move an owner. Say so in the refusal ("ask another
+owner, or use the admin token") and in the docs, and hide the control in the panel for the same cases.
+*Applied in:* P4-12.
 
 ## K. Admin UI
 

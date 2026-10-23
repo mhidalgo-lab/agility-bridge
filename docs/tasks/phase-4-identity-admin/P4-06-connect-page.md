@@ -2,7 +2,7 @@
 id: P4-06
 title: Connect page with client snippets
 phase: 4
-status: review
+status: done
 priority: medium
 depends_on: [P4-04, P4-07]
 adr: ["0016"]

@@ -156,4 +156,20 @@
   dashboard; (c) also write client secrets to `--secrets-file`.
 - **Recommendation:** (a). The identity provider keeps the client secret (rotating it is one click there), while the
   secrets file exists for values only Cloudflare would hold; a second copy of a client secret is one more place to leak.
+
+### D-45 — What the unbind audit row records about the old binding *(P4-12)*
+- **Context:** `user.unbind` must let an auditor tell which provider was cleared. The provider subject is a stable identifier of a
+  person at that provider; a hash of it is no safer when the subject is a number (GitHub) or an email-like string.
+- **Options:** (a) the previous provider id only; (b) provider id plus a truncated hash of the subject; (c) provider id plus
+  the subject.
+- **Recommendation:** (a): the user id in the row already says whose account it was, and a short unsalted hash of a guessable
+  id can be reversed by anyone who can read the audit log.
+- **Owner:** _pending_ (implemented as (a)).
+
+### D-46 — After an unbind, who may claim the account *(P4-12)*
+- **Context:** once the binding is cleared, the next verified sign-in whose email matches binds the account, at any configured
+  provider (L-092). A provider with weaker email verification is a way in during that window.
+- **Options:** (a) ship as is and document the residual (keep configured providers to ones whose email checks you trust);
+  (b) let the owner name the provider the next binding must come from, with an expiry (task P4-24).
+- **Recommendation:** (a) now, (b) when a deployment has providers of different strength; it is a small follow-up (P4-24).
 - **Owner:** _pending_ (implemented as (a)).

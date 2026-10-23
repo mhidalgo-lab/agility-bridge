@@ -21,6 +21,7 @@ export type FlashCode =
   | 'last_owner'
   | 'token_form_used'
   | 'sessions_ended'
+  | 'identity_cleared'
   | 'origin_changed'
   | 'invalid'
   | 'not_found'
@@ -48,6 +49,10 @@ export const FLASH_MESSAGES: Readonly<Record<FlashCode, FlashMessage>> = Object.
     text: 'That form was already used, so no second device token was created. Check the grant before making another.',
   },
   sessions_ended: { kind: 'success', text: 'Every browser session of that person has ended.' },
+  identity_cleared: {
+    kind: 'success',
+    text: 'The sign-in identity was cleared and the person was signed out everywhere. The next verified sign-in with their email binds the account.',
+  },
   origin_changed: {
     kind: 'success',
     text: 'The origin changed. Every credential of the instance and every grant that used them was revoked.',

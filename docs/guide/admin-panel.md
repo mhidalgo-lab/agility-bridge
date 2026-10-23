@@ -101,6 +101,10 @@ owners and admins read-only.
 - **Disable** ends their sessions and stops sign-in; there is no way to enable a user again from the panel. Their grants
   and device tokens stay until you revoke them on the grants page.
 - **End their sessions** works for yourself (any role), anyone (owners) or members (admins); ending your own signs you out.
+- **Move to another provider…** (owners only, for a person who is signed in with a provider, never your own page): clears their
+  sign-in identity so the next verified sign-in with their email binds again, and ends their sessions. The page warns about the
+  takeover risk and asks for the email again; it needs a recent sign-in. See
+  [moving a user to another provider](identity-providers.md#moving-a-user-to-another-provider).
 - The **last active owner** cannot be demoted or disabled. The page says "That would leave the server without an active
   owner" and changes nothing; make another person an owner first.
 

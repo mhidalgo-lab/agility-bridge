@@ -2,7 +2,13 @@
 // Two first sign-ins for one unbound email through two providers at once (L-185): exactly one wins. Shared by the
 // memory, SQLite and D1 runs, so every adapter proves the compare-and-set.
 import type { Storage } from '@agility-bridge/storage';
-import { EMPTY_LOGIN_POLICY, resolveLoginUser, type VerifiedIdentity } from '../src/index.ts';
+import {
+  accessServices,
+  EMPTY_LOGIN_POLICY,
+  guardedServices,
+  resolveLoginUser,
+  type VerifiedIdentity,
+} from '../src/index.ts';
 
 const identity = (idp: string, subject: string): VerifiedIdentity => ({
   idp,
@@ -26,5 +32,43 @@ export async function loginRace(
     ok: decisions.filter((d) => d.ok).length,
     conflict: decisions.filter((d) => !d.ok && d.reason === 'identity_conflict').length,
     bound: row?.idp ?? null,
+  };
+}
+
+/**
+ * Four concurrent owner unbinds of one bound user (P4-12, L-220): one wins, the rest conflict and write nothing; a
+ * first sign-in then binds another identity, and an unbind confirmed against the old binding is refused.
+ */
+export async function unbindRace(
+  storage: Storage,
+  userId: string,
+  email: string,
+): Promise<{ ok: number; conflict: number; later: 'conflict' | 'applied' }> {
+  const tools = new Map();
+  const svc = accessServices({ storage, tools });
+  const actor = { kind: 'break_glass' } as const;
+  const before = await storage.users.get(userId);
+  const settled = await Promise.all(
+    [1, 2, 3, 4].map(() =>
+      guardedServices(svc, { storage, tools }, actor)
+        .users.unbind(userId, email)
+        .then(
+          () => 'ok' as const,
+          (e: unknown) =>
+            (e as Error).name === 'ConflictError' ? ('conflict' as const) : ('other' as const),
+        ),
+    ),
+  );
+  await storage.users.bind(userId, 'github', 'gh-new');
+  const later = await svc.users
+    .unbind(userId, { idp: before?.idp as string, idpSubject: before?.idpSubject as string })
+    .then(
+      () => 'applied' as const,
+      () => 'conflict' as const,
+    );
+  return {
+    ok: settled.filter((r) => r === 'ok').length,
+    conflict: settled.filter((r) => r === 'conflict').length,
+    later,
   };
 }

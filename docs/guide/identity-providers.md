@@ -90,6 +90,39 @@ If the email of the person already exists as a user, they are promoted to owner 
 had is recorded in the audit row. After the first owner exists, create further users with
 `agility-bridge user add` or let people in through an allowlist.
 
+## Moving a user to another provider
+
+A user is bound to one provider account (one `(provider, subject)` per user). A verified email that belongs to a user bound
+elsewhere is refused, so someone who changes provider account is locked out until an **owner** clears the binding:
+
+```sh
+agility-bridge user unbind usr_abc123 --confirm ana@example.com
+# against a running server: AB_ADMIN_URL and the admin token, as for setup-link
+# or: POST /api/admin/v1/users/usr_abc123/unbind  {"confirm": "ana@example.com"}
+```
+
+In the admin panel (owners only): open the user, then **Move to another provider…**. The page states the takeover risk
+below and asks you to type the user's email again; a wrong email changes nothing and is not echoed back. The button is
+shown only for a user who is bound, and never on your own page. The panel never shows the provider subject.
+
+What happens: the provider and subject are cleared in one compare-and-set step against the binding you confirmed, and every
+browser session of the user ends. The user's role, Agility tokens, grants and device tokens are untouched. The **next
+verified sign-in whose email matches binds the account**, at whichever configured provider it comes from. That is the
+account-takeover risk: anyone who controls that email address at a provider you configured gets the account. Move a user
+only after checking with them, and keep the configured providers to ones whose email verification you trust (a generic
+OIDC provider can assert any address).
+
+Rules:
+
+- Owners only (an admin or member gets `403`); the break-glass admin token counts as an owner.
+- A session needs a sign-in from the last 10 minutes (`403 reauth_required`); the admin token does not.
+- Not your own account through a session (`403`: ask another owner, or use the admin token). This also means the only owner
+  cannot lock themselves out.
+- The request repeats the user's current email, compared after trim and lowercase (`422` otherwise, never echoed back); a
+  user with no binding is `409`; two owners unbinding at once get one `200` and one `409`.
+- It is audited as `user.unbind` with the previous provider id (never the subject or the typed email) and the sessions as
+  `session.revoke_all` with reason `unbind`. A refusal writes a `denied` row and changes nothing.
+
 ## Create the applications
 
 Redirect URIs are exact, and built from `AB_PUBLIC_URL`:

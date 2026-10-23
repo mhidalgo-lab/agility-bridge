@@ -1239,6 +1239,7 @@ describe('forms refuse what they must, and refuse it without any effect', () => 
     [`/admin/users/${e.ids.alice}/role`, { role: 'admin' }],
     [`/admin/users/${e.ids.alice}/disable`, { confirm: 'yes' }],
     [`/admin/users/${e.ids.alice}/sessions`, { confirm: 'yes' }],
+    [`/admin/users/${e.ids.alice}/unbind`, { confirm: 'yes', email: ALICE }],
   ];
 
   it('refuses a missing or wrong CSRF token, another site, another content type and a member, and a stranger is sent to sign-in', async () => {

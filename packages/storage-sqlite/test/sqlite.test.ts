@@ -241,6 +241,30 @@ describe('atomic single-use state across connections (L-073)', () => {
   });
 });
 
+describe('clearing an identity across connections (P4-12, L-220)', () => {
+  it('lets exactly one of four unbinds from two connections win, and a stale one never clears a new binding', async () => {
+    const file = join(dir, 'unbind.db');
+    const a = await openSqlStorage(createSqliteDriver(new DatabaseSync(file)));
+    const b = await openSqlStorage(createSqliteDriver(new DatabaseSync(file)));
+    await a.users.create({ id: 'u1', email: 'u1@example.test', role: 'member' });
+    await a.users.bind('u1', 'google', 'sub-1');
+    const expected = { idp: 'google', idpSubject: 'sub-1' };
+    const results = await Promise.all([
+      a.users.unbind('u1', expected),
+      b.users.unbind('u1', expected),
+      a.users.unbind('u1', expected),
+      b.users.unbind('u1', expected),
+    ]);
+    expect(results.filter((r) => r !== null)).toHaveLength(1);
+    // A first sign-in on one connection, a stale unbind on the other: the new binding stays.
+    await b.users.bind('u1', 'github', 'gh-1');
+    expect(await a.users.unbind('u1', expected)).toBeNull();
+    expect(await a.users.get('u1')).toMatchObject({ idp: 'github', idpSubject: 'gh-1' });
+    await a.close();
+    await b.close();
+  });
+});
+
 describe('access bundle (P3-02)', () => {
   it('reads a token and its access records in one driver call (one D1 round trip)', async () => {
     const inner = createSqliteDriver(new DatabaseSync(':memory:'));

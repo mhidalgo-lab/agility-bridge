@@ -54,6 +54,7 @@ function routes(w: World): [string, string, unknown?][] {
     ['GET', `/users/${w.ids.owner}`],
     ['PATCH', `/users/${w.ids.owner}`, { displayName: 'X' }],
     ['POST', `/users/${w.ids.owner}/disable`],
+    ['POST', `/users/${w.ids.alice}/unbind`, { confirm: 'alice@example.test' }],
     ['GET', '/instances'],
     ['POST', '/instances', { label: 'New', baseUrl: 'https://new.example.test/x' }],
     ['GET', `/instances/${w.ids.instance}`],
@@ -160,6 +161,7 @@ describe('negative authorization (every route)', () => {
       ['PATCH', `/users/${w.ids.alice}`, { role: 'admin' }],
       ['PATCH', `/users/${w.ids.owner}`, { displayName: 'x' }],
       ['POST', `/users/${w.ids.owner}/disable`],
+      ['POST', `/users/${w.ids.alice}/unbind`, { confirm: 'alice@example.test' }],
       ['PATCH', `/workspaces/${w.ids.workspaceA}`, { writePolicy: { enabled: true } }],
       [
         'POST',
@@ -280,6 +282,49 @@ describe('owner actions', () => {
       targetId: w.ids.instance,
       details: { actor: 'owner', via: 'api' },
     });
+  });
+
+  it('unbinding a user (P4-12): owners and the break-glass token, with a recent sign-in, and nobody else', async () => {
+    const w = await world({}, { admin: true });
+    await w.storage.users.bind(w.ids.alice, 'google', 'sub-alice');
+    const path = `/users/${w.ids.alice}/unbind`;
+    const body = { confirm: 'alice@example.test' };
+    const before = await snapshot(w);
+    expect((await call(w, 'none', 'POST', path, body)).status).toBe(401);
+    for (const who of ['member', 'admin'] as const) {
+      expect((await call(w, who, 'POST', path, body)).status, who).toBe(403);
+    }
+    const stale = await call(w, 'owner_stale', 'POST', path, body);
+    expect(stale.status).toBe(403);
+    expect((await stale.json()).error.code).toBe('reauth_required');
+    expect(await snapshot(w)).toBe(before);
+    expect(await w.storage.audit.query({ kind: 'admin', status: 'ok', limit: 100 })).toEqual([]);
+    // The break-glass token is not a browser session: no recent sign-in needed, and the row says who acted.
+    const ok = await call(w, 'break_glass', 'POST', path, body);
+    expect(ok.status).toBe(200);
+    expect(await w.storage.users.get(w.ids.alice)).toMatchObject({ idp: null, idpSubject: null });
+    const [row] = await w.storage.audit.query({ kind: 'admin', status: 'ok', limit: 100 });
+    expect(row).toMatchObject({
+      action: 'user.unbind',
+      targetId: w.ids.alice,
+      userId: null,
+      details: { actor: 'break_glass', previousIdp: 'google' },
+    });
+    expect(JSON.stringify(row)).not.toContain('sub-alice');
+    // An owner on their own account is refused even when they are the only owner (no session lock-out).
+    await w.storage.users.bind(w.ids.owner, 'google', 'sub-owner');
+    expect(
+      (await call(w, 'owner', 'POST', `/users/${w.ids.owner}/unbind`, { confirm: 'owner@example.test' }))
+        .status,
+    ).toBe(403);
+    expect(await w.storage.users.get(w.ids.owner)).toMatchObject({ idp: 'google' });
+    expect(
+      (
+        await call(w, 'break_glass', 'POST', `/users/${w.ids.owner}/unbind`, {
+          confirm: 'owner@example.test',
+        })
+      ).status,
+    ).toBe(200);
   });
 
   it('the last active owner cannot be demoted or disabled', async () => {

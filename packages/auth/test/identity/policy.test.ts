@@ -12,7 +12,7 @@ import {
   resolveLoginUser,
   type VerifiedIdentity,
 } from '../../src/index.ts';
-import { loginRace } from '../login-race.ts';
+import { loginRace, unbindRace } from '../login-race.ts';
 
 let storage: Storage;
 beforeEach(() => {
@@ -142,6 +142,16 @@ describe('existing users', () => {
 
   it('lets exactly one of several concurrent first sign-ins bind the user (L-185)', async () => {
     expect(await loginRace(storage)).toEqual({ ok: 1, conflict: 2, bound: expect.any(String) });
+  });
+
+  it('lets exactly one of several concurrent unbinds clear the binding (P4-12, L-220)', async () => {
+    await storage.users.create({ id: 'u-un', email: 'un@example.test', role: 'member' });
+    await storage.users.bind('u-un', 'google', 'g-un');
+    expect(await unbindRace(storage, 'u-un', 'un@example.test')).toEqual({
+      ok: 1,
+      conflict: 3,
+      later: 'conflict',
+    });
   });
 });
 

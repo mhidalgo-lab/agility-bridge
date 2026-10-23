@@ -247,6 +247,12 @@ export interface UserRepository extends Repository<User, NewUser, UserPatch> {
    * user already holds this `(idp, idpSubject)`. Two concurrent first sign-ins cannot both bind.
    */
   bind(id: string, idp: string, idpSubject: string, patch?: UserBindPatch): Promise<User | null>;
+  /**
+   * Clears the identity in one compare-and-set step, only while the row still holds exactly `expected` (P4-12, L-220):
+   * the owner confirmed the binding they saw, so a change in between (another unbind plus a new first sign-in) is not
+   * undone. Returns the updated user, or `null` when it did not apply (missing, unbound, or bound to another identity).
+   */
+  unbind(id: string, expected: { idp: string; idpSubject: string }): Promise<User | null>;
   list(): Promise<User[]>;
 }
 
