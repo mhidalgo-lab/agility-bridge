@@ -61,7 +61,8 @@ export function isWorkspaceSlug(value: string): boolean {
 /** The endpoint of a workspace: the configured origin plus `/w/<slug>/mcp`. Throws for a slug the storage would not hold. */
 export function endpointFor(publicOrigin: string, slug: string): string {
   if (!isWorkspaceSlug(slug)) throw new TypeError('not a workspace slug');
-  return `${publicOrigin.replace(/\/+$/, '')}/w/${slug}/mcp`;
+  // The origin alone: no path, so no trailing slash to strip.
+  return `${new URL(publicOrigin).origin}/w/${slug}/mcp`;
 }
 
 export function serverName(slug: string): string {
