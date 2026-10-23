@@ -376,10 +376,70 @@ describe('sign-in on workerd (P4-01)', () => {
         sub: 'first',
       });
       const done = await call(mf, `/auth/callback/oidc-corp?code=${authCode}&state=${state}`, {
+        redirect: 'manual',
         headers: { cookie },
       });
-      expect(done.status).toBe(200);
-      expect(await done.text()).toContain('first@example.test (owner)');
+      // The sign-in ends in a session (P4-02): a cookie and a redirect to the account page.
+      expect(done.status).toBe(303);
+      expect(done.headers.get('location')).toBe('/auth/account');
+      const sessionCookie = done.headers.getSetCookie().find((c) => c.startsWith('ab_session=')) as string;
+      expect(sessionCookie).toContain('HttpOnly');
+      const session = sessionCookie.split(';')[0] as string;
+      // A session-authenticated admin request works on the Worker: reads with the cookie, changes with the CSRF token,
+      // and the session lives in D1, so every isolate sees the logout.
+      const info = (await (
+        await call(mf, '/api/admin/v1/session', {
+          headers: { cookie: session, 'sec-fetch-site': 'same-origin' },
+        })
+      ).json()) as { user: { role: string; email: string }; csrfToken: string; recentAuth: boolean };
+      expect(info).toMatchObject({ user: { role: 'owner', email: 'first@example.test' }, recentAuth: true });
+      const asOwner = await call(mf, '/api/admin/v1/users', {
+        headers: { cookie: session, 'sec-fetch-site': 'same-origin' },
+      });
+      expect(asOwner.status).toBe(200);
+      const noToken = await call(mf, '/api/admin/v1/users', {
+        method: 'POST',
+        headers: {
+          cookie: session,
+          'sec-fetch-site': 'same-origin',
+          origin: ORIGIN,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ email: 'second@example.test', role: 'member' }),
+      });
+      expect(noToken.status).toBe(403);
+      const created = await call(mf, '/api/admin/v1/users', {
+        method: 'POST',
+        headers: {
+          cookie: session,
+          'sec-fetch-site': 'same-origin',
+          origin: ORIGIN,
+          'x-csrf-token': info.csrfToken,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ email: 'second@example.test', role: 'member' }),
+      });
+      expect(created.status).toBe(201);
+      const bad = await call(mf, '/api/admin/v1/users', {
+        headers: { cookie: 'ab_session=forged', 'sec-fetch-site': 'same-origin' },
+      });
+      expect(bad.status).toBe(401);
+      const out = await call(mf, '/auth/logout', {
+        method: 'POST',
+        headers: {
+          cookie: session,
+          'sec-fetch-site': 'same-origin',
+          origin: ORIGIN,
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        body: `_csrf=${info.csrfToken}`,
+      });
+      expect(out.status).toBe(200);
+      expect(out.headers.get('clear-site-data')).toBe('"cookies"');
+      const after = await call(mf, '/api/admin/v1/users', {
+        headers: { cookie: session, 'sec-fetch-site': 'same-origin' },
+      });
+      expect(after.status).toBe(401);
       // The one-time link is spent, and the owner exists with the identity bound (state in D1, not isolate memory).
       const again = await call(mf, '/auth/setup', {
         method: 'POST',
@@ -390,7 +450,10 @@ describe('sign-in on workerd (P4-01)', () => {
       const users = (await (
         await call(mf, '/api/admin/v1/users', { headers: { authorization: `Bearer ${admin}` } })
       ).json()) as { email: string; role: string; idp: string }[];
-      expect(users).toMatchObject([{ email: 'first@example.test', role: 'owner', idp: 'oidc:corp' }]);
+      expect(users.find((u) => u.role === 'owner')).toMatchObject({
+        email: 'first@example.test',
+        idp: 'oidc:corp',
+      });
     } finally {
       await srv.close();
     }

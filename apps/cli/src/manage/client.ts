@@ -3,7 +3,13 @@
 // no redirects, the admin token), or the same admin API in process over the local SQLite database (local, acting as
 // the break-glass owner, audit rows `via: cli`). Both speak the same requests, so results and audit rows match.
 import { dirname } from 'node:path';
-import { accessServices, credentialValidator, Keyring, verifyKeyring } from '@agility-bridge/auth';
+import {
+  accessServices,
+  credentialValidator,
+  Keyring,
+  revokeUserSessions,
+  verifyKeyring,
+} from '@agility-bridge/auth';
 import { CORE_TOOLS, type Logger, systemClock, webCryptoRandom } from '@agility-bridge/core';
 import { ADMIN_BASE, AuditWriter, createAdminApi } from '@agility-bridge/http-app';
 import { openSqliteStorage, type SqliteStorage } from '@agility-bridge/storage-sqlite';
@@ -62,6 +68,7 @@ export async function localClient(
     audit,
     onChange: () => {},
     authenticate: async () => ({ kind: 'break_glass' }),
+    revokeUserSessions: (userId) => revokeUserSessions(storage.kv, userId),
     clientIp: () => 'local',
     logger,
     clock: systemClock,

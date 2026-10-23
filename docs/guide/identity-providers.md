@@ -1,9 +1,9 @@
 # Sign-in providers and the first owner
 
-> Phase 4 (P4-01): who may sign in to the admin side of agility-bridge, and how the first owner is created. Browser
-> sessions and the admin panel come with P4-02 and later: until then a finished sign-in ends on a page that names the
-> user, and day-to-day administration is the [admin API](../reference/admin-api.md) and the
-> [management commands](cli.md).
+> Phase 4 (P4-01): who may sign in to the admin side of agility-bridge, and how the first owner is created. A finished
+> sign-in starts a browser session ([admin access](admin-access.md): cookie, roles, CSRF, re-authentication) and lands
+> on a small account page; the admin panel comes with P4-03 and later, and day-to-day administration is the
+> [admin API](../reference/admin-api.md) and the [management commands](cli.md).
 >
 > Status of verification: every flow below is tested against **local fake providers**. A sign-in with a real Google,
 > GitHub, Cloudflare Access or OIDC application has not been run yet; the checklist is in

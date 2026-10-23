@@ -469,6 +469,18 @@ export function createMemoryStorage(options: MemoryStorageOptions = {}): Storage
         .sort()
         .slice(0, limit);
     },
+    async deletePrefix(prefix) {
+      checkPrefix(prefix);
+      if (prefix === '') throw new InvalidInputError('kv.deletePrefix needs a non-empty prefix.');
+      let count = 0;
+      for (const k of [...kvData.keys()]) {
+        if (k.startsWith(prefix)) {
+          kvData.delete(k);
+          count++;
+        }
+      }
+      return count;
+    },
     async purgeExpired(limit) {
       const n = clampLimit(limit, 1_000, 10_000);
       let count = 0;

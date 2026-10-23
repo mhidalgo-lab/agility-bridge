@@ -41,6 +41,19 @@ export class ForbiddenError extends Error {
   }
 }
 
+/**
+ * The action needs a sign-in from the last 10 minutes (HTTP 403 `reauth_required`; the panel sends the user through
+ * `/auth/reauth`, L-093).
+ */
+export class ReauthRequiredError extends ForbiddenError {
+  readonly reauth = true as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'ReauthRequiredError';
+  }
+}
+
 const roleOf = (a: Actor): Role => (a.kind === 'break_glass' ? 'owner' : a.role);
 const userIdOf = (a: Actor): string | null => (a.kind === 'user' ? a.userId : null);
 const isOwner = (a: Actor) => roleOf(a) === 'owner';
@@ -51,6 +64,10 @@ function need(ok: boolean, message: string): void {
 }
 const needManager = (a: Actor) => need(isManager(a), 'This needs an owner or an admin.');
 const needOwner = (a: Actor, what: string) => need(isOwner(a), `Only an owner can ${what}.`);
+/** The break-glass token is exempt: it is not a browser session and re-signing in is meaningless for it. */
+function needRecent(a: Actor, what: string): void {
+  if (a.kind === 'user' && !a.recentAuth) throw new ReauthRequiredError(`Sign in again before ${what}.`);
+}
 
 export interface GuardContext {
   readonly storage: Storage;
@@ -93,7 +110,10 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     },
     async create(input: Parameters<AccessServices['users']['create']>[0]): Promise<User> {
       needManager(actor);
-      if (input.role !== 'member') needOwner(actor, 'create owners or admins');
+      if (input.role !== 'member') {
+        needOwner(actor, 'create owners or admins');
+        needRecent(actor, 'creating an owner or an admin');
+      }
       return services.users.create(input);
     },
     async update(id: string, patch: Parameters<AccessServices['users']['update']>[1]): Promise<User> {
@@ -101,6 +121,7 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
       const target = await load(storage.users.get(id), 'user');
       if (target.role !== 'member' || (patch.role !== undefined && patch.role !== 'member')) {
         needOwner(actor, 'change owners, admins or roles above member');
+        needRecent(actor, 'changing an owner, an admin or a role above member');
       }
       if (target.role === 'owner' && patch.role !== undefined && patch.role !== 'owner') {
         const others = (await activeOwners()).filter((u) => u.id !== id);
@@ -108,10 +129,23 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
       }
       return services.users.update(id, patch);
     },
+    /**
+     * Throws unless the actor may end every session of this user: yourself (any role), an owner anyone, an admin only
+     * members. A member asking about someone else gets "not found" (no existence oracle). Ends nothing itself.
+     */
+    async authorizeEndSessions(id: string): Promise<User> {
+      if (!isManager(actor) && id !== self) throw new NotFoundError('No user with this id.');
+      const target = await load(storage.users.get(id), 'user');
+      if (id !== self && target.role !== 'member') needOwner(actor, "end an owner's or an admin's sessions");
+      return target;
+    },
     async disable(id: string): Promise<User> {
       needManager(actor);
       const target = await load(storage.users.get(id), 'user');
-      if (target.role !== 'member') needOwner(actor, 'disable owners or admins');
+      if (target.role !== 'member') {
+        needOwner(actor, 'disable owners or admins');
+        needRecent(actor, 'disabling an owner or an admin');
+      }
       if (target.role === 'owner') {
         const others = (await activeOwners()).filter((u) => u.id !== id);
         need(others.length > 0, 'The last active owner cannot be disabled.');
@@ -134,10 +168,7 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     /** THREAT_MODEL A14: owner only, with a recent sign-in. */
     async retarget(id: string, target: { baseUrl: string; tls?: JsonObject | null }) {
       needOwner(actor, "change an instance's origin or TLS trust");
-      need(
-        actor.kind === 'break_glass' || actor.recentAuth,
-        'Sign in again before changing an instance origin.',
-      );
+      needRecent(actor, 'changing an instance origin');
       return services.instances.retarget(id, target);
     },
     async delete(id: string): Promise<void> {
@@ -167,6 +198,7 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
       const c = await load(storage.credentials.get(id), 'credential');
       if (c.ownerUserId === null) needManager(actor);
       else if (!mineCredential(c)) throw new NotFoundError('No credential with this id.');
+      needRecent(actor, "replacing a credential's token");
       return services.credentials.replaceToken(id, token);
     },
     async update(id: string, patch: { label?: string }): Promise<Credential> {
@@ -193,10 +225,16 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
   };
 
   const checkWorkspaceWrites = (input: Partial<NewWorkspaceInput>) => {
-    if (input.writePolicy !== undefined) needOwner(actor, 'change write settings');
+    if (input.writePolicy !== undefined) {
+      needOwner(actor, 'change write settings');
+      needRecent(actor, 'changing write settings');
+    }
     // A pass-through workspace serves anyone with a token for its instance: owners decide that (P2-14).
     if (input.credentialSource === 'passthrough') needOwner(actor, 'make a workspace pass-through');
-    if (writeTools(input.enabledTools).length > 0) needOwner(actor, 'enable write tools');
+    if (writeTools(input.enabledTools).length > 0) {
+      needOwner(actor, 'enable write tools');
+      needRecent(actor, 'enabling write tools');
+    }
   };
   const workspaces = {
     async list(): Promise<Workspace[]> {
@@ -239,12 +277,18 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     },
     async create(input: NewGrantInput): Promise<WithWarnings<Grant>> {
       needManager(actor);
-      if (writeTools(input.tools).length > 0) needOwner(actor, 'grant write tools');
+      if (writeTools(input.tools).length > 0) {
+        needOwner(actor, 'grant write tools');
+        needRecent(actor, 'granting write tools');
+      }
       return services.grants.create(input);
     },
     async update(id: string, patch: GrantPatchInput): Promise<WithWarnings<Grant>> {
       needManager(actor);
-      if (writeTools(patch.tools).length > 0) needOwner(actor, 'grant write tools');
+      if (writeTools(patch.tools).length > 0) {
+        needOwner(actor, 'grant write tools');
+        needRecent(actor, 'granting write tools');
+      }
       const current = await load(storage.grants.get(id), 'grant');
       if (patch.credentialId !== undefined && patch.credentialId !== current.credentialId) {
         await needCredentialOwner(patch.credentialId, "put a grant on someone's personal Agility token");
@@ -306,10 +350,7 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     },
     async retire(version: number, reason: string): Promise<KeyVersionStatus[]> {
       needOwner(actor, 'retire a master-key version');
-      need(
-        actor.kind === 'break_glass' || actor.recentAuth,
-        'Sign in again before retiring a master-key version.',
-      );
+      needRecent(actor, 'retiring a master-key version');
       if (ctx.keyring === undefined)
         throw new ForbiddenError('Master-key operations are not available here.');
       // The admin API writes the audit row, success or refusal, like every other admin change.
@@ -326,7 +367,7 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     /** Throws unless the actor may create a link; creates nothing. */
     authorize(): void {
       needOwner(actor, 'create an owner setup link');
-      need(actor.kind === 'break_glass' || actor.recentAuth, 'Sign in again before creating a setup link.');
+      needRecent(actor, 'creating a setup link');
     },
     async create(ttlMs: number, clock: { now(): number }): Promise<SetupLink> {
       setupLinks.authorize();

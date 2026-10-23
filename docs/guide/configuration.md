@@ -109,6 +109,9 @@ follows in the self-hosting guide.
 | `AB_INSTANCE_PRIVATE_ADDRESSES` | `allow` | `refuse` accepts only instances at public addresses: a host that is, or resolves to, a loopback, private, link-local (cloud metadata) or reserved address is refused when the instance is added or retargeted, and again at every connection (so a DNS answer that changes later is refused too). Keep `allow` for on-premises instances on a private network |
 | `AB_ALLOW_HTTP_INSTANCES` | `off` | `on` accepts plain-HTTP loopback instance URLs (`http://127.0.0.1/…`), for tests and the local synthetic Agility only; logged as a warning |
 | `AB_GOOGLE_*`, `AB_GITHUB_*`, `AB_OIDC_*`, `AB_CF_ACCESS_*`, `AB_LOGIN_*` | unset | Admin sign-in providers, allowlists and auto-provisioning: see [sign-in providers](identity-providers.md#settings). Secrets may come from `<NAME>_FILE` (`0600`) |
+| `AB_SESSION_IDLE_MINUTES`, `AB_SESSION_MAX_HOURS` | `30`, `12` | Admin browser sessions end after this many idle minutes (5-1440) and this many hours in all (1-168), whatever the activity ([admin access](admin-access.md)) |
+| `AB_SESSION_MAX_PER_USER` | `20` | Live sessions per user (1-100); the next sign-in ends the oldest |
+| `AB_LOGOUT_CLEAR_SITE_DATA` | `cookies` | `cookies`: sign-out also sends `Clear-Site-Data: "cookies"`, which clears the cookies of the whole registered domain and its subdomains; `off` only clears the session cookie |
 | `AB_IDENTITY_PRIVATE_ADDRESSES` | `refuse` | `allow` lets sign-in reach an identity provider on a private or loopback address; the default refuses non-public addresses at every connection |
 | `AB_ADMIN_URL` | unset | For the [management commands](cli.md): the server to manage through its admin API (HTTPS), instead of the local database |
 

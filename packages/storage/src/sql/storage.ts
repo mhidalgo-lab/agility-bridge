@@ -464,6 +464,15 @@ export function createSqlStorage(driver: SqlDriver, options: SqlStorageOptions =
       );
       return rows.map((r) => r[0] as string);
     },
+    async deletePrefix(prefix) {
+      checkPrefix(prefix);
+      if (prefix === '') throw new InvalidInputError('kv.deletePrefix needs a non-empty prefix.');
+      const rows = await raw('DELETE FROM kv WHERE substr(key, 1, ?) = ? RETURNING key', [
+        prefix.length,
+        prefix,
+      ]);
+      return rows.length;
+    },
     async purgeExpired(limit) {
       const n = clampLimit(limit, 1_000, 10_000);
       const rows = await raw(

@@ -62,6 +62,7 @@ describe('sign-in settings on serve', () => {
     expect(c.identity?.providers.map((p) => p.kind)).toEqual(['google']);
     expect(c.identity?.policy.autoProvision).toBe('member');
     expect(c.identityPrivateAddresses).toBe('refuse');
+    expect(c.session).toMatchObject({ maxPerUser: 20, clearSiteData: true });
     expect(loadServeConfig({ AB_DATA_DIR: '/d' }).identity).toBeUndefined();
   });
 
@@ -73,6 +74,9 @@ describe('sign-in settings on serve', () => {
       [{ AB_LOGIN_ALLOW_EMAILS: 'ann@example.test' }, 'AB_LOGIN_ALLOW_EMAILS'],
       [{ AB_IDENTITY_PRIVATE_ADDRESSES: 'maybe' }, 'AB_IDENTITY_PRIVATE_ADDRESSES'],
       [{ AB_RATE_LIMIT_SIGN_IN: '0' }, 'AB_RATE_LIMIT_SIGN_IN'],
+      [{ AB_SESSION_MAX_PER_USER: '0' }, 'AB_SESSION_MAX_PER_USER'],
+      [{ AB_SESSION_IDLE_MINUTES: '1' }, 'AB_SESSION_IDLE_MINUTES'],
+      [{ AB_LOGOUT_CLEAR_SITE_DATA: 'all' }, 'AB_LOGOUT_CLEAR_SITE_DATA'],
     ] as Array<[Record<string, string>, string]>) {
       try {
         loadServeConfig({ AB_DATA_DIR: '/d', AB_PUBLIC_URL: 'https://bridge.example.test', ...bad });
@@ -246,20 +250,47 @@ describe('the first owner, end to end over sockets', () => {
     const cookie = (start.headers.get('set-cookie') as string).split(';')[0] as string;
     const { code: authCode, state } = idp.authorize(location, { email: 'first@example.test', sub: 'first' });
     const done = await fetch(`${publicUrl}/auth/callback/oidc-corp?code=${authCode}&state=${state}`, {
+      redirect: 'manual',
       headers: { cookie },
     });
-    expect(done.status).toBe(200);
-    expect(await done.text()).toContain('first@example.test (owner)');
+    // A session starts (P4-02): the cookie and a redirect to the account page, which names the owner.
+    expect(done.status).toBe(303);
+    const session = done.headers.getSetCookie().find((c) => c.startsWith('ab_session=')) as string;
+    expect(session).toContain('HttpOnly');
+    const account = await fetch(`${publicUrl}/auth/account`, {
+      redirect: 'manual',
+      headers: { cookie: session.split(';')[0] as string },
+    });
+    expect(await account.text()).toContain('first@example.test');
     expect((await post(publicUrl, form(code))).status).toBe(400);
     const owners = (await server?.storage.users.list())?.filter((u) => u.role === 'owner');
     expect(owners).toMatchObject([{ email: 'first@example.test', idp: 'oidc:corp', idpSubject: 'first' }]);
 
+    // `user end-sessions` ends the browser session from the command line (the local database, in process).
+    const ownerId = (owners ?? [])[0]?.id as string;
+    const ended = await cli(['user', 'end-sessions', ownerId], e);
+    expect(ended.code).toBe(0);
+    expect(JSON.parse(ended.out)).toEqual({ ok: true, revoked: 1 });
+    const after = await fetch(`${publicUrl}/auth/account`, {
+      redirect: 'manual',
+      headers: { cookie: session.split(';')[0] as string },
+    });
+    expect(after.status).toBe(303);
+    expect(after.headers.get('location')).toBe('/auth/login');
+
     await server?.audit.flush();
     const rows = await server?.storage.audit.query({ limit: 100 });
     // The sign-in, the issue of the link, and the refused replay of the spent link.
-    expect(rows?.map((r) => r.action).sort()).toEqual(['login.denied', 'login.ok', 'setup_link.create']);
+    expect(rows?.map((r) => r.action).sort()).toEqual([
+      'login.denied',
+      'login.ok',
+      'session.create',
+      'session.revoke_all',
+      'setup_link.create',
+    ]);
     const text = `${lines.join('\n')}${JSON.stringify(rows)}${issued.err}`;
     expect(text).not.toContain(code);
+    expect(text).not.toContain((session.split(';')[0] as string).split('=')[1] as string);
     expect(text).not.toContain(idp.clientSecret);
     expect(JSON.stringify(rows)).not.toContain('first@example.test');
   });

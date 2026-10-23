@@ -103,6 +103,28 @@ describe('redactValue and Secret', () => {
     expect(s.reveal()).toBe('FAKE-token-value');
   });
 
+  it('removes admin session cookies and CSRF tokens (P4-02)', () => {
+    const value = `usr_${fake(12)}.${fake(43, `${B62}-_`)}`;
+    const csrf = fake(43, `${B62}-_`);
+    for (const line of [
+      `cookie header __Host-ab_session=${value}; other=1`,
+      `Set-Cookie: ab_session=${value}; Path=/; HttpOnly`,
+      `binding __Host-ab_login=${csrf}`,
+    ]) {
+      const out = redact(line);
+      expect(out).not.toContain(value);
+      expect(out).not.toContain(csrf);
+      expect(out).toContain(REDACTED);
+    }
+    expect(redactValue({ 'x-csrf-token': csrf, csrf, _csrf: csrf, note: 'ok' })).toEqual({
+      'x-csrf-token': REDACTED,
+      csrf: REDACTED,
+      _csrf: REDACTED,
+      note: 'ok',
+    });
+    expect(redact('the ab_session cookie is HttpOnly')).toBe('the ab_session cookie is HttpOnly');
+  });
+
   it('cuts cycles and depth', () => {
     const a: Record<string, unknown> = { name: 'a' };
     a['self'] = a;

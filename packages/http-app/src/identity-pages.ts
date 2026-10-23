@@ -65,6 +65,33 @@ export function setupBody(providers: readonly { readonly id: string; readonly la
   );
 }
 
+export interface AccountView {
+  readonly email: string;
+  readonly role: string;
+  readonly recentAuth: boolean;
+  /** Idle and absolute expiry, ISO 8601. */
+  readonly idleExpiresAt: string;
+  readonly expiresAt: string;
+  readonly csrf: string;
+}
+
+/**
+ * The account page: who is signed in, how to re-authenticate, and the sign-out forms. The CSRF token sits in a hidden
+ * field of a POST form (`POST /auth/logout`). Every value is escaped; the page is `no-store` and sent with
+ * `Referrer-Policy: same-origin`, so the browser's form POST carries a real `Origin` and not `null`.
+ */
+export function accountBody(view: AccountView): string {
+  const token = `<input type="hidden" name="_csrf" value="${escapeHtml(view.csrf)}">`;
+  return (
+    `<p>Signed in as <strong>${escapeHtml(view.email)}</strong> (${escapeHtml(view.role)}).</p>` +
+    `<p>Recent sign-in: ${view.recentAuth ? 'yes' : 'no (needed for high-impact changes)'}.</p>` +
+    `<p>This session ends after inactivity at ${escapeHtml(view.idleExpiresAt)} and at the latest at ${escapeHtml(view.expiresAt)}.</p>` +
+    '<p><a href="/auth/reauth">Sign in again</a></p>' +
+    `<form method="post" action="/auth/logout">${token}<button type="submit">Sign out</button></form>` +
+    `<form method="post" action="/auth/logout">${token}<input type="hidden" name="everywhere" value="1"><button type="submit">Sign out everywhere</button></form>`
+  );
+}
+
 /** Moves the setup code from the URL fragment into the form field, then removes it from the address bar. */
 export const SETUP_SCRIPT = `(function () {
   var match = /^#(ab_setup_[0-9a-f]{64})$/.exec(location.hash);

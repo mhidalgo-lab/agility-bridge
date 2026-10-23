@@ -41,3 +41,4 @@
 - **Options:** (a) go for Phase 4 now; (b) go after D-27 is decided and the clients are verified; (c) hold.
 - **Recommendation:** (a): Phase 4 (identity and the admin panel) does not depend on D-27, which only matters for a
   production deployment on the Free plan.
+- **Owner (2026-10-23):** Decided: (a), go for Phase 4 now.

@@ -3,6 +3,7 @@
 // only the caller's tools. Web-standard only, so the same app runs on Node (`agility-bridge serve`) and Workers.
 import {
   type AccessSettings,
+  type Actor,
   authenticateDeviceToken,
   bearerToken,
   type CredentialValidator,
@@ -37,11 +38,12 @@ import { createMcpHandler } from '@modelcontextprotocol/server';
 import { type Context, Hono } from 'hono';
 import { LinearRouter } from 'hono/router/linear-router';
 import { AccessCache } from './access-cache.ts';
-import { ADMIN_BASE, type AdminApiOptions, createAdminApi } from './admin/api.ts';
+import { ADMIN_BASE, type AdminApiOptions, adminAuthenticator, createAdminApi } from './admin/api.ts';
 import type { LoginEvent } from './audit.ts';
 import { createEdge, type EdgeOptions } from './edge.ts';
 import { createIdentityRoutes, IDENTITY_BASE, type IdentityOptions } from './identity.ts';
 import { type ClassifiedRequest, classifyMcpMessage, jsonRpcError, readMcpBody } from './mcp-request.ts';
+import { createSessionManager, type SessionManager, type SessionOptions } from './session.ts';
 
 /** 1 MiB (ARCHITECTURE §5 step 1). */
 export const MAX_BODY_BYTES = 1024 * 1024;
@@ -148,10 +150,15 @@ export interface HttpAppOptions extends EdgeOptions {
   };
   /** The admin API at `/api/admin/v1` (P2-09); absent = the whole API answers 404. */
   readonly admin?: Pick<AdminApiOptions, 'services' | 'audit' | 'authenticate'>;
+  /** Admin session timeouts, cap and logout behaviour (P4-02); used when sign-in (`identity`) is configured. */
+  readonly session?: SessionOptions;
   /**
    * The sign-in routes at `/auth` (P4-01); absent = they answer 404. Needs the keyring (the `login` purpose key).
    */
-  readonly identity?: Pick<IdentityOptions, 'publicUrl' | 'providers' | 'policy' | 'onLogin'> & {
+  readonly identity?: Pick<
+    IdentityOptions,
+    'publicUrl' | 'providers' | 'policy' | 'onLogin' | 'auditAdmin'
+  > & {
     /** Records sign-ins (`AuditWriter.login`). */
     readonly audit?: (event: LoginEvent) => Promise<void> | undefined;
   };
@@ -268,6 +275,18 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     options.background?.(c, settled);
   };
   const perRequest = options.isolation === 'request';
+  // Admin sessions exist when sign-in does (P4-02). Stateless: everything is read from storage per request (L-013).
+  const sessions: SessionManager | undefined =
+    options.identity === undefined
+      ? undefined
+      : createSessionManager({
+          publicUrl: options.identity.publicUrl,
+          storage: options.storage,
+          clock: services.clock,
+          ...(options.session === undefined ? {} : { options: options.session }),
+          ...(options.identity.auditAdmin === undefined ? {} : { audit: options.identity.auditAdmin }),
+          runInBackground: keepAlive,
+        });
   const observe = <K extends keyof HttpObserver>(
     c: Context,
     kind: K,
@@ -309,6 +328,9 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     for (const [k, v] of Object.entries(edge.securityHeaders)) {
       // A page with its own policy (the sign-in pages: one same-origin script) keeps it.
       if (k === 'content-security-policy' && res.headers.has(k)) continue;
+      // The account page sends `same-origin`: under `no-referrer` a browser posts its forms with `Origin: null`, which
+      // the CSRF check (rightly) refuses. Nothing else may loosen it.
+      if (k === 'referrer-policy' && res.headers.get(k) === 'same-origin') continue;
       res.headers.set(k, v);
     }
     for (const [k, v] of Object.entries(edge.corsHeaders(origin))) res.headers.set(k, v);
@@ -327,6 +349,11 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     const build = () =>
       createAdminApi({
         ...admin,
+        authenticate: adminAuthenticator({
+          token: admin.authenticate as (c: Context) => Promise<Actor | null>,
+          ...(sessions === undefined ? {} : { sessions }),
+        }),
+        ...(sessions === undefined ? {} : { revokeUserSessions: (id: string) => sessions.revokeUser(id) }),
         storage: options.storage,
         tools: options.access.tools,
         onChange: () => cache.clear(),
@@ -404,6 +431,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         {
           clock: services.clock,
           logger: services.logger,
+          ...(sessions === undefined ? {} : { sessions }),
           runInBackground: keepAlive,
           // The general per-IP limit first, then the sign-in one: every start writes a row and may call the IdP.
           async beforeSignIn(c) {

@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // Hono app with per-workspace MCP endpoints and the admin API (ARCHITECTURE §2, §5).
 export { AccessCache, MAX_ACCESS_CACHE_TTL_MS } from './access-cache.ts';
-export { ADMIN_BASE, type AdminApiOptions, adminTokenAuthenticator, createAdminApi } from './admin/api.ts';
+export {
+  ADMIN_BASE,
+  type AdminApiOptions,
+  type AdminAuthResult,
+  type AdminRefusal,
+  adminAuthenticator,
+  adminTokenAuthenticator,
+  createAdminApi,
+} from './admin/api.ts';
 export { AdminError, type AdminErrorBody, type AdminErrorCode, toAdminError } from './admin/errors.ts';
 export {
   createHttpApp,
@@ -55,6 +63,7 @@ export {
   type AssembledServer,
   assembleServer,
   parseServerSettings,
+  parseSessionSettings,
   revalidateOnAuthErrors,
   SERVER_SETTING_NAMES,
   type ServerParts,
@@ -65,3 +74,15 @@ export {
   settingList,
   settingWarnings,
 } from './server.ts';
+export {
+  CLEAR_SITE_DATA_VALUE,
+  CSRF_FIELD,
+  CSRF_HEADER,
+  createSessionManager,
+  type FetchOriginProblem,
+  isUnsafeMethod,
+  type SessionAuth,
+  type SessionManager,
+  type SessionOptions,
+  type SessionPrincipal,
+} from './session.ts';

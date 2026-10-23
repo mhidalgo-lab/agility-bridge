@@ -79,12 +79,18 @@ export function createCloudflareAccessProvider(options: CloudflareAccessOptions)
         throw new IdentityError('invalid_token', 'the Access assertion has no subject');
       }
       // Access issued the assertion after its own IdP login for this email: Access is the email verifier here.
+      // The assertion is issued when Access authenticates the user (and again when it is refreshed): its `iat` is the
+      // best evidence of recency the header gives (unverified against a live tenant, RESEARCH section 9).
+      const iat = claims['iat'];
       return Object.freeze({
         idp: 'cf-access',
         subject,
         email,
         emailVerified: true,
         displayName: null,
+        ...(typeof iat === 'number' && Number.isFinite(iat) && iat > 0
+          ? { authenticatedAt: Math.round(iat * 1000) }
+          : {}),
       });
     },
   };

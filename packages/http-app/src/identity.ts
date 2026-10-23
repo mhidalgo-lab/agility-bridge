@@ -23,6 +23,7 @@ import {
   type LoginOutcome,
   type LoginPolicy,
   PROVIDER_ID_RE,
+  RECENT_AUTH_WINDOW_MS,
   resolveLoginUser,
   setupCodeHash,
   setupLinkUsable,
@@ -34,8 +35,9 @@ import type { Role, Storage, User } from '@agility-bridge/storage';
 import { type Context, Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { LinearRouter } from 'hono/router/linear-router';
-import type { LoginEvent } from './audit.ts';
+import type { AdminChange, LoginEvent } from './audit.ts';
 import {
+  accountBody,
   chooserBody,
   IDENTITY_PAGE_CSP,
   messageBody,
@@ -44,12 +46,15 @@ import {
   SETUP_SCRIPT,
   setupBody,
 } from './identity-pages.ts';
+import { CLEAR_SITE_DATA_VALUE, CSRF_FIELD, CSRF_HEADER, type SessionManager } from './session.ts';
 
 export const IDENTITY_BASE: '/auth' = '/auth';
 /** Where a login continues when no (valid) `next` was given. */
-export const DEFAULT_LOGIN_NEXT = '/admin';
+export const DEFAULT_LOGIN_NEXT = '/auth/account';
 /** Largest setup form (a 74-character code and a provider id). */
 const MAX_SETUP_BODY = 2048;
+/** Largest logout form (a CSRF token and a flag). */
+const MAX_LOGOUT_BODY = 1024;
 
 export type StorageForIdentity = Pick<Storage, 'users' | 'kv'>;
 
@@ -62,6 +67,8 @@ export interface CompletedLogin {
   readonly provider: string;
   /** Validated same-origin path to continue to. */
   readonly next: string;
+  /** The sign-in re-authenticated the signed-in user (P4-02) instead of starting a session from nothing. */
+  readonly reauth: boolean;
 }
 
 export interface IdentityOptions {
@@ -73,12 +80,14 @@ export interface IdentityOptions {
   /** The master key's `login` purpose: the PKCE verifier and nonce are derived from it, not stored. */
   readonly keys: LoginKeys;
   /**
-   * Called with the verified, allowed user; its Response is sent. Without it a finished sign-in shows a page naming
-   * the user (the session arrives with P4-02).
+   * Called with the verified, allowed user; its Response is sent. Default: create a session (`deps.sessions`), set
+   * the cookie and redirect to `login.next`; without sessions a page naming the user.
    */
   readonly onLogin?: (c: Context, login: CompletedLogin) => Response | Promise<Response>;
   /** Records sign-ins (`AuditWriter.login`). */
   readonly audit?: (event: LoginEvent) => Promise<void> | undefined;
+  /** Records session changes made here (logout), as `admin` rows (`AuditWriter.admin`). */
+  readonly auditAdmin?: (change: AdminChange) => Promise<void> | undefined;
   /** Keyed hash of `(idp, subject)` for audit rows; omit to record none. */
   readonly identityHash?: (idp: string, subject: string) => Promise<string>;
   /** A router without a compile step on the first match (Workers). */
@@ -88,6 +97,8 @@ export interface IdentityOptions {
 export interface IdentityRouteDeps {
   readonly clock: Clock;
   readonly logger: Logger;
+  /** Admin sessions (P4-02): the default `onLogin`, `/logout`, `/account` and `/reauth`. */
+  readonly sessions?: SessionManager;
   /** The per-IP sign-in limit; a refusal is a 429 page. */
   readonly beforeSignIn?: (c: Context) => Promise<Response | undefined> | Response | undefined;
   /** Keeps work started for a request alive after the response (audit writes, the GitHub token revocation). */
@@ -129,6 +140,8 @@ const FAILURE_STATUS: Partial<Record<string, number>> = {
   binding_mismatch: 400,
   provider_mismatch: 400,
   setup_invalid: 400,
+  reauth_mismatch: 403,
+  reauth_stale: 403,
   idp_unavailable: 502,
   internal_error: 500,
 };
@@ -246,6 +259,70 @@ export function createIdentityRoutes(
     return fail(c, provider.id, provider.idp, 'internal_error', extra);
   };
 
+  /** The hand-off every successful sign-in ends in. */
+  const handOff = async (c: Context, login: CompletedLogin, extra: Record<string, string>) => {
+    const res = options.onLogin
+      ? await options.onLogin(c, login)
+      : deps.sessions
+        ? await deps.sessions.login(c, login)
+        : message(200, 'Signed in', [
+            `Signed in as ${login.user.email} (${login.user.role}).`,
+            'Browser sessions are not configured; use the admin API with the admin token.',
+          ]);
+    for (const [k, v] of Object.entries(extra)) res.headers.append(k, v);
+    return res;
+  };
+
+  /**
+   * Re-authentication (P4-02, L-093): the same person again, recently. No user is created or bound here: the identity
+   * must already be the one bound to the signed-in user. Header providers must prove recency (the Access assertion's
+   * issue time); redirect providers that report `auth_time` must show a recent one.
+   */
+  const completeReauth = async (
+    c: Context,
+    provider: IdentityProvider,
+    identity: VerifiedIdentity,
+    userId: string,
+    next: string,
+    extra: Record<string, string>,
+    hash: string | null,
+  ): Promise<Response> => {
+    const at = identity.authenticatedAt;
+    const recent = at !== undefined && clock.now() - at < RECENT_AUTH_WINDOW_MS && at <= clock.now() + 60_000;
+    if (provider.kind === 'header' ? !recent : at !== undefined && !recent) {
+      return fail(c, provider.id, provider.idp, 'reauth_stale', extra, hash);
+    }
+    const user = await storage.users.get(userId);
+    if (
+      user === null ||
+      user.disabledAt !== null ||
+      user.idp !== identity.idp ||
+      user.idpSubject !== identity.subject
+    ) {
+      return fail(c, provider.id, provider.idp, 'reauth_mismatch', extra, hash);
+    }
+    audit(c, {
+      status: 'ok',
+      provider: provider.id,
+      idp: provider.idp,
+      userId: user.id,
+      outcome: 'reauth',
+      ...(hash === null ? {} : { identityHash: hash }),
+    });
+    return handOff(
+      c,
+      {
+        user,
+        identity,
+        outcome: 'existing',
+        provider: provider.id,
+        next: safeNextPath(next, publicUrl) ?? DEFAULT_LOGIN_NEXT,
+        reauth: true,
+      },
+      extra,
+    );
+  };
+
   /** Shared tail of every login kind: setup link, user mapping, audit, hand-off. */
   const complete = async (
     c: Context,
@@ -254,8 +331,11 @@ export function createIdentityRoutes(
     setup: string | null,
     next: string,
     extra: Record<string, string>,
+    /** Re-authentication: the id of the signed-in user this sign-in must be the same person as. */
+    reauth: string | null = null,
   ): Promise<Response> => {
     const hash = await hashIdentity(identity);
+    if (reauth !== null) return completeReauth(c, provider, identity, reauth, next, extra, hash);
     // Consumed before the user decision, so concurrent completions of one link cannot both become owners. A sign-in
     // refused afterwards (disabled user, conflict) therefore uses the link up: the owner issues another.
     if (setup !== null && !(await consumeSetupLink(storage.kv, setup, clock))) {
@@ -274,22 +354,19 @@ export function createIdentityRoutes(
       ...(hash === null ? {} : { identityHash: hash }),
       ...(decision.previousRole === undefined ? {} : { previousRole: decision.previousRole satisfies Role }),
     });
-    const login: CompletedLogin = {
-      user: decision.user,
-      identity,
-      outcome: decision.outcome,
-      provider: provider.id,
-      // Checked again where the transaction is read: the stored value is never trusted blindly.
-      next: safeNextPath(next, publicUrl) ?? DEFAULT_LOGIN_NEXT,
-    };
-    const res = options.onLogin
-      ? await options.onLogin(c, login)
-      : message(200, 'Signed in', [
-          `Signed in as ${decision.user.email} (${decision.user.role}).`,
-          'Browser sessions arrive with the admin panel; use the admin API with the admin token for now.',
-        ]);
-    for (const [k, v] of Object.entries(extra)) res.headers.append(k, v);
-    return res;
+    return handOff(
+      c,
+      {
+        user: decision.user,
+        identity,
+        outcome: decision.outcome,
+        provider: provider.id,
+        // Checked again where the transaction is read: the stored value is never trusted blindly.
+        next: safeNextPath(next, publicUrl) ?? DEFAULT_LOGIN_NEXT,
+        reauth: false,
+      },
+      extra,
+    );
   };
 
   const app = new Hono<{ Variables: Vars }>(
@@ -324,12 +401,13 @@ export function createIdentityRoutes(
     provider: IdentityProvider & { kind: 'redirect' },
     setup: string | null,
     status: 302 | 303,
+    reauth: string | null = null,
   ): Promise<Response> => {
     try {
       const started = await startLogin(
         storage.kv,
         options.keys,
-        { provider: provider.id, next: queryNext(c), setup },
+        { provider: provider.id, next: queryNext(c), setup, reauth },
         clock,
       );
       const url = await provider.authorizationUrl({
@@ -337,6 +415,7 @@ export function createIdentityRoutes(
         state: started.state,
         nonce: started.nonce,
         codeChallenge: started.codeChallenge,
+        ...(reauth === null ? {} : { reauth: true }),
       });
       return new Response(null, {
         status,
@@ -388,7 +467,7 @@ export function createIdentityRoutes(
           warn: (msg, fields) => logger.warn(msg, { requestId: requestId(c), ...fields }),
         },
       );
-      return await complete(c, provider, identity, tx.setup, tx.next, clear);
+      return await complete(c, provider, identity, tx.setup, tx.next, clear, tx.reauth);
     } catch (error) {
       if (isIdentityError(error)) return fail(c, provider.id, provider.idp, error.code, clear);
       return internalFailure(c, provider, error, clear);
@@ -398,12 +477,17 @@ export function createIdentityRoutes(
   const headerProvider = () => [...providers.values()].find((p) => p.kind === 'header');
 
   /** Header login (Cloudflare Access): verify the assertion, then the shared tail. */
-  const headerLogin = async (c: Context, setup: string | null, next: string): Promise<Response> => {
+  const headerLogin = async (
+    c: Context,
+    setup: string | null,
+    next: string,
+    reauth: string | null = null,
+  ): Promise<Response> => {
     const provider = headerProvider();
     if (provider === undefined || provider.kind !== 'header') return c.json({ error: 'not_found' }, 404);
     try {
       const identity = await provider.verify(c.req.raw.headers);
-      return await complete(c, provider, identity, setup, next, {});
+      return await complete(c, provider, identity, setup, next, {}, reauth);
     } catch (error) {
       if (isIdentityError(error)) return fail(c, provider.id, provider.idp, error.code);
       return internalFailure(c, provider, error, {});
@@ -459,5 +543,116 @@ export function createIdentityRoutes(
     return headerLogin(c, hash, DEFAULT_LOGIN_NEXT);
   });
 
+  if (deps.sessions) registerSessionRoutes(app, deps.sessions);
   return app;
+
+  // ------------------------------------------------------------------------------------------ session routes
+  function registerSessionRoutes(router: Hono<{ Variables: Vars }>, sessions: SessionManager): void {
+    const refused = (c: Context, reason: string) => {
+      const work = options.auditAdmin?.({
+        requestId: requestId(c),
+        action: 'admin.forbidden',
+        status: 'denied',
+        targetType: 'session',
+        targetId: '-',
+        errorCode: 'forbidden',
+        details: { reason, route: `${c.req.method} ${c.req.path}` },
+      });
+      if (work !== undefined) deps.runInBackground(c, work);
+      return message(403, 'Request refused', ['This request did not come from this site.']);
+    };
+    const toLogin = (next?: string): Response =>
+      new Response(null, {
+        status: 303,
+        headers: {
+          Location: `${IDENTITY_BASE}/login${next === undefined ? '' : `?next=${encodeURIComponent(next)}`}`,
+        },
+      });
+
+    router.get('/account', async (c) => {
+      const problem = sessions.checkFetchOrigin(c, false);
+      if (problem !== null) return refused(c, problem);
+      const auth = await sessions.authenticate(c);
+      if (!auth.ok) return toLogin();
+      const { principal } = auth;
+      return html(
+        200,
+        'Your account',
+        accountBody({
+          email: principal.user.email,
+          role: principal.role,
+          recentAuth: principal.recentAuth,
+          idleExpiresAt: new Date(principal.session.idleExpiresAt).toISOString(),
+          expiresAt: new Date(principal.session.record.expiresAt).toISOString(),
+          csrf: principal.session.record.csrf,
+        }),
+        { 'referrer-policy': 'same-origin' },
+      );
+    });
+
+    /** Re-authentication: the signed-in user signs in again, with the same provider, and returns to `next`. */
+    router.get('/reauth', async (c) => {
+      const problem = sessions.checkFetchOrigin(c, false);
+      if (problem !== null) return refused(c, problem);
+      const next = queryNext(c);
+      const auth = await sessions.authenticate(c);
+      if (!auth.ok) return toLogin(next);
+      const provider = providers.get(auth.principal.session.record.provider);
+      if (provider === undefined) return toLogin(next);
+      if (provider.kind === 'redirect') return start(c, provider, null, 302, auth.principal.user.id);
+      return headerLogin(c, null, next, auth.principal.user.id);
+    });
+
+    const capped = bodyLimit({
+      maxSize: MAX_LOGOUT_BODY,
+      onError: () => message(413, 'Sign-out refused', ['The request is too large.']),
+    });
+
+    /** Sign out: POST only; the CSRF token, same origin; the session is deleted and the browser told to drop cookies. */
+    router.post('/logout', capped, async (c) => {
+      const auth = await sessions.authenticate(c);
+      // No live session: nothing to protect, only drop the cookie that was presented (an expired or revoked one).
+      // Without a cookie (a cross-site form: SameSite=Lax withholds it) nothing happens, so another site cannot sign
+      // this browser out.
+      if (!auth.ok) {
+        const presented = sessions.readCookie(c) !== undefined;
+        if (presented) await sessions.revokeCurrent(c);
+        return message(200, 'Signed out', ['You are not signed in.'], {
+          link: { href: `${IDENTITY_BASE}/login`, label: 'Sign in' },
+          headers: presented ? { 'set-cookie': sessions.clearCookie } : {},
+        });
+      }
+      const { principal } = auth;
+      let token = c.req.header(CSRF_HEADER);
+      let everywhere = false;
+      if (/^application\/x-www-form-urlencoded\s*(;|$)/i.test(c.req.header('content-type') ?? '')) {
+        const form = new URLSearchParams(await c.req.text());
+        token ??= form.get(CSRF_FIELD) ?? undefined;
+        everywhere = form.get('everywhere') === '1';
+      }
+      const problem =
+        sessions.checkFetchOrigin(c, true) ?? (sessions.csrfMatches(principal, token) ? null : 'csrf');
+      if (problem !== null) return refused(c, problem);
+      const userId = principal.user.id;
+      let revoked = 1;
+      if (everywhere) revoked = await sessions.revokeUser(userId);
+      else await sessions.revokeCurrent(c);
+      const work = options.auditAdmin?.({
+        requestId: requestId(c),
+        action: everywhere ? 'session.revoke_all' : 'session.revoke',
+        userId,
+        targetType: everywhere ? 'user' : 'session',
+        targetId: everywhere ? userId : principal.session.ref,
+        details: { reason: everywhere ? 'logout_everywhere' : 'logout', revoked },
+      });
+      if (work !== undefined) deps.runInBackground(c, work);
+      return message(200, 'Signed out', ['You are signed out.'], {
+        link: { href: `${IDENTITY_BASE}/login`, label: 'Sign in' },
+        headers: {
+          'set-cookie': sessions.clearCookie,
+          ...(sessions.clearSiteData ? { 'clear-site-data': CLEAR_SITE_DATA_VALUE } : {}),
+        },
+      });
+    });
+  }
 }

@@ -9,6 +9,8 @@ export const REDACTED = '[REDACTED]';
 const VALUE_PATTERNS: ReadonlyArray<[RegExp, (match: string, ...groups: string[]) => string]> = [
   // agility-bridge device, admin and setup tokens (ARCHITECTURE §4): ab_live_ / ab_test_ / ab_admin_ / ab_setup_ + random.
   [/\bab_(live|test|admin|setup)_[A-Za-z0-9_-]{8,}/g, (_m, kind) => `ab_${kind}_${REDACTED}`],
+  // Admin session and sign-in cookies (P4-02, P4-01): `__Host-ab_session=<user>.<secret>`, `ab_login=<binding>`.
+  [/((?:__Host-)?ab_(?:session|login))(\s*=\s*)[^\s;,"]+/g, (_m, name, sep) => `${name}${sep}${REDACTED}`],
   // Bearer credentials in headers or messages (Agility access tokens travel this way).
   [/\b(Bearer)\s+[A-Za-z0-9._~+/=-]{8,}/gi, (_m, scheme) => `${scheme} ${REDACTED}`],
   // Authorization headers with any scheme (Basic, Token, Digest, custom): the scheme stays, the credential goes. A
@@ -53,7 +55,7 @@ const FREE_TEXT_PATTERNS: ReadonlyArray<[RegExp, string]> = [
 
 /** Object keys whose values are always redacted, whatever they contain. */
 const SECRET_KEY_RE =
-  /^(api[-_]?key|x-api-key|authorization|proxy-authorization|token|access[-_]?token|refresh[-_]?token|id[-_]?token|password|secret|client[-_]?secret|master[-_]?key|cookie|set-cookie)$/i;
+  /^(api[-_]?key|x-api-key|authorization|proxy-authorization|token|access[-_]?token|refresh[-_]?token|id[-_]?token|password|secret|client[-_]?secret|master[-_]?key|cookie|set-cookie|x-csrf-token|csrf|_csrf|csrf[-_]?token)$/i;
 
 export function isSecretKeyName(key: string): boolean {
   return SECRET_KEY_RE.test(key);

@@ -226,7 +226,7 @@ export async function startServe(
     url,
     publicUrl: config.publicUrl ?? null,
     database: config.dbPath,
-    adminApi: adminVerifier !== undefined,
+    adminApi: adminVerifier !== undefined || config.identity !== undefined,
   });
   return {
     url,

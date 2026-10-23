@@ -91,6 +91,20 @@ agility-bridge user disable <user-id>
 
 Local or remote.
 
+### `user end-sessions`
+
+End all of a user's browser sessions (sign them out everywhere).
+
+```text
+agility-bridge user end-sessions <user-id>
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `<user-id>` | argument | User id |
+
+Local or remote.
+
 ## instance
 
 ### `instance list`

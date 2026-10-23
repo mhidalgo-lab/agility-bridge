@@ -524,3 +524,23 @@ those flows are tested against local fake providers and stay **unverified** end 
 - **Generic OIDC.** Discovery (`/.well-known/openid-configuration`, exact `issuer` match), PKCE S256, `nonce`, RFC 9207
   `iss` on the authorization response when advertised (`authorization_response_iss_parameter_supported`), client
   authentication by Basic (default) or body, `email_verified` required. Specification-level facts; no vendor was run.
+
+### Sessions, `Clear-Site-Data` and re-authentication (P4-02)
+
+Checked 2026-10-23.
+
+- **`Clear-Site-Data`.** Each directive is a quoted string (`"cookies"`; an unquoted value is invalid). `"cookies"` removes
+  the cookies of the **registered domain including its subdomains** ("`https://example.com` as well as
+  `https://stage.example.com`"), unlike the other directives, which act on the origin. Browsers honour it in secure
+  contexts only; the page does not say how a redirect response is handled, so logout answers with a 200 page. Source:
+  https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Clear-Site-Data
+- **Forcing a fresh login.** OIDC Core section 3.1.2.1: `prompt=login` asks the provider to re-authenticate the user;
+  `max_age=0` has the same effect and makes `auth_time` mandatory in the ID token. We send both for OIDC providers and
+  check `auth_time` only when the provider sends it. Google documents `prompt` values `none`, `consent` and
+  `select_account` (not `login`) and sends no `auth_time` in our scopes: **unverified** whether Google re-prompts for
+  `prompt=login`; GitHub's authorization endpoint has no re-authentication parameter (a signed-in browser is redirected
+  straight back). Cloudflare Access: the assertion's `iat` is used as the time of authentication, *unverified* against a
+  live tenant. Source: https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+- **Fetch metadata.** A redirect chain that began on another site keeps `Sec-Fetch-Site: cross-site` for its last
+  request, so the page after an IdP redirect arrives as a cross-site top-level navigation (`Sec-Fetch-Mode: navigate`,
+  `Sec-Fetch-Dest: document`). Source: https://web.dev/articles/fetch-metadata
