@@ -1,5 +1,29 @@
 # agility-bridge
 
+## 0.3.0
+
+### Minor Changes
+
+- 177e0e6: `agility-bridge serve` and the management commands refuse plain-HTTP instance URLs (also `http://127.0.0.1`) unless
+  `AB_ALLOW_HTTP_INSTANCES=on`, meant for tests and the local synthetic Agility. New `AB_INSTANCE_PRIVATE_ADDRESSES=refuse`
+  accepts only instances at public addresses, checked when an instance is added or retargeted and at every connection.
+  The stdio mode is unchanged.
+- ba32352: Master-key status and retirement through the admin API (`GET /keys`, `POST /keys/{version}/retire`, owners; retiring
+  needs a recent sign-in and is audited), so `agility-bridge keys status` and `keys retire` work remotely too (for
+  example against a Cloudflare Worker). `agility-bridge init --version <N>` writes a key for the next version of a
+  rotation. `keys rotate` stays local.
+
+### Patch Changes
+
+- eb5d24c: Device tokens are resolved with one database round trip instead of four (the token and the records its access reads
+  in one batch).
+- bdcc3e9: Phase 3 review fixes: `keys retire` (and `POST /keys/{version}/retire`) refuses a version this database never used or a
+  future one, and keeps the operator's reason in the audit row; `AB_INSTANCE_PRIVATE_ADDRESSES=refuse` also refuses
+  IPv4 embedded in IPv6 (IPv4-compatible, SIIT, NAT64, 6to4), site-local IPv6 and the special and documentation IPv4
+  ranges.
+- ea56e1e: `agility-bridge serve` reads its settings and assembles its app through the code the Cloudflare Worker now shares
+  (no change in behaviour or settings).
+
 ## 0.2.0
 
 ### Minor Changes
