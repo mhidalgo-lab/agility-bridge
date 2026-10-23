@@ -5,6 +5,7 @@ import {
   appliedMigrations,
   createD1Driver,
   type D1Database,
+  type D1PreparedStatement,
   MIGRATIONS,
   openSqlStorage,
 } from '@agility-bridge/storage';
@@ -25,8 +26,43 @@ beforeAll(async () => {
       d1Databases: ['DB'],
     }),
   );
-  db = (await mf.getD1Database('DB')) as unknown as D1Database;
+  db = inFlightLimit((await mf.getD1Database('DB')) as unknown as D1Database, 16);
 });
+
+/**
+ * Miniflare's Node-side binding sends each call over its own socket to workerd, which closes sockets under ~100
+ * simultaneous calls ("other side closed"). On Cloudflare the binding is in-process, so the harness caps calls in
+ * flight; 16 still interleave, which is what the concurrency tests need.
+ */
+function inFlightLimit(d: D1Database, limit: number): D1Database {
+  let active = 0;
+  const waiting: (() => void)[] = [];
+  const run = async <T>(call: () => Promise<T>): Promise<T> => {
+    while (active >= limit) await new Promise<void>((resolve) => waiting.push(resolve));
+    active++;
+    try {
+      return await call();
+    } finally {
+      active--;
+      waiting.shift()?.();
+    }
+  };
+  // A batch hands the binding its own statements back.
+  const original = new WeakMap<D1PreparedStatement, D1PreparedStatement>();
+  const wrap = (s: D1PreparedStatement): D1PreparedStatement => {
+    const w: D1PreparedStatement = {
+      bind: (...values) => wrap(s.bind(...values)),
+      run: () => run(() => s.run()),
+      raw: () => run(() => s.raw()),
+    };
+    original.set(w, s);
+    return w;
+  };
+  return {
+    prepare: (sql) => wrap(d.prepare(sql)),
+    batch: (statements) => run(() => d.batch(statements.map((s) => original.get(s) ?? s))),
+  };
+}
 afterAll(() => mf.dispose());
 
 /** Drops every trigger, index and table, so each test migrates an empty database. */
