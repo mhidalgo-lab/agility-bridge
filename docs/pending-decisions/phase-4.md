@@ -227,3 +227,15 @@
 - **Options:** (a) as it is: tokens up to 90 days stay frictionless, they are listed, revocable and traced by id in the audit log; (b) every device token needs the recent sign-in (a prompt on most connects); (c) lower the default lifetime (30 days) and keep the rule.
 - **Recommendation:** (a): (b) makes connecting a second device a sign-in event for every member, and the standing-credential cases are covered. Revisit (c) with real usage.
 - **Owner:** _pending_ (implemented as (a)).
+
+### D-59 — Go for Phase 5 *(P4-11)*
+- **Context:** Phase 4 is built, reviewed (P4-09 and P4-11) and deployed on staging up to the sign-in routes. The one thing not
+  proven is a real sign-in with a real identity provider, because the agent may not create OAuth apps. Phase 5 (OAuth 2.1
+  for hosted MCP clients) reuses the providers, sessions and the consent pages built here.
+- **Options:** (a) go now: start Phase 5 and do the real sign-in in parallel; (b) go after the owner steps (a real
+  sign-in, a phone walkthrough, client runs); (c) hold Phase 5 and spend the time on the open follow-ups (P4-24, P4-28,
+  P4-30, P4-31, P4-34 … P4-37).
+- **Recommendation:** (a). Nothing in Phase 5's first tasks (metadata, dynamic client registration, the token endpoint)
+  needs a real provider, and a provider defect shows up at the sign-in step whatever the order. Switch to (b) before the
+  consent page task (the first one that signs a person in), and do the follow-ups by priority, not as a gate.
+- **Owner:** _pending_.

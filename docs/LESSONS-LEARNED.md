@@ -34,15 +34,15 @@ How to use it:
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236 |
-| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235 |
+| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
-| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238 |
+| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
-| [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136 |
+| [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163 |
 | [Top 20](#top-20) | the lessons that save the most time |
 
@@ -1174,6 +1174,16 @@ and its end; an instance row records the host, never the path or query. Values a
 and tools, switches and reasons; names, emails and labels stay out.
 *Applied in:* P4-09.
 
+**L-240 — A feature that adds a secret adds its redaction forms in the same PR: text, key name and URL.**
+The admin sign-in added the session cookie, the CSRF token, the PKCE verifier, the nonce, the setup code and the OAuth
+callback `code`, and redaction covered the cookie and the setup code (token shape) but not `_csrf=…`, `code_verifier=…`,
+`nonce=…` in free text, those names as object keys (`codeVerifier`, `sessionSecret`, `setupCode`) or `?code=…` in a URL.
+Nothing logged them (logs carry error names only), so it was a latent gap rather than a leak; the point is that redaction
+is the backstop for the day someone logs a request or an error message. Name each new secret in the redaction corpus in all
+three forms (a `name=value` string, an object key, a URL query), and keep a plain `code` or `state` key unredacted: error
+codes live under that name.
+*Applied in:* P4-11 review, `packages/core/src/redact.ts`, `packages/core/test/redact.test.ts`.
+
 ## Q. Testing, evals and live verification
 
 **L-121 — Negative authorization is first-class.**
@@ -1309,6 +1319,14 @@ Reconcile them with the shipped version in the release PR.
 One prefix (`AB_`), validated at boot, unknown keys rejected, YAML up to 1 MiB with `${ENV}` or keychain references and a
 warning unless mode `0600`, flags override environment, never secrets in flags.
 *Applied in:* P1-11.
+
+**L-241 — Numbered indexes are checked by a test, not by eye.**
+Lesson L-200 was missing from its theme index for a whole phase and nobody noticed, and decision numbers D-20 and D-21 exist
+twice (Phase 0 and Phase 1 files) because two branches took the next free number. History is never renumbered, so the
+repeat is pinned as the only accepted one. `scripts/test/numbering.test.ts` fails on a repeated or unlisted lesson, on an
+index entry without a lesson and on any new repeated decision number: take the next free number after rebasing, and add the
+index entry in the same edit as the heading.
+*Applied in:* P4-11 review, `scripts/test/numbering.test.ts`.
 
 ## T. Agility platform behaviours
 

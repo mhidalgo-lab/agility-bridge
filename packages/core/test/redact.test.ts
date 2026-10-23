@@ -125,6 +125,44 @@ describe('redactValue and Secret', () => {
     expect(redact('the ab_session cookie is HttpOnly')).toBe('the ab_session cookie is HttpOnly');
   });
 
+  it('removes sign-in transaction values: PKCE verifier, nonce, CSRF form field, OAuth code (P4-11)', () => {
+    const v = fake(64, '0123456789abcdef');
+    const csrf = fake(43, `${B62}-_`);
+    for (const line of [
+      `token request code_verifier=${v}`,
+      `form _csrf=${csrf}&x=1`,
+      `{"csrf":"${csrf}"}`,
+      `claims nonce=${v}`,
+      `GET /auth/callback/google?code=4%2F0${fake(30)}&state=abc`,
+    ]) {
+      const out = redact(line);
+      expect(out).not.toContain(v);
+      expect(out).not.toContain(csrf);
+      expect(out).not.toMatch(/code=4/);
+      expect(out).toContain(REDACTED);
+    }
+    expect(
+      redactValue({
+        codeVerifier: v,
+        code_verifier: v,
+        nonce: v,
+        setupCode: v,
+        sessionSecret: v,
+        code: 'E_X',
+        state: 's',
+      }),
+    ).toEqual({
+      codeVerifier: REDACTED,
+      code_verifier: REDACTED,
+      nonce: REDACTED,
+      setupCode: REDACTED,
+      sessionSecret: REDACTED,
+      code: 'E_X',
+      state: 's',
+    });
+    expect(redact('ID token nonce does not match the login')).toBe('ID token nonce does not match the login');
+  });
+
   it('cuts cycles and depth', () => {
     const a: Record<string, unknown> = { name: 'a' };
     a['self'] = a;
