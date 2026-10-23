@@ -4,6 +4,7 @@
 //
 //   GET /admin                     overview (any signed-in role)
 //   GET /admin/account             the signed-in person's session and two small forms (any role; the name form: owners)
+//   /admin/me/*                    "My access": my personal Agility token, grants and devices (any role, P4-07)
 //   /admin/instances, /credentials, /workspaces, /grants (with their device tokens) and /users: P4-04, owners and admins
 //   GET /admin/assets/:file        static assets (public, hashed names, immutable)
 //   ALL /admin/*                   signed-in 404 page (everyone else: sign-in redirect)
@@ -17,6 +18,7 @@ import { registerAccount } from './screens/account.tsx';
 import { registerCredentials } from './screens/credentials.tsx';
 import { registerGrants } from './screens/grants.tsx';
 import { registerInstances } from './screens/instances.tsx';
+import { registerMe } from './screens/me.tsx';
 import { registerOverview } from './screens/overview.tsx';
 import { registerTokens } from './screens/tokens.tsx';
 import { registerUsers } from './screens/users.tsx';
@@ -29,6 +31,7 @@ export const ADMIN_UI_BASE: '/admin' = '/admin';
 function registerScreens(ui: Hono, kit: UiKit): void {
   registerOverview(ui, kit);
   registerAccount(ui, kit);
+  registerMe(ui, kit);
   registerInstances(ui, kit);
   registerCredentials(ui, kit);
   registerWorkspaces(ui, kit);

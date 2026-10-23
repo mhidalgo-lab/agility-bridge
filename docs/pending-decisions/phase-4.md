@@ -93,3 +93,25 @@
 - **Recommendation:** (a). A 422 message names the field and the rule from our own validators, never upstream text; the other
   statuses (403, 404, 409, 502) are where names and Agility's words can appear, and they stay fixed.
 - **Owner:** _pending_ (implemented as (a)).
+
+### D-39 — No per-workspace switch for personal tokens, and no member-created grants *(P4-07)*
+- **Context:** a member brings their own Agility token and chooses which of their grants uses it. Grants (scope, tools, limits)
+  are assigned by administrators. Nothing lets a workspace say "personal tokens not allowed here", and a member cannot create
+  a grant for themselves.
+- **Options:** (a) keep: administrators assign grants, members choose among their own valid tokens; the workspace and the
+  grant still limit projects and tools; (b) a workspace flag letting members create their own grant with the workspace's
+  defaults; (c) a workspace flag forbidding personal tokens (members stay on the shared default).
+- **Recommendation:** (a). A personal token only changes *whose* Agility permissions answer, never what the workspace allows,
+  and relic-bridge decided the same way (2026-10-09). Revisit (c) if a team wants shared-only workspaces: a pass-through or
+  shared-only workspace already behaves that way.
+- **Owner:** _pending_ (implemented as (a)).
+
+### D-40 — Personal credential caps and where they apply *(P4-07)*
+- **Context:** a member can add personal tokens and device tokens without an administrator. Unbounded, each is a storage row
+  and a validation call to Agility.
+- **Options:** (a) fixed caps in the services: 10 personal credentials per person (revoked ones count until deleted) and 20
+  live device tokens per grant, re-checked after the insert; (b) configurable caps (environment variables); (c) no caps for
+  owners and admins.
+- **Recommendation:** (a): the numbers match relic-bridge, apply to every writer (API, panel, command line), and owners and
+  admins are people too. Make them settings only if a team asks.
+- **Owner:** _pending_ (implemented as (a)).

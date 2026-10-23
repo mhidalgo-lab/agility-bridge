@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // A complete server for HTTP tests: memory storage, two workspaces on one fake Agility instance, personal credentials
 // for two users, device tokens, and a recorder of which Agility token reached the fake.
-import { type Actor, accessServices, generateMasterKey, Keyring, type ToolInfo } from '@agility-bridge/auth';
+import {
+  type Actor,
+  accessServices,
+  type CredentialValidator,
+  credentialValidator,
+  generateMasterKey,
+  Keyring,
+  type ToolInfo,
+} from '@agility-bridge/auth';
 import {
   CircuitBreakers,
   CORE_TOOLS,
@@ -86,60 +94,75 @@ export async function world(
     services?: Partial<HostServices>;
     /** The tool catalogue the access model and the admin API know (default: the core tools). */
     tools?: ReadonlyMap<string, ToolInfo>;
+    /**
+     * Validate stored Agility tokens against the fake right after they are stored (P4-07), like a deployment does.
+     * `reject` names tokens the fake answers 401 for (the validation then ends `invalid`).
+     */
+    validate?: { reject?: (token: string) => boolean };
   } = {},
 ): Promise<World> {
   const now = { t: Date.UTC(2026, 9, 21, 12) };
   const storage = createMemoryStorage({ now: () => now.t });
   const keyring = await Keyring.create(generateMasterKey(1));
   const toolInfo = options.tools ?? TOOL_INFO;
-  const svc = accessServices({ storage, keyring, tools: toolInfo, now: () => now.t });
-  const alice = await svc.users.create({ email: 'alice@example.test', role: 'member' });
-  const bob = await svc.users.create({ email: 'bob@example.test', role: 'member' });
-  const instance = await svc.instances.create({ label: 'Fake', baseUrl: FAKE_BASE_URL });
-  const aliceCred = await svc.credentials.create({
+  // Fixtures are stored without a validator; the services the admin API uses get one when the test asks for it.
+  const fixtureSvc = accessServices({ storage, keyring, tools: toolInfo, now: () => now.t });
+  let validator: CredentialValidator | undefined;
+  const late: CredentialValidator = {
+    validate: (...a) => (validator as CredentialValidator).validate(...a),
+    probe: (...a) => (validator as CredentialValidator).probe(...a),
+  };
+  const svc =
+    options.validate === undefined
+      ? fixtureSvc
+      : accessServices({ storage, keyring, tools: toolInfo, now: () => now.t, validator: late });
+  const alice = await fixtureSvc.users.create({ email: 'alice@example.test', role: 'member' });
+  const bob = await fixtureSvc.users.create({ email: 'bob@example.test', role: 'member' });
+  const instance = await fixtureSvc.instances.create({ label: 'Fake', baseUrl: FAKE_BASE_URL });
+  const aliceCred = await fixtureSvc.credentials.create({
     instanceId: instance.id,
     ownerUserId: alice.id,
     label: 'a',
     token: ALICE_AGILITY,
   });
-  const bobCred = await svc.credentials.create({
+  const bobCred = await fixtureSvc.credentials.create({
     instanceId: instance.id,
     ownerUserId: bob.id,
     label: 'b',
     token: BOB_AGILITY,
   });
   for (const c of [aliceCred, bobCred]) await storage.credentials.update(c.id, { validationStatus: 'valid' });
-  const wsA = await svc.workspaces.create({
+  const wsA = await fixtureSvc.workspaces.create({
     slug: 'team-a',
     name: 'Team A',
     instanceId: instance.id,
     allowedScopeIds: ['Scope:1001'],
   });
-  const wsB = await svc.workspaces.create({
+  const wsB = await fixtureSvc.workspaces.create({
     slug: 'team-b',
     name: 'Team B',
     instanceId: instance.id,
     allowedScopeIds: options.projectsB ?? ['Scope:2001'],
   });
   const aliceGrant = (
-    await svc.grants.create({ workspaceId: wsA.id, userId: alice.id, credentialId: aliceCred.id })
+    await fixtureSvc.grants.create({ workspaceId: wsA.id, userId: alice.id, credentialId: aliceCred.id })
   ).record;
   const aliceGrantB = (
-    await svc.grants.create({ workspaceId: wsB.id, userId: alice.id, credentialId: aliceCred.id })
+    await fixtureSvc.grants.create({ workspaceId: wsB.id, userId: alice.id, credentialId: aliceCred.id })
   ).record;
   const bobGrant = (
-    await svc.grants.create({
+    await fixtureSvc.grants.create({
       workspaceId: wsB.id,
       userId: bob.id,
       credentialId: bobCred.id,
       tools: ['whoami', 'get_assets'],
     })
   ).record;
-  const ownerUser = await svc.users.create({ email: 'owner@example.test', role: 'owner' });
-  const adminUser = await svc.users.create({ email: 'admin@example.test', role: 'admin' });
-  const a = await svc.tokens.issue({ grantId: aliceGrant.id, label: 'laptop' });
-  const aB = await svc.tokens.issue({ grantId: aliceGrantB.id, label: 'laptop' });
-  const b = await svc.tokens.issue({ grantId: bobGrant.id, label: 'phone' });
+  const ownerUser = await fixtureSvc.users.create({ email: 'owner@example.test', role: 'owner' });
+  const adminUser = await fixtureSvc.users.create({ email: 'admin@example.test', role: 'admin' });
+  const a = await fixtureSvc.tokens.issue({ grantId: aliceGrant.id, label: 'laptop' });
+  const aB = await fixtureSvc.tokens.issue({ grantId: aliceGrantB.id, label: 'laptop' });
+  const b = await fixtureSvc.tokens.issue({ grantId: bobGrant.id, label: 'phone' });
 
   const agilityTokens: string[] = [];
   const fake = new FakeAgility({
@@ -147,7 +170,9 @@ export async function world(
     assets: (options.assets ?? ASSETS) as never,
     filters: options.filters ?? 'evaluate',
     override: (req) => {
-      agilityTokens.push(req.headers.get('authorization')?.replace(/^Bearer /, '') ?? '');
+      const token = req.headers.get('authorization')?.replace(/^Bearer /, '') ?? '';
+      agilityTokens.push(token);
+      if (options.validate?.reject?.(token) === true) return new Response('{}', { status: 401 });
       return undefined;
     },
   });
@@ -155,6 +180,15 @@ export async function world(
   const toolCalls: ToolCallRecord[] = [];
   const logs: string[] = [];
   const logger = createLogger({ level: 'debug', sink: (l) => logs.push(l) });
+  validator = credentialValidator({
+    fetchFor: () => fake.fetch,
+    limiters: new CredentialLimiters(),
+    breakers: new CircuitBreakers(),
+    metadata: new MetadataService(),
+    logger,
+    clock: { now: () => now.t },
+    random: webCryptoRandom,
+  });
   const audit = new AuditWriter({
     storage: options.auditStorage?.(storage) ?? storage,
     logger,

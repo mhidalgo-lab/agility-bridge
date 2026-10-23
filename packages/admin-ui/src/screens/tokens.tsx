@@ -8,8 +8,11 @@
 //   GET  /admin/grants/:id/tokens/new           device name and lifetime form (writes one handle)
 //   POST /admin/grants/:id/tokens               issue -> the one-time page
 //   POST /admin/grants/:gid/tokens/:id/revoke   revoke (confirmation page first)
+// The same three routes exist for members under `/admin/me/grants/...` (P4-07): their own grants only, and the grant's
+// workspace comes from `GET /me/grants` (members cannot read workspaces). One implementation, two areas.
 import type { Context, Hono } from 'hono';
 import type { JSX } from 'hono/jsx/jsx-runtime';
+import type { UiRole } from '../components.tsx';
 import {
   Button,
   DataTable,
@@ -30,11 +33,12 @@ import {
   one,
   parseCredential,
   parseGrant,
+  parseMyGrant,
   parseToken,
   parseWorkspace,
   rows,
   type Token,
-  type Workspace,
+  type WorkspaceName,
 } from './data.ts';
 import {
   confirmed,
@@ -54,7 +58,34 @@ import {
 } from './shared.tsx';
 
 const GRANTS = '/admin/grants';
-const ROUTE = '/grants/:id/tokens';
+
+/** Where a set of token routes lives: owners and admins on any grant, or members on their own. */
+interface Area {
+  readonly minRole: UiRole;
+  /** Route prefix inside the panel (`/grants`, `/me/grants`). */
+  readonly rel: string;
+  /** The list page the area falls back to. */
+  readonly back: string;
+  /** Nav entry to highlight. */
+  readonly current: string;
+  /** Members find the workspace through their own grant list. */
+  readonly member: boolean;
+}
+const ADMIN_AREA: Area = {
+  minRole: 'admin',
+  rel: '/grants',
+  back: GRANTS,
+  current: GRANTS,
+  member: false,
+};
+export const MEMBER_AREA: Area = {
+  minRole: 'member',
+  rel: '/me/grants',
+  back: '/admin/me',
+  current: '/admin/me',
+  member: true,
+};
+const grantPage = (area: Area, id: string): string => `/admin${area.rel}${adminPath`/${id}`}`;
 
 /** Lifetimes offered (days; `never` is warned about by the API and here). */
 export const LIFETIMES = [
@@ -88,7 +119,9 @@ export function TokenTable(props: {
   readonly grantId: string;
   readonly tokens: readonly Token[];
   readonly now: number;
+  readonly area?: Area;
 }): JSX.Element {
+  const area = props.area ?? ADMIN_AREA;
   return (
     <DataTable
       caption="Device tokens"
@@ -105,7 +138,7 @@ export function TokenTable(props: {
           cell: (k) =>
             k.revokedAt === null ? (
               <RowAction
-                action={adminPath`/admin/grants/${props.grantId}/tokens/${k.id}/revoke`}
+                action={`${grantPage(area, props.grantId)}${adminPath`/tokens/${k.id}/revoke`}`}
                 csrf={props.viewer.csrf}
                 label="Revoke…"
                 name={`Revoke ${k.label}`}
@@ -121,17 +154,18 @@ export function TokenTable(props: {
 
 function NewTokenPage(props: {
   readonly viewer: UiPrincipal;
+  readonly area: Area;
   readonly grant: Grant;
-  readonly workspace: Workspace | null;
+  readonly workspace: WorkspaceName | null;
   readonly values: { label: string; lifetime: string };
   readonly errors: Readonly<Record<string, string>>;
   readonly once: string;
   readonly message?: string | undefined;
 }) {
   const { viewer, grant, values } = props;
-  const self = adminPath`/admin/grants/${grant.id}`;
+  const self = grantPage(props.area, grant.id);
   return (
-    <Layout title="New device token" viewer={viewer} current={GRANTS}>
+    <Layout title="New device token" viewer={viewer} current={props.area.current}>
       <p>
         On the grant{' '}
         <a href={self}>{grant.userId === null ? `service: ${grant.label ?? 'unnamed'}` : 'for a person'}</a>
@@ -171,6 +205,7 @@ function NewTokenPage(props: {
 /** The one-time page of a new device token: the token in a box, notes, how to use it. Rendered only as the POST's answer. */
 function IssuedTokenPage(props: {
   readonly viewer: UiPrincipal;
+  readonly current: string;
   readonly record: Token;
   readonly token: string;
   readonly warnings: readonly string[];
@@ -179,7 +214,7 @@ function IssuedTokenPage(props: {
 }) {
   const { record, token } = props;
   return (
-    <Layout title="Your new device token" viewer={props.viewer} current={GRANTS}>
+    <Layout title="Your new device token" viewer={props.viewer} current={props.current}>
       <div class="flash flash-info" role="status">
         Copy the token now. It is not stored and cannot be shown again: if you lose it, revoke it and create a
         new one.
@@ -217,13 +252,35 @@ function IssuedTokenPage(props: {
 }
 
 export function registerTokens(ui: Hono, kit: UiKit): void {
-  const now = () => (kit.deps.now ?? Date.now)();
+  registerTokenRoutes(ui, kit, ADMIN_AREA);
+  registerTokenRoutes(ui, kit, MEMBER_AREA);
+}
 
+function registerTokenRoutes(ui: Hono, kit: UiKit, area: Area): void {
+  const now = () => (kit.deps.now ?? Date.now)();
+  const ROUTE = `${area.rel}/:id/tokens`;
+
+  /**
+   * The grant, or the failed answer. The member area is "mine only", also for owners and admins who could read any grant
+   * through the API: a grant of someone else is a 404 here (their own pages are the admin screens).
+   */
   const loadGrant = async (c: Context, principal: UiPrincipal, id: string) => {
     const got = await load(kit, c, principal, adminPath`/grants/${id}`, (b) => one(b, parseGrant));
-    return got.ok ? got.value : got.result;
+    if (!got.ok) return got.result;
+    if (area.member && got.value.userId !== principal.userId)
+      return { status: 404, body: { error: { code: 'not_found', message: 'Not found.' } } };
+    return got.value;
   };
-  const loadWorkspace = async (c: Context, principal: UiPrincipal, id: string) => {
+  const loadWorkspace = async (
+    c: Context,
+    principal: UiPrincipal,
+    id: string,
+  ): Promise<WorkspaceName | null> => {
+    if (area.member) {
+      // Members cannot read workspaces; their own grant list carries the few fields shown here.
+      const mine = await load(kit, c, principal, '/me/grants', (b) => rows(b, parseMyGrant));
+      return mine.ok ? (mine.value.find((m) => m.workspace?.id === id)?.workspace ?? null) : null;
+    }
     const got = await load(kit, c, principal, adminPath`/workspaces/${id}`, (b) => one(b, parseWorkspace));
     return got.ok ? got.value : null;
   };
@@ -235,7 +292,7 @@ export function registerTokens(ui: Hono, kit: UiKit): void {
 
   ui.get(
     `${ROUTE}/new`,
-    kit.page('admin', async (c, page) => {
+    kit.page(area.minRole, async (c, page) => {
       const { principal } = page;
       const id = c.req.param('id');
       if (!isId(id)) return errorPage(404, undefined, principal);
@@ -243,11 +300,12 @@ export function registerTokens(ui: Hono, kit: UiKit): void {
       if ('status' in grant) return loadFailed(c, grant, principal);
       const credential = await loadCredential(c, principal, grant.credentialId);
       if (!canIssueOn(grant, credential, principal, now()))
-        return page.html(<NoToken viewer={principal} grantId={id} />, 409);
+        return page.html(<NoToken viewer={principal} area={area} grantId={id} />, 409);
       // The handle is written here, for the page that shows the form, and nowhere else (relic-bridge review L6).
       return page.html(
         <NewTokenPage
           viewer={principal}
+          area={area}
           grant={grant}
           workspace={await loadWorkspace(c, principal, grant.workspaceId)}
           values={{ label: '', lifetime: '90' }}
@@ -260,12 +318,12 @@ export function registerTokens(ui: Hono, kit: UiKit): void {
 
   ui.post(
     ROUTE,
-    kit.form('admin', async (c, principal, form) => {
+    kit.form(area.minRole, async (c, principal, form) => {
       const id = c.req.param('id');
-      if (!isId(id)) return kit.redirect(GRANTS, 'not_found');
-      const self = adminPath`/admin/grants/${id}`;
+      if (!isId(id)) return kit.redirect(area.back, 'not_found');
+      const self = grantPage(area, id);
       const grant = await loadGrant(c, principal, id);
-      if ('status' in grant) return kit.fail(c, principal, grant, GRANTS);
+      if ('status' in grant) return kit.fail(c, principal, grant, area.back);
       const workspace = await loadWorkspace(c, principal, grant.workspaceId);
       const label = field(form, 'label');
       const lifetime = form.fields.get('lifetime') ?? '90';
@@ -279,6 +337,7 @@ export function registerTokens(ui: Hono, kit: UiKit): void {
         htmlResponse(
           <NewTokenPage
             viewer={principal}
+            area={area}
             grant={grant}
             workspace={workspace}
             values={values}
@@ -330,6 +389,7 @@ export function registerTokens(ui: Hono, kit: UiKit): void {
       return htmlResponse(
         <IssuedTokenPage
           viewer={principal}
+          current={area.current}
           record={record}
           token={token}
           warnings={warnings}
@@ -341,28 +401,38 @@ export function registerTokens(ui: Hono, kit: UiKit): void {
   );
 
   ui.post(
-    '/grants/:gid/tokens/:id/revoke',
-    kit.form('admin', async (c, principal, form) => {
+    `${area.rel}/:gid/tokens/:id/revoke`,
+    kit.form(area.minRole, async (c, principal, form) => {
       const gid = c.req.param('gid');
       const id = c.req.param('id');
-      if (!isId(gid) || !isId(id)) return kit.redirect(GRANTS, 'not_found');
-      const self = adminPath`/admin/grants/${gid}`;
+      if (!isId(gid) || !isId(id)) return kit.redirect(area.back, 'not_found');
+      const self = grantPage(area, gid);
+      if (area.member) {
+        // The token must be on a grant of mine, whatever the API would let this role do.
+        const grant = await loadGrant(c, principal, gid);
+        if ('status' in grant) return kit.fail(c, principal, grant, area.back);
+        const list = await load(kit, c, principal, adminPath`/grants/${gid}/tokens`, (b) =>
+          rows(b, parseToken),
+        );
+        if (!list.ok) return kit.fail(c, principal, list.result, area.back);
+        if (!list.value.some((k) => k.id === id)) return kit.redirect(self, 'not_found');
+      }
       if (!confirmed(form)) {
         const list = await load(kit, c, principal, adminPath`/grants/${gid}/tokens`, (b) =>
           rows(b, parseToken),
         );
-        if (!list.ok) return kit.fail(c, principal, list.result, GRANTS);
+        if (!list.ok) return kit.fail(c, principal, list.result, area.back);
         const token = list.value.find((k) => k.id === id);
         if (token === undefined) return kit.redirect(self, 'not_found');
         return confirmPage({
           viewer: principal,
-          current: GRANTS,
+          current: area.current,
           title: `Revoke the token of ${token.label}?`,
           paragraphs: [
             `The device using ${token.prefix}… loses access at once. Other devices keep working.`,
             'A revoked token cannot be restored: the device needs a new token.',
           ],
-          action: adminPath`/admin/grants/${gid}/tokens/${id}/revoke`,
+          action: `${self}${adminPath`/tokens/${id}/revoke`}`,
           confirm: 'Revoke the token',
           cancel: self,
         });
@@ -378,14 +448,14 @@ export function registerTokens(ui: Hono, kit: UiKit): void {
   );
 }
 
-function NoToken(props: { readonly viewer: UiPrincipal; readonly grantId: string }) {
+function NoToken(props: { readonly viewer: UiPrincipal; readonly area: Area; readonly grantId: string }) {
   return (
-    <Layout title="No device token here" viewer={props.viewer} current={GRANTS}>
+    <Layout title="No device token here" viewer={props.viewer} current={props.area.current}>
       <p>
         This grant cannot get a new device token: it is revoked or expired, or it uses another person's
         personal Agility token, which only that person can issue device tokens for.
       </p>
-      <LinkButton href={adminPath`/admin/grants/${props.grantId}`} variant="secondary">
+      <LinkButton href={grantPage(props.area, props.grantId)} variant="secondary">
         Back to the grant
       </LinkButton>
     </Layout>

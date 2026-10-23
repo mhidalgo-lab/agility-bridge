@@ -243,6 +243,70 @@ export function parseToken(r: Row): Token | null {
   };
 }
 
+/** The workspace fields "My access" has for one of my grants (members cannot read workspaces; `GET /me/grants`). */
+export interface MyWorkspace {
+  readonly id: string;
+  readonly slug: string;
+  readonly name: string;
+  readonly instanceId: string;
+  readonly credentialSource: 'stored' | 'passthrough';
+  readonly hasDefaultCredential: boolean;
+  readonly disabledAt: number | null;
+}
+/** What the token pages need of a workspace. */
+export type WorkspaceName = Pick<Workspace, 'slug' | 'name'>;
+
+export interface MyGrant {
+  readonly grant: Grant;
+  readonly workspace: MyWorkspace | null;
+}
+
+export function parseMyGrant(r: Row): MyGrant | null {
+  const grant = parseGrant(obj(r['grant']));
+  if (grant === null) return null;
+  const w = obj(r['workspace']);
+  const id = str(w['id']);
+  return {
+    grant,
+    workspace:
+      id === ''
+        ? null
+        : {
+            id,
+            slug: str(w['slug']),
+            name: str(w['name']),
+            instanceId: str(w['instanceId']),
+            credentialSource: w['credentialSource'] === 'passthrough' ? 'passthrough' : 'stored',
+            hasDefaultCredential: w['hasDefaultCredential'] === true,
+            disabledAt: intOrNull(w['disabledAt']),
+          },
+  };
+}
+
+/** One line of "my recent changes" (`GET /me/audit`). */
+export interface MyAuditRow {
+  readonly id: string;
+  readonly ts: number;
+  readonly action: string;
+  readonly status: 'ok' | 'error' | 'denied';
+  readonly targetType: string | null;
+  readonly targetId: string | null;
+}
+
+export function parseMyAudit(r: Row): MyAuditRow | null {
+  const id = str(r['id']);
+  if (id === '') return null;
+  const status = r['status'];
+  return {
+    id,
+    ts: int(r['ts']),
+    action: str(r['action']),
+    status: status === 'error' || status === 'denied' ? status : 'ok',
+    targetType: strOrNull(r['targetType']),
+    targetId: strOrNull(r['targetId']),
+  };
+}
+
 export interface Tool {
   readonly name: string;
   readonly kind: 'read' | 'write' | 'destructive';

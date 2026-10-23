@@ -558,6 +558,52 @@ describe('sign-in on workerd (P4-01)', () => {
       ).json()) as unknown[];
       expect(tokens).toHaveLength(1);
 
+      // "My access" (P4-07) on the Worker: the signed-in person's grants, a personal token checked against the synthetic
+      // Agility and stored in D1, and a grant moved to it; the token never comes back in a page.
+      const ownerId = ((info as { user: { id?: string } }).user.id ?? '') as string;
+      const mine = await viaApi('/grants', {
+        workspaceId: workspace.id,
+        userId: ownerId,
+        credentialId: shared.id,
+      });
+      const myAccess = await (await screen('/admin/me')).text();
+      expect(myAccess).toContain('My grants');
+      expect(myAccess).toContain('Panel workspace');
+      expect((await screen('/admin/me/credentials/new')).status).toBe(200);
+      const personal = 'synthetic-personal-token-any-value';
+      const addedToken = await call(mf, '/admin/me/credentials', {
+        method: 'POST',
+        redirect: 'manual',
+        headers: issueHeaders,
+        body: new URLSearchParams({
+          _csrf: info.csrfToken,
+          instanceId: instance.id as string,
+          label: 'My token',
+          token: personal,
+        }).toString(),
+      });
+      expect(addedToken.status).toBe(303);
+      const personalPage = addedToken.headers.get('location') as string;
+      expect(personalPage).toMatch(/^\/admin\/me\/credentials\/[^/]+$/);
+      const personalHtml = await (await screen(personalPage)).text();
+      expect(personalHtml).toContain('valid');
+      expect(personalHtml).not.toContain(personal);
+      const personalId = personalPage.split('/').pop() as string;
+      const switched = await call(mf, `/admin/me/grants/${mine.record?.id}/credential`, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: issueHeaders,
+        body: new URLSearchParams({ _csrf: info.csrfToken, credentialId: personalId }).toString(),
+      });
+      expect(switched.status).toBe(303);
+      const myGrants = (await (
+        await call(mf, '/api/admin/v1/me/grants', {
+          headers: { cookie: session, 'sec-fetch-site': 'same-origin' },
+        })
+      ).json()) as { grant: { credentialId: string | null } }[];
+      expect(myGrants.map((g) => g.grant.credentialId)).toContain(personalId);
+      expect(await (await screen(`/admin/me/grants/${mine.record?.id}`)).text()).not.toContain(personal);
+
       const bad = await call(mf, '/api/admin/v1/users', {
         headers: { cookie: 'ab_session=forged', 'sec-fetch-site': 'same-origin' },
       });

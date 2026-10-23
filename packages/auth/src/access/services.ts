@@ -62,6 +62,11 @@ export interface WithWarnings<T> {
   readonly warnings: readonly string[];
 }
 
+/** Personal Agility credentials one person may keep (P4-07, THREAT_MODEL T20): revoked ones count until deleted. */
+export const MAX_PERSONAL_CREDENTIALS = 10;
+/** Live (not revoked, not expired) device tokens per grant (P4-07, THREAT_MODEL T20). */
+export const MAX_LIVE_TOKENS_PER_GRANT = 20;
+
 const defaultId = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
 
 function parse<T>(schema: z.ZodType<T>, value: unknown, field: string): T {
@@ -373,15 +378,27 @@ export function accessServices(options: AccessServicesOptions) {
       const token = checkAgilityToken(input.token);
       const instance = await mustGet(storage.instances.get(input.instanceId), 'instance');
       if (instance.disabledAt !== null) throw new InvalidInputError('The instance is disabled.');
+      const owner = input.ownerUserId;
+      const capMessage = `At most ${MAX_PERSONAL_CREDENTIALS} personal Agility tokens per person; delete one you no longer use first.`;
+      const personal = () => storage.credentials.list({ ownerUserId: owner });
+      if (owner !== null && (await personal()).length >= MAX_PERSONAL_CREDENTIALS) {
+        throw new ConflictError(capMessage);
+      }
       const id = newId('crd');
       const sealed = await sealCredentialToken(keyring, id, token);
       await storage.credentials.create({
         id,
         instanceId: input.instanceId,
-        ownerUserId: input.ownerUserId,
+        ownerUserId: owner,
         label: input.label,
         ...sealed,
       });
+      // Parallel adds can all pass the check above: count again after the insert and take this one back when over (the
+      // losers of a race all retreat, so the cap holds; the person retries).
+      if (owner !== null && (await personal()).length > MAX_PERSONAL_CREDENTIALS) {
+        await storage.credentials.delete(id);
+        throw new ConflictError(capMessage);
+      }
       return validateCredential(id);
     },
     /**
@@ -584,6 +601,12 @@ export function accessServices(options: AccessServicesOptions) {
       }
       const warnings =
         days === 'never' ? ['The token never expires; revoke it when the device is lost or retired.'] : [];
+      const capMessage = `At most ${MAX_LIVE_TOKENS_PER_GRANT} live device tokens per grant; revoke one you no longer use first.`;
+      const live = async () =>
+        (await storage.accessTokens.list({ grantId: grant.id })).filter(
+          (t) => t.revokedAt === null && (t.expiresAt === null || t.expiresAt > now()),
+        ).length;
+      if ((await live()) >= MAX_LIVE_TOKENS_PER_GRANT) throw new ConflictError(capMessage);
       const issued = await generateDeviceToken(options.environment ?? 'live');
       const record = await storage.accessTokens.create({
         id: newId('tok'),
@@ -593,6 +616,11 @@ export function accessServices(options: AccessServicesOptions) {
         label: input.label,
         expiresAt: days === 'never' ? null : now() + days * 86_400_000,
       });
+      // Same re-check as for credentials: parallel issues retreat together rather than pass the cap (P4-07).
+      if ((await live()) > MAX_LIVE_TOKENS_PER_GRANT) {
+        await storage.accessTokens.delete(record.id);
+        throw new ConflictError(capMessage);
+      }
       return { token: issued.token, record, warnings };
     },
     revoke: (id: string) => storage.accessTokens.update(id, { revokedAt: now() }),

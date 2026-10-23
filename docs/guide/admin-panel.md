@@ -102,6 +102,27 @@ owners and admins read-only.
 - The **last active owner** cannot be demoted or disabled. The page says "That would leave the server without an active
   owner" and changes nothing; make another person an owner first.
 
+## My access (every role)
+
+Everyone who signs in, members included, has **My access** in the menu (`/admin/me`). It shows only your own things; an
+owner or an admin sees the same pages, not other people's, and manages other people's tokens and grants in the screens above.
+
+- **My grants**: the workspaces an administrator gave you, which Agility token each one uses, and whether it is active.
+  Administrators assign grants; you cannot create one or change which projects or tools it reaches.
+- **My Agility tokens**: your personal tokens (up to 10). The page tells you how to create one on Agility's Applications
+  page (profile menu, Applications, Add Application, copy the token once). Paste it into the password field; it is
+  encrypted at once, checked against Agility, and never shown again: the page keeps only its last four characters. You can
+  add a token only for an instance you have a grant on. If Agility refuses the token, it is kept but unusable and the
+  page says so: replace it with a new one.
+- **Check now**, **Rename**, **Replace the token** (needs a sign-in from the last 10 minutes), **Revoke** (final) and
+  **Delete** (removes the encrypted token from the server; only when none of your grants uses it).
+- **My grant**: choose which of your valid tokens the grant uses, or go back to the workspace default. Going back is
+  allowed only while the grant uses one of *your* tokens: an administrator's choice of a shared token is theirs to change.
+  Switching to a personal token revokes the device tokens already issued on that grant, so none keeps acting through a
+  different token. Writes stay off: a personal token never enables write tools.
+- **My devices**: device tokens on the grant (up to 20 live ones): issue one per device (shown once), revoke one.
+- **My recent changes**: your own last administrative changes (what and when, never a secret).
+
 ## When the page asks you to sign in again
 
 A change that needs a recent sign-in (origin, replacing a token, write settings, owner and admin changes) answers with a

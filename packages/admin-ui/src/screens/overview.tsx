@@ -48,6 +48,7 @@ export function registerOverview(ui: Hono, kit: UiKit): void {
               ]}
             />
             <div class="actions">
+              <LinkButton href="/admin/me">My access</LinkButton>
               <LinkButton href="/admin/account" variant="secondary">
                 Account
               </LinkButton>

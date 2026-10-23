@@ -60,7 +60,7 @@ session cookie came with it. The admin API exists when sign-in is configured, wh
 
 | | Member | Admin | Owner |
 |---|---|---|---|
-| See and use their own credentials, grants and tokens | yes | yes | yes |
+| See and use their own credentials, grants and tokens ("My access" in the panel: add, check, replace, revoke and delete their personal Agility token, choose it on their grants, issue and revoke their device tokens) | yes | yes | yes |
 | Manage instances, shared credentials, workspaces, grants, members | no | yes | yes |
 | Create, promote, demote, disable or end the sessions of **admins and owners** | no | no | yes |
 | Enable write tools and write policies, pass-through workspaces, master-key versions, setup links, instance origin changes | no | no | yes |
@@ -68,7 +68,14 @@ session cookie came with it. The admin API exists when sign-in is configured, wh
 | Read the audit log | no | yes | yes |
 
 The rules live in the guards every writer shares (API, command line), not in the session; a session only says who is
-asking. The break-glass token acts as an owner.
+asking. The break-glass token acts as an owner, except on `/me/*` (it is nobody there).
+
+**Members' own access.** The API routes `/credentials`, `/grants/{id}/tokens` and `/tokens/{id}/revoke` already let a member
+work on their own records only (another person's or a shared credential, and a grant that is not theirs, answer `404`), and
+P4-07 adds `DELETE /credentials/{id}` for their own personal credential, `GET /me/grants`, `POST
+/me/grants/{id}/credential` and `GET /me/audit`. A member stores a personal token only for an instance they have a live
+grant on; at most 10 personal credentials per person and 20 live device tokens per grant. See the [admin panel
+guide](admin-panel.md#my-access-every-role).
 
 ## Re-authentication
 
