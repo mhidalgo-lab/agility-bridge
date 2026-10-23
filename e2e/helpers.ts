@@ -7,18 +7,28 @@ import type { TestServer } from './server.ts';
 export async function expectNoHorizontalScroll(page: Page): Promise<void> {
   const { overflow, culprits } = await page.evaluate(() => {
     const width = document.documentElement.clientWidth;
-    // The innermost elements that reach past the viewport, so a failure names what to fix.
+    // Elements that reach past the viewport and are not inside a box that scrolls on its own (those are fine), the
+    // innermost ones first, so a failure names what to fix.
+    const scrolls = (e: Element): boolean =>
+      ['auto', 'scroll', 'hidden'].includes(getComputedStyle(e).overflowX);
+    const clipped = (e: Element): boolean => {
+      for (let a = e.parentElement; a !== null && a !== document.body; a = a.parentElement)
+        if (scrolls(a)) return true;
+      return false;
+    };
     const wide = [...document.body.querySelectorAll('*')].filter(
-      (e) => e.getBoundingClientRect().right > width + 0.5,
+      (e) => e.getBoundingClientRect().right > width + 0.5 && !clipped(e),
     );
     const innermost = wide.filter((e) => !wide.some((o) => o !== e && e.contains(o)));
+    const name = (e: Element): string =>
+      `${e.tagName.toLowerCase()}${e.id ? `#${e.id}` : ''}${e.className ? `.${String(e.className).split(' ').join('.')}` : ''}`;
     return {
       overflow: document.documentElement.scrollWidth - width,
       culprits: innermost
         .slice(0, 5)
         .map(
           (e) =>
-            `${e.tagName.toLowerCase()}${e.id ? `#${e.id}` : ''}${e.className ? `.${String(e.className).split(' ').join('.')}` : ''} (right ${Math.round(e.getBoundingClientRect().right)} > ${width})`,
+            `${name(e)} in ${e.parentElement ? name(e.parentElement) : '?'} (right ${Math.round(e.getBoundingClientRect().right)} > ${width})`,
         ),
     };
   });
