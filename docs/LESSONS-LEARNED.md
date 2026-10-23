@@ -34,7 +34,7 @@ How to use it:
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193 |
-| [K. Admin UI](#k-admin-ui) | L-095 |
+| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-196 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
@@ -774,7 +774,31 @@ and `auth_time` when reported, the Cloudflare Access assertion's `iat`), and rot
 Auto-escaped server rendering only, no inline scripts or styles, a strict CSP with hashed assets,
 `frame-ancestors 'none'`, CSRF synchronizer tokens plus Origin/Fetch-Metadata checks, mutations only through POST. The
 panel calls the admin API in-process so validation, authorization and audit are identical.
-*Applied in:* [ADR-0004](adr/0004-typescript-runtime-agnostic-core.md), P4-03.
+*Applied in:* [ADR-0004](adr/0004-typescript-runtime-agnostic-core.md), P4-03 ([admin panel guide](dev/admin-ui.md)).
+
+**L-194 — Assert a security header against a literal, and keep a page's own policy only on an exact match.**
+A test that compares the CSP header to the constant the page was built from can never fail (relic-bridge's Phase 4 review,
+Q1). The panel's tests spell the policy out once, as a string, and check its directives; the edge keeps a response's own CSP
+only when it equals one of the panel's two policies as a whole (`isUiCsp`) and replaces every other, so a page that sets a
+looser policy by mistake is still served with the JSON-only default. A header an HTML page passes replaces the default
+instead of being appended (two CSP headers are two policies, and the stricter wins silently).
+*Applied in:* P4-03, `packages/admin-ui/test/headers.test.tsx`, `packages/http-app/test/admin-panel.test.ts`.
+
+**L-195 — A strict `form-action` breaks a form that is answered with a redirect to another origin.**
+Chromium applies `form-action` to the redirects that follow a form post, so the owner setup form (posted here, answered
+with a 303 to the identity provider) cannot live under the panel's `form-action 'self'`. The setup page alone drops that
+one directive and keeps the rest (`UI_CSP_SETUP`, tested as the panel policy minus `form-action`); every other form posts to
+and is answered by this origin. P4-01 found it with its own inline policy; moving the sign-in pages onto the panel layout
+had to keep it.
+*Applied in:* P4-03.
+
+**L-196 — Load the panel lazily and keep it out of script and MCP paths, and share the app the API route uses.**
+`http-app` imports the `.tsx` panel with `import()` on the first panel or sign-in page: MCP requests never evaluate it on
+Workers (the bundle wraps it in a lazy initialiser), and scripts that run `http-app` from source under plain Node never need
+a JSX transform. Cache the loaded module (a completed value), never the promise (L-096), and let a failed import be retried.
+The panel's in-process calls enter the admin API through the same lazily built app as the HTTP route, with the request id in
+an internal header the caller sets, so a panel change and an API call produce the same audit row.
+*Applied in:* P4-03, `packages/http-app/test/admin-panel-lazy.test.ts`.
 
 ## L. Cloudflare Workers
 

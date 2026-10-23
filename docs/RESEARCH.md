@@ -544,3 +544,12 @@ Checked 2026-10-23.
 - **Fetch metadata.** A redirect chain that began on another site keeps `Sec-Fetch-Site: cross-site` for its last
   request, so the page after an IdP redirect arrives as a cross-site top-level navigation (`Sec-Fetch-Mode: navigate`,
   `Sec-Fetch-Dest: document`). Source: https://web.dev/articles/fetch-metadata
+
+### CSP `form-action` and redirects after a form post (P4-03)
+
+- MDN warns that whether `form-action` blocks the redirects that follow a form submission "is debated and browser
+  implementations of this aspect are inconsistent (e.g., Firefox 57 doesn't block the redirects whereas Chrome 63 does)"
+  (checked 2026-10-23,
+  <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/form-action>). The owner
+  setup page therefore has a policy without `form-action` ([L-195](LESSONS-LEARNED.md), D-35). Current behaviour of the
+  browsers *unverified*: the P4-08 browser run checks it.

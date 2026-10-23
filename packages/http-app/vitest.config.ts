@@ -8,6 +8,7 @@ export default defineProject({
   // Workspace packages resolve to their sources (see apps/cli/vitest.config.ts).
   resolve: {
     alias: {
+      '@agility-bridge/admin-ui': src('admin-ui'),
       '@agility-bridge/auth': src('auth'),
       '@agility-bridge/core': src('core'),
       '@agility-bridge/storage': src('storage'),

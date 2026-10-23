@@ -19,6 +19,7 @@
     "wrangler": "4.149.0"
   },
   "dependencies": {
+    "@agility-bridge/admin-ui": "workspace:*",
     "@agility-bridge/auth": "workspace:*",
     "@agility-bridge/core": "workspace:*",
     "@agility-bridge/http-app": "workspace:*",

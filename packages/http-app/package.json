@@ -23,6 +23,7 @@
     "runtime": "web"
   },
   "dependencies": {
+    "@agility-bridge/admin-ui": "workspace:*",
     "@agility-bridge/auth": "workspace:*",
     "@agility-bridge/core": "workspace:*",
     "@agility-bridge/storage": "workspace:*",

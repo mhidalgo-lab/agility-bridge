@@ -1,12 +1,30 @@
 # Admin access: sessions, roles and re-authentication
 
-> Phase 4 (P4-02). How people use the admin side of agility-bridge once they have signed in
-> ([sign-in providers](identity-providers.md)): the browser session, who may do what, the extra sign-in that
-> high-impact changes need, and how to end sessions. The panel itself arrives with P4-03; until then the pages are
-> `/auth/account` and the [admin API](../reference/admin-api.md).
+> Phase 4 (P4-02, P4-03). How people use the admin side of agility-bridge once they have signed in
+> ([sign-in providers](identity-providers.md)): the browser session, the panel at `/admin`, who may do what, the extra
+> sign-in that high-impact changes need, and how to end sessions. The panel's screens arrive with P4-04 to P4-07; today
+> it has an overview and an account page, and everything else is the [admin API](../reference/admin-api.md) and the CLI.
 >
 > Verification: all of it is tested against local fake providers and in-process requests, on Node and in workerd. No
 > real browser has driven it yet (the browser end-to-end task is P4-08).
+
+## The panel
+
+Sign-in lands on `/admin`. The panel is server-rendered pages without scripts that matter (one small optional script
+adds buttons that only help), a strict content security policy, and a layout that works on a phone (320 px wide). It
+shows what the admin API shows you and changes things only by calling the admin API as you, so the roles, the
+re-authentication rule and the audit rows are exactly those of the API (`via: api`).
+
+| Page | Who | What it does |
+|---|---|---|
+| `/admin` | everyone signed in | Your session (email, role, expiry), sign-out buttons; admins also see the first users |
+| `/admin/account` | everyone signed in | Your details; *End all my sessions* (any role); owners can change their display name |
+
+Anyone who is not signed in is sent to `/auth/login?next=<page>` for every `/admin` address; signed-in people get a
+404 page for an address that does not exist. A change form that is refused (missing or wrong CSRF token, another site,
+the wrong content type, too large, a role that may not use it) changes nothing and writes an `admin.forbidden` row.
+When a change needs a recent sign-in (see below) the page says so and offers **Sign in again**; after it, repeat the
+change. `/auth/account` still works and leads to `/admin/account`.
 
 ## Two ways in
 
@@ -68,7 +86,7 @@ The break-glass token is exempt.
 
 ## Signing out and ending sessions
 
-- **Sign out**: the account page (`/auth/account`) has two buttons, *Sign out* and *Sign out everywhere*. They are
+- **Sign out**: every panel page has *Sign out* in its footer, and the overview has *Sign out everywhere*. They are
   `POST /auth/logout` forms with the CSRF token; a `GET` does nothing. The server deletes the session, clears the cookie
   and sends `Clear-Site-Data: "cookies"`.
 - **Careful**: `"cookies"` clears the cookies of the whole registered domain and its subdomains (a sign-out at
@@ -105,5 +123,5 @@ when they are cross-site and not a page navigation. Nothing happens on a refusal
 
 `session.create` (sign-in or re-authentication, whether it rotated a session, how many were evicted), `session.revoke`
 (sign-out), `session.revoke_all` (sign-out everywhere, role change, disable, end-sessions, with the reason) and
-`admin.forbidden` (reason `csrf`, `cross_site`, `origin_mismatch`, `origin_missing`) are recorded as admin rows. A session
+`admin.forbidden` (reason `csrf`, `cross_site`, `origin_mismatch`, `origin_missing`, and `role` for a panel form your role may not use) are recorded as admin rows. A session
 is named by a short hash prefix; cookies, secrets and CSRF tokens never reach the log or the audit table.

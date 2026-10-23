@@ -327,6 +327,9 @@ describe('boot failures', () => {
   });
 });
 
+const PANEL_CSP =
+  "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; require-trusted-types-for 'script'";
+
 describe('sign-in on workerd (P4-01)', () => {
   it('boots the sign-in routes and takes the first owner through a setup link and a local fake IdP', async () => {
     let handler: ((r: Request) => Promise<Response>) | undefined;
@@ -349,7 +352,9 @@ describe('sign-in on workerd (P4-01)', () => {
       const page = await call(mf, '/auth/login');
       expect(page.status).toBe(200);
       expect(await page.text()).toContain('/auth/login/oidc-corp');
-      expect(page.headers.get('content-security-policy')).toContain("script-src 'self'");
+      // The sign-in pages share the panel's layout and its strict policy (P4-03).
+      expect(page.headers.get('content-security-policy')).toBe(PANEL_CSP);
+      expect(page.headers.get('referrer-policy')).toBe('same-origin');
 
       const issued = await call(mf, '/api/admin/v1/setup-links', {
         method: 'POST',
@@ -379,9 +384,9 @@ describe('sign-in on workerd (P4-01)', () => {
         redirect: 'manual',
         headers: { cookie },
       });
-      // The sign-in ends in a session (P4-02): a cookie and a redirect to the account page.
+      // The sign-in ends in a session (P4-02): a cookie and a redirect to the panel.
       expect(done.status).toBe(303);
-      expect(done.headers.get('location')).toBe('/auth/account');
+      expect(done.headers.get('location')).toBe('/admin');
       const sessionCookie = done.headers.getSetCookie().find((c) => c.startsWith('ab_session=')) as string;
       expect(sessionCookie).toContain('HttpOnly');
       const session = sessionCookie.split(';')[0] as string;
@@ -420,6 +425,58 @@ describe('sign-in on workerd (P4-01)', () => {
         body: JSON.stringify({ email: 'second@example.test', role: 'member' }),
       });
       expect(created.status).toBe(201);
+
+      // The panel renders on the Worker (P4-03): headers, the session's user, a list from the admin API, an asset, and a
+      // form that changes the user through the admin API in-process (built on the first panel request, from D1 state).
+      const panel = await call(mf, '/admin', {
+        headers: { cookie: session, 'sec-fetch-site': 'same-origin' },
+      });
+      const html = await panel.text();
+      expect(panel.status).toBe(200);
+      expect(panel.headers.get('content-security-policy')).toBe(PANEL_CSP);
+      expect(panel.headers.get('cache-control')).toBe('no-store');
+      expect(panel.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(panel.headers.get('x-frame-options')).toBe('DENY');
+      expect(html).toContain('first@example.test');
+      expect(html).toContain('second@example.test');
+      expect(html).not.toMatch(/<script[^>]*>[^<]/i);
+      expect((await call(mf, '/admin', { redirect: 'manual' })).status).toBe(303);
+      const css = /href="(\/admin\/assets\/[^"]+\.css)"/.exec(html)?.[1] as string;
+      const asset = await call(mf, css);
+      expect(asset.status).toBe(200);
+      expect(asset.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+      expect(asset.headers.get('content-type')).toBe('text/css; charset=utf-8');
+      const accountPage = await call(mf, '/admin/account', {
+        headers: { cookie: session, 'sec-fetch-site': 'same-origin' },
+      });
+      expect(accountPage.status).toBe(200);
+      const formHeaders = {
+        cookie: session,
+        'sec-fetch-site': 'same-origin',
+        origin: ORIGIN,
+        'content-type': 'application/x-www-form-urlencoded',
+      };
+      const forged = await call(mf, '/admin/account/name', {
+        method: 'POST',
+        redirect: 'manual',
+        headers: formHeaders,
+        body: 'displayName=Forged&_csrf=wrong',
+      });
+      expect(forged.status).toBe(403);
+      const renamed = await call(mf, '/admin/account/name', {
+        method: 'POST',
+        redirect: 'manual',
+        headers: formHeaders,
+        body: new URLSearchParams({ displayName: 'Panel Owner', _csrf: info.csrfToken }).toString(),
+      });
+      expect(renamed.status).toBe(303);
+      expect(renamed.headers.get('location')).toBe('/admin/account');
+      const listed = (await (
+        await call(mf, '/api/admin/v1/users', { headers: { authorization: `Bearer ${admin}` } })
+      ).json()) as { email: string; displayName: string | null }[];
+      expect(listed.find((u) => u.email === 'first@example.test')?.displayName).toBe('Panel Owner');
+      expect(listed.some((u) => u.displayName === 'Forged')).toBe(false);
+
       const bad = await call(mf, '/api/admin/v1/users', {
         headers: { cookie: 'ab_session=forged', 'sec-fetch-site': 'same-origin' },
       });

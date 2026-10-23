@@ -6,8 +6,8 @@
 //   GET  /auth/callback/:provider    finishes it: consume the transaction once, exchange the code, verify, map to a user
 //   GET  /auth/cf-access             Cloudflare Access: verify the `Cf-Access-Jwt-Assertion` header, map to a user
 //   GET  /auth/setup                 the first-owner page; the setup code arrives in the URL fragment
-//   GET  /auth/setup.js              the page's one script (moves the code from the fragment into the form)
 //   POST /auth/setup                 starts the first-owner sign-in; the code is in the body, never in a URL
+//   GET  /auth/account               redirects to the panel's account page (/admin/account)
 //
 // The routes end at a verified, allowed user record and hand it to `onLogin` (P4-02 creates the session there).
 // Every outcome is audited (`auth` / `login.ok` | `login.denied`); the browser gets one generic failure page whose
@@ -35,22 +35,13 @@ import type { Role, Storage, User } from '@agility-bridge/storage';
 import { type Context, Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { LinearRouter } from 'hono/router/linear-router';
+import type { AdminUiModule } from './admin-ui.ts';
 import type { AdminChange, LoginEvent } from './audit.ts';
-import {
-  accountBody,
-  chooserBody,
-  IDENTITY_PAGE_CSP,
-  messageBody,
-  type PageLink,
-  page,
-  SETUP_SCRIPT,
-  setupBody,
-} from './identity-pages.ts';
 import { CLEAR_SITE_DATA_VALUE, CSRF_FIELD, CSRF_HEADER, type SessionManager } from './session.ts';
 
 export const IDENTITY_BASE: '/auth' = '/auth';
 /** Where a login continues when no (valid) `next` was given. */
-export const DEFAULT_LOGIN_NEXT = '/auth/account';
+export const DEFAULT_LOGIN_NEXT = '/admin';
 /** Largest setup form (a 74-character code and a provider id). */
 const MAX_SETUP_BODY = 2048;
 /** Largest logout form (a CSRF token and a flag). */
@@ -103,6 +94,16 @@ export interface IdentityRouteDeps {
   readonly beforeSignIn?: (c: Context) => Promise<Response | undefined> | Response | undefined;
   /** Keeps work started for a request alive after the response (audit writes, the GitHub token revocation). */
   readonly runInBackground: (c: Context, task: Promise<unknown>) => void;
+  /**
+   * The panel's page renderer (P4-03): `load` runs first on every request (it imports the panel on first use), `get`
+   * then returns the loaded module. Sign-in pages share the panel's layout and headers.
+   */
+  readonly ui: { load(): Promise<unknown>; get(): AdminUiModule };
+}
+
+interface PageLink {
+  readonly href: string;
+  readonly label: string;
 }
 
 type Vars = { requestId: string };
@@ -188,28 +189,19 @@ export function createIdentityRoutes(
     return found;
   };
 
-  const html = (
-    status: number,
-    title: string,
-    body: string,
-    headers: Record<string, string> = {},
-    scripts: readonly string[] = [],
-  ): Response =>
-    new Response(page(title, body, scripts), {
-      status,
-      headers: {
-        'content-type': 'text/html; charset=utf-8',
-        'content-security-policy': IDENTITY_PAGE_CSP,
-        'cache-control': 'no-store',
-        ...headers,
-      },
-    });
   const message = (
     status: number,
     title: string,
     paragraphs: readonly string[],
     extra: { link?: PageLink; requestId?: string; headers?: Record<string, string> } = {},
-  ) => html(status, title, messageBody(paragraphs, extra.link, extra.requestId), extra.headers ?? {});
+  ) =>
+    deps.ui
+      .get()
+      .messagePageResponse(
+        status,
+        { title, paragraphs, link: extra.link, requestId: extra.requestId },
+        extra.headers ?? {},
+      );
 
   const requestId = (c: Context): string => (c.get('requestId' as never) as string | undefined) ?? '';
   const audit = (c: Context, event: Omit<LoginEvent, 'requestId'>) => {
@@ -374,11 +366,13 @@ export function createIdentityRoutes(
   );
 
   app.use('*', async (c, next) => {
-    // The setup script is a static file; everything else costs a storage write or an IdP call.
-    if (deps.beforeSignIn && c.req.path !== `${IDENTITY_BASE}/setup.js`) {
+    // Every route costs a storage write or an IdP call.
+    if (deps.beforeSignIn) {
       const stop = await deps.beforeSignIn(c);
       if (stop) return stop;
     }
+    // The pages share the panel's layout; import it before any handler renders one.
+    await deps.ui.load();
     await next();
     return undefined;
   });
@@ -392,7 +386,7 @@ export function createIdentityRoutes(
       href: p.kind === 'header' ? `${IDENTITY_BASE}/cf-access${qs}` : `${IDENTITY_BASE}/login/${p.id}${qs}`,
       label: p.label,
     }));
-    return html(200, 'Sign in', chooserBody(list));
+    return deps.ui.get().loginPageResponse(list);
   });
 
   /** Starts a redirect login for `provider`, with the setup link `setup` (a hash) when there is one. */
@@ -499,19 +493,7 @@ export function createIdentityRoutes(
   // ------------------------------------------------------------------------------------------ first-owner setup
   app.get('/setup', (c) => {
     if (providers.size === 0) return c.json({ error: 'not_found' }, 404);
-    return html(200, 'Set up the first owner', setupBody([...providers.values()]), {}, [
-      `${IDENTITY_BASE}/setup.js`,
-    ]);
-  });
-
-  app.get('/setup.js', () => {
-    return new Response(SETUP_SCRIPT, {
-      headers: {
-        'content-type': 'text/javascript; charset=utf-8',
-        'cache-control': 'no-store',
-        'content-security-policy': IDENTITY_PAGE_CSP,
-      },
-    });
+    return deps.ui.get().setupPageResponse([...providers.values()]);
   });
 
   const capped = bodyLimit({
@@ -569,26 +551,11 @@ export function createIdentityRoutes(
         },
       });
 
-    router.get('/account', async (c) => {
-      const problem = sessions.checkFetchOrigin(c, false);
-      if (problem !== null) return refused(c, problem);
-      const auth = await sessions.authenticate(c);
-      if (!auth.ok) return toLogin();
-      const { principal } = auth;
-      return html(
-        200,
-        'Your account',
-        accountBody({
-          email: principal.user.email,
-          role: principal.role,
-          recentAuth: principal.recentAuth,
-          idleExpiresAt: new Date(principal.session.idleExpiresAt).toISOString(),
-          expiresAt: new Date(principal.session.record.expiresAt).toISOString(),
-          csrf: principal.session.record.csrf,
-        }),
-        { 'referrer-policy': 'same-origin' },
-      );
-    });
+    // The account page is part of the panel now (P4-03); the old address keeps working.
+    router.get(
+      '/account',
+      () => new Response(null, { status: 303, headers: { Location: '/admin/account' } }),
+    );
 
     /** Re-authentication: the signed-in user signs in again, with the same provider, and returns to `next`. */
     router.get('/reauth', async (c) => {

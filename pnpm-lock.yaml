@@ -242,6 +242,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@agility-bridge/admin-ui':
+        specifier: workspace:*
+        version: link:../../packages/admin-ui
       '@agility-bridge/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -315,6 +318,9 @@ importers:
 
   packages/http-app:
     dependencies:
+      '@agility-bridge/admin-ui':
+        specifier: workspace:*
+        version: link:../admin-ui
       '@agility-bridge/auth':
         specifier: workspace:*
         version: link:../auth

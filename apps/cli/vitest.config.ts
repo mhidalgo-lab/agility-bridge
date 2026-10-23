@@ -7,6 +7,9 @@ export default defineProject({
   // export condition: third-party packages publish that condition too, pointing at TypeScript inside node_modules.
   resolve: {
     alias: {
+      '@agility-bridge/admin-ui': fileURLToPath(
+        new URL('../../packages/admin-ui/src/index.ts', import.meta.url),
+      ),
       '@agility-bridge/auth': fileURLToPath(new URL('../../packages/auth/src/index.ts', import.meta.url)),
       '@agility-bridge/core': fileURLToPath(new URL('../../packages/core/src/index.ts', import.meta.url)),
       '@agility-bridge/http-app': fileURLToPath(

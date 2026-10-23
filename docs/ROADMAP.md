@@ -205,8 +205,8 @@ Status lives in each task file.
 | ID | Task | Priority | Depends on | Status |
 |---|---|---|---|---|
 | P4-01 | [Identity providers and owner bootstrap](tasks/phase-4-identity-admin/P4-01-identity-providers.md) | high | P3-11 | done |
-| P4-02 | [Admin sessions, roles, CSRF and re-authentication](tasks/phase-4-identity-admin/P4-02-admin-sessions.md) | high | P4-01 | review |
-| P4-03 | [Admin UI scaffold](tasks/phase-4-identity-admin/P4-03-admin-ui-scaffold.md) | high | P4-02 | todo |
+| P4-02 | [Admin sessions, roles, CSRF and re-authentication](tasks/phase-4-identity-admin/P4-02-admin-sessions.md) | high | P4-01 | done |
+| P4-03 | [Admin UI scaffold](tasks/phase-4-identity-admin/P4-03-admin-ui-scaffold.md) | high | P4-02 | review |
 | P4-04 | [Admin screens: instances, credentials, workspaces, grants, tokens, users](tasks/phase-4-identity-admin/P4-04-admin-screens.md) | high | P4-03 | todo |
 | P4-05 | [Audit viewer and usage statistics](tasks/phase-4-identity-admin/P4-05-audit-viewer.md) | medium | P4-03 | todo |
 | P4-06 | [Connect page with client snippets](tasks/phase-4-identity-admin/P4-06-connect-page.md) | medium | P4-04 | todo |
@@ -217,6 +217,7 @@ Status lives in each task file.
 | P4-11 | [Phase 4 review](tasks/phase-4-identity-admin/P4-11-phase-4-review.md) | high | P4-08, P4-09, P4-10 | todo |
 | P4-12 | [Move a user to another identity on purpose (owner-only unbind)](tasks/phase-4-identity-admin/P4-12-unbind-identity.md) | medium | P4-02 | todo |
 | P4-13 | [pnpm cf:setup prompts for the sign-in settings](tasks/phase-4-identity-admin/P4-13-cf-setup-sign-in.md) | low | P4-01 | todo |
+| P4-14 | [CPU benchmark scenarios for the panel](tasks/phase-4-identity-admin/P4-14-panel-benchmark-scenarios.md) | low | P4-03 | todo |
 
 ### Phase 5
 

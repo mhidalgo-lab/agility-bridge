@@ -36,5 +36,14 @@ THREAT_MODEL T3, T13, A5.
 ## Docs to update
 - docs/guide/admin-panel.md (new)
 
+## Notes from P4-03 (the scaffold) and relic-bridge's reviews
+- Build screens in `packages/admin-ui/src/screens/` with `kit.page` / `kit.form` / `kit.callAdmin` / `kit.fail` ([admin panel
+  guide](../../dev/admin-ui.md)); a screen never imports storage or auth.
+- The "shown once" token page needs a single-use form handle, which P4-03 does not provide. relic-bridge keeps handles in
+  `kv`, bounded per user; writing one on every GET let any member spend D1 writes (its review L6), so issue it only for the
+  page that shows a form, cap the open ones, and write nothing for HEAD.
+- Admins get `403 owner` from the API for an owner's keys, grants and tokens: hide those controls from admins instead of
+  offering a button that leads to the 403 page (relic-bridge review L9).
+
 ## Out of scope
 - Anything not listed under Scope.

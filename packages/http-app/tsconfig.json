@@ -6,6 +6,7 @@
     "isolatedDeclarations": false,
     "customConditions": [],
     "paths": {
+      "@agility-bridge/admin-ui": ["../admin-ui/src/index.ts"],
       "@agility-bridge/auth": ["../auth/src/index.ts"],
       "@agility-bridge/core": ["../core/src/index.ts"],
       "@agility-bridge/storage": ["../storage/src/index.ts"]

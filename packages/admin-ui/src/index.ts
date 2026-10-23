@@ -1,4 +1,83 @@
 // SPDX-License-Identifier: Apache-2.0
-// Server-rendered admin panel in Hono JSX (ADR-0004).
-// Placeholder from P0-01; the first code arrives with P4-03.
-export {};
+// `@agility-bridge/admin-ui`: the server-rendered admin panel (P4-03, ADR-0004). Web-standard only; depends on Hono.
+export { ADMIN_UI_BASE, createAdminUi } from './app.ts';
+export { ASSET_BASE, ASSET_CACHE_CONTROL, ASSETS, assetHref, findAsset, type StaticAsset } from './assets.ts';
+export {
+  Badge,
+  type BadgeTone,
+  Button,
+  Checkbox,
+  CONFIRM_FIELD,
+  type Column,
+  ConfirmAction,
+  CSRF_FIELD,
+  DataTable,
+  Document,
+  Facts,
+  type FieldProps,
+  Flash,
+  Form,
+  Layout,
+  type LayoutProps,
+  LinkButton,
+  localHref,
+  NAV_ITEMS,
+  type NavItem,
+  QueryForm,
+  SelectField,
+  SignOut,
+  TextField,
+  Time,
+  UI_ROLE_RANK,
+  type UiRole,
+  type UiViewer,
+} from './components.tsx';
+export {
+  clearFlashCookie,
+  FLASH_MESSAGES,
+  type FlashCode,
+  type FlashKind,
+  type FlashMessage,
+  flashCookie,
+  flashCookieName,
+  readFlash,
+} from './flash.ts';
+export {
+  isUiCsp,
+  PERMISSIONS_POLICY,
+  UI_CSP,
+  UI_CSP_SETUP,
+  UI_PAGE_HEADERS,
+  UI_REFERRER_POLICY,
+} from './headers.ts';
+export {
+  type AdminCall,
+  type AdminCallResult,
+  type AdminUiDeps,
+  adminPath,
+  createUiKit,
+  DEFAULT_MAX_FORM_BYTES,
+  type FormHandler,
+  type PageContext,
+  type PageHandler,
+  pageFetchProblem,
+  requestIdOf,
+  type UiAuthResult,
+  type UiKit,
+  type UiPrincipal,
+  type VerifiedForm,
+} from './kit.ts';
+export {
+  errorPage,
+  htmlResponse,
+  LoginPage,
+  type LoginProvider,
+  loginPageResponse,
+  MessagePage,
+  type MessagePageProps,
+  messagePageResponse,
+  reauthPage,
+  renderDocument,
+  SetupPage,
+  setupPageResponse,
+} from './pages.tsx';

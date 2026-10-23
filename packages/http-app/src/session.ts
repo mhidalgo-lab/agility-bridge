@@ -218,7 +218,7 @@ export function createSessionManager(deps: SessionManagerDeps): SessionManager {
         status: 303,
         headers: {
           // `next` was checked when the login started; check again so no path can ever leave the origin (L-091).
-          Location: /^\/(?![/\\])/.test(login.next) ? login.next : '/auth/account',
+          Location: /^\/(?![/\\])/.test(login.next) ? login.next : '/admin',
           'Set-Cookie': cookie(issued.cookieValue, maxAge),
         },
       });
