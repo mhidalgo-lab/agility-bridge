@@ -8,6 +8,7 @@
 //   GET  /admin/instances/:id            detail: facts, credentials, workspaces, the forms below
 //   POST /admin/instances/:id            rename            POST .../disable | enable | delete (confirmation page first)
 //   GET  /admin/instances/:id/origin     origin and TLS form (owners)     POST .../origin     retarget (owner, recent sign-in)
+//   GET  /admin/instances/:id/prefixes   number prefixes, one `Type=PREFIX` per line       POST .../prefixes   change (P4-15)
 import type { Context, Hono } from 'hono';
 import {
   Button,
@@ -18,6 +19,7 @@ import {
   Layout,
   LinkButton,
   Pager,
+  TextAreaField,
   TextField,
 } from '../components.tsx';
 import { adminPath, type UiKit, type UiPrincipal } from '../kit.ts';
@@ -59,6 +61,86 @@ const ROUTE = '/instances';
 const MAX_LABEL = 200;
 const MAX_URL = 2_048;
 const MAX_PATH = 1_024;
+const MAX_PREFIX_LINES = 64;
+const MAX_PREFIX_TEXT = 4_000;
+
+/** The prefixes as the form shows them: one `Type=PREFIX` per line, in type order. */
+export const prefixText = (prefixes: Readonly<Record<string, string>>): string =>
+  Object.entries(prefixes)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([type, prefix]) => `${type}=${prefix}`)
+    .join('\n');
+
+/**
+ * Reads the form's text: `Type=PREFIX` per line, blank lines skipped. Only the shape is checked here (one `=`, both sides
+ * present, no type twice, at most 64 lines); which names and prefixes are allowed is the admin API's rule (it answers 422).
+ */
+export function parsePrefixText(
+  text: string,
+):
+  | { readonly ok: true; readonly prefixes: Record<string, string> }
+  | { readonly ok: false; readonly error: string } {
+  const prefixes: Record<string, string> = {};
+  const lines = text.split(/\r?\n/).map((l) => l.trim());
+  let count = 0;
+  for (const line of lines) {
+    if (line === '') continue;
+    if (++count > MAX_PREFIX_LINES) return { ok: false, error: 'At most 64 lines.' };
+    const at = line.indexOf('=');
+    const type = at < 0 ? '' : line.slice(0, at).trim();
+    const prefix = at < 0 ? '' : line.slice(at + 1).trim();
+    if (type === '' || prefix === '' || prefix.includes('='))
+      return { ok: false, error: 'Write each line as Type=PREFIX, for example Story=S.' };
+    if (Object.hasOwn(prefixes, type) || type === '__proto__')
+      return { ok: false, error: 'Each asset type can appear once.' };
+    prefixes[type] = prefix;
+  }
+  return { ok: true, prefixes };
+}
+
+const samePrefixes = (a: Readonly<Record<string, string>>, b: Readonly<Record<string, string>>): boolean =>
+  prefixText(a) === prefixText(b);
+
+function PrefixesPage(props: {
+  readonly viewer: UiPrincipal;
+  readonly instance: Instance;
+  readonly text: string;
+  readonly error?: string | undefined;
+}) {
+  const { viewer, instance } = props;
+  const self = adminPath`/admin/instances/${instance.id}`;
+  return (
+    <Layout title={`Number prefixes of ${instance.label}`} viewer={viewer} current={INSTANCES}>
+      <p>
+        The letters before the dash in an Agility number (the S of S-01054), per asset type. One line per
+        type, written Type=PREFIX, for example Story=S. Leave the box empty to have them learned from Agility.
+      </p>
+      <p class="hint">
+        Stored with the instance. They are not applied to number lookups yet: until then every lookup still
+        learns the prefixes from Agility.
+      </p>
+      <Form action={`${self}/prefixes`} csrf={viewer.csrf} label="Number prefixes">
+        <TextAreaField
+          name="prefixes"
+          label="Prefixes"
+          hint="Asset type names are letters, digits and underscores; a prefix is one to four capital letters."
+          value={props.text}
+          rows={8}
+          maxlength={MAX_PREFIX_TEXT}
+          spellcheck={false}
+          autocomplete="off"
+          error={props.error}
+        />
+        <div class="actions">
+          <Button>Save</Button>
+          <LinkButton href={self} variant="secondary">
+            Cancel
+          </LinkButton>
+        </div>
+      </Form>
+    </Layout>
+  );
+}
 
 interface InstanceDraft {
   readonly label: string;
@@ -377,6 +459,13 @@ export function registerInstances(ui: Hono, kit: UiKit): void {
               <Button>Save</Button>
             </Form>
           </section>
+          <section class="card" aria-labelledby="prefix-heading">
+            <h2 id="prefix-heading">Number prefixes</h2>
+            <p>The letters before the dash in a number, per asset type (shown above).</p>
+            <LinkButton href={`${self}/prefixes`} variant="secondary">
+              Edit the prefixes
+            </LinkButton>
+          </section>
           <section class="card" aria-labelledby="origin-heading">
             <h2 id="origin-heading">Origin and certificate authority</h2>
             {isOwner(principal) ? (
@@ -511,6 +600,59 @@ export function registerInstances(ui: Hono, kit: UiKit): void {
         form,
       );
       return isOk(res) ? kit.redirect(INSTANCES, 'deleted') : kit.fail(c, principal, res, self);
+    }),
+  );
+
+  ui.get(
+    `${ROUTE}/:id/prefixes`,
+    kit.page('admin', async (c, page) => {
+      const id = c.req.param('id');
+      if (!isId(id)) return errorPage(404, undefined, page.principal);
+      const instance = await loadInstance(c, page.principal, id);
+      if ('status' in instance) return loadFailed(c, instance, page.principal);
+      return page.html(
+        <PrefixesPage
+          viewer={page.principal}
+          instance={instance}
+          text={prefixText(instance.numberPrefixes)}
+        />,
+      );
+    }),
+  );
+
+  ui.post(
+    `${ROUTE}/:id/prefixes`,
+    kit.form('admin', async (c, principal, form) => {
+      const id = c.req.param('id');
+      if (!isId(id)) return kit.redirect(INSTANCES, 'not_found');
+      const self = adminPath`/admin/instances/${id}`;
+      const instance = await loadInstance(c, principal, id);
+      if ('status' in instance) return kit.fail(c, principal, instance, INSTANCES);
+      const text = form.fields.get('prefixes') ?? '';
+      const again = (error: string, status = 422) =>
+        htmlResponse(
+          <PrefixesPage viewer={principal} instance={instance} text={text} error={error} />,
+          status,
+        );
+      if (text.length > MAX_PREFIX_TEXT) return again('At most 4000 characters.');
+      const parsed = parsePrefixText(text);
+      if (!parsed.ok) return again(parsed.error);
+      // Only what changed is sent (L-198): an unchanged form writes nothing and audits nothing.
+      if (samePrefixes(parsed.prefixes, instance.numberPrefixes)) return kit.redirect(self, 'saved');
+      const res = await kit.callAdmin(
+        c,
+        principal,
+        {
+          method: 'PATCH',
+          path: adminPath`/instances/${id}`,
+          body: { numberPrefixes: Object.keys(parsed.prefixes).length === 0 ? null : parsed.prefixes },
+        },
+        form,
+      );
+      if (isOk(res)) return kit.redirect(self, 'saved');
+      const problem = problemOf(res);
+      if (problem.status === 422) return again(formMessage(problem));
+      return kit.fail(c, principal, res, `${self}/prefixes`);
     }),
   );
 

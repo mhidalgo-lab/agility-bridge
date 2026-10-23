@@ -217,3 +217,15 @@ through an `Area` (`ADMIN_AREA` for owners and admins on any grant, `MEMBER_AREA
 ## Not in the panel (yet)
 
 The audit viewer and the connect page are above; the owner-only unbind (P4-12) is the `/admin/users/{id}/unbind` pair in `screens/users.tsx`: a thin client of `POST /users/{id}/unbind` (owner-only `kit.page`/`kit.form`, the control offered by `canUnbind`, the typed email re-rendered never echoed). A browser run (axe-core, keyboard, 320 px, CSP violations in a real browser) is P4-08.
+
+### Panel follow-ups (P4-15)
+
+- **Enable** is the `/admin/users/{id}/enable` pair in `screens/users.tsx` (`canEnable` = `canManage` and disabled; confirmation page
+  first; the unconfirmed step does not call the API, the confirmed one always does, so a forged POST is answered by the guards).
+- **Device token list**: `screens/all-tokens.tsx`, registered after `registerTokens`; one `GET /tokens` per page, `parseTokenPage`
+  forwards `next` only when it matches `TOKEN_CURSOR_RE`, and the screen forwards `after`, `grant` and `user` only when they have
+  the shape the API accepts (anything else is the first page). Revoke posts to the grant's own revoke route (one confirmation
+  page, one implementation). There is no `previous`: keyset lists offer *Newest entries* (`Pager first`).
+- **Number prefixes**: `GET/POST /admin/instances/{id}/prefixes` in `screens/instances.tsx`; `parsePrefixText` checks only the
+  shape (one `=`, no repeated type, at most 64 lines), the rules (`ASSET_TYPE_NAME_RE`, `NUMBER_PREFIX_RE`) are the admin API's
+  and shown as its 422 sentence. Only a changed value is sent, empty clears (`null`). `TextAreaField` is the multi-line field.

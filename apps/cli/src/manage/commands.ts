@@ -193,6 +193,12 @@ export const COMMANDS: readonly CommandSpec[] = [
     api: async (_r, p) => ({ method: 'POST', path: `/users/${enc(p.args[0] as string)}/disable` }),
   },
   {
+    words: ['user', 'enable'],
+    summary: 'Enable a disabled user again (their grants and device tokens that were not revoked work again)',
+    args: [id('user-id', 'User id')],
+    api: async (_r, p) => ({ method: 'POST', path: `/users/${enc(p.args[0] as string)}/enable` }),
+  },
+  {
     words: ['user', 'unbind'],
     summary:
       "Clear a user's sign-in identity so they can sign in with another provider (owner; the next verified sign-in with their email binds the account)",

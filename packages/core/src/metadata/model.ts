@@ -42,6 +42,8 @@ export interface AssetTypeMeta {
 }
 
 export const ASSET_TYPE_NAME_RE: RegExp = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+/** The letters before the dash of an Agility number (`S` in `S-01054`): what an owner may configure per asset type. */
+export const NUMBER_PREFIX_RE: RegExp = /^[A-Z]{1,4}$/;
 export const ATTRIBUTE_NAME_RE: RegExp = /^[A-Za-z][A-Za-z0-9_]{0,99}$/;
 const KINDS = new Set<string>(ATTRIBUTE_KINDS);
 

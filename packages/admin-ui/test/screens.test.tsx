@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { TextField } from '../src/components.tsx';
 import { createUiKit, ONCE_FIELD, ONCE_MAX_OUTSTANDING } from '../src/kit.ts';
 import { renderDocument } from '../src/pages.tsx';
+import { parseTokenPage, parseUser, type User } from '../src/screens/data.ts';
+import { parsePrefixText, prefixText } from '../src/screens/instances.tsx';
 import {
   assetTypesFrom,
   formMessage,
@@ -20,7 +22,8 @@ import {
   withQuery,
   words,
 } from '../src/screens/shared.tsx';
-import { CSRF, type Fake, fakeDeps, get, post } from './helpers/fake-deps.ts';
+import { canEnable } from '../src/screens/users.tsx';
+import { CSRF, type Fake, fakeDeps, get, post, principal } from './helpers/fake-deps.ts';
 
 const asAdmin = { 'x-test-session': 'admin' };
 const asOwner = { 'x-test-session': 'owner' };
@@ -500,5 +503,129 @@ describe('users screen', () => {
       expect(asO).toContain('aria-label="Edit the person"');
       expect(asO).toContain('aria-label="Change the role"');
     }
+  });
+});
+
+describe('P4-15 helpers and screens', () => {
+  const person = (id: string, role: string, over: Record<string, unknown> = {}) => ({
+    id,
+    email: `${id}@example.test`,
+    displayName: null,
+    idp: null,
+    idpSubject: null,
+    role,
+    createdAt: 1,
+    updatedAt: 1,
+    disabledAt: null,
+    ...over,
+  });
+
+  it('reads and writes the prefix text, checking only its shape', () => {
+    expect(prefixText({ Story: 'S', Defect: 'B' })).toBe('Defect=B\nStory=S');
+    expect(prefixText({})).toBe('');
+    expect(parsePrefixText(' Story = S \r\n\r\nDefect=B\n')).toEqual({
+      ok: true,
+      prefixes: { Story: 'S', Defect: 'B' },
+    });
+    expect(parsePrefixText('')).toEqual({ ok: true, prefixes: {} });
+    for (const bad of ['Story', '=S', 'Story=', 'Story=S=T', 'Story=S\nStory=B', '__proto__=S']) {
+      expect(parsePrefixText(bad).ok, bad).toBe(false);
+    }
+    expect(parsePrefixText(Array.from({ length: 65 }, (_, i) => `T${i}=A`).join('\n')).ok).toBe(false);
+    expect(Object.keys((parsePrefixText('constructor=A') as { prefixes: object }).prefixes)).toEqual([
+      'constructor',
+    ]);
+  });
+
+  it('parses a token page and drops a cursor that is not one', () => {
+    const row = { id: 'tok_1', grantId: 'grt_1', prefix: 'ab_live_abcd', label: 'laptop', createdAt: 5 };
+    expect(
+      parseTokenPage({
+        data: [{ ...row, userId: 'usr_a', workspaceId: 'wsp_1', grantLabel: null }],
+        next: '5:tok_1',
+      }),
+    ).toMatchObject({ data: [{ id: 'tok_1', userId: 'usr_a', workspaceId: 'wsp_1' }], next: '5:tok_1' });
+    expect(parseTokenPage({ data: [], next: 'javascript:alert(1)' })).toEqual({ data: [], next: null });
+    expect(parseTokenPage([])).toBeNull();
+    expect(parseTokenPage({ data: 'x' })).toBeNull();
+    expect(JSON.stringify(parseTokenPage({ data: [{ ...row, tokenHash: 'h' }] }))).not.toContain('tokenHash');
+  });
+
+  it('offers Enable exactly for people the viewer may manage who are disabled', () => {
+    for (const viewer of ['owner', 'admin', 'member'] as const) {
+      for (const role of ['owner', 'admin', 'member'] as const) {
+        for (const disabledAt of [null, 7]) {
+          const target = parseUser(person('usr_t', role, { disabledAt })) as User;
+          const expected =
+            (viewer === 'owner' || (viewer === 'admin' && role === 'member')) && disabledAt !== null;
+          expect(canEnable(principal(viewer), target), `${viewer} ${role} ${disabledAt}`).toBe(expected);
+        }
+      }
+    }
+  });
+
+  it('asks before enabling, then sends one call, and shows no button the API would refuse', async () => {
+    const f = fakeDeps();
+    api(f, {
+      'GET /users/usr_t': person('usr_t', 'member', { disabledAt: 7 }),
+      'POST /users/usr_t/enable': person('usr_t', 'member'),
+    });
+    const ask = await post(f, '/admin/users/usr_t/enable', { _csrf: CSRF }, asAdmin);
+    expect(ask.status).toBe(200);
+    expect(f.calls.filter((c) => c.method === 'POST')).toEqual([]);
+    const done = await post(f, '/admin/users/usr_t/enable', { _csrf: CSRF, confirm: 'yes' }, asAdmin);
+    expect(done.status).toBe(303);
+    expect(done.headers.getSetCookie().join(';')).toContain('ab_flash=enabled');
+    expect(f.calls.filter((c) => c.method === 'POST')).toHaveLength(1);
+    api(f, { 'GET /users/usr_o': person('usr_o', 'owner', { disabledAt: 7 }) });
+    expect(await (await get(f, '/admin/users/usr_o', asAdmin)).text()).not.toContain('Enable…');
+    expect(await (await get(f, '/admin/users/usr_o', asOwner)).text()).toContain('Enable…');
+  });
+
+  it('sends the prefixes only when they changed, and clears with null', async () => {
+    const f = fakeDeps();
+    api(f, {
+      'GET /instances/ins_1': instance({ numberPrefixes: { Story: 'S' } }),
+      'PATCH /instances/ins_1': instance(),
+    });
+    const form = (prefixes: string) => ({ _csrf: CSRF, prefixes });
+    const same = await post(f, '/admin/instances/ins_1/prefixes', form('Story = S'), asAdmin);
+    expect(same.status).toBe(303);
+    expect(bodies(f, 'PATCH /instances/ins_1')).toEqual([]);
+    await post(f, '/admin/instances/ins_1/prefixes', form('Story=B\nEpic=E'), asAdmin);
+    await post(f, '/admin/instances/ins_1/prefixes', form(''), asOwner);
+    expect(bodies(f, 'PATCH /instances/ins_1')).toEqual([
+      { numberPrefixes: { Story: 'B', Epic: 'E' } },
+      { numberPrefixes: null },
+    ]);
+    // A shape error never reaches the API; an API validation sentence is shown beside the form.
+    const bad = await post(f, '/admin/instances/ins_1/prefixes', form('Story'), asAdmin);
+    expect(bad.status).toBe(422);
+    expect(bodies(f, 'PATCH /instances/ins_1')).toHaveLength(2);
+    api(f, {
+      'GET /instances/ins_1': instance(),
+      'PATCH /instances/ins_1': err(422, 'invalid_input', `numberPrefixes.Story: ${HOSTILE}`),
+    });
+    const refused = await post(f, '/admin/instances/ins_1/prefixes', form('Story=s'), asAdmin);
+    expect(refused.status).toBe(422);
+    expect(await refused.text()).not.toContain(HOSTILE);
+  });
+
+  it('lists tokens through GET /tokens only, forwards a well-formed cursor and filters, and nothing else', async () => {
+    const f = fakeDeps();
+    api(f, {
+      'GET /tokens': { data: [], next: null },
+      'GET /grants': [],
+      'GET /users': [],
+      'GET /workspaces': [],
+    });
+    await get(f, '/admin/tokens?after=5:tok_1&grant=grt_1&user=usr_1', asAdmin);
+    await get(f, `/admin/tokens?after=${encodeURIComponent(HOSTILE)}&grant=a%20b&user=..`, asOwner);
+    expect(f.calls.filter((c) => c.path === '/tokens').map((c) => c.query)).toEqual([
+      { grantId: 'grt_1', userId: 'usr_1', after: '5:tok_1' },
+      {},
+    ]);
+    expect((await get(f, '/admin/tokens', asMember)).status).toBe(403);
+    expect(f.calls.filter((c) => c.path === '/tokens')).toHaveLength(2);
   });
 });

@@ -34,7 +34,7 @@ How to use it:
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222 |
-| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208, L-210 – L-214, L-223 |
+| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208, L-210 – L-214, L-223, L-229 – L-231 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
@@ -918,6 +918,28 @@ creates or deploys anything, so a bad issuer fails at setup, not at the first re
 once, in one place. Client secrets are held in memory, sent on stdin and checked absent from arguments, logs, the local
 config and the secrets file by a test that looks at all four.
 *Applied in:* P4-13.
+
+**L-229 — The inverse of a guarded action gets the same guard, and authorization comes before the state check.**
+Enabling a disabled user restores everything they still hold (grants, device tokens), so it is as sensitive as disabling:
+an owner for owners and admins with a recent sign-in, an admin for members. The "is it disabled" check (409) comes after the
+role check, so a caller who may not enable never learns whether someone is disabled (the same 403 for both). Write the role
+matrix once for the pair and run it against the panel's button too (L-197).
+*Applied in:* P4-15.
+
+**L-230 — A list across owners is a function of the actor, and keyset paging is tested with writes between the pages.**
+`GET /tokens` is not "all tokens with an optional filter": the set the caller may see is computed from the actor first (everything
+for owners and admins, the tokens of one's own grants for anyone else, a foreign grant is "not found", a foreign user matches
+nothing), and the filters only narrow it. The page key is `(createdAt, id)` newest first with the id breaking ties; the test
+adds a newer token and revokes an older one between two pages and demands that every token that existed throughout appears
+exactly once. A malformed cursor is a 422, and the panel forwards only a cursor of the API's shape.
+*Applied in:* P4-15.
+
+**L-231 — Check that something reads a setting before building the control for it, and validate it where every writer passes.**
+`instances.numberPrefixes` had been accepted by the API since Phase 2 with no validation, and no host passed it to the metadata
+service: a form would have edited a value nothing used. The validator went into the services (so the API, the CLI and the panel
+share it and the metadata layer's own patterns are the same constants), the missing consumer became task P4-30, and the form says
+so in words instead of promising an effect.
+*Applied in:* P4-15.
 
 ## L. Cloudflare Workers
 

@@ -218,7 +218,7 @@ Status lives in each task file.
 | P4-12 | [Move a user to another identity on purpose (owner-only unbind)](tasks/phase-4-identity-admin/P4-12-unbind-identity.md) | medium | P4-02, P4-04 | done |
 | P4-13 | [pnpm cf:setup prompts for the sign-in settings](tasks/phase-4-identity-admin/P4-13-cf-setup-sign-in.md) | low | P4-01 | done |
 | P4-14 | [CPU benchmark scenarios for the panel](tasks/phase-4-identity-admin/P4-14-panel-benchmark-scenarios.md) | low | P4-03 | todo |
-| P4-15 | [Panel follow-ups: enable a disabled user, list every device token, edit number prefixes](tasks/phase-4-identity-admin/P4-15-panel-follow-ups.md) | low | P4-04, P4-12 | in-progress |
+| P4-15 | [Panel follow-ups: enable a disabled user, list every device token, edit number prefixes](tasks/phase-4-identity-admin/P4-15-panel-follow-ups.md) | low | P4-04, P4-12 | review |
 | P4-24 | [Unbind to a named provider: narrow who can claim the account](tasks/phase-4-identity-admin/P4-24-unbind-to-named-provider.md) | low | P4-12 | todo |
 | P4-30 | [Apply an instance's stored number prefixes when resolving numbers](tasks/phase-4-identity-admin/P4-30-apply-stored-number-prefixes.md) | low | P4-15 | todo |
 | P4-31 | [Keyset paging for device tokens in storage](tasks/phase-4-identity-admin/P4-31-token-list-storage-keyset.md) | low | P4-15 | todo |

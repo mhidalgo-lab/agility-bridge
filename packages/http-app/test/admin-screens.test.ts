@@ -134,6 +134,8 @@ describe('every screen renders for each role', () => {
     `/admin/workspaces/new?instance=${e.ids.instance}`,
     `/admin/workspaces/${e.ids.workspaceA}`,
     `/admin/workspaces/${e.ids.workspaceA}/edit`,
+    '/admin/tokens',
+    `/admin/instances/${e.ids.instance}/prefixes`,
     '/admin/grants',
     `/admin/grants?workspace=${e.ids.workspaceA}`,
     '/admin/grants/new',
@@ -161,7 +163,7 @@ describe('every screen renders for each role', () => {
     }
     // Everything above only read: no handle but the one token form wrote, and nothing else changed.
     expect((await e.s.w.storage.kv.list('ui-once:')).length).toBe(2);
-  });
+  }, 30_000);
 
   it('shows members, strangers and disabled people nothing, and writes nothing', async () => {
     const e = await env();

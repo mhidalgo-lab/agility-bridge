@@ -91,6 +91,20 @@ agility-bridge user disable <user-id>
 
 Local or remote.
 
+### `user enable`
+
+Enable a disabled user again (their grants and device tokens that were not revoked work again).
+
+```text
+agility-bridge user enable <user-id>
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `<user-id>` | argument | User id |
+
+Local or remote.
+
 ### `user unbind`
 
 Clear a user's sign-in identity so they can sign in with another provider (owner; the next verified sign-in with their email binds the account).

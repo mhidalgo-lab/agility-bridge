@@ -96,6 +96,7 @@ export {
   ATTRIBUTE_NAME_RE,
   type AttributeKind,
   type AttributeMeta,
+  NUMBER_PREFIX_RE,
   parseAssetType,
 } from './metadata/model.ts';
 export {

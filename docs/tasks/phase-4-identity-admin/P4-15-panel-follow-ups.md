@@ -2,7 +2,7 @@
 id: P4-15
 title: "Panel follow-ups: enable a disabled user, list every device token, edit number prefixes"
 phase: 4
-status: in-progress
+status: review
 priority: low
 depends_on: [P4-04, P4-12]
 adr: ["0008"]
@@ -51,21 +51,47 @@ Three additions, each through the admin API first (the screens call the API only
   tokens keeps small): task P4-31, when a deployment has thousands.
 
 ## Acceptance criteria
-- [ ] `POST /users/{id}/enable` is guarded like `disable` (role matrix over the pairs, re-authentication for owners and admins,
+- [x] `POST /users/{id}/enable` is guarded like `disable` (role matrix over the pairs, re-authentication for owners and admins,
   409 when not disabled, 404 for a missing user), audited `ok` and `denied`, and a refusal writes nothing.
-- [ ] `GET /tokens` returns only what the caller may see, never a hash or a token value, pages by keyset without repeats or
+- [x] `GET /tokens` returns only what the caller may see, never a hash or a token value, pages by keyset without repeats or
   gaps while tokens are added or revoked, refuses a malformed cursor, and members see only their own.
-- [ ] `numberPrefixes` is validated on create and update on every path; hostile type names and prefixes are refused and
+- [x] `numberPrefixes` is validated on create and update on every path; hostile type names and prefixes are refused and
   change nothing; the panel form sends only a changed value.
-- [ ] Each panel control (enable, token list and its revoke buttons, the prefix form) is offered exactly when the API allows
+- [x] Each panel control (enable, token list and its revoke buttons, the prefix form) is offered exactly when the API allows
   it, for every role (role matrix test against the API).
-- [ ] Negative authorization tests for each new route (no data and no side effect on denial); hostile strings stay inert in
+- [x] Negative authorization tests for each new route (no data and no side effect on denial); hostile strings stay inert in
   the new pages.
-- [ ] A workerd smoke covers one new route against D1.
-- [ ] The security tests are mutation-checked (L-121) and the checks recorded in the Outcome.
+- [x] A workerd smoke covers one new route against D1.
+- [x] The security tests are mutation-checked (L-121) and the checks recorded in the Outcome.
 
 ## Docs to update
 - docs/guide/admin-panel.md, docs/dev/admin-ui.md, docs/reference/admin-api.md (generated), docs/THREAT_MODEL.md (T13, T14), docs/LESSONS-LEARNED.md
 
 ## Out of scope
 - Anything not listed under Scope.
+
+## Outcome
+
+- **Built**: `POST /users/{id}/enable` (`users.enable` in the guarded services, audit `user.enable`, CLI `user enable`, an
+  Enable button and confirmation page on the user's page); `GET /tokens` (`tokens.listAll`: the actor's visible grants, filters
+  `grantId` and `userId`, keyset on `(createdAt, id)` with an opaque `after`, `limit` 1-200) and the `/admin/tokens` screen
+  with a menu entry; `checkNumberPrefixes` as the one validator of `numberPrefixes` on instance create and update (shared
+  `NUMBER_PREFIX_RE` and `ASSET_TYPE_NAME_RE` with the metadata layer) and the `/admin/instances/{id}/prefixes` form
+  (`TextAreaField`, only a changed value is sent).
+- **Admin API**: `POST /users/{id}/enable`, `GET /tokens`; `PATCH /instances/{id}` and `POST /instances` now answer 422 for a bad
+  `numberPrefixes`. Reference regenerated.
+- **Tests**: `packages/auth/test/guards-follow-ups.test.ts` (9), `packages/http-app/test/panel-follow-ups.test.ts` (25: role matrix
+  over viewers and targets through real sessions, re-authentication, 409 and no state oracle, no session created, audit rows,
+  members' own tokens only, keyset paging with writes between pages and timestamp ties, malformed cursors and limits, hostile
+  labels and type names inert, forged and CSRF-less POSTs without effect, panel control equal to the API), 5 tests in
+  `packages/admin-ui/test/screens.test.tsx`, the new screens in the every-screen safe-forms test, and a workerd smoke against
+  D1 in `apps/worker/test/worker.test.ts` (token list page, enable, prefix validation).
+- **Mutation checks (L-121)**: 23 deliberate reversions each fail at least one test: admins may enable owners and admins, no recent
+  sign-in for enabling, "not disabled" checked before the role (state oracle), an active user accepted by enable, every actor
+  sees every grant's tokens, a member may name a foreign grant, the user filter ignored, no id tie-break in the cursor, cursor
+  not validated, the API returns the hash, type names unchecked, prefix pattern unchecked, update path unvalidated, create
+  path unvalidated, Enable offered for active people, Enable offered to admins for owners, enable without a confirmation,
+  the token page forwards any cursor, the token page open to members, Revoke offered for revoked tokens, unchanged prefixes
+  sent, a repeated type accepted, a cursor taken from the API unchecked.
+- **Found, not done**: stored number prefixes are not applied by any host (P4-30); a storage-level keyset for tokens (P4-31).
+- **New**: lessons L-229 to L-231, decisions D-51 and D-52, tasks P4-30 and P4-31.
