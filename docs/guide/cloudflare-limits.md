@@ -41,7 +41,8 @@ tools fit the Free budget today (the largest declares 24); a workspace or grant 
 
 ## Measured cost
 
-CPU per request, 2026-10-22. *Local*: Node 24 (the same V8 as workerd), `pnpm bench:worker`, medians, request
+CPU per request, 2026-10-22. *Local*: Node 24 (the same V8 as workerd), `pnpm bench:worker` (medians of warm calls; the
+fastest of nine cold boots, after a garbage collection, against the fastest calibration sample), request
 isolation as on Workers, Agility-shaped fake responses. *Staging*: `agility-bridge-staging` on the Free plan,
 `wrangler tail` CPU time, a synthetic deployment migrated in (no Agility reachable, so no tool call there, D-01).
 
