@@ -1074,6 +1074,78 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
     async (c, { id }) => tokenOut(await services(c).tokens.revoke(id)),
   );
 
+  // Member self-service (P4-07): the signed-in person's own grants, credential choice and recent changes, open to every
+  // role. No route takes a user id; the guards work from the actor, and the admin token (nobody) is refused.
+  const me = { tag: 'me' };
+  const MyGrantOut = z
+    .object({
+      grant: GrantOut,
+      workspace: z
+        .object({
+          id: z.string(),
+          slug: z.string(),
+          name: z.string(),
+          instanceId: z.string(),
+          credentialSource: z.enum(['stored', 'passthrough']),
+          hasDefaultCredential: z.boolean(),
+          disabledAt: z.number().nullable(),
+        })
+        .nullable(),
+    })
+    .openapi('MyGrant');
+  add(
+    {
+      method: 'get',
+      path: '/me/grants',
+      ...me,
+      summary: 'My grants, each with its workspace (any signed-in role)',
+      out: z.array(MyGrantOut),
+    },
+    async (c) =>
+      (await services(c).me.grants()).map(({ grant, workspace }) => ({
+        grant,
+        workspace:
+          workspace === null
+            ? null
+            : {
+                id: workspace.id,
+                slug: workspace.slug,
+                name: workspace.name,
+                instanceId: workspace.instanceId,
+                credentialSource: workspace.credentialSource,
+                hasDefaultCredential: workspace.defaultCredentialId !== null,
+                disabledAt: workspace.disabledAt,
+              },
+      })),
+  );
+  add(
+    {
+      method: 'post',
+      path: '/me/grants/{id}/credential',
+      ...me,
+      params: true,
+      summary:
+        'Use one of my own valid personal Agility tokens on my grant, or (null) go back to the workspace default',
+      body: z.strictObject({ credentialId: Id.nullable() }),
+      out: GrantWithWarnings,
+      audit: { action: 'grant.set_credential', targetType: 'grant' },
+      auditBody: ['credentialId'],
+    },
+    (c, { id, body }) =>
+      services(c).me.setGrantCredential(id, (body as { credentialId: string | null }).credentialId),
+  );
+  add(
+    {
+      method: 'get',
+      path: '/me/audit',
+      ...me,
+      summary: 'My recent administrative changes (newest first, at most 50)',
+      query: z.object({ limit: z.coerce.number().int().min(1).max(50).optional() }),
+      out: z.array(AuditOut),
+    },
+    async (c, { query }) => services(c).me.audit((query as { limit?: number }).limit),
+  );
+
   add(
     {
       method: 'get',

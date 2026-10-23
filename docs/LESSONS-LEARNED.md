@@ -34,7 +34,7 @@ How to use it:
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193 |
-| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199 |
+| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
@@ -822,6 +822,33 @@ forged, foreign or concurrent form issues nothing. Handles are written only by t
 lists or refused views), at most ten stay open per user (further pages reuse one), and they expire. A validation re-render
 gets a fresh handle and does not spend the old one.
 *Applied in:* P4-04, `packages/http-app/test/admin-screens.test.ts`, relic-bridge review L6.
+
+**L-205 — A "mine only" page is mine only for every role, not just the lowest.**
+The admin API is role-aware: an owner may read any credential or grant, a member only their own. A self-service page that
+simply loads `GET /credentials/{id}` therefore shows an owner another person's personal credential under "My access", and an
+owner's forged `POST` on someone else's grant or token goes through, because the API allows it for that role. The member area
+re-checks ownership itself (the row's `ownerUserId` or `userId` must be the signed-in person, anything else is the 404 page) and
+the tests post the same forged ids as an owner and an admin, not only as a member.
+*Applied in:* P4-07, `packages/http-app/test/member-self-service.test.ts`.
+
+**L-206 — A cap checked before an insert is not a cap: count again after it and take the row back.**
+"Fewer than ten, then create" lets parallel requests all pass the check. The services count after the insert and, when over,
+remove the new row and refuse; the racers all retreat, so the limit holds and the person simply retries. Applied to personal
+credentials per person and live device tokens per grant, tested with parallel requests (relic-bridge P4-19).
+*Applied in:* P4-07, `packages/auth/src/access/services.ts`.
+
+**L-207 — A stored token that Agility refused is inert: nothing may be switched to it until it is valid.**
+Storing a token and validating it are two steps, and a member can type a wrong one. The resolver already denies an
+unvalidated credential; the self-service switch refuses it as well (it asks for `valid`), and the page says what is wrong
+and offers to replace it, instead of letting a grant point at something that can only deny.
+*Applied in:* P4-07.
+
+**L-208 — Moving a grant back to the default is an escalation of someone else's choice unless the grant used the member's own token.**
+An administrator may pin a member's grant to a narrow shared credential. If a member could send `credentialId: null`, they
+would undo that pin and fall back to whatever the workspace default reaches. Going back is allowed only while the grant
+currently uses a credential of the member's own (relic-bridge P4-18); switching to one of their own valid tokens never widens
+anything the workspace and grant limit.
+*Applied in:* P4-07, relic-bridge P4-18.
 
 ## L. Cloudflare Workers
 

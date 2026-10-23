@@ -18,6 +18,8 @@ export interface Opts {
   isolation?: 'request';
   /** The tool catalogue (default: the core tools, all read-only). */
   tools?: ReadonlyMap<string, ToolInfo>;
+  /** Validate stored tokens against the fake Agility (P4-07); `reject` picks tokens it answers 401 for. */
+  validate?: { reject?: (token: string) => boolean };
 }
 
 export async function setup(options: Opts = {}) {
@@ -56,7 +58,11 @@ export async function setup(options: Opts = {}) {
       ...(options.session === undefined ? {} : { session: options.session }),
       ...(options.isolation === undefined ? {} : { isolation: options.isolation }),
     },
-    { admin: true, ...(options.tools === undefined ? {} : { tools: options.tools }) },
+    {
+      admin: true,
+      ...(options.tools === undefined ? {} : { tools: options.tools }),
+      ...(options.validate === undefined ? {} : { validate: options.validate }),
+    },
   );
   const send = (
     method: string,

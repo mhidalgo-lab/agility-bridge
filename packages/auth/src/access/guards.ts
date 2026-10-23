@@ -3,6 +3,8 @@
 // future import call `guardedServices(services, actor)`, never the raw services, so the same rules hold on every path.
 import {
   type AccessToken,
+  type AuditEntry,
+  ConflictError,
   type Credential,
   type Grant,
   type Instance,
@@ -68,6 +70,9 @@ const needOwner = (a: Actor, what: string) => need(isOwner(a), `Only an owner ca
 function needRecent(a: Actor, what: string): void {
   if (a.kind === 'user' && !a.recentAuth) throw new ReauthRequiredError(`Sign in again before ${what}.`);
 }
+
+/** One line of "my recent changes" (P4-07). */
+export type MyAuditRow = Pick<AuditEntry, 'id' | 'ts' | 'action' | 'status' | 'targetType' | 'targetId'>;
 
 export interface GuardContext {
   readonly storage: Storage;
@@ -190,8 +195,21 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     /** Shared: owners and admins. Personal: only the user themselves (nobody stores a token for someone else). */
     async create(input: Parameters<AccessServices['credentials']['create']>[0]): Promise<Credential> {
       if (input.ownerUserId === null) needManager(actor);
-      else
+      else {
         need(input.ownerUserId === self, 'Only the user themselves can store their personal Agility token.');
+        // A member stores a token only for an instance they have a live grant on (P4-07): owners and admins may also
+        // prepare theirs before they are granted anything.
+        if (!isManager(actor)) {
+          const grants = await storage.grants.list({ userId: input.ownerUserId });
+          let granted = false;
+          for (const g of grants) {
+            if (g.revokedAt !== null) continue;
+            const w = await storage.workspaces.get(g.workspaceId);
+            if (w !== null && w.instanceId === input.instanceId) granted = true;
+          }
+          need(granted, 'You can store a personal Agility token only for an instance you have a grant on.');
+        }
+      }
       return services.credentials.create(input);
     },
     async replaceToken(id: string, token: string): Promise<Credential> {
@@ -218,8 +236,15 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
       }
       return services.credentials.revoke(id);
     },
+    /**
+     * Owners and admins delete any unused credential; a member only their own personal one (P4-07), which removes the
+     * encrypted token for good. Someone else's is "not found". The storage refuses while a grant still uses it.
+     */
     async delete(id: string): Promise<void> {
-      needManager(actor);
+      if (!isManager(actor)) {
+        const c = await load(storage.credentials.get(id), 'credential');
+        if (!mineCredential(c)) throw new NotFoundError('No credential with this id.');
+      }
       await storage.credentials.delete(id);
     },
   };
@@ -340,6 +365,76 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     },
   };
 
+  /**
+   * Member self-service (P4-07): the signed-in person's own access, whatever their role. Every method works from the
+   * actor's own user id and takes no user, owner or workspace id from the caller; the break-glass token is nobody and gets
+   * a refusal. A record that is someone else's answers like a missing one.
+   */
+  function needSelf(): string {
+    if (self === null) throw new ForbiddenError('This needs a signed-in person, not the admin token.');
+    return self;
+  }
+  const me = {
+    /** My grants with the workspace each one is in (name, slug, whether it uses stored credentials), for "My access". */
+    async grants(): Promise<{ grant: Grant; workspace: Workspace | null }[]> {
+      const id = needSelf();
+      const own = await storage.grants.list({ userId: id });
+      const out: { grant: Grant; workspace: Workspace | null }[] = [];
+      for (const grant of own)
+        out.push({ grant, workspace: await storage.workspaces.get(grant.workspaceId) });
+      return out;
+    },
+    /**
+     * Point one of my live grants at one of my own valid personal credentials, or (`null`) back at the workspace's
+     * default, which is allowed only while the grant uses a credential of mine (an administrator's pin on a shared
+     * credential is not mine to undo, P4-18 in relic-bridge). Scope, tools and limits are untouched: the workspace's
+     * project restriction and the grant's own limits still apply (THREAT_MODEL T3).
+     */
+    async setGrantCredential(grantId: string, credentialId: string | null): Promise<WithWarnings<Grant>> {
+      const id = needSelf();
+      const grant = await load(storage.grants.get(grantId), 'grant');
+      if (grant.userId !== id) throw new NotFoundError('No grant with this id.');
+      if (grant.revokedAt !== null) throw new ConflictError('The grant is revoked.');
+      const workspace = await load(storage.workspaces.get(grant.workspaceId), 'workspace');
+      if (workspace.disabledAt !== null) throw new ConflictError('The workspace is disabled.');
+      if (workspace.credentialSource !== 'stored') {
+        throw new ConflictError('This workspace uses the token you send with each request, not stored ones.');
+      }
+      if (credentialId === null) {
+        const current =
+          grant.credentialId === null ? null : await storage.credentials.get(grant.credentialId);
+        if (current === null || current.ownerUserId !== id) {
+          throw new ForbiddenError(
+            "Only a grant that uses your own Agility token can go back to the workspace's.",
+          );
+        }
+      } else {
+        const c = await storage.credentials.get(credentialId);
+        if (c === null || c.ownerUserId !== id) throw new NotFoundError('No credential with this id.');
+        if (c.revokedAt !== null) throw new ConflictError('That token is revoked.');
+        if (c.validationStatus !== 'valid') {
+          throw new ConflictError('Check the token against Agility first: only a valid token can be used.');
+        }
+      }
+      return services.grants.update(grantId, { credentialId });
+    },
+    /** What changed in my own access recently: admin rows with me as the actor (newest first, at most 50). */
+    async audit(limit = 20): Promise<MyAuditRow[]> {
+      const id = needSelf();
+      const bounded = Math.max(1, Math.min(50, Math.trunc(limit)));
+      const found = await storage.audit.query({ userId: id, kind: 'admin', limit: bounded });
+      // Only what a person needs to recognise their own change: no request ids, queries or free-form details.
+      return found.map((r) => ({
+        id: r.id,
+        ts: r.ts,
+        action: r.action,
+        status: r.status,
+        targetType: r.targetType,
+        targetId: r.targetId,
+      }));
+    },
+  };
+
   /** Master-key versions (P3-13): owners only; retiring needs a recent sign-in, like a retarget. */
   const keys = {
     async status(): Promise<KeyVersionStatus[]> {
@@ -383,6 +478,7 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     workspaces,
     grants,
     tokens,
+    me,
     keys,
     setupLinks,
   });

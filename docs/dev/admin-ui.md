@@ -166,7 +166,19 @@ page, tool/limit/asset-type pickers, error text). Conventions:
 - The admin API gained `GET /tools` (name, kind, group; owner and admin) for the tool checklists, and every last-owner
   refusal carries `error.detail = "last_owner"`.
 
+## My access (P4-07)
+
+`screens/me.tsx` is the member area (`/admin/me/...`, `kit.page('member')`), and `tokens.tsx` registers its token routes twice
+through an `Area` (`ADMIN_AREA` for owners and admins on any grant, `MEMBER_AREA` for the signed-in person's own). Rules:
+
+- **Mine only, for every role** (L-205): the admin API lets an owner read any credential or grant, so the member area checks
+  the row's `ownerUserId` / `userId` against the principal itself and answers the 404 page (`loadCredential`, `loadGrant`,
+  `/me/grants`), also for owners and admins.
+- Members cannot read workspaces: the pages take the few workspace fields from `GET /me/grants`.
+- The choice of a credential is `POST /me/grants/{id}/credential`; the page offers only valid tokens of the grant's instance and
+  the default only while the grant uses the person's own token (the guard decides; the page mirrors it, L-197).
+- The add form lists only instances of the person's live grants in workspaces that use stored tokens (the guard enforces it too).
+
 ## Not in the panel (yet)
 
-The audit viewer (P4-05), the connect page with client snippets (P4-06), member self-service (P4-07) and the owner-only
-unbind (P4-12). A browser run (axe-core, keyboard, 320 px, CSP violations in a real browser) is P4-08.
+The audit viewer (P4-05), the connect page with client snippets (P4-06) and the owner-only unbind (P4-12). A browser run (axe-core, keyboard, 320 px, CSP violations in a real browser) is P4-08.

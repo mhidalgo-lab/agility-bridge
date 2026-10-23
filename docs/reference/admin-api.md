@@ -63,6 +63,14 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | `GET` | `/keys` | Master-key versions: credentials on each, loaded, current, retired (owner) | — | 200 KeyVersion[] |
 | `POST` | `/keys/{id}/retire` | Retire a master-key version no credential uses any more (owner; recorded in the audit log) | `reason`: string | 200 KeyVersion[] |
 
+## me
+
+| Method | Path | What | Body | Response |
+|---|---|---|---|---|
+| `GET` | `/me/grants` | My grants, each with its workspace (any signed-in role) | — | 200 MyGrant[] |
+| `POST` | `/me/grants/{id}/credential` | Use one of my own valid personal Agility tokens on my grant, or (null) go back to the workspace default | `credentialId`: string \| null | 200 object |
+| `GET` | `/me/audit` | My recent administrative changes (newest first, at most 50) | — | 200 AuditEntry[] |
+
 ## session
 
 | Method | Path | What | Body | Response |
@@ -113,6 +121,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 - **Grant**: `id`: string, `workspaceId`: string, `userId`: string \| null, `label`: string \| null, `credentialId`: string \| null, `tools`: array \| null, `scopeIds`: array \| null, `assetTypes`: object \| null, `limits`: object, `rateLimit`: object \| null, `createdAt`: number, `updatedAt`: number, `expiresAt`: number \| null, `revokedAt`: number \| null
 - **Instance**: `id`: string, `label`: string, `baseUrl`: string, `tls`: object \| null, `numberPrefixes`: object \| null, `metaFingerprint`: string \| null, `createdAt`: number, `updatedAt`: number, `disabledAt`: number \| null
 - **KeyVersion**: `version`: number, `credentials`: number, `loaded`: boolean, `current`: boolean, `retired`: boolean
+- **MyGrant**: `grant`: Grant, `workspace`: object \| null
 - **Session**: `actor`: "session" \| "break_glass" \| "user", `user`: object \| null, `recentAuth`: boolean, `signedInAt`: number \| null, `idleExpiresAt`: number \| null, `expiresAt`: number \| null, `csrfToken`: string \| null
 - **SetupLink**: `id`: string, `url`: string, `expiresAt`: number
 - **Tool**: `name`: string, `kind`: "read" \| "write" \| "destructive", `group`: string
