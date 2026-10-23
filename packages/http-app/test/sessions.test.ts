@@ -23,6 +23,7 @@ const MIN = 60_000;
 const ISSUER = 'https://login.example.test';
 
 interface Opts {
+  allowedOrigins?: string[];
   publicUrl?: string;
   session?: SessionOptions;
 }
@@ -59,6 +60,7 @@ async function setup(options: Opts = {}) {
         auditAdmin: (c) => w.audit.admin(c),
       },
       publicUrl,
+      ...(options.allowedOrigins === undefined ? {} : { allowedOrigins: options.allowedOrigins }),
       ...(options.session === undefined ? {} : { session: options.session }),
     },
     { admin: true },
@@ -328,6 +330,19 @@ describe('CSRF and request origin', () => {
     expect((await s.w.storage.users.get(s.w.ids.alice))?.role).toBe('member');
   });
 
+  it('an allowed CORS origin is still not the public origin: it cannot change anything with the session', async () => {
+    const s = await setup({ allowedOrigins: ['https://tool.example.test'] });
+    const a = await s.session(OWNER);
+    const res = await s.send('POST', `${ADMIN_BASE}${target(s)}`, {
+      cookie: a.cookie,
+      headers: { 'x-csrf-token': a.csrf, origin: 'https://tool.example.test' },
+    });
+    expect(res.status).toBe(403);
+    expect((await s.api('GET', '/users', a)).status).toBe(200);
+    const row = (await s.rows()).find((r) => r.action === 'admin.forbidden');
+    expect((row?.details as { reason: string } | undefined)?.reason).toBe('origin_mismatch');
+  });
+
   it('a cross-site navigation may open a page, a cross-site fetch may not read', async () => {
     const s = await setup();
     const a = await s.session(OWNER);
@@ -471,6 +486,8 @@ describe('roles through real sessions', () => {
     const own = await s.session(OWNER);
     expect((await s.api('GET', '/users', a)).status).toBe(200);
     expect((await s.api('POST', `/users/${s.w.ids.alice}/disable`, own)).status).toBe(200);
+    // Ended by the disable itself, before Alice makes another request.
+    expect(await s.w.storage.kv.list(`sess:${s.w.ids.alice}:`)).toEqual([]);
     expect((await s.api('GET', '/users', a)).status).toBe(401);
     await s.w.storage.users.update(s.w.ids.alice, { disabledAt: null });
     expect((await s.api('GET', '/users', a)).status).toBe(401);

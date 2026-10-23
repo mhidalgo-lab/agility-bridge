@@ -2,7 +2,7 @@
 id: P4-02
 title: Admin sessions, roles, CSRF and re-authentication
 phase: 4
-status: in-progress
+status: review
 priority: high
 depends_on: [P4-01]
 adr: ["0009"]
@@ -61,26 +61,52 @@ task plugs a session in there and makes the admin API accept it, as the `user` a
   `AB_LOGOUT_CLEAR_SITE_DATA` (`cookies` default | `off`).
 
 ## Acceptance criteria
-- [ ] Session lifecycle with an injected clock: idle and absolute expiry (boundaries), activity never extends the
+- [x] Session lifecycle with an injected clock: idle and absolute expiry (boundaries), activity never extends the
   absolute lifetime, cap eviction of the oldest, rotation at sign-in (the old cookie is dead), end-all (self, owner,
   admin over members only), `deletePrefix` on memory, SQLite and D1.
-- [ ] Cookie attributes on https and http loopback; a duplicated cookie, a malformed value and a cookie for another
+- [x] Cookie attributes on https and http loopback; a duplicated cookie, a malformed value and a cookie for another
   user's id are refused before or without a session; storage and logs hold no session secret or CSRF token.
-- [ ] CSRF: missing and wrong token, cross-site `Origin`, `Origin: null`, `Sec-Fetch-Site` cross-site and same-site,
+- [x] CSRF: missing and wrong token, cross-site `Origin`, `Origin: null`, `Sec-Fetch-Site` cross-site and same-site,
   on every unsafe admin API method and on logout; a cross-site navigation GET is allowed, a cross-site fetch GET is
   not; the bearer token path needs none and never falls back to the cookie.
-- [ ] Role matrix through real sessions (owner, admin, member): owner-only routes, admins cannot touch admins or owners,
+- [x] Role matrix through real sessions (owner, admin, member): owner-only routes, admins cannot touch admins or owners,
   last owner cannot be demoted or disabled; a disabled user and a role change take effect on the next request.
-- [ ] Re-authentication: window boundaries (just inside, just outside), reauth must resolve to the same user, stale
+- [x] Re-authentication: window boundaries (just inside, just outside), reauth must resolve to the same user, stale
   `auth_time` refused, every action listed above answers `403 reauth_required` without a recent sign-in and succeeds
   after `/auth/reauth`; the break-glass token is exempt.
-- [ ] Logout: POST only (GET is 404/405), CSRF-checked, deletes the session, sends `Clear-Site-Data: "cookies"`; a
+- [x] Logout: POST only (GET is 404/405), CSRF-checked, deletes the session, sends `Clear-Site-Data: "cookies"`; a
   cross-site logout form changes nothing.
-- [ ] Negative authorization tests: denial causes no side effect and returns no data.
-- [ ] A session-authenticated admin request works on the Worker (workerd), and on `serve` over a real socket.
-- [ ] Key security tests are mutation-checked (L-121), recorded under Outcome.
-- [ ] `docs/guide/admin-access.md` (commands run, L-133), THREAT_MODEL T13 and T14, the configuration reference, the
+- [x] Negative authorization tests: denial causes no side effect and returns no data.
+- [x] A session-authenticated admin request works on the Worker (workerd), and on `serve` over a real socket.
+- [x] Key security tests are mutation-checked (L-121), recorded under Outcome.
+- [x] `docs/guide/admin-access.md` (commands run, L-133), THREAT_MODEL T13 and T14, the configuration reference, the
   generated admin API and CLI references, new lessons, and a changeset are done.
+
+## Outcome
+- Built as scoped. Beyond the first draft: `kv.deletePrefix` (new storage operation, contract-tested on memory, SQLite
+  and D1), `ReauthRequiredError` (`403 reauth_required`), `agility-bridge user end-sessions <id>`, `GET /session`, and
+  redaction of `ab_session` / `ab_login` cookies and CSRF field names. The admin API now also exists with sign-in alone
+  (no `AB_ADMIN_TOKEN`). No cache of users or sessions anywhere (the role is one D1/SQLite read per request).
+- relic-bridge findings folded in up front: rotation at sign-in, role read per request, cookie named twice is none,
+  a session of a disabled user is deleted (so enabling does not revive it), bounded end-all and a per-user cap (P4-17),
+  owner-only admin management and the last-owner rule (already in the guards and storage here), `Referrer-Policy:
+  same-origin` on pages with forms, open-redirect re-check at the `Location` header.
+- Differences from relic-bridge: re-authentication did not exist there; here it is a flow bound to the signed-in user.
+  `Clear-Site-Data: "cookies"` is switchable because it clears the whole registered domain (L-190, D-33). Sign-in lands
+  on `/auth/account` (`DEFAULT_LOGIN_NEXT`); P4-03 repoints it to the panel.
+- Mutation checks (L-121): 32 deliberate reversions of the security code each fail a test: absolute and idle expiry,
+  secret stored instead of its hash, cap, end-all, CSRF comparison, recent-window boundary, absolute end extended,
+  rotation, cross-site change, foreign `Origin`, missing `Origin` and metadata, cross-site reads, disabled user, duplicate
+  cookie, `HttpOnly`, `SameSite`, `Secure`, bearer-to-cookie fallback, CSRF check on the API, role change and disable
+  ending sessions, the re-authentication guard, an admin ending an owner's sessions, re-authentication by another
+  identity, stale `auth_time`, logout CSRF, `Clear-Site-Data`, the re-authentication transaction binding, `prompt=login`,
+  the form page's referrer policy, cookie redaction. Two survived the first test set and led to tests: a foreign
+  `Origin` (the edge allowlist shadows it, so a test now uses an allowed CORS origin that is not the public one) and
+  "disable ends sessions" (the fail-closed check on the next request hid it; a test now looks before that request).
+- Not exercised: a real browser (P4-08), real providers (owner step in `docs/pending-decisions/phase-4.md`), whether
+  Google honours `prompt=login`, and Cloudflare Access's `iat` as the authentication time (RESEARCH section 9).
+- Not done, by scope: a session list screen, ending one other session of a user, an import (the re-authentication guard
+  for it belongs to that task). Decisions D-33, D-34.
 
 ## Security notes
 THREAT_MODEL T13, T14. From relic-bridge's Phase 4 reviews, folded in up front: sessions rotate at sign-in; the role
