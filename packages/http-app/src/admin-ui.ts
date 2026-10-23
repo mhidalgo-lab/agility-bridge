@@ -5,6 +5,7 @@
 // only through `callAdmin`, which runs the admin API's own app in-process with the caller's session. Web-standard only
 // (ADR-0004).
 import type { AdminCall, AdminCallResult, AdminUiDeps, UiPrincipal } from '@agility-bridge/admin-ui';
+import type { KvStore } from '@agility-bridge/storage';
 import type { Context } from 'hono';
 import { ADMIN_BASE } from './admin/api.ts';
 import type { AdminChange } from './audit.ts';
@@ -22,6 +23,8 @@ const CLIENT_ADDRESS_HEADERS = ['cf-connecting-ip', 'x-forwarded-for'] as const;
 
 export interface AdminUiWiring {
   readonly sessions: SessionManager;
+  /** Single-use form handles (the one-time device token page) live here (P4-04); `take` is atomic (L-073). */
+  readonly kv: KvStore;
   /** `AB_PUBLIC_URL`'s origin. */
   readonly publicOrigin: string;
   readonly now: () => number;
@@ -67,6 +70,11 @@ export function adminUiDeps(w: AdminUiWiring): AdminUiDeps {
     secureCookies: w.publicOrigin.startsWith('https:'),
     clearSessionCookie: sessions.clearCookie,
     ...(w.beforeAuth === undefined ? {} : { beforeAuth: w.beforeAuth }),
+    onceStore: {
+      put: (key, ttlSeconds) => w.kv.set(key, '1', { expiresAt: w.now() + ttlSeconds * 1000 }),
+      take: async (key) => (await w.kv.take(key)) !== null,
+      list: (prefix, limit) => w.kv.list(prefix, { limit }),
+    },
 
     async authenticate(c) {
       const auth = await sessions.authenticate(c);

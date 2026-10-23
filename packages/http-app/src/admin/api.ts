@@ -1103,6 +1103,28 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
     },
   );
 
+  const ToolOut = z
+    .object({ name: z.string(), kind: z.enum(['read', 'write', 'destructive']), group: z.string() })
+    .openapi('Tool');
+  add(
+    {
+      method: 'get',
+      path: '/tools',
+      tag: 'tools',
+      summary:
+        'The tool catalogue: name, kind and group of every tool (owner, admin); what workspaces and grants choose from',
+      out: z.array(ToolOut),
+    },
+    async (c) => {
+      const actor = c.get('actor' as never) as Actor;
+      if (actor.kind === 'user' && actor.role === 'member')
+        throw new AdminError('forbidden', 'This needs an owner or an admin.');
+      return [...options.tools.entries()]
+        .map(([name, info]) => ({ name, kind: info.kind, group: info.group }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+  );
+
   const KeyVersionOut = z
     .object({
       version: z.number(),

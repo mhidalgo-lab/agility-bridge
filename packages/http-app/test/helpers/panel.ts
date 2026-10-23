@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // A complete server with sign-in for the panel's tests (P4-03): a local fake identity provider, real sessions, and
 // helpers that behave like a browser (fetch metadata, `Origin`, cookies). Same shape as the session tests' own setup.
-import { createIdentityProviders, EMPTY_LOGIN_POLICY } from '@agility-bridge/auth';
+import { createIdentityProviders, EMPTY_LOGIN_POLICY, type ToolInfo } from '@agility-bridge/auth';
 import { Secret } from '@agility-bridge/core';
 import { type FakeOidc, fakeOidc, route } from '../../../auth/test/helpers/fake-idp.ts';
 import { ADMIN_BASE, type SessionOptions } from '../../src/index.ts';
@@ -16,6 +16,8 @@ export interface Opts {
   session?: SessionOptions;
   /** `request`: the Workers configuration (L-096): linear routers, nothing shared between requests. */
   isolation?: 'request';
+  /** The tool catalogue (default: the core tools, all read-only). */
+  tools?: ReadonlyMap<string, ToolInfo>;
 }
 
 export async function setup(options: Opts = {}) {
@@ -54,7 +56,7 @@ export async function setup(options: Opts = {}) {
       ...(options.session === undefined ? {} : { session: options.session }),
       ...(options.isolation === undefined ? {} : { isolation: options.isolation }),
     },
-    { admin: true },
+    { admin: true, ...(options.tools === undefined ? {} : { tools: options.tools }) },
   );
   const send = (
     method: string,

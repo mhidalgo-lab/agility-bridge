@@ -517,6 +517,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         mod.createAdminUi(
           adminUiDeps({
             sessions: gate,
+            kv: options.storage.kv,
             publicOrigin,
             now: () => services.clock.now(),
             ...(identity.auditAdmin === undefined ? {} : { audit: identity.auditAdmin }),

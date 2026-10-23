@@ -30,6 +30,10 @@ export interface Fake {
   readonly forbidden: string[];
   /** What the next admin API call answers. */
   answer: AdminCallResult;
+  /** Answers per call, ahead of `answer` (return undefined to fall through). */
+  respond?: (call: AdminCall) => AdminCallResult | undefined;
+  /** The single-use handles in the fake store (key to present). */
+  readonly once: Map<string, true>;
   /** The panel as the HTTP app mounts it. */
   readonly app: Hono;
 }
@@ -45,6 +49,7 @@ export function fakeDeps(over: Partial<AdminUiDeps> = {}): Fake {
     calls,
     forbidden,
     answer: { status: 200, body: [] },
+    once: new Map<string, true>(),
     app: undefined as never,
     deps: {
       now: () => NOW,
@@ -61,7 +66,18 @@ export function fakeDeps(over: Partial<AdminUiDeps> = {}): Fake {
       csrfMatches: (p, presented) => presented === p.csrf,
       async callAdmin(_c, _p, call) {
         calls.push(call);
-        return fake.answer;
+        return fake.respond?.(call) ?? fake.answer;
+      },
+      onceStore: {
+        async put(key) {
+          fake.once.set(key, true);
+        },
+        async take(key) {
+          return fake.once.delete(key);
+        },
+        async list(prefix, limit) {
+          return [...fake.once.keys()].filter((k) => k.startsWith(prefix)).slice(0, limit);
+        },
       },
       onForbidden: (_c, _p, reason) => {
         forbidden.push(reason);

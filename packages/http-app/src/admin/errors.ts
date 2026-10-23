@@ -96,5 +96,9 @@ export function toAdminError(error: unknown): { status: number; body: AdminError
     code = 'unavailable';
     message = 'The server cannot use its master key for this.';
   }
-  return { status: STATUS[code], body: errorBody(code, message, field), expected: code !== 'internal' };
+  const body = errorBody(code, message, field);
+  // The panel explains the last-owner rule in its own words (P4-04): the guard (403) and the storage trigger (409) both
+  // say it, so the marker is set here, once, for either.
+  if (code !== 'internal' && /\blast active owner\b/i.test(message)) body.error.detail = 'last_owner';
+  return { status: STATUS[code], body, expected: code !== 'internal' };
 }

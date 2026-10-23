@@ -12,6 +12,16 @@ export interface FlashMessage {
 /** Every flash code. Screens add theirs here and in the catalogue below. */
 export type FlashCode =
   | 'saved'
+  | 'created'
+  | 'deleted'
+  | 'revoked'
+  | 'disabled'
+  | 'enabled'
+  | 'validated'
+  | 'last_owner'
+  | 'token_form_used'
+  | 'sessions_ended'
+  | 'origin_changed'
   | 'invalid'
   | 'not_found'
   | 'not_allowed'
@@ -23,6 +33,25 @@ export type FlashCode =
 /** Every flash message the panel can show. */
 export const FLASH_MESSAGES: Readonly<Record<FlashCode, FlashMessage>> = Object.freeze({
   saved: { kind: 'success', text: 'Saved.' },
+  created: { kind: 'success', text: 'Created.' },
+  deleted: { kind: 'success', text: 'Deleted.' },
+  revoked: { kind: 'success', text: 'Revoked. It stopped working at once.' },
+  disabled: { kind: 'success', text: 'Disabled.' },
+  enabled: { kind: 'success', text: 'Enabled.' },
+  validated: { kind: 'info', text: 'Checked against Agility. The result is below.' },
+  last_owner: {
+    kind: 'error',
+    text: 'That would leave the server without an active owner. Make another person an owner first. Nothing changed.',
+  },
+  token_form_used: {
+    kind: 'info',
+    text: 'That form was already used, so no second device token was created. Check the grant before making another.',
+  },
+  sessions_ended: { kind: 'success', text: 'Every browser session of that person has ended.' },
+  origin_changed: {
+    kind: 'success',
+    text: 'The origin changed. Every credential of the instance and every grant that used them was revoked.',
+  },
   invalid: { kind: 'error', text: 'Some of what you entered is not valid. Check it and try again.' },
   not_found: { kind: 'error', text: 'That item no longer exists.' },
   not_allowed: { kind: 'error', text: 'Your role does not allow that.' },

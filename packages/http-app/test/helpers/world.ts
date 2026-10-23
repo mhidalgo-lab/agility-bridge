@@ -84,12 +84,15 @@ export async function world(
     detachedAudit?: boolean;
     /** Host services replacing the defaults (limiters, metadata, …). */
     services?: Partial<HostServices>;
+    /** The tool catalogue the access model and the admin API know (default: the core tools). */
+    tools?: ReadonlyMap<string, ToolInfo>;
   } = {},
 ): Promise<World> {
   const now = { t: Date.UTC(2026, 9, 21, 12) };
   const storage = createMemoryStorage({ now: () => now.t });
   const keyring = await Keyring.create(generateMasterKey(1));
-  const svc = accessServices({ storage, keyring, tools: TOOL_INFO, now: () => now.t });
+  const toolInfo = options.tools ?? TOOL_INFO;
+  const svc = accessServices({ storage, keyring, tools: toolInfo, now: () => now.t });
   const alice = await svc.users.create({ email: 'alice@example.test', role: 'member' });
   const bob = await svc.users.create({ email: 'bob@example.test', role: 'member' });
   const instance = await svc.instances.create({ label: 'Fake', baseUrl: FAKE_BASE_URL });
@@ -163,7 +166,7 @@ export async function world(
     storage,
     keyring,
     access: {
-      tools: TOOL_INFO,
+      tools: toolInfo,
       writesEnabled: false,
       environment: 'live',
       limits: {
