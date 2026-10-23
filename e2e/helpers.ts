@@ -5,10 +5,24 @@ import type { TestServer } from './server.ts';
 
 /** A page whose layout fits the viewport: nothing wider than the screen (the 320 px promise, WCAG reflow). */
 export async function expectNoHorizontalScroll(page: Page): Promise<void> {
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(overflow, `horizontal overflow on ${page.url()}`).toBeLessThanOrEqual(0);
+  const { overflow, culprits } = await page.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    // The innermost elements that reach past the viewport, so a failure names what to fix.
+    const wide = [...document.body.querySelectorAll('*')].filter(
+      (e) => e.getBoundingClientRect().right > width + 0.5,
+    );
+    const innermost = wide.filter((e) => !wide.some((o) => o !== e && e.contains(o)));
+    return {
+      overflow: document.documentElement.scrollWidth - width,
+      culprits: innermost
+        .slice(0, 5)
+        .map(
+          (e) =>
+            `${e.tagName.toLowerCase()}${e.id ? `#${e.id}` : ''}${e.className ? `.${String(e.className).split(' ').join('.')}` : ''} (right ${Math.round(e.getBoundingClientRect().right)} > ${width})`,
+        ),
+    };
+  });
+  expect(overflow, `horizontal overflow on ${page.url()}: ${culprits.join('; ')}`).toBeLessThanOrEqual(0);
 }
 
 /**
