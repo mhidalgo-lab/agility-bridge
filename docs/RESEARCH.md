@@ -581,5 +581,5 @@ Checked 2026-10-23.
   implementations of this aspect are inconsistent (e.g., Firefox 57 doesn't block the redirects whereas Chrome 63 does)"
   (checked 2026-10-23,
   <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/form-action>). The owner
-  setup page therefore has a policy without `form-action` ([L-195](LESSONS-LEARNED.md), D-35). Current behaviour of the
-  browsers *unverified*: the P4-08 browser run checks it.
+  setup page therefore has a policy without `form-action` ([L-195](LESSONS-LEARNED.md), D-35). Chromium confirmed it in the P4-08 browser run
+  (2026-10-23, the policy and the redirect behave as specified); Firefox and WebKit are *unverified* (D-44).

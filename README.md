@@ -1,8 +1,11 @@
 # agility-bridge
 
-> **Status: Phase 1 (pre-release).** The local stdio server works: 13 read-only tools for every asset type, with
-> bound queries, workspace scope and untrusted-data handling. v0.1 is the first npm release; remote modes, writes and
-> reports follow in later phases ([roadmap](docs/ROADMAP.md)). Start with the [quickstart](docs/guide/quickstart-local.md).
+> **Status: pre-release.** The local stdio server works (read-only tools for every asset type, with bound queries,
+> workspace scope and untrusted-data handling), and so do the team server (`agility-bridge serve`, Docker or a Cloudflare
+> Worker) with sign-in, an admin panel, workspaces, grants and per-device tokens. OAuth for claude.ai and mobile, writes
+> and reports follow in later phases ([roadmap](docs/ROADMAP.md)). Start with the
+> [local quickstart](docs/guide/quickstart-local.md) for one person, or the
+> [remote quickstart](docs/guide/quickstart-remote.md) for a team.
 
 An open-source [Model Context Protocol](https://modelcontextprotocol.io) server that lets AI agents — GitHub Copilot
 (VS Code, JetBrains, CLI), Claude (Code, Desktop, claude.ai, mobile), Cursor, Windsurf and others — work with
@@ -53,8 +56,13 @@ MCP server for Digital.ai Agility exists ([research](docs/RESEARCH.md#7-prior-ar
 
 ## Quick start
 
-See the [quickstart](docs/guide/quickstart-local.md) and the [client setup guide](docs/guide/clients.md); the tools are
-listed in the [tool reference](docs/reference/tools.md).
+- **On your machine:** the [local quickstart](docs/guide/quickstart-local.md) and the
+  [client setup guide](docs/guide/clients.md).
+- **For a team:** the [remote quickstart](docs/guide/quickstart-remote.md) (a server or a Cloudflare Worker, a signed-in
+  owner, a connected client), then the [admin guide](docs/guide/admin-guide.md) (who can do what, everyday tasks,
+  troubleshooting), the [admin panel](docs/guide/admin-panel.md) and [sign-in providers](docs/guide/identity-providers.md).
+
+The tools are listed in the [tool reference](docs/reference/tools.md).
 
 ## Documentation
 
@@ -63,6 +71,9 @@ listed in the [tool reference](docs/reference/tools.md).
 - **Design:** [architecture](docs/ARCHITECTURE.md) · [decisions (ADRs)](docs/adr/README.md) ·
   [tool conventions](docs/dev/tool-conventions.md) · [tool catalogue](docs/reference/tool-catalogue.md) ·
   [client compatibility](docs/reference/client-compatibility.md)
+- **Guides:** [local quickstart](docs/guide/quickstart-local.md) · [remote quickstart](docs/guide/quickstart-remote.md) ·
+  [admin guide](docs/guide/admin-guide.md) · [self-hosting](docs/guide/self-hosting.md) ·
+  [Cloudflare deploy](docs/guide/cloudflare-deploy.md) · [troubleshooting](docs/guide/troubleshooting.md)
 - **Research:** [Agility APIs, MCP, OAuth and platform facts](docs/RESEARCH.md)
 - **Security:** [threat model](docs/THREAT_MODEL.md)
 - **Lessons learned:** [engineering rules and known failure modes](docs/LESSONS-LEARNED.md)

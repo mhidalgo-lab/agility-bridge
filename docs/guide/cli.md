@@ -40,7 +40,7 @@ of that device ([devices](multi-device.md)) at `https://<server>/w/team-mobile/m
 data directory and back it up separately ([secrets](secrets.md)).
 
 Credentials added here are **shared** (a service member's token, used read-only). A member's own token is personal:
-only they can store it (the admin panel, Phase 4); nobody can store it for them.
+only they can store it (in the admin panel under *My access*, [admin panel](admin-panel.md#my-access-every-role)); nobody can store it for them.
 
 ## Everyday commands
 

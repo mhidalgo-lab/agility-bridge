@@ -1,7 +1,7 @@
 # Admin panel (`packages/admin-ui`)
 
 The server-rendered panel at `/admin` ([ADR-0004](../adr/0004-typescript-runtime-agnostic-core.md), L-095, THREAT_MODEL
-T13). P4-03 ships the frame and two small pages; the management screens (P4-04) and the later ones (P4-05 to P4-07) are built in it by the conventions below.
+T13). The frame (P4-03), the management screens (P4-04), the audit viewer (P4-05), the connect page (P4-06) and member self-service (P4-07) are built by the conventions below; what the screens do for an operator is in the [admin guide](../guide/admin-guide.md).
 
 | Piece | Where | Notes |
 |---|---|---|
@@ -217,7 +217,7 @@ through an `Area` (`ADMIN_AREA` for owners and admins on any grant, `MEMBER_AREA
 - Statistics come from `GET /audit/stats`, bounded in storage (`audit.stats`: newest 10,000 rows, 100 groups) and honest
   about truncation.
 
-## Not in the panel (yet)
+## Also in the panel
 
 The audit viewer and the connect page are above; the owner-only unbind (P4-12) is the `/admin/users/{id}/unbind` pair in `screens/users.tsx`: a thin client of `POST /users/{id}/unbind` (owner-only `kit.page`/`kit.form`, the control offered by `canUnbind`, the typed email re-rendered never echoed). A browser run (axe-core, keyboard, 320 px, CSP violations in a real browser) is P4-08.
 

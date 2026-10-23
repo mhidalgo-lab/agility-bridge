@@ -1,14 +1,14 @@
 # Admin access: sessions, roles and re-authentication
 
-> Phase 4 (P4-02, P4-03). How people use the admin side of agility-bridge once they have signed in
-> ([sign-in providers](identity-providers.md)): the browser session, the panel at `/admin`, who may do what, the extra
-> sign-in that high-impact changes need, and how to end sessions. The panel's screens for instances, credentials,
-> workspaces, grants, device tokens and users are in the [admin panel guide](admin-panel.md) (P4-04); the audit viewer
-> and usage statistics (P4-05) are in the same guide; the connect page and member self-service (P4-06, P4-07) are still to come, and everything is also in the
-> [admin API](../reference/admin-api.md) and the CLI.
+> How people use the admin side of agility-bridge once they have signed in ([sign-in providers](identity-providers.md)):
+> the browser session, the panel at `/admin`, who may do what, the extra sign-in that high-impact changes need, and how to
+> end sessions. The [admin guide](admin-guide.md) is the starting page (role matrix, everyday tasks, troubleshooting). The
+> panel's screens, member self-service, the connect page, the audit viewer and usage statistics are in the
+> [admin panel guide](admin-panel.md), and everything is also in the [admin API](../reference/admin-api.md) and the CLI.
 >
-> Verification: all of it is tested against local fake providers and in-process requests, on Node and in workerd. No
-> real browser has driven it yet (the browser end-to-end task is P4-08).
+> Verification: tested against local fake providers and in-process requests, on Node and in workerd, and a real Chromium
+> drives the panel end to end over http and https (P4-08, `pnpm test:e2e`). A sign-in with a real provider application has
+> not been run yet ([pending decisions](../pending-decisions/phase-4.md)).
 
 ## The panel
 

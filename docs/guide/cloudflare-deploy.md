@@ -1,7 +1,8 @@
 # Deploy to Cloudflare Workers
 
 > Deployment mode D: agility-bridge as a Cloudflare Worker on D1, reachable from every device, no server to run.
-> Limits, measured costs and rate limits per plan: [Cloudflare limits](cloudflare-limits.md). Executed against a real
+> From nothing to a signed-in owner and a connected client: [remote quickstart](quickstart-remote.md); running it
+> afterwards: [admin guide](admin-guide.md). Limits, measured costs and rate limits per plan: [Cloudflare limits](cloudflare-limits.md). Executed against a real
 > account as recorded in [verification](../dev/verification.md#cloudflare-deployment-p3-05-p3-07).
 
 ## Which Agility instances a Worker can reach

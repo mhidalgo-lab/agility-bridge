@@ -1,6 +1,9 @@
 # One token per device
 
-> For `agility-bridge serve` (v0.2). OAuth sign-in for claude.ai and mobile clients arrives in Phase 5.
+> For `agility-bridge serve` (v0.2) and the Cloudflare Worker. Everything here can also be done in the browser: a grant's
+> page issues tokens and shows the client snippets, and *Device tokens* lists and revokes every token ([admin
+> panel](admin-panel.md#grants-and-device-tokens), [admin guide](admin-guide.md)). OAuth sign-in for claude.ai and mobile
+> clients arrives in Phase 5.
 
 Every device — a laptop, a second laptop, a CI runner — gets **its own device token** for the grant, so losing one
 device means revoking one token, not re-configuring everyone ([access model](access-model.md#device-tokens)).

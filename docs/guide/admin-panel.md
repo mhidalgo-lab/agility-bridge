@@ -1,9 +1,11 @@
 # The admin panel: instances, credentials, workspaces, grants, device tokens and users
 
-> Phase 4 (P4-04). What an owner or an admin can do in the browser, screen by screen, and what each role sees. Signing in,
-> roles, re-authentication and sessions are in [admin access](admin-access.md); the panel's design rules for contributors
-> are in [admin panel (developer guide)](../dev/admin-ui.md). Members use their own pages ("My access", P4-07) and the
-> connect page with client snippets (P4-06) comes next; the audit viewer and usage statistics (P4-05) are below.
+> What an owner or an admin can do in the browser, screen by screen, and what each role sees; members' own pages ("My
+> access"), the connect page with client snippets, the audit viewer and usage statistics are below. Start with the
+> [admin guide](admin-guide.md) (who can do what, everyday tasks, troubleshooting) or the
+> [remote quickstart](quickstart-remote.md). Signing in, roles, re-authentication and sessions are in
+> [admin access](admin-access.md); the panel's design rules for contributors are in
+> [admin panel (developer guide)](../dev/admin-ui.md).
 >
 > Verification: every screen is tested against the real admin API, real sessions and the storage contract in-process, and
 > one screen flow runs in workerd. A real Chromium drives the panel end to end at 1280 px and 320 px (P4-08,
