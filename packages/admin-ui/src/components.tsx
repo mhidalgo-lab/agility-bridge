@@ -531,7 +531,7 @@ export interface DataTableProps<T> {
 /** A table with a caption and column headers; scrolls sideways on narrow screens instead of overflowing the page. */
 export function DataTable<T>(props: DataTableProps<T>): JSX.Element {
   return (
-    <div class="table-wrap">
+    <section class="table-wrap" aria-label={props.caption} tabindex={0}>
       <table>
         <caption>{props.caption}</caption>
         <thead>
@@ -559,7 +559,7 @@ export function DataTable<T>(props: DataTableProps<T>): JSX.Element {
           )}
         </tbody>
       </table>
-    </div>
+    </section>
   );
 }
 

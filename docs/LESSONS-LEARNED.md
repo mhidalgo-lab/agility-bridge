@@ -32,15 +32,15 @@ How to use it:
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
-| [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189 |
+| [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222 |
-| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208, L-210 – L-214, L-223, L-229 – L-231 |
+| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-199, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-231 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163 |
@@ -651,6 +651,14 @@ value lets the attacker choose which one counts, so a header that names the cook
 none (relic-bridge Phase 4 review Q9). Do it for the sign-in binding cookie and for the session cookie.
 *Applied in:* P4-01, P4-02.
 
+**L-219 — A framework exception thrown by a validator is not an internal error.**
+A POST with `Content-Type: application/json` and an empty body passed the admin API's own JSON gate (an empty body is
+allowed for actions that take none), reached Hono's validator, which throws `HTTPException(400)`, and the app's
+`onError` answered `500 internal error` and logged `unhandled error`. Found by the first browser-harness call that sent
+`{}`-less JSON. `onError` now maps a 400 `HTTPException` to the `bad_request` envelope; a test sends empty JSON to three
+routes.
+*Applied in:* P4-08.
+
 ## J. OAuth and identity
 
 **L-086 — OAuth state lives in shared storage.**
@@ -941,6 +949,15 @@ share it and the metadata layer's own patterns are the same constants), the miss
 so in words instead of promising an effect.
 *Applied in:* P4-15.
 
+**L-218 — A table that scrolls sideways must be reachable by keyboard, and only a real layout shows it.**
+`.table-wrap { overflow-x: auto }` kept the 320 px page from overflowing, but a keyboard user could not scroll it (WCAG
+2.1.1): axe-core's `scrollable-region-focusable` found it on the first audit-log run in Chromium, light and dark. A
+scrollable container is a focusable, named region (`tabindex="0"`, `role="region"`, `aria-label`). jsdom has no layout, so
+the contrast and scroll rules need a browser; `visit()` in the E2E harness runs axe on every page it opens. The same goes
+for a long path or address with no break opportunity: it overflowed only with CI's fonts, as text (not an element), so the
+overflow check names overflowing text nodes too and `main` has `overflow-wrap: break-word`.
+*Applied in:* P4-08.
+
 ## L. Cloudflare Workers
 
 **L-096 — Never share in-flight I/O between requests on Workers.**
@@ -1148,6 +1165,26 @@ reads, refusals, dry runs and applied writes.
 
 **L-126 — Browser E2E and a DAST scan find what unit tests miss.**
 Schedule both against the admin panel.
+*Applied in:* P4-08.
+
+**L-215 — A browser test sees less than the browser, and less than the page's own script.**
+Playwright's `page.evaluate` runs through the DevTools protocol, which is exempt from the page's `unsafe-eval` rule (and
+`response.headers()` hides `Set-Cookie` and `Clear-Site-Data`; `allHeaders()` shows them). A test that calls `eval` that way
+passes whatever the policy says. Assert `eval` and inline script by the exact header, and use the browser for what it
+enforces for protocol code too: Trusted Types, `img-src`, `style-src`, `form-action`, framing.
+*Applied in:* P4-08.
+
+**L-216 — The forger a CSRF test needs is another origin on the same site, not only another site.**
+`http://localhost:<other port>` is the same site as the panel (ports do not count), so `SameSite=Lax` sends the session
+cookie with its forms and fetches: only the `Origin` and fetch-metadata checks and the CSRF token stand in the way. A test
+with a page on `127.0.0.1` alone (cross-site, cookie withheld) passes even when those checks are gone. Run both, and a plain
+link from the other site (a top-level navigation, which must work).
+*Applied in:* P4-08.
+
+**L-217 — Cross a time window by moving the stored timestamp, never by waiting or faking the clock of a child process.**
+The re-authentication window is 10 minutes. The browser test moves every stored session's `createdAt` back 11 minutes in
+the server's own database, then drives the real flow (the stale prompt, the refused other identity, `prompt=login`, the
+retry). No sleep, no clock hook in production code.
 *Applied in:* P4-08.
 
 **L-159 — Benchmarks must yield to the event loop between requests.**

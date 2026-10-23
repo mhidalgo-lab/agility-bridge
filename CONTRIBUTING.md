@@ -24,7 +24,12 @@ pnpm lint             # Biome, web-standard imports, panel escaping and embedded
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm test:e2e         # the admin panel in a real browser (needs `pnpm exec playwright install chromium` once); not part of `pnpm test`
+pnpm scan:zap         # an OWASP ZAP baseline scan of the panel (needs Docker)
 ```
+
+The browser and ZAP checks are described in [`docs/dev/testing.md`](docs/dev/testing.md#browser-e2e-and-zap-e2e-phase-4);
+CI runs them as non-required jobs on pull requests that touch the panel, sign-in or the admin API.
 
 ### Repository layout
 

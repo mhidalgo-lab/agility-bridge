@@ -6,7 +6,8 @@
 > connect page with client snippets (P4-06) comes next; the audit viewer and usage statistics (P4-05) are below.
 >
 > Verification: every screen is tested against the real admin API, real sessions and the storage contract in-process, and
-> one screen flow runs in workerd. No real browser has driven it yet (P4-08).
+> one screen flow runs in workerd. A real Chromium drives the panel end to end at 1280 px and 320 px (P4-08,
+> `pnpm test:e2e`, [testing](../dev/testing.md#browser-e2e-and-zap-e2e-phase-4)), and an OWASP ZAP baseline scans it.
 
 The panel is at `/admin` on `agility-bridge serve` and on the Cloudflare Worker. It works without scripts (one small
 optional script adds a *Copy* button), fits a phone 320 px wide, and shows only what the **admin API** shows you: every

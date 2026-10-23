@@ -453,6 +453,15 @@ describe('requests and errors', () => {
     expect((await call(w, 'admin', 'DELETE', `/credentials/${w.ids.aliceCredential}`)).status).toBe(409);
   });
 
+  it('an empty body sent as JSON is a 400 in the error envelope, not an internal error (found by the P4-08 browser run)', async () => {
+    const w = await world({}, { admin: true });
+    for (const path of ['/users', '/instances', '/setup-links']) {
+      const res = await call(w, 'owner', 'POST', path, '');
+      expect(res.status, path).toBe(400);
+      expect((await res.json()).error.code).toBe('bad_request');
+    }
+  });
+
   it('a change clears the access cache, so a revoked grant stops at once', async () => {
     const w = await world({ accessCacheTtlSeconds: 60 }, { admin: true });
     const list = () =>

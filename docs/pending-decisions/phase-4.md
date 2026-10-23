@@ -172,6 +172,16 @@
 - **Options:** (a) ship as is and document the residual (keep configured providers to ones whose email checks you trust);
   (b) let the owner name the provider the next binding must come from, with an expiry (task P4-24).
 - **Recommendation:** (a) now, (b) when a deployment has providers of different strength; it is a small follow-up (P4-24).
+### D-43 — Should the browser E2E and ZAP jobs be required checks? *(P4-08)*
+- **Context:** `.github/workflows/admin-e2e.yml` runs a Playwright job and a ZAP baseline job on pull requests and pushes to `main` that touch the panel, sign-in, the admin API, the CLI, storage or `e2e/`, weekly, and on demand. A workflow filtered by paths does not report on other pull requests, so a required check on it would block every unrelated PR forever.
+- **Options:** (a) keep them non-required and path-filtered (a failure is visible on the PR and on `main`, merging is the owner's call); (b) drop the path filter, run on every pull request and require both (about 5 to 10 minutes of Actions on each PR; a flaky browser run would block merges); (c) required only on `release/*` pull requests.
+- **Recommendation:** (a) until the jobs have been green on `main` for a few weeks; then (b) for the Playwright job only (the ZAP image pull is the slow, network-dependent one), or (c). Changing required checks is a repository setting and an owner step: add the check names to [repository settings](../security/repo-settings.md) in the same change.
+- **Owner:** _pending_ (implemented as (a)). Also an owner step: after the first run on `main`, confirm both jobs are green and tick the last box of P4-08.
+
+### D-44 — Browser coverage beyond Chromium *(P4-08)*
+- **Context:** the specs run in Chromium (desktop and 320 px). Firefox and WebKit run only the smoke spec, on demand (`AB_E2E_BROWSERS=all`), because the security checks use Chromium-specific facts (Trusted Types enforcement, `chrome-error:` frames, DevTools-level evaluation) and the panel's script is a few lines.
+- **Options:** (a) Chromium for everything, Firefox and WebKit smoke on demand; (b) run the smoke spec in all three browsers in CI on every run (two more browser downloads, a few minutes); (c) port the header and cookie specs to all three.
+- **Recommendation:** (a): the panel works without its script and uses no browser-specific feature; revisit (b) if a user reports a Firefox or Safari problem.
 - **Owner:** _pending_ (implemented as (a)).
 
 ### D-51 — How `GET /tokens` pages and who sees what *(P4-15)*

@@ -23,3 +23,8 @@ apps/worker/wrangler.*.local.jsonc
 # Local IDE and MCP client configuration (machine-specific paths and test settings), never committed.
 .idea/
 .vscode/
+# Browser E2E and ZAP scan output (P4-08).
+dist-e2e-browser/
+playwright-report/
+test-results/
+zap-reports/

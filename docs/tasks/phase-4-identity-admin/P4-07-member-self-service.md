@@ -2,7 +2,7 @@
 id: P4-07
 title: "Member self-service: bring your own Agility token"
 phase: 4
-status: review
+status: done
 priority: high
 depends_on: [P4-04]
 adr: ["0008", "0013"]

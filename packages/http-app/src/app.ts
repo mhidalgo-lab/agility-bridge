@@ -36,9 +36,11 @@ import {
 import type { Storage } from '@agility-bridge/storage';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { type Context, Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import { LinearRouter } from 'hono/router/linear-router';
 import { AccessCache } from './access-cache.ts';
 import { ADMIN_BASE, type AdminApiOptions, adminAuthenticator, createAdminApi } from './admin/api.ts';
+import { errorBody } from './admin/errors.ts';
 import { ADMIN_UI_BASE, type AdminUiModule, adminUiDeps, loadAdminUiModule } from './admin-ui.ts';
 import type { LoginEvent } from './audit.ts';
 import { createEdge, type EdgeOptions } from './edge.ts';
@@ -378,6 +380,10 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
   });
 
   app.onError((error, c) => {
+    // A JSON-typed request with an empty body: the validator's 400, not an internal error (found by P4-08).
+    if (error instanceof HTTPException && error.status === 400) {
+      return c.json(errorBody('bad_request', 'The body is not valid JSON.'), 400);
+    }
     services.logger.error('unhandled error', { error: error.name });
     return c.json({ error: 'internal error' }, 500);
   });
@@ -425,6 +431,10 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         built.route(ADMIN_BASE, getApi());
         // The same JSON answers as the main app, and errors logged by name only (P3-11 review).
         built.onError((error, ic) => {
+          // A JSON-typed request with an empty body: the validator's 400, not an internal error (found by P4-08).
+          if (error instanceof HTTPException && error.status === 400) {
+            return ic.json(errorBody('bad_request', 'The body is not valid JSON.'), 400);
+          }
           services.logger.error('unhandled error', { error: error.name });
           return ic.json({ error: 'internal error' }, 500);
         });
