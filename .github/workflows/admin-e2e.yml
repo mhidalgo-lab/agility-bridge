@@ -57,7 +57,7 @@ jobs:
   browser:
     name: Admin browser E2E (Chromium)
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         with:
@@ -72,7 +72,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
-        timeout-minutes: 5
+        # The apt mirror sometimes serves a few KB/s (first run: 5 minutes for 8 packages).
+        timeout-minutes: 15
       - name: Run the browser tests
         run: pnpm test:e2e
         timeout-minutes: 25
