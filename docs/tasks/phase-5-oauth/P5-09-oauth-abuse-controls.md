@@ -2,7 +2,7 @@
 id: P5-09
 title: Abuse controls for unauthenticated endpoints
 phase: 5
-status: in-progress
+status: review
 priority: medium
 depends_on: [P5-03]
 adr: ["0010"]
@@ -50,18 +50,45 @@ address cannot lock the others out (except through the documented deployment-wid
   RESEARCH (platform facts, dated), audit-log guide.
 
 ## Acceptance criteria
-- [ ] Flood tests per endpoint (authorize, consent, token failures, register, CIMD) show stored rows and outbound fetches
+- [x] Flood tests per endpoint (authorize, consent, token failures, register, CIMD) show stored rows and outbound fetches
   stay within budget, on memory, SQLite and workerd/D1.
-- [ ] One address flooding cannot lock out another; the deployment caps do (documented); a clean address is still served
+- [x] One address flooding cannot lock out another; the deployment caps do (documented); a clean address is still served
   while the deployment's token-failure cap is exhausted.
-- [ ] Refusals are `429` with `Retry-After`, audited once per window, with no token, secret or address in the row, the log
+- [x] Refusals are `429` with `Retry-After`, audited once per window, with no token, secret or address in the row, the log
   or the response.
-- [ ] Negative authorization: a refused request reaches no endpoint code, stores nothing, fetches nothing and asks Agility
+- [x] Negative authorization: a refused request reaches no endpoint code, stores nothing, fetches nothing and asks Agility
   nothing.
-- [ ] Settings validated and documented; defaults safe; windows reset with fake time (no fixed sleeps).
-- [ ] The sweeps run on both hosts, bounded; storage rows stay bounded after a flood and a sweep.
-- [ ] Security tests are mutation-checked (L-121), recorded under Outcome.
-- [ ] Docs, THREAT_MODEL, RESEARCH, cloudflare-limits, a changeset, new lessons and decisions.
+- [x] Settings validated and documented; defaults safe; windows reset with fake time (no fixed sleeps).
+- [x] The sweeps run on both hosts, bounded; storage rows stay bounded after a flood and a sweep.
+- [x] Security tests are mutation-checked (L-121), recorded under Outcome.
+- [x] Docs, THREAT_MODEL, RESEARCH, cloudflare-limits, a changeset, new lessons and decisions.
+
+## Outcome
+- Built as scoped. One limiter design (`oauth/abuse.ts`): fixed-window counters in `kv`, atomic `increment` with `max`, address
+  first then deployment, the isolate remembering refused counters and audit markers (L-257). Wired at the route edge
+  (`runtime.guard` in `app.ts`), so the token endpoint's code (P5-05) is untouched. P5-03's own per-address counters and caps
+  stay; the deployment-wide registration (100/h) and fetch (200/h) limits are new. Settings `AB_OAUTH_AUTHORIZE_IP_LIMIT`,
+  `AB_OAUTH_AUTHORIZE_LIMIT`, `AB_OAUTH_CONSENT_IP_LIMIT`, `AB_OAUTH_CONSENT_LIMIT`, `AB_OAUTH_TOKEN_FAILURE_IP_LIMIT`,
+  `AB_OAUTH_TOKEN_FAILURE_LIMIT`, `AB_OAUTH_DCR_LIMIT`, `AB_OAUTH_CIMD_LIMIT` (D-72, D-73).
+- Found while building: `agility-bridge serve` had no job that removes expired `kv` rows at all (L-256). It now runs a bounded purge
+  at start and hourly with the registration sweep; the Worker cron gains a bounded sweep (20 per run, cursor in `kv`).
+- Suites: `abuse-suite.ts` (6 flood cases) on memory, memory in the Workers shape, SQLite and workerd/D1; `abuse.test.ts` (windows,
+  both caps, audit once, fail-open, no write for a remembered refusal, no address anywhere, sweeps, housekeeping, settings),
+  `abuse-consent.test.ts` (the consent post on the built-in screen), `apps/worker/test/scheduled-oauth.test.ts`. `pnpm test`: 2,614
+  passed, 7 failed: the five offline `npx agility-bridge` documentation tests, plus two that passed when rerun alone (a core
+  seeded property and the workerd denial matrix, which timed out at 60 s while the whole suite ran).
+- Mutation checks (L-121), each reverted, number of failing tests: address counter skipped (8), deployment counter skipped (7),
+  token failures not counted (6), deployment failure cap hitting clean addresses (1), address failure cap ignored (4), refusal
+  not remembered (1), audit once per window off (7), counter store failing closed (1, after the test asserted "below 500" instead
+  of "not 429"), counters without expiry (1), token route unguarded (6), authorize route unguarded (8), consent route
+  unguarded (2), token failures counted only for 200 (6), registration hourly cap off (1), fetch hourly cap off (1), sweep
+  removing used registrations (1, after adding the case), sweep cursor not saved (1), sweep bound ignored (1), constant
+  `Retry-After` (1). Survivor, equivalent: the sweep's skip of stored document clients (a document record has no
+  `registrationDate`, so the sweep would skip it anyway; the skip only saves a read).
+- Not covered: D1's billing of a statement that changes no row (unverified, no probing of the service; the design does not
+  depend on it); a many-address flood over real networks; the Cloudflare edge limits (P5-19). Fixed windows allow twice a limit
+  around a boundary (D-72).
+- New: lessons L-256 to L-258, decisions D-72 and D-73, tasks P5-19 and P5-20.
 
 ## Security notes
 THREAT_MODEL T10, T11, T20 (T9 touched).

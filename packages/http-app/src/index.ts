@@ -58,6 +58,12 @@ export {
   fetchMetadataDocument,
 } from './oauth/clients.ts';
 export {
+  type StorageHousekeepingOptions,
+  SWEEP_SLICE,
+  scheduleStorageHousekeeping,
+  sweepRegistrations,
+} from './oauth/housekeeping.ts';
+export {
   createOAuthRuntime,
   looksLikeOAuthToken,
   MCP_SCOPE,

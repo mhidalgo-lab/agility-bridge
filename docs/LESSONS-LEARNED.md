@@ -33,7 +33,7 @@ How to use it:
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-252 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-252, L-256 – L-258 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -1268,6 +1268,29 @@ shown or trusted by a feature written after this one. Parse, validate, and hand 
 fields we use; refuse unsupported grants and auth methods instead of dropping them so the client does not believe it has
 them. The same rule keeps metadata-document clients to a name and the callbacks on their own host.
 *Applied in:* P5-03, `clients.ts` (`checkRegistration`).
+
+**L-256 — Expired rows are only removed by a job: check that every host runs one.**
+Counters, markers and provider records carry an expiry, and a read treats an expired row as absent, which hides that
+nothing deletes it. The Worker had a cron `purgeExpired`; `agility-bridge serve` had no job at all, so a long-running Node
+server grew by every expired session, marker and (now) counter. When a feature adds rows that expire, name the job that
+removes them on each host and test that it runs, with a bound per run that fits the cheapest host (50 D1 queries).
+*Applied in:* P5-09, `scheduleStorageHousekeeping`, `scheduled.ts`.
+
+**L-257 — Remember a refusal in the isolate when each check costs a billed write.**
+A shared counter makes the limit exact, but on D1 every `increment` is a query (and a row written when it counts). Once a
+counter has refused, it will refuse until its window ends, so the isolate keeps `counter -> until` (a hashed name and a
+time: no request data, so it is allowed state, L-013) and answers the rest of the flood from memory. Do the same for the
+audit marker. The cache is only an optimisation: losing it costs one more refused increment, and the storage stays the
+authority. Test it by counting storage calls, not by timing.
+*Applied in:* P5-09, `abuse.ts`.
+
+**L-258 — A deployment-wide cap on failures should only refuse the callers that already failed.**
+A global failure budget on a token endpoint lets anyone who can produce failures lock out every client. Counting failures
+per address, and applying the deployment limit only to addresses that already have a failure in the window, keeps the
+protection (the sum of failures is bounded) without turning it into a denial of service for clean clients. Caps that
+guard a shared resource and cannot work this way (authorize, consent, registration) are documented as deployment-wide, with
+the setting that raises them.
+*Applied in:* P5-09, `abuse.ts` (`blocked`).
 
 ## Q. Testing, evals and live verification
 

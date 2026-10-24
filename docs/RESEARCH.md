@@ -477,6 +477,11 @@ Checked 2026-10 in Cloudflare documentation; P0-09 measures with Agility-shaped 
 - **D1**: no interactive transactions (`batch()` is one transaction); statement size ≤ 100 KB; ≤ 100 bound parameters;
   rows/strings ≤ 2 MB; 30 s per query; read-only queries retried by the platform, writes not; foreign keys enforced;
   Free: 5 M rows read and 100,000 written per day. — [D1 limits](https://developers.cloudflare.com/d1/platform/limits/)
+- **D1 write accounting for counters (2026-10-24)**: Free allows 100,000 rows written a day; a refused conditional upsert
+  (`INSERT … ON CONFLICT DO UPDATE … WHERE … RETURNING` that changes no row) writes nothing locally (`node:sqlite` and
+  local D1 agree, P5-09 tests); whether D1 bills the attempt of a statement that changed no row is *unverified* against a
+  real database (no probing of the service), so the design caps counters by their own `max` and remembers a refusal in the
+  isolate instead of relying on it. — [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/)
 - **Durable Objects** (SQLite-backed on Free): good for an exact deployment-wide limiter; each call is billed and placed
   near the first caller. — [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/)
 - **Rate Limiting binding**: `limit({ key })` → `{ success }`, periods of 10 or 60 s, per location and eventually

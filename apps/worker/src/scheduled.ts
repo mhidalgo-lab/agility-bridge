@@ -2,7 +2,7 @@
 // Housekeeping on Workers (P3-08): one cron trigger runs bounded slices of each job, sized for the Free plan's 50 D1
 // queries and 50 subrequests per invocation (L-097). A failing job is logged and the others still run.
 import { rotateCredentialKeys } from '@agility-bridge/auth';
-import { purgeAudit } from '@agility-bridge/http-app';
+import { purgeAudit, SWEEP_SLICE, sweepRegistrations } from '@agility-bridge/http-app';
 import type { JobContext } from './boot.ts';
 
 /** Per run: audit batches of 1,000 rows, expired kv entries, credentials re-encrypted, credentials revalidated. */
@@ -11,6 +11,7 @@ export const SLICES = Object.freeze({
   kvEntries: 1_000,
   rotationBatch: 10,
   revalidations: 1,
+  registrations: SWEEP_SLICE,
 });
 export const ROTATION_LEASE = 'lock:key-rotation';
 const LEASE_MS = 10 * 60_000;
@@ -18,6 +19,7 @@ const LEASE_MS = 10 * 60_000;
 export interface JobsResult {
   auditDeleted: number;
   kvPurged: number;
+  registrationsSwept: number;
   rotated: number | null;
   revalidated: number;
   failed: string[];
@@ -25,7 +27,14 @@ export interface JobsResult {
 
 export async function runScheduled(jobs: JobContext, now: number, runId: string): Promise<JobsResult> {
   const { storage, keyring, services, settings, logger } = jobs;
-  const result: JobsResult = { auditDeleted: 0, kvPurged: 0, rotated: null, revalidated: 0, failed: [] };
+  const result: JobsResult = {
+    auditDeleted: 0,
+    kvPurged: 0,
+    registrationsSwept: 0,
+    rotated: null,
+    revalidated: 0,
+    failed: [],
+  };
   const step = async (name: string, run: () => Promise<void>) => {
     try {
       await run();
@@ -40,6 +49,18 @@ export async function runScheduled(jobs: JobContext, now: number, runId: string)
   await step('kv_purge', async () => {
     result.kvPurged = await storage.kv.purgeExpired(SLICES.kvEntries);
   });
+  // Unused dynamic registrations (P5-09): a bounded slice per run, resuming where the last one stopped.
+  if (settings.oauth !== undefined) {
+    await step('oauth_sweep', async () => {
+      result.registrationsSwept = (
+        await sweepRegistrations(storage, {
+          now: () => now,
+          unusedTtlSeconds: settings.oauth?.registrationUnusedTtlSeconds ?? 86_400,
+          limit: SLICES.registrations,
+        })
+      ).removed;
+    });
+  }
   // Re-encrypt what is still on an older key, one batch per run; the lease keeps overlapping runs apart (the
   // compare-and-swap per row keeps them correct anyway, L-075).
   if (keyring.versions.length > 1) {

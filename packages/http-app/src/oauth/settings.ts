@@ -11,6 +11,11 @@
 //   AB_OAUTH_DCR_MAX_CLIENTS    live dynamic registrations at once (default 200; 1-500)
 //   AB_OAUTH_DCR_IP_LIMIT       registrations one address may make per hour (default 10; 1-10000)
 //   AB_OAUTH_DCR_REDIRECT_HOSTS comma list: https redirect hosts a dynamic client may use (default: any; loopback always)
+//   AB_OAUTH_DCR_LIMIT          registrations the whole deployment accepts per hour (default 100; 1-100000) (P5-09)
+//   AB_OAUTH_CIMD_LIMIT         document fetches the whole deployment makes per hour (default 200; 1-100000)
+//   AB_OAUTH_AUTHORIZE_IP_LIMIT, AB_OAUTH_AUTHORIZE_LIMIT   authorization requests per 10 minutes, per address / in all (30, 600)
+//   AB_OAUTH_CONSENT_IP_LIMIT, AB_OAUTH_CONSENT_LIMIT       consent form posts per 10 minutes, per address / in all (30, 300)
+//   AB_OAUTH_TOKEN_FAILURE_IP_LIMIT, AB_OAUTH_TOKEN_FAILURE_LIMIT   failed token requests per 10 minutes (20, 300)
 //   AB_OAUTH_DCR_UNUSED_TTL     how long a registration that never exchanged a code lives (default 24h; 1h-7d)
 // Durations: a number of seconds, or a number with s, m, h or d (`90m`, `12h`, `30d`).
 
@@ -38,6 +43,14 @@ export interface OAuthSettings {
   readonly registrationIpLimit?: number;
   readonly registrationRedirectHosts?: readonly string[];
   readonly registrationUnusedTtlSeconds?: number;
+  readonly registrationHourlyLimit?: number;
+  readonly clientMetadataHourlyLimit?: number;
+  readonly authorizeIpLimit?: number;
+  readonly authorizeLimit?: number;
+  readonly consentIpLimit?: number;
+  readonly consentLimit?: number;
+  readonly tokenFailureIpLimit?: number;
+  readonly tokenFailureLimit?: number;
 }
 
 export type OAuthEnv = Readonly<Record<string, string | undefined>>;
@@ -55,6 +68,14 @@ export const OAUTH_SETTING_NAMES: readonly string[] = Object.freeze([
   'AB_OAUTH_DCR_IP_LIMIT',
   'AB_OAUTH_DCR_REDIRECT_HOSTS',
   'AB_OAUTH_DCR_UNUSED_TTL',
+  'AB_OAUTH_DCR_LIMIT',
+  'AB_OAUTH_CIMD_LIMIT',
+  'AB_OAUTH_AUTHORIZE_IP_LIMIT',
+  'AB_OAUTH_AUTHORIZE_LIMIT',
+  'AB_OAUTH_CONSENT_IP_LIMIT',
+  'AB_OAUTH_CONSENT_LIMIT',
+  'AB_OAUTH_TOKEN_FAILURE_IP_LIMIT',
+  'AB_OAUTH_TOKEN_FAILURE_LIMIT',
 ]);
 
 const DURATION_RE = /^(\d{1,8})([smhd]?)$/;
@@ -151,6 +172,14 @@ export function oauthSettingsFromEnv(env: OAuthEnv, publicUrl: boolean): OAuthSe
     7 * 86_400,
     '1h and 7d',
   );
+  const registrationHourlyLimit = count(env, 'AB_OAUTH_DCR_LIMIT', 1, 100_000);
+  const clientMetadataHourlyLimit = count(env, 'AB_OAUTH_CIMD_LIMIT', 1, 100_000);
+  const authorizeIpLimit = count(env, 'AB_OAUTH_AUTHORIZE_IP_LIMIT', 1, 100_000);
+  const authorizeLimit = count(env, 'AB_OAUTH_AUTHORIZE_LIMIT', 1, 100_000);
+  const consentIpLimit = count(env, 'AB_OAUTH_CONSENT_IP_LIMIT', 1, 100_000);
+  const consentLimit = count(env, 'AB_OAUTH_CONSENT_LIMIT', 1, 100_000);
+  const tokenFailureIpLimit = count(env, 'AB_OAUTH_TOKEN_FAILURE_IP_LIMIT', 1, 100_000);
+  const tokenFailureLimit = count(env, 'AB_OAUTH_TOKEN_FAILURE_LIMIT', 1, 100_000);
   if (flag !== 'on') return null;
   if (!publicUrl) {
     throw new OAuthConfigError(
@@ -169,5 +198,13 @@ export function oauthSettingsFromEnv(env: OAuthEnv, publicUrl: boolean): OAuthSe
     ...(registrationIpLimit === undefined ? {} : { registrationIpLimit }),
     ...(registrationRedirectHosts === undefined ? {} : { registrationRedirectHosts }),
     ...(registrationUnusedTtlSeconds === undefined ? {} : { registrationUnusedTtlSeconds }),
+    ...(registrationHourlyLimit === undefined ? {} : { registrationHourlyLimit }),
+    ...(clientMetadataHourlyLimit === undefined ? {} : { clientMetadataHourlyLimit }),
+    ...(authorizeIpLimit === undefined ? {} : { authorizeIpLimit }),
+    ...(authorizeLimit === undefined ? {} : { authorizeLimit }),
+    ...(consentIpLimit === undefined ? {} : { consentIpLimit }),
+    ...(consentLimit === undefined ? {} : { consentLimit }),
+    ...(tokenFailureIpLimit === undefined ? {} : { tokenFailureIpLimit }),
+    ...(tokenFailureLimit === undefined ? {} : { tokenFailureLimit }),
   };
 }

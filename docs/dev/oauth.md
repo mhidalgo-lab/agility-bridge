@@ -1,6 +1,6 @@
 # OAuth 2.1 server (developer guide)
 
-Status: P5-01 (server), P5-02 (resource metadata) and P5-04 (sign-in, consent, devices) built; **off by default**.
+Status: P5-01 (server), P5-02 (resource metadata), P5-03 (clients), P5-04 (sign-in, consent, devices) and P5-09 (abuse controls) built; **off by default**.
 `AB_OAUTH=on` needs `AB_PUBLIC_URL` and a sign-in provider ([D-60](../pending-decisions/phase-5.md), superseded). Decisions: [ADR-0009](../adr/0009-authentication.md); evidence:
 [spikes/oauth](../../spikes/oauth/RESULTS.md), [RESEARCH §4](../RESEARCH.md#4-oauth-21-for-mcp).
 
@@ -171,18 +171,64 @@ registration lives 24 h (`AB_OAUTH_DCR_UNUSED_TTL`); the first token exchange re
 
 **Cleanup hooks** (`HttpApp.oauthRegistrations`): `count()` (live dynamic registrations and stored documents) and
 `sweep()` (deletes unused registrations older than the unused lifetime now configured: lowering
-`AB_OAUTH_DCR_UNUSED_TTL` applies to existing ones). Expired rows are purged by the store's own housekeeping. P5-08 and
-P5-09 build admin lists and scheduled sweeps on these.
+`AB_OAUTH_DCR_UNUSED_TTL` applies to existing ones). Expired rows are purged by the hosts' housekeeping (see
+[Abuse controls](#abuse-controls-p5-09)). P5-08 builds the admin list on these.
 
 **Client names are untrusted text.** They are checked on the way in (length, no control, bidi, zero-width or separator
 characters, no Latin/Cyrillic/Greek mixed words) and still go through the escaping of every output path (P5-04 shows them
 on the consent screen, marked unverified for dynamic clients, with the vouching host for documents).
 
+## Abuse controls (P5-09)
+
+The unauthenticated endpoints are bounded by **one limiter design**: fixed-window counters in the shared `kv` table, taken
+with the store's atomic `increment` (`max`), so the count is exact and deployment-wide on every host (SQLite on Node, D1 on
+Workers) instead of per isolate (L-081). The general per-IP limiter (`beforeAuth`, P2-07) stays in front; these counters
+add what it cannot: a shared count, and limits that differ per surface (L-079). Code: `oauth/abuse.ts` (the guard),
+`runtime.guard()` (the route edge, wired in `app.ts`), the P5-03 caps (`server.ts`) and `oauth/housekeeping.ts`.
+
+| Surface | Counted | Per address | Deployment | Window |
+|---|---|---|---|---|
+| `GET /oauth/authorize` | every request, before any work | 30 (`AB_OAUTH_AUTHORIZE_IP_LIMIT`) | 600 (`AB_OAUTH_AUTHORIZE_LIMIT`) | 10 min |
+| `POST /oauth/consent` | every post, before the session or handle is read | 30 (`AB_OAUTH_CONSENT_IP_LIMIT`) | 300 (`AB_OAUTH_CONSENT_LIMIT`) | 10 min |
+| `POST /oauth/token` | **failed** exchanges (a `4xx` except `429`); a refused address is turned away before the code is read | 20 (`AB_OAUTH_TOKEN_FAILURE_IP_LIMIT`) | 300 (`AB_OAUTH_TOKEN_FAILURE_LIMIT`), only against addresses that already failed in the window | 10 min |
+| `POST /oauth/register` | per address (P5-03, 10) then **deployment registrations** (new) then live clients (P5-03, 200) | 10 (`AB_OAUTH_DCR_IP_LIMIT`) | 100 (`AB_OAUTH_DCR_LIMIT`) | 1 h |
+| CIMD fetches (cache misses) | per address (P5-03, 20) then **deployment fetches** (new) and the stored-document cap (200) | 20 (`AB_OAUTH_CIMD_FETCH_LIMIT`) | 200 (`AB_OAUTH_CIMD_LIMIT`) | 1 h |
+
+- **Order**: the address first, then the deployment (L-251). A flood from one address stops at its own limit and has taken
+  nothing from the deployment counter, so it cannot lock others out; only many addresses together can reach a deployment
+  cap (documented, T20; the knobs are the settings above, `AB_OAUTH_DCR=off` and an edge rule, P5-19).
+- **Token failures** are the one place the deployment limit does not apply to everybody: it only refuses addresses that
+  already have a failure in the window, so a client with a clean record is never locked out by someone else's failures
+  (D-73). Successful exchanges write no counter.
+- **Refusal**: `429`, `Retry-After` (seconds to the end of the window), the JSON `temporarily_unavailable` body the OAuth
+  routes already use, before any endpoint code: nothing is stored, fetched, read from Agility or consumed (a code
+  presented by a refused address stays valid for its holder). The first refusal per window, surface and scope writes one
+  `oauth.request.refused` row (`reason`, `surface`, `scope` `address` or `deployment`, `limit`) and one log line; counters
+  are keyed by a hash of the address and nothing logged or audited holds an address (T25).
+- **Cost on Workers** (D-27, L-097): a taken unit is one D1 row write; a refused `increment` writes nothing; the isolate
+  remembers which counters refused until their window ends (a hashed counter name and a time, no request data), and the
+  audit markers it has seen, so a flood costs about `limit + 1` writes per counter and window and no further query. Each
+  authorization request costs two writes, a failed token request two, a consent post two. When the counter store itself
+  fails the request goes on (fail open, logged, L-080): the request limiter and the storage the request needs anyway are
+  still in front of it.
+- **Windows are fixed**, so a client can use a limit twice around a boundary (at most twice the limit in any ten minutes).
+  The counters expire with their window plus the audit markers' extra window; `purgeExpired` reclaims them (D-72).
+- **Rows after a flood**: at most one counter per address and surface per window, plus one deployment counter per
+  surface; stored clients and documents are bounded by their caps; nothing is stored for a refused request. The number of
+  distinct addresses is bounded by the general limiter and the address space, and the rows are gone after their window.
+
+**Housekeeping.** Expired rows (counters, markers, sessions, provider records) are only ever removed by a job. The Worker's
+cron already ran `kv.purgeExpired` (1,000 per run); it now also sweeps unused dynamic registrations, 20 per run, resuming
+from a cursor row (`oauth-sweep-cursor`), because a run has 50 D1 queries on the Free plan. `agility-bridge serve` had no
+purge job: it now runs one at start and hourly (up to 20,000 rows per run) together with the full registration sweep
+(`scheduleStorageHousekeeping`). Both call `sweepRegistrations(storage, …)`, which needs only the storage, so the OAuth
+runtime is not involved. Stored document clients expire by their own TTL (5 min to 24 h) and are reclaimed by the purge.
+
 ## Audit
 
 `auth` rows: `oauth.authorize` (ok or denied, with the deny reason; a deny names the person), `oauth.token.issued`,
 `oauth.token.refused`, `oauth.token.revoked`, `oauth.code.replayed`, `oauth.device.replaced`, `oauth.device.revoke`, and for clients `oauth.client.registered`, `oauth.client.fetched`, `oauth.client.refused` (kind, host, limit, stable reason; never a document);
-`admin` rows: `oauth.consent.refused` (the handle and grant refusals above); the device is `oauth_<provider grant id>` in `token_id`, the client in
+`admin` rows: `oauth.consent.refused` (the handle and grant refusals above); `auth` rows `oauth.request.refused` (P5-09: a limit was reached; reason, surface, scope and limit, once per window, never an address); the device is `oauth_<provider grant id>` in `token_id`, the client in
 `client_id`. Tool-call rows of OAuth requests carry the same two ids.
 
 ## Plugging in the other tasks
@@ -192,10 +238,18 @@ on the consent screen, marked unverified for dynamic clients, with the vouching 
 - **P5-04** (built) supplies the consent handler and lifts the `AB_OAUTH=on` refusal; `oauthConsent` on
   `parseServerSettings`/`assembleServer` is now only a test stand-in.
 - **P5-05** builds refresh families and the reuse window over the provider's one-generation rule (D-63).
-- **P5-08** adds the administrator views (all users' devices, registered clients) over the same grants; **P5-09** adds per-surface limits (today only the general
-  per-IP `beforeAuth` limit applies).
+- **P5-08** adds the administrator views (all users' devices, registered clients) over the same grants.
+- **P5-09** (done, see [Abuse controls](#abuse-controls-p5-09)): per-surface limits, the sweep schedule and the flood tests.
 
 ## Testing
+
+Abuse controls (P5-09) have a third shared suite (`abuse-suite.ts`) on the same three hosts, with the default limits: a
+flood of one address per endpoint (authorize, token failures, registration, document fetches) must stay within the
+stored-row and outbound-fetch budget, answer `429` with `Retry-After`, be audited once, and leave another address and the
+legitimate client untouched. `abuse.test.ts` adds what needs a moving clock and small limits (windows, both caps, the
+audit once per window, fail-open, no storage write for a remembered refusal, the sweeps, the settings),
+`abuse-consent.test.ts` the consent post on the built-in screen, and `apps/worker/test/scheduled-oauth.test.ts` the cron's
+bounded sweep. A host picks the caller's address with a header (`OAuthHost.address`).
 
 Client registration (P5-03) has a second shared suite (`clients-suite.ts`) on the same three hosts, with a fake origin of
 metadata documents (`documents.ts`: injected fetcher on Node, Miniflare `outboundService` in workerd, so nothing touches

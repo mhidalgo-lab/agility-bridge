@@ -15,6 +15,8 @@ export async function memoryHost(
   const w = await world(
     {
       publicUrl: ORIGIN,
+      // Tests choose the client address with a header (P5-09); no header = one shared address.
+      clientIp: (c) => c.req.header('x-test-ip') ?? 'unknown',
       accessCacheTtlSeconds: shape.cache === true ? 30 : 0,
       oauth: { consent: testConsent, clientMetadataFetch: documents.fetcher, ...(shape.oauth ?? {}) },
       // The Workers shape (L-096): per-request isolation, linear routers, a detached audit writer.
@@ -57,6 +59,7 @@ export async function memoryHost(
     },
     agilityRequests: () => w.agilityTokens.length,
     logs: () => w.logs,
+    address: (ip) => ({ 'x-test-ip': ip }),
     advance: (ms) => vi.setSystemTime(Date.now() + ms),
     close: async () => {
       await w.audit.flush();

@@ -53,6 +53,8 @@ export interface OAuthHost {
   readonly documents: FakeDocuments;
   /** The app's registration hooks (in-process hosts only). */
   readonly registrations?: OAuthRegistrations;
+  /** The request headers that make the caller look like this client address (how each host reads it). */
+  address(ip: string): Record<string, string>;
   /** Moves time (Node hosts, in process); absent in workerd. */
   advance?(ms: number): void;
   close(): Promise<void>;

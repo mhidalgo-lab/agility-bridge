@@ -73,6 +73,10 @@ carry `requestId`.
 | warn | `oauth registration per-address limit reached` | `limit` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | warn | `oauth registration cap reached` | `limit` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | warn | `oauth metadata document client cap reached` | `limit` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| warn | `oauth limit reached` | `surface`, `scope` (`address` or `deployment`), `limit`; first refusal per window only; never the address | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| warn | `oauth abuse limiter failed; allowing the request` | `surface`, `error` (class) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| info | `storage housekeeping` | `expiredRows`, `registrationsSwept` | [housekeeping.ts](../../packages/http-app/src/oauth/housekeeping.ts) |
+| error | `storage housekeeping failed` | `error` (class) | [housekeeping.ts](../../packages/http-app/src/oauth/housekeeping.ts) |
 | warn | `OAuth client metadata documents are off: the global_fetch_strictly_public compatibility flag is not set. Dynamic registration still works.` | none (Worker start) | [boot.ts](../../apps/worker/src/boot.ts) |
 | error | `audit write failed` | `action`, `error` (class) | [audit.ts](../../packages/http-app/src/audit.ts) |
 | error | `audit queue full; rows dropped` | `dropped` | [audit.ts](../../packages/http-app/src/audit.ts) |

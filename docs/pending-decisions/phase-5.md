@@ -102,3 +102,28 @@
 - **Recommendation:** (a) now, as relic-bridge; P5-06 (client matrix) decides whether a client we want needs (b), and then
   P5-04's consent screen must show the scheme.
 - **Owner:** _pending_ (implemented as (a)).
+
+### D-72 — OAuth abuse counters are fixed windows in the shared `kv` table, and fail open *(P5-09)*
+- **Context:** the limits must be exact across Worker isolates and replicas (L-081) and cheap on D1's Free plan (L-097),
+  and P5-03 already counts registrations and fetches with `kv.increment` and `max`. The general per-IP limiter is a token
+  bucket per isolate.
+- **Options:** (a) fixed-window counters in `kv` for every OAuth surface (one design, atomic, no new table), with the
+  isolate remembering refused counters and audit markers, failing open when the store errors; (b) a Durable Object limiter
+  (exact, billed per call, new binding); (c) token buckets in `kv` (read-modify-write, not atomic on D1, or a CAS loop);
+  (d) fail closed when the counter store is down.
+- **Recommendation:** (a). Fixed windows allow up to twice a limit around a boundary, which these limits (abuse, not
+  quotas) tolerate; (d) would turn a D1 hiccup into a sign-in outage when the request needs the same storage anyway.
+  Windows are 10 minutes for the interactive endpoints and an hour for registration and fetches.
+- **Owner:** _pending_ (implemented as (a)).
+
+### D-73 — Defaults and the shape of the deployment-wide caps *(P5-09)*
+- **Context:** every deployment-wide cap can be reached by many addresses together and then refuses honest users until the
+  window ends. The defaults trade that risk against the cost of a flood (D1 writes on Free, outbound fetches, rows).
+- **Options:** (a) per address 30 authorize / 30 consent / 20 token failures per 10 minutes; deployment 600 / 300 / 300;
+  100 registrations and 200 fetches per hour; the token-failure deployment cap refuses only addresses that already
+  failed; (b) per-address limits only, no deployment caps (a botnet is then bounded only by the edge); (c) stricter
+  defaults (10 / 10 / 5).
+- **Recommendation:** (a). Real use is a few authorizations per person per day, so the address limits leave room for a
+  shared office address (a 10-person team connecting at once is well within 30 per ten minutes) while the deployment caps stop
+  sustained floods at a bounded number of writes. Raise `AB_OAUTH_*_LIMIT` for a large organisation behind one address.
+- **Owner:** _pending_ (implemented as (a)).
