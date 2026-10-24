@@ -2,7 +2,7 @@
 id: P5-09
 title: Abuse controls for unauthenticated endpoints
 phase: 5
-status: review
+status: done
 priority: medium
 depends_on: [P5-03]
 adr: ["0010"]
