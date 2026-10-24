@@ -4,7 +4,7 @@
 import { createIdentityProviders, EMPTY_LOGIN_POLICY, type ToolInfo } from '@agility-bridge/auth';
 import { Secret } from '@agility-bridge/core';
 import { type FakeOidc, fakeOidc, route } from '../../../auth/test/helpers/fake-idp.ts';
-import { ADMIN_BASE, type SessionOptions } from '../../src/index.ts';
+import { ADMIN_BASE, type OAuthOptions, type SessionOptions } from '../../src/index.ts';
 import { type World, world } from './world.ts';
 
 export const MIN = 60_000;
@@ -20,6 +20,8 @@ export interface Opts {
   tools?: ReadonlyMap<string, ToolInfo>;
   /** Validate stored tokens against the fake Agility (P4-07); `reject` picks tokens it answers 401 for. */
   validate?: { reject?: (token: string) => boolean };
+  /** The OAuth server with the built-in consent screen (P5-04; the provider reads the real clock, L-243). */
+  oauth?: OAuthOptions;
 }
 
 export async function setup(options: Opts = {}) {
@@ -57,9 +59,11 @@ export async function setup(options: Opts = {}) {
       ...(options.allowedOrigins === undefined ? {} : { allowedOrigins: options.allowedOrigins }),
       ...(options.session === undefined ? {} : { session: options.session }),
       ...(options.isolation === undefined ? {} : { isolation: options.isolation }),
+      ...(options.oauth === undefined ? {} : { oauth: options.oauth }),
     },
     {
       admin: true,
+      ...(options.oauth === undefined ? {} : { liveClock: true }),
       ...(options.tools === undefined ? {} : { tools: options.tools }),
       ...(options.validate === undefined ? {} : { validate: options.validate }),
     },

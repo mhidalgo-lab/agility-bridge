@@ -143,10 +143,17 @@ describe('AB_OAUTH settings', () => {
       expect((error as Error).message).toContain('AB_OAUTH_ACCESS_TTL');
       expect((error as Error).message).not.toContain(secretish);
     }
-    // No host has a consent screen yet: on is refused; with one it parses.
+    // The built-in consent screen signs people in: `on` without a provider is refused, unless a stand-in is injected.
     const on = { AB_OAUTH: 'on', AB_PUBLIC_URL: 'https://mcp.example.com' };
-    expect(() => parseServerSettings(on, defaults)).toThrow(/consent screen/);
+    expect(() => parseServerSettings(on, defaults)).toThrow(/needs sign-in/);
     expect(parseServerSettings(on, defaults, { oauthConsent: true }).oauth).toEqual({});
+    const withLogin = {
+      ...on,
+      AB_OIDC_ISSUER: 'https://login.example.test',
+      AB_OIDC_CLIENT_ID: 'client',
+      AB_OIDC_CLIENT_SECRET: 'not-a-real-secret-value',
+    };
+    expect(parseServerSettings(withLogin, defaults).oauth).toEqual({});
     expect(parseServerSettings({}, defaults, { oauthConsent: true }).oauth).toBeUndefined();
   });
 });

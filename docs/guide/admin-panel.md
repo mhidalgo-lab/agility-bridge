@@ -143,6 +143,10 @@ owner or an admin sees the same pages, not other people's, and manages other peo
 - **My devices**: device tokens on the grant (up to 20 live ones): issue one per device (shown once), revoke one.
 - **Connect a client** (on the grant, also for owners and admins on any grant): the endpoint of the workspace and a copy-paste
   configuration for each client, see [Connect a client](#connect-a-client).
+- **Connected apps** (only when [OAuth](oauth-phone.md) is on): the apps you allowed on the consent screen, with the
+  name the app gave itself (not verified), the device name you typed, the workspace, where it sends its answers, when you
+  connected it and when its access ends. **Disconnect** ends that app's access and refresh tokens at once; **Disconnect
+  all apps** does it for every one. You see and disconnect only your own; administrators do not see these yet.
 - **My recent changes**: your own last administrative changes (what and when, never a secret).
 
 ### Connect a client

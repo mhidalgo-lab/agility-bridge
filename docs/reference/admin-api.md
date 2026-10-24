@@ -70,6 +70,9 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 |---|---|---|---|---|
 | `GET` | `/me/grants` | My grants, each with its workspace (any signed-in role) | — | 200 MyGrant[] |
 | `POST` | `/me/grants/{id}/credential` | Use one of my own valid personal Agility tokens on my grant, or (null) go back to the workspace default | `credentialId`: string \| null | 200 object |
+| `GET` | `/me/oauth-devices` | The apps I connected with OAuth, newest first (any signed-in role; 404 when OAuth is off) | — | 200 OAuthDevice[] |
+| `POST` | `/me/oauth-devices/revoke-all` | Disconnect every app I connected with OAuth: their access and refresh tokens stop working at once | — | 200 object |
+| `POST` | `/me/oauth-devices/{id}/revoke` | Disconnect one of my apps: its access and refresh tokens stop working at once (another person's device answers 404) | — | 200 object |
 | `GET` | `/me/audit` | My recent administrative changes (newest first, at most 50) | — | 200 AuditEntry[] |
 
 ## session
@@ -128,6 +131,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 - **Instance**: `id`: string, `label`: string, `baseUrl`: string, `tls`: object \| null, `numberPrefixes`: object \| null, `metaFingerprint`: string \| null, `createdAt`: number, `updatedAt`: number, `disabledAt`: number \| null
 - **KeyVersion**: `version`: number, `credentials`: number, `loaded`: boolean, `current`: boolean, `retired`: boolean
 - **MyGrant**: `grant`: Grant, `workspace`: object \| null
+- **OAuthDevice**: `id`: string, `clientName`: string \| null, `redirectHost`: string, `workspaceId`: string \| null, `workspaceName`: string \| null, `workspaceSlug`: string \| null, `label`: string \| null, `createdAt`: number, `expiresAt`: number \| null
 - **Session**: `actor`: "session" \| "break_glass" \| "user", `user`: object \| null, `recentAuth`: boolean, `signedInAt`: number \| null, `idleExpiresAt`: number \| null, `expiresAt`: number \| null, `csrfToken`: string \| null
 - **SetupLink**: `id`: string, `url`: string, `expiresAt`: number
 - **Tool**: `name`: string, `kind`: "read" \| "write" \| "destructive", `group`: string

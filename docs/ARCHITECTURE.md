@@ -479,7 +479,7 @@ validate input + metadata (operation allowed, attributes writable, values typed)
 | `AB_AUDIT_RETENTION_DAYS` | `90` | `0` keeps forever |
 | `AB_RATE_LIMIT`, `AB_RATE_LIMIT_IP_PER_MINUTE`, `…_AUTH_FAILURES`, `…_TOKEN_PER_MINUTE`, `…_GRANT_PER_MINUTE` | `on`, 600, 10 per 5 min, 120, 300 | edge rate limits (P2-07, [configuration](guide/configuration.md#rate-limits)) |
 | `AB_PASSTHROUGH` | `off` | enable mode E |
-| `AB_OAUTH` | `off` | enable OAuth 2.1 (Phase 5; `on` needs `AB_PUBLIC_URL` and, until P5-04, is refused: no consent screen yet) |
+| `AB_OAUTH` | `off` | enable OAuth 2.1 (Phase 5; `on` needs `AB_PUBLIC_URL` and sign-in: the consent screen signs the person in, P5-04) |
 | `AB_OAUTH_ACCESS_TTL` / `AB_OAUTH_REFRESH_TTL` | `1h` / `30d` | OAuth token lifetimes (60 s-24 h / 1 h-365 d) |
 | `AB_PLAN` | `free` | Workers presets: `free` \| `paid` |
 | `AB_LIVE_AGILITY_URL`, `AB_LIVE_AGILITY_TOKEN`, `AB_LIVE_SCOPE` | unset | live test suite only |

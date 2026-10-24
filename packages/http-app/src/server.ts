@@ -82,9 +82,8 @@ export const SERVER_SETTING_NAMES: readonly string[] = Object.freeze([
 ]);
 
 /**
- * What the host brings that some settings need. `oauthConsent`: the host has the consent screen OAuth needs to approve a
- * client (P5-04). No host has it yet, so `AB_OAUTH=on` is refused at start: a server nobody can authorize against is
- * worse than an off switch.
+ * What the host brings that some settings need. `oauthConsent`: the host injects its own consent step (tests). Without
+ * one, `AB_OAUTH=on` uses the built-in consent screen (P5-04), which needs sign-in: people approve apps with a session.
  */
 export interface HostFeatures {
   readonly oauthConsent?: boolean;
@@ -196,11 +195,6 @@ export function parseServerSettings(
     if (error instanceof OAuthConfigError) throw new SettingsError(error.message);
     throw error;
   }
-  if (oauth !== null && features.oauthConsent !== true) {
-    throw new SettingsError(
-      'AB_OAUTH=on is not available yet: people approve apps on a consent screen that arrives with task P5-04.',
-    );
-  }
   let identity: IdentitySettings | null;
   try {
     identity = identitySettingsFromEnv(env);
@@ -208,6 +202,12 @@ export function parseServerSettings(
     // The message names the variable, never its value.
     if (error instanceof IdentityConfigError) throw new SettingsError(error.message);
     throw error;
+  }
+  // The consent screen signs people in to approve an app: without a sign-in provider there is nobody to approve.
+  if (oauth !== null && identity === null && features.oauthConsent !== true) {
+    throw new SettingsError(
+      'AB_OAUTH=on needs sign-in (an identity provider: AB_GOOGLE_*, AB_GITHUB_*, AB_OIDC_*): people approve apps on a consent screen after signing in.',
+    );
   }
   return {
     ...(publicUrl === undefined ? {} : { publicUrl }),
@@ -390,7 +390,7 @@ export interface ServerParts {
   readonly checkInstanceHost?: (hostname: string) => Promise<void>;
   /** The tool registry built once (Workers: at module scope, P3-14). */
   readonly registry?: ToolRegistry;
-  /** The interactive step of `/oauth/authorize` (P5-04). Needed when `settings.oauth` is set. */
+  /** A stand-in for the interactive step of `/oauth/authorize` (tests); default: the built-in consent screen (P5-04). */
   readonly oauthConsent?: OAuthConsentHandler;
 }
 
@@ -423,8 +423,10 @@ export function assembleServer(parts: ServerParts): AssembledServer {
       ...(parts.checkInstanceHost === undefined ? {} : { checkHost: parts.checkInstanceHost }),
     },
   });
-  if (settings.oauth !== undefined && parts.oauthConsent === undefined) {
-    throw new SettingsError('AB_OAUTH=on needs the consent screen, which this host does not have.');
+  if (settings.oauth !== undefined && parts.oauthConsent === undefined && settings.identity === undefined) {
+    throw new SettingsError(
+      'AB_OAUTH=on needs sign-in: people approve apps on a consent screen after signing in.',
+    );
   }
   const authErrors = revalidateOnAuthErrors(services, logger, () => host.clock.now());
   const app = createHttpApp({
@@ -480,12 +482,12 @@ export function assembleServer(parts: ServerParts): AssembledServer {
             auditAdmin: (change) => audit.admin(change),
           },
         }),
-    ...(settings.oauth === undefined || parts.oauthConsent === undefined
+    ...(settings.oauth === undefined
       ? {}
       : {
           oauth: {
             ...settings.oauth,
-            consent: parts.oauthConsent,
+            ...(parts.oauthConsent === undefined ? {} : { consent: parts.oauthConsent }),
             audit: (event) => audit.oauth(event),
           },
         }),

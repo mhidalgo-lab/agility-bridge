@@ -35,6 +35,14 @@ export {
   type UiViewer,
 } from './components.tsx';
 export {
+  CONSENT_FIELDS,
+  CONSENT_LABEL_MAX,
+  type ConsentClient,
+  type ConsentGrantOption,
+  ConsentPage,
+  type ConsentPageProps,
+} from './consent.tsx';
+export {
   clearFlashCookie,
   FLASH_MESSAGES,
   type FlashCode,
@@ -45,6 +53,8 @@ export {
   readFlash,
 } from './flash.ts';
 export {
+  consentCsp,
+  formActionSource,
   isUiCsp,
   PERMISSIONS_POLICY,
   UI_CSP,

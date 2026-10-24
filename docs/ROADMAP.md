@@ -242,6 +242,8 @@ Status lives in each task file.
 | P5-08 | [Admin: connected apps and devices](tasks/phase-5-oauth/P5-08-admin-oauth-apps.md) | medium | P5-05 | todo |
 | P5-09 | [Abuse controls for unauthenticated endpoints](tasks/phase-5-oauth/P5-09-oauth-abuse-controls.md) | medium | P5-03 | todo |
 | P5-10 | [Phase 5 review](tasks/phase-5-oauth/P5-10-phase-5-review.md) | high | P5-07, P5-08, P5-09 | todo |
+| P5-13 | [Remembered read consent (opt-in)](tasks/phase-5-oauth/P5-13-remembered-consent.md) | low | P5-04, P5-05 | todo |
+| P5-14 | [Device last-used time and idle expiry](tasks/phase-5-oauth/P5-14-device-last-used.md) | low | P5-04, P5-05 | todo |
 
 ### Phase 6
 

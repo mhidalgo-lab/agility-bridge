@@ -1160,13 +1160,14 @@ export function defineOAuthSuite(name: string, makeHost: () => Promise<OAuthHost
       expect(live).toContain(await sha256(rotated.refresh_token));
       expect(live).toContain(`oauth:grant:${first.access_token.split(':')[0]}:`);
       // Grant properties (workspace, access grant, user, client) are encrypted: none of their ids is stored in clear
-      // text in a token or grant record, except what the grant metadata says on purpose (the opaque access grant id).
+      // text in a token or grant record, except what the grant metadata says on purpose (the opaque access grant and
+      // workspace ids and the device name, P5-04: the list of connected apps needs them without the token).
       const grantRows = live
         .split('\n')
         .filter((line) => line.startsWith('oauth:grant:') || line.startsWith('oauth:token:'));
       expect(grantRows.length).toBeGreaterThanOrEqual(2);
       for (const line of grantRows) {
-        expect(line).not.toContain(h.ids.workspaceA);
+        expect(line.replaceAll(/"metadata":\{[^}]*\}/g, '')).not.toContain(h.ids.workspaceA);
         expect(line).not.toContain('"workspaceSlug"');
         expect(line).not.toContain('"props"');
       }
