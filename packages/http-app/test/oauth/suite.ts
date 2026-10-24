@@ -1455,6 +1455,25 @@ export function defineRefreshFamilySuite(
       expect((await reuseRows(h)).length).toBe(1);
     });
 
+    it('the failed-exchange counter (P5-09) counts a revoking reuse, not a repeat the window answered', async () => {
+      const h = await hostWith(30);
+      if (h.advance === undefined) return;
+      const failures = async (): Promise<number> =>
+        (await h.storage.kv.list('oauth-abuse:token_failure:', { limit: 1000 })).length;
+      const { tokens, client } = await connectWorkspace(h);
+      const first = await rotate(h, client, tokens.refresh_token as string);
+      const before = await failures();
+      // The repeat inside the window answers 200 (the route guard ran first and let it through): no failure counted.
+      expect((await rotate(h, client, tokens.refresh_token as string)).refresh_token).toBe(
+        first.refresh_token,
+      );
+      expect(await failures()).toBe(before);
+      // After the window the repeat is a 400 and the revocation counts as a failure (the address and the deployment).
+      h.advance(31_000);
+      expect((await refresh(h, client, tokens.refresh_token as string)).status).toBe(400);
+      expect(await failures()).toBe(before + 2);
+    });
+
     it('window 0 is strict single use: the second use of a spent token revokes the device', async () => {
       const h = await hostWith(0);
       const { tokens, client } = await connectWorkspace(h);
