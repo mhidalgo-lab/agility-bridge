@@ -33,7 +33,7 @@ How to use it:
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-252, L-256 – L-258 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-258 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -844,6 +844,29 @@ that one target is answered by a same-origin page that navigates (`Refresh` and 
 The edge keeps a panel CSP only when it is the panel policy plus exactly one such source. A browser test catches this; a unit
 test of the header does not.
 *Applied in:* P5-04 (relic-bridge P5-12/L8).
+
+**L-253 — Rotation has one spender: claim, re-check, then rotate; the others wait and share the result.**
+Parallel refreshes with one token must not each call the library: it would mint one successor per call and keep only the
+last (L-164). A per-token atomic claim (`setIfAbsent`) lets one request rotate; the others poll for the recorded result and
+answer with the same successor. Re-read the "already rotated" marker **after** winning the claim (a request can finish
+between the read and the claim), write the sealed answer before the marker, release the claim only afterwards, and let a
+failed rotation release it so a waiter can take its turn. Test it with parallel requests, not with two in a row.
+*Applied in:* P5-05.
+
+**L-254 — Answering from storage instead of the library inherits every check the library would have made.**
+The reuse window's repeat never reaches the provider's refresh handler, so client authentication (a wrong secret), the
+client and resource binding, scope, the access decision and revocation all have to be redone on that path. The provider
+authenticates clients before it dispatches the grant, so a probe request carrying a token that cannot be real gets exactly
+that check without rotating anything; the rest is compared against what the sealed answer was issued for. Every negative
+test of the normal path needs a twin on the shortcut.
+*Applied in:* P5-05.
+
+**L-255 — A key derived from the secret that may read the data needs no key storage.**
+A transient answer meant for the holder of one specific token (the refresh successor) can be sealed under HKDF of that
+token, bound to the row by the token's hash. A copy of the database holds nothing that opens it, there is no key to keep
+away from the data (L-074), rotate or lose, and no per-request key fetch on Workers. Use a master-key purpose when someone
+other than the token's holder must read the value later.
+*Applied in:* P5-05 (D-70).
 
 ## K. Admin UI
 

@@ -12,7 +12,12 @@ import { defineOAuthAbuseSuite } from '../../../packages/http-app/test/oauth/abu
 import { defineOAuthClientSuite } from '../../../packages/http-app/test/oauth/clients-suite.ts';
 import { testConsent } from '../../../packages/http-app/test/oauth/consent.ts';
 import { createFakeDocuments } from '../../../packages/http-app/test/oauth/documents.ts';
-import { defineOAuthSuite, type OAuthHost } from '../../../packages/http-app/test/oauth/suite.ts';
+import {
+  defineOAuthSuite,
+  defineRefreshFamilySuite,
+  type OAuthHost,
+  type RefreshHostShape,
+} from '../../../packages/http-app/test/oauth/suite.ts';
 import { type FixtureAgility, startFixtureAgility } from '../../../scripts/fixture-agility.ts';
 import { ConfigError } from '../src/config.ts';
 import { loadServeConfig, startServe } from '../src/serve.ts';
@@ -24,7 +29,7 @@ beforeAll(async () => {
 });
 afterAll(() => agility.close());
 
-async function sqliteHost(): Promise<OAuthHost> {
+async function sqliteHost(shape?: RefreshHostShape): Promise<OAuthHost> {
   const dir = mkdtempSync(join(tmpdir(), 'ab-oauth-'));
   const key = generateMasterKey(1);
   writeFileSync(join(dir, 'master.key'), key, { mode: 0o600 });
@@ -37,6 +42,7 @@ async function sqliteHost(): Promise<OAuthHost> {
       AB_PORT: '0',
       AB_PUBLIC_URL: ORIGIN,
       AB_OAUTH: 'on',
+      ...(shape === undefined ? {} : { AB_OAUTH_REFRESH_REUSE_WINDOW: String(shape.reuseWindowSeconds) }),
       AB_ACCESS_CACHE_TTL: '0',
       AB_ALLOW_HTTP_INSTANCES: 'on',
       AB_ENVIRONMENT: 'production',
@@ -135,7 +141,8 @@ async function sqliteHost(): Promise<OAuthHost> {
   };
 }
 
-defineOAuthSuite('SQLite storage (agility-bridge serve)', sqliteHost);
+defineOAuthSuite('SQLite storage (agility-bridge serve)', () => sqliteHost());
+defineRefreshFamilySuite('SQLite storage (agility-bridge serve)', sqliteHost);
 defineOAuthClientSuite('SQLite storage (agility-bridge serve)', sqliteHost);
 defineOAuthAbuseSuite('SQLite storage (agility-bridge serve)', sqliteHost);
 
@@ -158,10 +165,20 @@ describe('OAuth settings on the shipped host', () => {
     );
     expect(
       loadServeConfig(
-        { AB_OAUTH: 'on', AB_PUBLIC_URL: ORIGIN, AB_OAUTH_ACCESS_TTL: '30m', AB_OAUTH_REFRESH_TTL: '7d' },
+        {
+          AB_OAUTH: 'on',
+          AB_PUBLIC_URL: ORIGIN,
+          AB_OAUTH_ACCESS_TTL: '30m',
+          AB_OAUTH_REFRESH_TTL: '7d',
+          AB_OAUTH_REFRESH_REUSE_WINDOW: '10',
+        },
         { oauthConsent: true },
       ).oauth,
-    ).toEqual({ accessTokenTtlSeconds: 1800, refreshTokenTtlSeconds: 604_800 });
+    ).toEqual({
+      accessTokenTtlSeconds: 1800,
+      refreshTokenTtlSeconds: 604_800,
+      refreshReuseWindowSeconds: 10,
+    });
   });
 
   it('checks the values, and needs AB_PUBLIC_URL (the issuer)', () => {
@@ -175,6 +192,8 @@ describe('OAuth settings on the shipped host', () => {
       { ...on, AB_OAUTH_REFRESH_TTL: '30m' },
       { ...on, AB_OAUTH_REFRESH_TTL: '400d' },
       { ...on, AB_OAUTH_REFRESH_TTL: 'soon' },
+      { ...on, AB_OAUTH_REFRESH_REUSE_WINDOW: '121' },
+      { ...on, AB_OAUTH_REFRESH_REUSE_WINDOW: 'never' },
       { ...on, AB_OAUTH_ACCESS_TTL: '12h', AB_OAUTH_REFRESH_TTL: '2h' },
     ]) {
       expect(() => loadServeConfig(bad, features), JSON.stringify(bad)).toThrow(ConfigError);

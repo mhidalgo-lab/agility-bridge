@@ -1,6 +1,6 @@
 # OAuth 2.1 server (developer guide)
 
-Status: P5-01 (server), P5-02 (resource metadata), P5-03 (clients), P5-04 (sign-in, consent, devices) and P5-09 (abuse controls) built; **off by default**.
+Status: P5-01 (server), P5-02 (resource metadata), P5-03 (clients), P5-04 (sign-in, consent, devices), P5-05 (token lifecycle) and P5-09 (abuse controls) built; **off by default**.
 `AB_OAUTH=on` needs `AB_PUBLIC_URL` and a sign-in provider ([D-60](../pending-decisions/phase-5.md), superseded). Decisions: [ADR-0009](../adr/0009-authentication.md); evidence:
 [spikes/oauth](../../spikes/oauth/RESULTS.md), [RESEARCH §4](../RESEARCH.md#4-oauth-21-for-mcp).
 
@@ -38,6 +38,9 @@ to the shim (the provider uses `WorkerEntrypoint` for `instanceof` only), Worker
 | `oauth:token:<user>:<grant>:<sha256>` | access-token record | hash only |
 | `oauth-code:<sha256(code)>` | single-use marker, 10 min | hash only |
 | `oauth-revoked:<user>:<grant>` | tombstone of a revoked device (refresh lifetime) | none |
+| `oauth-rotated:<sha256(spent refresh token)>` | rotation marker `{"at": ms}`: the token was spent (P5-05); kept for the refresh lifetime so a late replay is recognised | none (a hash of a spent token and a time) |
+| `oauth-successor:<sha256(spent refresh token)>` | the answer the spent token got (new access and refresh token, expiry, scope, resource, client), **sealed**; kept for the reuse window only | AES-GCM under a key derived from the spent token (D-70) |
+| `oauth-refresh-claim:<sha256(refresh token)>` | the request that is spending this token, 15 s | none |
 | `oauth-consent:<user>:<expiry>-<random>` | consent form handle, 15 min: the SHA-256 of the exact authorization request the page showed | none (a hash of public request values) |
 
 Tokens are `<user id>:<grant id>:<secret>` (user id is ours, `usr_…`; no email anywhere, T25). Props are
@@ -68,6 +71,45 @@ Tests scan `kv`, audit rows, logs and a SQLite file copy for codes, tokens and v
   resource_metadata="…", scope="mcp:read"`; no `error=`, for device tokens and OAuth tokens alike); OAuth off keeps the
   plain `Bearer`. Both are built from the configured public URL. The document is under the app-wide `no-store` policy
   and the per-IP `beforeAuth` limit (D-65).
+## Refresh tokens (P5-05, D-63, D-70)
+
+`refreshGrant` (`oauth/server.ts`; the seal and the client-id reader are `oauth/refresh-family.ts`) wraps the token
+endpoint's `refresh_token` grant for every token of our shape; anything else is the provider's to refuse.
+
+```
+refresh(R) ─▶ tombstone of the device?  yes ▶ invalid_grant (and revoke again)
+           ─▶ marker oauth-rotated:<h(R)> present?
+                no  ▶ claim oauth-refresh-claim:<h(R)> (setIfAbsent) ─▶ won: re-read the marker, then the provider rotates
+                      (the provider's issuance check re-runs the access decision), tombstone re-checked, THEN the sealed
+                      successor is written, THEN the marker, then the claim is released
+                      ─▶ lost: poll for the marker (10-250 ms, about 40 times), then answer as "present"; a released claim
+                         with no marker (the winner failed) lets the next request take its turn; none left: 503
+                yes ▶ age < window?  no ▶ REUSE: revoke the device (tombstone, grant, tokens), `oauth.refresh.reuse`, invalid_grant
+                                     yes ▶ open the sealed successor with R, check the device is still there, authenticate
+                                           the client (probe), client id, resource, scope, grant expiry, access decision,
+                                           answer with the same tokens (`expires_in` recomputed)
+```
+
+- **One rotation per token.** The provider mints a successor per call and keeps only the last (L-164), so the claim, the
+  re-read after winning it and the write order (sealed answer, marker, release) are what make parallel refreshes
+  converge on one successor (L-253). A claim lives 15 s; a rotation slower than that could double-rotate (the later
+  successor would orphan the earlier one and the client would reconnect: bounded, never a leak).
+- **The provider's "previous token works once" rule is never reached** for a token we saw spent: its marker answers first.
+  A token whose rotation was not recorded (the process died between the provider's write and ours) is still the
+  provider's previous token and rotates once more.
+- **The replay path does not reach the provider's grant handler**, so it redoes what that handler would: the client is
+  authenticated by a probe (the same request with a refresh token that cannot be real: the provider authenticates the
+  client first and answers `invalid_grant` when that worked, `invalid_client` otherwise) and its id (Basic header, else
+  `client_id`; assertions are refused) must be the one the successor was issued to; `resource` must be the grant's;
+  `scope` must grant something; the grant must exist and not be about to expire; the access decision runs again on the
+  grant's decrypted props (`unwrapToken` of the successor's access token) and a refusal revokes the device like at issuance (L-254).
+- **Reuse** is any repeat with no sealed successor left, i.e. after the window, or at window 0. It revokes the device and
+  clears the access cache. Only a token whose hash has a marker can cause it: a forged secret for a real device is the
+  provider's `invalid_grant` and costs nothing.
+- **The seal** is AES-256-GCM, key = HKDF-SHA-256 of the spent refresh token, info and AAD = its hash; the database holds
+  nothing that opens it (D-70, L-255). It is deleted by expiry after the window; markers expire after the refresh lifetime.
+- Settings: `AB_OAUTH_REFRESH_REUSE_WINDOW` (`refreshReuseWindowSeconds`, 0-120, not above the access lifetime).
+
 - No write scope yet: tokens carry `mcp:read` (+ `offline_access`); the `oauth` principal's `writeScope` is false.
 
 ## Sign-in and consent (P5-04)
@@ -227,7 +269,9 @@ runtime is not involved. Stored document clients expire by their own TTL (5 min 
 ## Audit
 
 `auth` rows: `oauth.authorize` (ok or denied, with the deny reason; a deny names the person), `oauth.token.issued`,
-`oauth.token.refused`, `oauth.token.revoked`, `oauth.code.replayed`, `oauth.device.replaced`, `oauth.device.revoke`, and for clients `oauth.client.registered`, `oauth.client.fetched`, `oauth.client.refused` (kind, host, limit, stable reason; never a document);
+`oauth.token.refused`, `oauth.token.revoked`, `oauth.code.replayed`, `oauth.refresh.reuse` (a spent refresh token reused after
+the window: the device was revoked; `details` carry the window, never a token), `oauth.device.replaced`, `oauth.device.revoke`, and for clients `oauth.client.registered`, `oauth.client.fetched`, `oauth.client.refused` (kind, host, limit, stable reason; never a document);
+`oauth.token.issued` rows of a refresh say `reused: true` when the reuse window answered them;
 `admin` rows: `oauth.consent.refused` (the handle and grant refusals above); `auth` rows `oauth.request.refused` (P5-09: a limit was reached; reason, surface, scope and limit, once per window, never an address); the device is `oauth_<provider grant id>` in `token_id`, the client in
 `client_id`. Tool-call rows of OAuth requests carry the same two ids.
 
@@ -237,7 +281,7 @@ runtime is not involved. Stored document clients expire by their own TTL (5 min 
   Client ID Metadata Documents, `OAuthAuthorizationRequest.clientKind` and `clientHost` for the consent screen.
 - **P5-04** (built) supplies the consent handler and lifts the `AB_OAUTH=on` refusal; `oauthConsent` on
   `parseServerSettings`/`assembleServer` is now only a test stand-in.
-- **P5-05** builds refresh families and the reuse window over the provider's one-generation rule (D-63).
+- **P5-05** (built) wraps the refresh grant in a refresh family with the reuse window over the provider's one-generation rule (D-63, D-70).
 - **P5-08** adds the administrator views (all users' devices, registered clients) over the same grants.
 - **P5-09** (done, see [Abuse controls](#abuse-controls-p5-09)): per-surface limits, the sweep schedule and the flood tests.
 
@@ -265,5 +309,5 @@ suite (`test/oauth/consent.test.ts`: sign-in round trip, every refusal, devices)
 (`e2e/oauth-consent.spec.ts`, desktop and 320 px, CSP watch). Discovery is tested with
 the SDK's `auth()` and `discoverOAuthProtectedResourceMetadata` (no `validateResourceURL` workaround), once from the
 challenge's `resource_metadata` URL and once by path insertion. Provider quirks: it prints a
-`console.warn` about CIMD on load without Workers' `global_fetch_strictly_public` flag; the previous refresh token stays valid
-once; code expiry rests on the `kv` TTL. Mutation checks are recorded in the P5-01 and P5-02 task Outcomes.
+`console.warn` about CIMD on load without Workers' `global_fetch_strictly_public` flag; its previous refresh token stays valid
+once, without a time limit (our family answers first, P5-05); code expiry rests on the `kv` TTL. The refresh family has its own suite (`defineRefreshFamilySuite`, run on all four hosts with the default window and with window 0, so the reuse paths also run where time cannot move: SQLite and workerd) and unit tests of the seal. Mutation checks are recorded in the P5-01, P5-02, P5-04 and P5-05 task Outcomes.

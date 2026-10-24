@@ -11,6 +11,7 @@ import {
   SettingsError,
 } from '../../src/index.ts';
 import { oauthKvNamespace } from '../../src/oauth/kv-namespace.ts';
+import { openSuccessor, requestClientId, sealSuccessor } from '../../src/oauth/refresh-family.ts';
 import { connect, post, world } from '../helpers/world.ts';
 
 const T0 = Date.UTC(2026, 9, 24, 12);
@@ -129,10 +130,42 @@ describe('AB_OAUTH settings', () => {
     ).toThrow(/shorter/);
   });
 
+  it('reads the refresh reuse window (0-120 s, not longer than the access lifetime)', () => {
+    const on = { AB_OAUTH: 'on' };
+    expect(oauthSettingsFromEnv(on, PUBLIC)).toEqual({});
+    expect(oauthSettingsFromEnv({ ...on, AB_OAUTH_REFRESH_REUSE_WINDOW: '0' }, PUBLIC)).toEqual({
+      refreshReuseWindowSeconds: 0,
+    });
+    expect(oauthSettingsFromEnv({ ...on, AB_OAUTH_REFRESH_REUSE_WINDOW: '45s' }, PUBLIC)).toEqual({
+      refreshReuseWindowSeconds: 45,
+    });
+    expect(oauthSettingsFromEnv({ ...on, AB_OAUTH_REFRESH_REUSE_WINDOW: '2m' }, PUBLIC)).toEqual({
+      refreshReuseWindowSeconds: 120,
+    });
+    for (const value of ['121', '3m', '-1', '1.5', 'long', '99999999999d']) {
+      expect(
+        () => oauthSettingsFromEnv({ ...on, AB_OAUTH_REFRESH_REUSE_WINDOW: value }, PUBLIC),
+        value,
+      ).toThrow(OAuthConfigError);
+    }
+    // Longer than the access lifetime: the successor's access token would already be dead.
+    expect(() =>
+      oauthSettingsFromEnv({ ...on, AB_OAUTH_ACCESS_TTL: '60', AB_OAUTH_REFRESH_REUSE_WINDOW: '61' }, PUBLIC),
+    ).toThrow(/AB_OAUTH_REFRESH_REUSE_WINDOW/);
+    expect(
+      oauthSettingsFromEnv({ ...on, AB_OAUTH_ACCESS_TTL: '60', AB_OAUTH_REFRESH_REUSE_WINDOW: '60' }, PUBLIC),
+    ).toEqual({ accessTokenTtlSeconds: 60, refreshReuseWindowSeconds: 60 });
+  });
+
   it('the shared parser names the variable, never the value, and is registered for both hosts', () => {
     const defaults = { callBudget: 1000, maxResponseBytes: 8_388_608 };
     expect(SERVER_SETTING_NAMES).toEqual(
-      expect.arrayContaining(['AB_OAUTH', 'AB_OAUTH_ACCESS_TTL', 'AB_OAUTH_REFRESH_TTL']),
+      expect.arrayContaining([
+        'AB_OAUTH',
+        'AB_OAUTH_ACCESS_TTL',
+        'AB_OAUTH_REFRESH_TTL',
+        'AB_OAUTH_REFRESH_REUSE_WINDOW',
+      ]),
     );
     const secretish = 'hunter2-not-a-duration';
     try {
@@ -211,5 +244,51 @@ describe('the protected resource metadata route (P5-02)', () => {
     expect(limited.status).toBe(429);
     expect(limited.headers.get('retry-after')).toBe('30');
     expect(JSON.stringify(await limited.json())).not.toContain('authorization_servers');
+  });
+});
+
+describe('the refresh family seal (P5-05, D-70)', () => {
+  const successor = {
+    accessToken: 'usr_a:grantgrantgrant1:accessaccessaccessaccessaccess12',
+    refreshToken: 'usr_a:grantgrantgrant1:refreshrefreshrefreshrefresh123',
+    accessExpiresAt: T0 + 3_600_000,
+    scope: 'mcp:read offline_access',
+    resource: 'https://bridge.example.test/w/team-a/mcp',
+    clientId: 'client-1',
+  };
+  const spent = 'usr_a:grantgrantgrant1:spentspentspentspentspentspent12';
+
+  it('opens with the spent token only, and is bound to the token hash', async () => {
+    const sealed = await sealSuccessor(spent, 'hash-1', successor);
+    expect(sealed).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(sealed).not.toContain('refresh');
+    expect(await openSuccessor(spent, 'hash-1', sealed)).toEqual(successor);
+    expect(await openSuccessor(`${spent}x`, 'hash-1', sealed)).toBeNull();
+    expect(await openSuccessor(spent, 'hash-2', sealed)).toBeNull();
+    // Two seals of the same answer differ (random nonce).
+    expect(await sealSuccessor(spent, 'hash-1', successor)).not.toBe(sealed);
+  });
+
+  it('refuses tampered, truncated and foreign rows without throwing', async () => {
+    const sealed = await sealSuccessor(spent, 'hash-1', successor);
+    const flipped = `${sealed.slice(0, 20)}${sealed[20] === 'A' ? 'B' : 'A'}${sealed.slice(21)}`;
+    for (const bad of [flipped, sealed.slice(0, 30), '', '!!!', 'AAAA', `${sealed}AAAA`]) {
+      expect(await openSuccessor(spent, 'hash-1', bad), bad).toBeNull();
+    }
+  });
+
+  it('reads the client the way the provider does: Basic header, else client_id, never an assertion', () => {
+    const basic = (id: string, secret = 's') => `Basic ${btoa(`${id}:${secret}`)}`;
+    expect(requestClientId(null, new URLSearchParams({ client_id: 'abc' }))).toBe('abc');
+    expect(requestClientId(basic('abc'), new URLSearchParams())).toBe('abc');
+    expect(requestClientId(basic('a%40b'), new URLSearchParams())).toBe('a@b');
+    expect(requestClientId(null, new URLSearchParams())).toBeNull();
+    expect(requestClientId('Basic !!!', new URLSearchParams({ client_id: 'abc' }))).toBeNull();
+    expect(requestClientId(basic(''), new URLSearchParams())).toBeNull();
+    expect(
+      requestClientId(null, new URLSearchParams({ client_id: 'abc', client_assertion: 'x' })),
+    ).toBeNull();
+    // A bearer header is not client authentication.
+    expect(requestClientId('Bearer x', new URLSearchParams({ client_id: 'abc' }))).toBe('abc');
   });
 });

@@ -638,6 +638,37 @@ describe('devices (P5-04, L-090, T15)', () => {
     expect(bg.status).toBe(403);
   });
 
+  it('a device disconnected on My access cannot refresh, not even with a token spent a moment ago (P5-05)', async () => {
+    const t = await server();
+    const cookie = await login(t, 'alice@example.test');
+    const mine = await connect(t, cookie, { name: 'Mine' });
+    const refresh = (token: string) =>
+      t.send('POST', '/oauth/token', {
+        site: null,
+        form: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: token,
+          client_id: mine.request.clientId,
+        }).toString(),
+      });
+    const rotated = await refresh(mine.refresh);
+    expect(rotated.status).toBe(200);
+    const next = (await rotated.json()) as { access_token: string; refresh_token: string };
+    const csrf = await csrfOf(t, cookie);
+    const list = (await (await api(t, cookie, csrf, 'GET', '/me/oauth-devices')).json()) as Array<{
+      id: string;
+    }>;
+    expect((await api(t, cookie, csrf, 'POST', `/me/oauth-devices/${list[0]?.id}/revoke`)).status).toBe(200);
+    // Inside the reuse window the spent token would be answered with the stored successor: not for a gone device.
+    for (const token of [mine.refresh, next.refresh_token]) {
+      const res = await refresh(token);
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toBe('invalid_grant');
+    }
+    expect((await mcp(t, next.access_token)).status).toBe(401);
+    expect((await mcp(t, mine.access)).status).toBe(401);
+  });
+
   it('shows connected apps on My access, escaped, with a Disconnect form that works and "disconnect all"', async () => {
     const t = await server();
     const cookie = await login(t, 'alice@example.test');

@@ -481,6 +481,7 @@ validate input + metadata (operation allowed, attributes writable, values typed)
 | `AB_PASSTHROUGH` | `off` | enable mode E |
 | `AB_OAUTH` | `off` | enable OAuth 2.1 (Phase 5; `on` needs `AB_PUBLIC_URL` and sign-in: the consent screen signs the person in, P5-04) |
 | `AB_OAUTH_ACCESS_TTL` / `AB_OAUTH_REFRESH_TTL` | `1h` / `30d` | OAuth token lifetimes (60 s-24 h / 1 h-365 d) |
+| `AB_OAUTH_REFRESH_REUSE_WINDOW` | `30s` | Refresh reuse window (0-120 s; later reuse revokes the device, P5-05) |
 | `AB_PLAN` | `free` | Workers presets: `free` \| `paid` |
 | `AB_LIVE_AGILITY_URL`, `AB_LIVE_AGILITY_TOKEN`, `AB_LIVE_SCOPE` | unset | live test suite only |
 

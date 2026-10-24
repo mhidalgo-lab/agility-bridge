@@ -48,6 +48,14 @@ import {
 } from './clients.ts';
 import { CLIENT_RECORD_PREFIX, DOCUMENT_CLIENT_PREFIX, sweepRegistrations } from './housekeeping.ts';
 import { OAUTH_KV_PREFIX, type OAuthKvNamespace, oauthKvNamespace } from './kv-namespace.ts';
+import {
+  CLAIM_PREFIX,
+  openSuccessor,
+  ROTATED_PREFIX,
+  requestClientId,
+  SUCCESSOR_PREFIX,
+  sealSuccessor,
+} from './refresh-family.ts';
 
 export const OAUTH_AUTHORIZE_PATH = '/oauth/authorize';
 export const OAUTH_TOKEN_PATH = '/oauth/token';
@@ -63,6 +71,13 @@ export const OAUTH_SCOPES: readonly string[] = Object.freeze([MCP_SCOPE, 'offlin
 
 export const DEFAULT_OAUTH_ACCESS_TTL_S = 3600;
 export const DEFAULT_OAUTH_REFRESH_TTL_S: number = 30 * 86_400;
+/** A spent refresh token presented again within this many seconds gets the same successor (P5-05, D-63); later revokes. */
+export const DEFAULT_OAUTH_REFRESH_REUSE_WINDOW_S = 30;
+export const MAX_OAUTH_REFRESH_REUSE_WINDOW_S = 120;
+/** One refresh token is spent by one request at a time; the claim of a request that died frees itself after this. */
+const REFRESH_CLAIM_TTL_MS = 15_000;
+/** A request that finds its token being spent waits for the result: up to about 40 polls, 10 to 250 ms apart. */
+const REFRESH_WAIT_POLLS = 40;
 /** How long an authorization code may wait for its exchange (the provider's own grant TTL is the same). */
 export const OAUTH_CODE_TTL_S = 600;
 /** Largest token or registration request body read. */
@@ -265,6 +280,11 @@ export interface OAuthOptions {
   readonly registrationRedirectHosts?: readonly string[];
   /** Lifetime of a registration that never exchanged a code, seconds (1 h - 7 d). Default 24 h. */
   readonly registrationUnusedTtlSeconds?: number;
+   * Seconds in which a refresh token that was just spent is answered with the same successor again (parallel refreshes,
+   * a lost response), 0-120, not longer than the access lifetime. Default 30; 0 = strict single use. A repeat after the
+   * window revokes the device (P5-05).
+   */
+  readonly refreshReuseWindowSeconds?: number;
 }
 
 export type OAuthAuthentication =
@@ -467,6 +487,16 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     3_600,
     365 * 86_400,
   );
+  const reuseWindow = checkInt(
+    'oauth.refreshReuseWindowSeconds',
+    options.refreshReuseWindowSeconds ?? DEFAULT_OAUTH_REFRESH_REUSE_WINDOW_S,
+    0,
+    MAX_OAUTH_REFRESH_REUSE_WINDOW_S,
+  );
+  if (reuseWindow > accessTtl) {
+    throw new RangeError('oauth.refreshReuseWindowSeconds must not exceed the access token lifetime');
+  }
+  const reuseWindowMs = reuseWindow * 1000;
   if (typeof options.consent !== 'function') throw new TypeError('oauth.consent must be a function');
   const consent = options.consent;
   const onRevocation = deps.onRevocation ?? (() => undefined);
@@ -996,6 +1026,242 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     return true;
   };
 
+  // --------------------------------------------------------------------------- refresh family (P5-05, D-63, D-70)
+
+  const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+  const pollDelay = (poll: number): number => Math.min(250, 10 * 2 ** Math.min(poll, 5));
+
+  /** The refresh grant: one request at a time spends a token; a repeat inside the window gets the same successor. */
+  const refreshGrant = async (
+    c: Context,
+    as: OAuthAuthorizationServer<ProviderEnv>,
+    helpers: OAuthHelpers,
+    form: URLSearchParams,
+    body: string,
+    refreshToken: string,
+    onRevocation: () => void,
+  ): Promise<Response> => {
+    const m = PROVIDER_TOKEN_RE.exec(refreshToken) as unknown as [string, string, string];
+    const [, userId, grantId] = m;
+    const tokenId = `oauth_${grantId}`;
+    const hash = await sha256Hex(refreshToken);
+    const rotatedKey = `${ROTATED_PREFIX}${hash}`;
+    const successorKey = `${SUCCESSOR_PREFIX}${hash}`;
+    const claimKey = `${CLAIM_PREFIX}${hash}`;
+    const invalid = (description = 'Invalid refresh token'): Response =>
+      jsonError(400, 'invalid_grant', description);
+
+    // A device that was disconnected, replaced or pushed out is gone before anything else is looked at.
+    if (await revokedMeanwhile(refreshToken, helpers)) return invalid();
+
+    const issued = (reused: boolean, clientId: string | null): void =>
+      audit(
+        {
+          action: 'oauth.token.issued',
+          status: 'ok',
+          requestId: requestIdOf(c),
+          userId,
+          clientId,
+          tokenId,
+          details: { grantType: 'refresh_token', reused },
+        },
+        c,
+      );
+
+    /** A spent token that came back: revoke the device unless this is the reuse window's repeat. */
+    const replay = async (marker: string): Promise<Response> => {
+      const grant = (await env.OAUTH_KV.get(`grant:${userId}:${grantId}`, { type: 'json' })) as {
+        readonly expiresAt?: unknown;
+        readonly clientId?: unknown;
+      } | null;
+      if (grant === null) return invalid('Grant not found');
+      const at = (() => {
+        try {
+          const v = (JSON.parse(marker) as { at?: unknown }).at;
+          return typeof v === 'number' ? v : Number.NEGATIVE_INFINITY;
+        } catch {
+          return Number.NEGATIVE_INFINITY;
+        }
+      })();
+      const age = clock.now() - at;
+      const sealed = age < reuseWindowMs ? await storage.kv.get(successorKey) : null;
+      if (sealed === null) {
+        // Outside the window (or no window): the token was stolen or the client is broken; the device pays.
+        await revokeFamily(userId, grantId, helpers);
+        onRevocation();
+        logger.warn('oauth refresh token reused; device revoked', { oauthGrant: grantId });
+        audit(
+          {
+            action: 'oauth.refresh.reuse',
+            status: 'denied',
+            requestId: requestIdOf(c),
+            userId,
+            clientId: typeof grant.clientId === 'string' ? grant.clientId : null,
+            tokenId,
+            reason: 'refresh_reuse',
+            details: { revoked: true, windowSeconds: reuseWindow },
+          },
+          c,
+        );
+        return invalid('The authorization is no longer valid.');
+      }
+      const successor = await openSuccessor(refreshToken, hash, sealed);
+      if (successor === null) {
+        logger.error('oauth refresh successor unreadable', { oauthGrant: grantId });
+        return invalid();
+      }
+      // The provider's grant handler is not reached from here: it authenticates the client for us (the probe carries a
+      // token that cannot be a real one, so it never rotates anything), and the rest of its checks follow.
+      const probe = new URLSearchParams(form);
+      probe.set('refresh_token', `${userId}:${grantId}:${'A'.repeat(32)}`);
+      const probed = await fetchProvider(as, c, probe.toString());
+      const probedError = probed.ok
+        ? null
+        : ((await probed.json().catch(() => null)) as { error?: unknown } | null)?.error;
+      if (probedError !== 'invalid_grant') {
+        return probed.ok
+          ? invalid()
+          : jsonError(probed.status, String(probedError ?? 'invalid_client'), 'Client authentication failed');
+      }
+      if (requestClientId(c.req.header('authorization') ?? null, form) !== successor.clientId) {
+        return invalid('Client ID mismatch');
+      }
+      const resource = form.get('resource');
+      if (resource !== null && resource !== successor.resource) {
+        return jsonError(
+          400,
+          'invalid_target',
+          'resource must be the one this authorization was issued for.',
+        );
+      }
+      const requested = (form.get('scope') ?? '').split(' ').filter((s) => s !== '');
+      const granted = successor.scope.split(' ');
+      if (requested.length > 0 && !requested.some((s) => granted.includes(s))) {
+        return jsonError(400, 'invalid_scope', 'None of the requested scopes were granted');
+      }
+      if (typeof grant.expiresAt === 'number' && grant.expiresAt - Math.floor(clock.now() / 1000) < 60) {
+        return invalid('Refresh token has expired');
+      }
+      // Access is decided again, as at every issuance: the successor's access token carries the grant's properties.
+      const summary = await helpers.unwrapToken<Partial<OAuthGrantProps>>(successor.accessToken);
+      const props = summary?.grant.props;
+      if (
+        props === undefined ||
+        props === null ||
+        typeof props.grantId !== 'string' ||
+        typeof props.workspaceId !== 'string' ||
+        typeof props.workspaceSlug !== 'string' ||
+        props.userId !== userId
+      ) {
+        return invalid();
+      }
+      const decision = await decide(
+        { grantId: props.grantId, workspaceId: props.workspaceId, userId },
+        props.workspaceSlug,
+        { tokenId, clientId: successor.clientId, expiresAt: null },
+      );
+      if (!decision.ok) {
+        await revokeFamily(userId, grantId, helpers);
+        onRevocation();
+        logger.info('oauth token refused; device revoked', {
+          reason: decision.reason,
+          oauthGrant: grantId,
+          grantType: 'refresh_token',
+        });
+        audit(
+          {
+            action: 'oauth.token.refused',
+            status: 'denied',
+            requestId: requestIdOf(c),
+            userId,
+            workspaceId: props.workspaceId,
+            clientId: successor.clientId,
+            tokenId,
+            reason: decision.reason,
+            details: { grantType: 'refresh_token', revoked: true },
+          },
+          c,
+        );
+        return invalid('The authorization is no longer valid.');
+      }
+      issued(true, successor.clientId);
+      return new Response(
+        JSON.stringify({
+          access_token: successor.accessToken,
+          token_type: 'bearer',
+          expires_in: Math.max(1, Math.ceil((successor.accessExpiresAt - clock.now()) / 1000)),
+          refresh_token: successor.refreshToken,
+          scope: successor.scope,
+          ...(successor.resource === null ? {} : { resource: successor.resource }),
+        }),
+        { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', Pragma: 'no-cache' } },
+      );
+    };
+
+    /** This request spends the token: the provider rotates it, then the answer is recorded for the repeats. */
+    const spend = async (): Promise<Response> => {
+      const response = await fetchProvider(as, c, body);
+      if (!response.ok) return response;
+      // Revoked while the provider was answering: it may have written the grant back.
+      if (await revokedMeanwhile(refreshToken, helpers)) return invalid();
+      const answer = (await response
+        .clone()
+        .json()
+        .catch(() => null)) as {
+        access_token?: unknown;
+        refresh_token?: unknown;
+        expires_in?: unknown;
+        scope?: unknown;
+        resource?: unknown;
+      } | null;
+      const clientId = requestClientId(c.req.header('authorization') ?? null, form);
+      const at = clock.now();
+      if (
+        answer !== null &&
+        typeof answer.access_token === 'string' &&
+        typeof answer.refresh_token === 'string' &&
+        typeof answer.expires_in === 'number'
+      ) {
+        if (reuseWindowMs > 0 && clientId !== null) {
+          await storage.kv.set(
+            successorKey,
+            await sealSuccessor(refreshToken, hash, {
+              accessToken: answer.access_token,
+              refreshToken: answer.refresh_token,
+              accessExpiresAt: at + answer.expires_in * 1000,
+              scope: typeof answer.scope === 'string' ? answer.scope : '',
+              resource: typeof answer.resource === 'string' ? answer.resource : null,
+              clientId,
+            }),
+            { expiresAt: at + reuseWindowMs },
+          );
+        }
+        // After the sealed answer: whoever sees the marker finds the successor.
+        await storage.kv.set(rotatedKey, JSON.stringify({ at }), {
+          expiresAt: at + refreshTtl * 1000 + 60_000,
+        });
+      }
+      issued(false, clientId);
+      return response;
+    };
+
+    for (let poll = 0; poll < REFRESH_WAIT_POLLS; poll++) {
+      const marker = await storage.kv.get(rotatedKey);
+      if (marker !== null) return replay(marker);
+      if (await storage.kv.setIfAbsent(claimKey, '1', { expiresAt: clock.now() + REFRESH_CLAIM_TTL_MS })) {
+        try {
+          // Another request may have finished between the read and the claim: the provider must not rotate twice.
+          const late = await storage.kv.get(rotatedKey);
+          return late === null ? await spend() : await replay(late);
+        } finally {
+          await storage.kv.delete(claimKey).catch(() => undefined);
+        }
+      }
+      await sleep(pollDelay(poll));
+    }
+    return jsonError(503, 'temporarily_unavailable', 'The refresh is being processed; try again.');
+  };
+
   /** A replayed (or raced) code: when it really was issued for its grant, revoke the grant and its tokens. */
   const revokeReplayed = async (c: Context, code: string, helpers: OAuthHelpers): Promise<void> => {
     const m = PROVIDER_TOKEN_RE.exec(code);
@@ -1351,6 +1617,13 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
           return jsonError(400, 'invalid_grant', 'Invalid authorization code');
         }
       }
+      if (grantType === 'refresh_token') {
+        const presented = form.get('refresh_token') ?? '';
+        // Anything that is not the shape of our tokens is the provider's to refuse.
+        if (PROVIDER_TOKEN_RE.test(presented)) {
+          return refreshGrant(c, as, helpers, form, body, presented, onRevocation);
+        }
+      }
       // RFC 7009 revocation shares this endpoint (no grant_type).
       const revocation = grantType === null && form.has('token');
       const response = await fetchProvider(as, c, body);
@@ -1380,22 +1653,6 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
           },
           c,
         );
-      } else if (grantType === 'refresh_token') {
-        const m = PROVIDER_TOKEN_RE.exec(form.get('refresh_token') ?? '');
-        if (response.ok) {
-          audit(
-            {
-              action: 'oauth.token.issued',
-              status: 'ok',
-              requestId: requestIdOf(c),
-              userId: m?.[1] ?? null,
-              clientId: form.get('client_id'),
-              tokenId: m === null ? null : `oauth_${m[2]}`,
-              details: { grantType },
-            },
-            c,
-          );
-        }
       }
       if (revocation && response.ok) {
         // Drop cached decisions at once, so a revoked token stops working here without waiting for the cache.

@@ -1,7 +1,7 @@
 # Connect a phone or a browser app with OAuth
 
 > For `agility-bridge serve` and the Cloudflare Worker with `AB_OAUTH=on`. Apps that cannot hold a device token (claude.ai
-> in a browser, Claude on a phone) connect by OAuth: you sign in, see who is asking and approve. Developer details:
+> in a browser, Claude on a phone) connect by OAuth: you sign in, see who is asking and approve. How tokens rotate and why a reconnect can be needed: [how it works](oauth-how-it-works.md). Developer details:
 > [OAuth server](../dev/oauth.md).
 
 ## What the operator turns on

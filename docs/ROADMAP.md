@@ -236,7 +236,7 @@ Status lives in each task file.
 | P5-02 | [Protected resource metadata per workspace](tasks/phase-5-oauth/P5-02-protected-resource-metadata.md) | high | P5-01 | done |
 | P5-03 | [Client registration: CIMD and DCR](tasks/phase-5-oauth/P5-03-client-registration.md) | high | P5-02 | done |
 | P5-04 | [Consent screen and device handling](tasks/phase-5-oauth/P5-04-consent-devices.md) | high | P5-01 | done |
-| P5-05 | [Token lifecycle and refresh concurrency](tasks/phase-5-oauth/P5-05-token-lifecycle.md) | high | P5-01 | in-progress |
+| P5-05 | [Token lifecycle and refresh concurrency](tasks/phase-5-oauth/P5-05-token-lifecycle.md) | high | P5-01 | review |
 | P5-06 | [Real-client compatibility matrix (OAuth)](tasks/phase-5-oauth/P5-06-client-matrix-oauth.md) | high | P5-02, P5-03, P5-04, P5-05 | todo |
 | P5-07 | [OAuth documentation](tasks/phase-5-oauth/P5-07-oauth-docs.md) | medium | P5-06 | todo |
 | P5-08 | [Admin: connected apps and devices](tasks/phase-5-oauth/P5-08-admin-oauth-apps.md) | medium | P5-05 | todo |

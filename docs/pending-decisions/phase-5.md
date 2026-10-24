@@ -37,7 +37,10 @@
 - **Options:** (a) accept until P5-05 adds reuse detection and the 30-second window; (b) block now with a marker per
   refresh token (relic-bridge's P5-05 design, pulled forward).
 - **Recommendation:** (a): P5-05 is next, `AB_OAUTH` cannot be on before P5-04, and the window it builds replaces this rule.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner:** _pending_ (implemented as (a)). **Superseded by P5-05 (2026-10-24):** every refresh now goes through the refresh
+  family ([D-70](#d-70--refresh-successors-are-sealed-under-a-key-derived-from-the-spent-token-p5-05)): a spent token is
+  answered with the same successor for the reuse window (default 30 s) and revokes the device after it; the provider's
+  "previous token" rule is never reached for a token we have seen spent.
 
 ### D-64 — Protected resource metadata is the same for known, unknown and disabled workspaces *(P5-02)*
 - **Context:** RFC 9728 clients fetch `/.well-known/oauth-protected-resource/w/{slug}/mcp` before they have a token. The MCP
@@ -101,6 +104,20 @@
   the callback).
 - **Recommendation:** (a) now, as relic-bridge; P5-06 (client matrix) decides whether a client we want needs (b), and then
   P5-04's consent screen must show the scheme.
+### D-70 — Refresh successors are sealed under a key derived from the spent token, not under the master key *(P5-05)*
+- **Context:** the reuse window answers a repeat of a just-spent refresh token with the same successor, so the successor
+  (new refresh token and access token) must be recoverable for up to 120 s. ADR-0009 says a recoverable transient secret
+  is envelope-encrypted, and D-62 expected "its own derived key". The OAuth runtime has no keyring (it holds no master
+  key, and the Worker's request path would need one more secret read per refresh).
+- **Options:** (a) AES-256-GCM under a key derived (HKDF-SHA-256) from the spent refresh token itself, bound to its hash:
+  only a holder of the token that is allowed to ask can open the row, the database and its backups hold nothing that
+  opens it, and no key is stored, rotated or lost (L-074 holds trivially); (b) a keyring purpose under the master key (the
+  database plus the master key opens every sealed successor in the window; the runtime needs the keyring; a master-key
+  rotation has to rewrite or drop live rows); (c) store the successor in clear for the window (refused by ADR-0009).
+- **Recommendation:** (a). It is stronger against the threat the seal exists for (a stolen database or backup) and needs no
+  new key plumbing. It does not defend against someone who holds the spent token, who by the window's definition may ask
+  for the successor anyway. The sealed row lives for the window only; the rotation marker (a hash and a time) lives for the
+  refresh lifetime so a late replay is recognised.
 - **Owner:** _pending_ (implemented as (a)).
 
 ### D-72 — OAuth abuse counters are fixed windows in the shared `kv` table, and fail open *(P5-09)*

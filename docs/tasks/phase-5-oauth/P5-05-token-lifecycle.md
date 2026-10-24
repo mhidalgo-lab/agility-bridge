@@ -2,7 +2,7 @@
 id: P5-05
 title: Token lifecycle and refresh concurrency
 phase: 5
-status: in-progress
+status: review
 priority: high
 depends_on: [P5-01]
 adr: ["0009"]
@@ -41,18 +41,37 @@ device, a stolen and replayed refresh token costs the thief the device, and a di
 - Both hosts: Node `serve` (SQLite) and the Worker (D1); no `node:*` in `packages/http-app`.
 
 ## Acceptance criteria
-- [ ] Parallel-refresh test (several concurrent refreshes from one client) keeps the device, all get the same working
+- [x] Parallel-refresh test (several concurrent refreshes from one client) keeps the device, all get the same working
   successor and the successor refreshes again; replay after the window revokes the device and every token of it.
-- [ ] The reuse window's successor tokens are kept encrypted, never in plaintext; a storage scan (kv rows, audit,
+- [x] The reuse window's successor tokens are kept encrypted, never in plaintext; a storage scan (kv rows, audit,
   logs, SQLite file) finds no refresh or access token, and the successor row is gone after the window.
-- [ ] `AB_OAUTH_REFRESH_REUSE_WINDOW` (0-120 s, not above the access lifetime) is read by both hosts with bounds tests;
+- [x] `AB_OAUTH_REFRESH_REUSE_WINDOW` (0-120 s, not above the access lifetime) is read by both hosts with bounds tests;
   the lifetimes keep their bounds tests.
-- [ ] Negative tests: a disconnected or replaced device cannot refresh (also inside the window); a wrong client, a wrong
+- [x] Negative tests: a disconnected or replaced device cannot refresh (also inside the window); a wrong client, a wrong
   secret or another `resource` gets no successor; a forged token of a real device revokes nothing; window `0` is strict.
-- [ ] The suite runs on memory, SQLite and workerd/D1.
-- [ ] Security tests are mutation-checked (L-121), recorded under Outcome.
-- [ ] `docs/guide/oauth-how-it-works.md` (new), `docs/dev/oauth.md`, configuration docs, THREAT_MODEL T9 and T15,
+- [x] The suite runs on memory, SQLite and workerd/D1.
+- [x] Security tests are mutation-checked (L-121), recorded under Outcome.
+- [x] `docs/guide/oauth-how-it-works.md` (new), `docs/dev/oauth.md`, configuration docs, THREAT_MODEL T9 and T15,
   decisions (D-63 superseded, D-70), lessons and a changeset are done.
+
+## Outcome
+- Built as scoped. The refresh family wraps the token endpoint's `refresh_token` grant (`oauth/server.ts` `refreshGrant`,
+  seal and client-id reader in `oauth/refresh-family.ts`); `AB_OAUTH_REFRESH_REUSE_WINDOW` is new (`refreshReuseWindowSeconds`),
+  the lifetimes already had their bounds. Decisions: D-63 superseded, D-70 new (the successor is sealed under a key derived
+  from the spent token, not under a master-key purpose: the owner may prefer (b), see the decision). The device cap and
+  replace-after-exchange (D-67) were already built in P5-04; here they show as "cannot refresh" tests.
+- Beyond the brief: the repeat path authenticates the client through a provider probe and re-runs the access decision on
+  the grant's props (L-254); a refresh that finds a tombstone revokes again before and after the provider rotates.
+- Tests: `defineRefreshFamilySuite` (16 cases) on memory, memory in the Workers shape, SQLite and workerd/D1, each with
+  window 30 and window 0 where it matters (time moves only on memory); unit tests of the seal, the client-id reader and the
+  settings bounds; a My access disconnect case in `consent.test.ts`; the settings tests of both hosts.
+- Mutation checks (L-121), each reverted: claim always won (4 failing cases), reuse does not revoke (8), window never
+  ends by age (survives: the sealed row's own expiry enforces the same, equivalent), successor stored in clear (17), no
+  tombstone check before rotating (survives alone: the check after rotating catches it; both removed: 2 fail), no
+  re-read after the claim (survives: needs a request interleaved between a read and a claim, reasoned and documented,
+  L-253), no grant check on the repeat path (4), no client probe (6), no client id binding (2), no resource check (2), no scope
+  check (2), no access decision on the repeat path (2), marker written before the sealed answer (2), window of a day (12),
+  no `oauth.refresh.reuse` row (8), claim not released on failure (2, an existing retarget test).
 
 ## Security notes
 THREAT_MODEL T9, T15 (T21, T23 touched: no module-level request state, no secret in logs).

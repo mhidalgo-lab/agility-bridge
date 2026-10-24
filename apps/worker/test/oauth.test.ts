@@ -14,7 +14,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { defineOAuthAbuseSuite } from '../../../packages/http-app/test/oauth/abuse-suite.ts';
 import { defineOAuthClientSuite } from '../../../packages/http-app/test/oauth/clients-suite.ts';
 import { createFakeDocuments } from '../../../packages/http-app/test/oauth/documents.ts';
-import { defineOAuthSuite, type OAuthHost } from '../../../packages/http-app/test/oauth/suite.ts';
+import {
+  defineOAuthSuite,
+  defineRefreshFamilySuite,
+  type OAuthHost,
+  type RefreshHostShape,
+} from '../../../packages/http-app/test/oauth/suite.ts';
 import { type FixtureAgility, startFixtureAgility } from '../../../scripts/fixture-agility.ts';
 import { BootError, boot } from '../src/boot.ts';
 
@@ -38,7 +43,7 @@ afterEach(async () => {
   await Promise.all(running.splice(0).map((mf) => mf.dispose()));
 });
 
-async function workerHost(): Promise<OAuthHost> {
+async function workerHost(shape?: RefreshHostShape): Promise<OAuthHost> {
   const key = generateMasterKey(1);
   const documents = createFakeDocuments({ observesRedirectMode: false });
   const mf = new Miniflare(
@@ -70,6 +75,7 @@ async function workerHost(): Promise<OAuthHost> {
         AB_ALLOW_HTTP_INSTANCES: 'on',
         AB_PUBLIC_URL: ORIGIN,
         AB_OAUTH: 'on',
+        ...(shape === undefined ? {} : { AB_OAUTH_REFRESH_REUSE_WINDOW: String(shape.reuseWindowSeconds) }),
         AB_ACCESS_CACHE_TTL: '0',
         // One Worker serves a whole test (dozens of requests from one address); limits have their own tests.
         AB_RATE_LIMIT_AUTH_FAILURES: '1000',
@@ -127,7 +133,8 @@ async function workerHost(): Promise<OAuthHost> {
     call: async (url, init) =>
       (await mf.dispatchFetch(url, {
         ...init,
-        headers: { 'cf-connecting-ip': '203.0.113.9', ...(init?.headers as Record<string, string>) },
+        // The SDK passes `Headers` objects (client authentication): flatten them, spreading one loses every header.
+        headers: { 'cf-connecting-ip': '203.0.113.9', ...Object.fromEntries(new Headers(init?.headers)) },
       } as never)) as unknown as Response,
     storage,
     ids: {
@@ -151,7 +158,8 @@ async function workerHost(): Promise<OAuthHost> {
   };
 }
 
-defineOAuthSuite('workerd with D1 (Worker)', workerHost);
+defineOAuthSuite('workerd with D1 (Worker)', () => workerHost());
+defineRefreshFamilySuite('workerd with D1 (Worker)', workerHost);
 defineOAuthClientSuite('workerd with D1 (Worker)', workerHost, { matrix: false });
 defineOAuthAbuseSuite('workerd with D1 (Worker)', workerHost);
 
@@ -188,7 +196,13 @@ describe('OAuth settings on the shipped Worker', () => {
     ).rejects.toThrow(BootError);
     // With OAuth off the OAuth variables are accepted (and checked), and boot goes on to the missing D1 binding.
     await expect(
-      boot({ AB_OAUTH: 'off', AB_OAUTH_ACCESS_TTL: '30m' } as never, '0.0.0-test'),
+      boot(
+        { AB_OAUTH: 'off', AB_OAUTH_ACCESS_TTL: '30m', AB_OAUTH_REFRESH_REUSE_WINDOW: '10' } as never,
+        '0.0.0-test',
+      ),
     ).rejects.toThrow(/D1 binding/);
+    await expect(
+      boot({ AB_OAUTH: 'off', AB_OAUTH_REFRESH_REUSE_WINDOW: '500' } as never, '0.0.0-test'),
+    ).rejects.toThrow(BootError);
   });
 });

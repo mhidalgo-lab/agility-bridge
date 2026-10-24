@@ -117,6 +117,7 @@ const KNOWN_ENV = new Set([
   'AB_OAUTH_CONSENT_LIMIT',
   'AB_OAUTH_TOKEN_FAILURE_IP_LIMIT',
   'AB_OAUTH_TOKEN_FAILURE_LIMIT',
+  'AB_OAUTH_REFRESH_REUSE_WINDOW',
   'AB_PLAN',
   // Sign-in (P4-01): the provider settings, their secrets as 0600 files, and the IdP address policy.
   ...IDENTITY_SETTING_NAMES,
