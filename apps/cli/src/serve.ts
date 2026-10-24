@@ -34,6 +34,7 @@ import {
   type ServerSettings,
   SettingsError,
   scheduleAuditRetention,
+  scheduleStorageHousekeeping,
   settingInteger,
   settingWarnings,
 } from '@agility-bridge/http-app';
@@ -213,6 +214,11 @@ export async function startServe(
     passthroughSecure: (c) => config.trustedProxyHops > 0 && c.req.header('x-forwarded-proto') === 'https',
   });
   const stopRetention = scheduleAuditRetention(storage, config.auditRetentionDays, systemClock, logger);
+  const stopHousekeeping = scheduleStorageHousekeeping(storage, {
+    clock: systemClock,
+    logger,
+    oauth: config.oauth,
+  });
   const stopRevalidation = scheduleRevalidation(services, config.revalidationHours, logger);
 
   const server = await new Promise<ReturnType<typeof serveNode>>((resolve, reject) => {
@@ -248,6 +254,7 @@ export async function startServe(
     async close() {
       await new Promise<void>((resolve) => server.close(() => resolve()));
       stopRetention();
+      stopHousekeeping();
       stopRevalidation();
       await audit.flush();
       await storage.close();

@@ -32,6 +32,17 @@ Every tool declares the most Agility requests one call can cost ([tool reference
 whose cost is above the caller's budget is **not listed** in `tools/list` and is refused if called anyway (L-115). All
 tools fit the Free budget today (the largest declares 24); a workspace or grant with a smaller budget hides more.
 
+## OAuth endpoints and the D1 write budget
+
+With `AB_OAUTH=on` the public OAuth endpoints are limited by shared counters in D1 ([OAuth abuse controls](../dev/oauth.md#abuse-controls-p5-09)):
+every authorization request, consent post and failed token request is one extra D1 row write per counter (two: the
+address and the deployment); a request refused by a limit writes nothing, and each isolate remembers a refused counter
+until its window ends, so a flood costs about the limit's worth of writes per counter and window, not one per request.
+Normal use is a handful of writes per connected app. The Free plan allows 100,000 D1 rows written a day
+([RESEARCH](../RESEARCH.md#cloudflare-workers)); the default limits keep one flooding address to about 160 writes per ten
+minutes (authorize 30, token failures 20 and consent 30, each on two counters) and the deployment-wide caps bound the sum. The cron
+sweeps 20 unused registrations per run (one read each, at most 50 D1 queries per run together with the purge).
+
 ## Where usage shows
 
 - **Audit log**: every tool call's row holds `agilityRequests`, the requests it used (`GET /api/admin/v1/audit`,

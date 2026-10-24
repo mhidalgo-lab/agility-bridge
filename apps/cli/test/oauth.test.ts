@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { accessServices, generateMasterKey, Keyring } from '@agility-bridge/auth';
 import { CORE_TOOLS } from '@agility-bridge/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { defineOAuthAbuseSuite } from '../../../packages/http-app/test/oauth/abuse-suite.ts';
 import { defineOAuthClientSuite } from '../../../packages/http-app/test/oauth/clients-suite.ts';
 import { testConsent } from '../../../packages/http-app/test/oauth/consent.ts';
 import { createFakeDocuments } from '../../../packages/http-app/test/oauth/documents.ts';
@@ -39,6 +40,8 @@ async function sqliteHost(): Promise<OAuthHost> {
       AB_ACCESS_CACHE_TTL: '0',
       AB_ALLOW_HTTP_INSTANCES: 'on',
       AB_ENVIRONMENT: 'production',
+      // The client address comes from the proxy header, so a test can be several addresses (P5-09).
+      AB_TRUSTED_PROXY_HOPS: '1',
     },
     { sink: (l) => lines.push(l), oauthConsent: testConsent, clientMetadataFetch: documents.fetcher },
   );
@@ -119,6 +122,7 @@ async function sqliteHost(): Promise<OAuthHost> {
           }
         })
         .join('\n'),
+    address: (ip) => ({ 'x-forwarded-for': ip }),
     // No `advance`: the SQLite storage reads its clock when it opens, so a mocked clock cannot expire its rows.
     close: async () => {
       await running.close();
@@ -133,6 +137,7 @@ async function sqliteHost(): Promise<OAuthHost> {
 
 defineOAuthSuite('SQLite storage (agility-bridge serve)', sqliteHost);
 defineOAuthClientSuite('SQLite storage (agility-bridge serve)', sqliteHost);
+defineOAuthAbuseSuite('SQLite storage (agility-bridge serve)', sqliteHost);
 
 describe('OAuth settings on the shipped host', () => {
   it('is off by default, and AB_OAUTH=on needs sign-in for the built-in consent screen (P5-04)', () => {

@@ -678,13 +678,20 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     app.get(`${OAUTH_RESOURCE_METADATA_PREFIX}/w/:slug/mcp`, (c) =>
       limited(c, async () => runtime.resourceMetadata(c.req.param('slug')) ?? c.notFound()),
     );
-    app.get(OAUTH_AUTHORIZE_PATH, (c) => limited(c, () => runtime.authorize(c)));
-    app.post(OAUTH_TOKEN_PATH, (c) => limited(c, () => runtime.token(c, () => cache.clear())));
+    // The OAuth abuse controls (P5-09) sit behind the general per-IP limit and in front of the endpoint's own work.
+    app.get(OAUTH_AUTHORIZE_PATH, (c) =>
+      limited(c, () => runtime.guard('authorize', c, () => runtime.authorize(c))),
+    );
+    app.post(OAUTH_TOKEN_PATH, (c) =>
+      limited(c, () => runtime.guard('token', c, () => runtime.token(c, () => cache.clear()))),
+    );
     app.post(OAUTH_REGISTER_PATH, (c) => limited(c, () => runtime.register(c)));
     const screen = consentScreen;
     // The built-in consent screen's form post (P5-04); a stand-in handler has no such route.
     if (screen !== undefined)
-      app.post(OAUTH_CONSENT_PATH, (c) => limited(c, () => screen.decide(c, runtime)));
+      app.post(OAUTH_CONSENT_PATH, (c) =>
+        limited(c, () => runtime.guard('consent', c, () => screen.decide(c, runtime))),
+      );
   }
 
   // Liveness and version only (L-151).

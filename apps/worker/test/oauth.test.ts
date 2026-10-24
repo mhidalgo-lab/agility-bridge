@@ -11,6 +11,7 @@ import { CORE_TOOLS } from '@agility-bridge/core';
 import { createD1Driver, type D1Database, openSqlStorage } from '@agility-bridge/storage';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { defineOAuthAbuseSuite } from '../../../packages/http-app/test/oauth/abuse-suite.ts';
 import { defineOAuthClientSuite } from '../../../packages/http-app/test/oauth/clients-suite.ts';
 import { createFakeDocuments } from '../../../packages/http-app/test/oauth/documents.ts';
 import { defineOAuthSuite, type OAuthHost } from '../../../packages/http-app/test/oauth/suite.ts';
@@ -141,6 +142,7 @@ async function workerHost(): Promise<OAuthHost> {
       aliceDeviceTokenA: token,
     },
     agilityRequests: () => agility.requests(),
+    address: (ip) => ({ 'cf-connecting-ip': ip }),
     // The Worker's console is not captured here; the redaction corpus and the Node suites cover the log lines.
     logs: () => [],
     close: async () => {
@@ -151,6 +153,7 @@ async function workerHost(): Promise<OAuthHost> {
 
 defineOAuthSuite('workerd with D1 (Worker)', workerHost);
 defineOAuthClientSuite('workerd with D1 (Worker)', workerHost, { matrix: false });
+defineOAuthAbuseSuite('workerd with D1 (Worker)', workerHost);
 
 describe('OAuth settings on the shipped Worker', () => {
   const base = {

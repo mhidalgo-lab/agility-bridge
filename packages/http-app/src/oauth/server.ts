@@ -37,6 +37,7 @@ import type {
 } from '@cloudflare/workers-oauth-provider';
 import type { Context } from 'hono';
 import type { OAuthEvent } from '../audit.ts';
+import { type AbuseRefusal, type AbuseSurface, createAbuseGuard } from './abuse.ts';
 import {
   ClientMetadataError,
   type ClientMetadataFetch,
@@ -45,6 +46,7 @@ import {
   fetchMetadataDocument,
   looksLikeClientIdUrl,
 } from './clients.ts';
+import { CLIENT_RECORD_PREFIX, DOCUMENT_CLIENT_PREFIX, sweepRegistrations } from './housekeeping.ts';
 import { OAUTH_KV_PREFIX, type OAuthKvNamespace, oauthKvNamespace } from './kv-namespace.ts';
 
 export const OAUTH_AUTHORIZE_PATH = '/oauth/authorize';
@@ -94,15 +96,27 @@ export const OAUTH_DEFAULT_DCR_IP_LIMIT = 10;
 export const OAUTH_DEFAULT_CIMD_MAX_CLIENTS = 200;
 /** Metadata-document fetches one address may cause per hour (cache misses only). Settable. */
 export const OAUTH_DEFAULT_CIMD_FETCH_LIMIT = 20;
+/** Registrations the whole deployment accepts per hour (a bound on storage churn, T11). Settable. */
+export const OAUTH_DEFAULT_DCR_HOURLY_LIMIT = 100;
+/** Metadata-document fetches the whole deployment makes per hour (outbound budget, T11). Settable. */
+export const OAUTH_DEFAULT_CIMD_HOURLY_LIMIT = 200;
+/** Authorization requests per address, and in all, per 10 minutes (P5-09). Settable. */
+export const OAUTH_DEFAULT_AUTHORIZE_IP_LIMIT = 30;
+export const OAUTH_DEFAULT_AUTHORIZE_LIMIT = 600;
+/** Consent form posts per address, and in all, per 10 minutes. Settable. */
+export const OAUTH_DEFAULT_CONSENT_IP_LIMIT = 30;
+export const OAUTH_DEFAULT_CONSENT_LIMIT = 300;
+/** Failed token requests per address, and in all (counted against addresses that already failed), per 10 minutes. */
+export const OAUTH_DEFAULT_TOKEN_FAILURE_IP_LIMIT = 20;
+export const OAUTH_DEFAULT_TOKEN_FAILURE_LIMIT = 300;
+/** Window of the interactive-endpoint limits above. */
+const ABUSE_WINDOW_S = 600;
 /** Counter windows of the registration and fetch limits. */
 const CAP_WINDOW_S = 3600;
 /** `kv` keys outside the provider's `oauth:` namespace: per-address counters (hashed address) and cap-audit markers. */
 const DCR_IP_PREFIX = 'oauth-dcr-ip:';
 const CIMD_IP_PREFIX = 'oauth-cimd-ip:';
 const CAP_AUDIT_PREFIX = 'oauth-cap-audit:';
-/** Where the provider keeps its client records, as seen through the `kv` table. Document clients start `https://`. */
-const CLIENT_RECORD_PREFIX = 'oauth:client:';
-const DOCUMENT_CLIENT_PREFIX = 'oauth:client:https://';
 /** Most keys one `kv.list` returns (the store's own cap). */
 const KV_LIST_MAX = 1000;
 
@@ -228,12 +242,25 @@ export interface OAuthOptions {
   readonly clientMetadataMaxClients?: number;
   /** Fetches one address may cause per hour. Default {@link OAUTH_DEFAULT_CIMD_FETCH_LIMIT}. */
   readonly clientMetadataFetchLimit?: number;
+  /** Fetches the whole deployment may make per hour. Default {@link OAUTH_DEFAULT_CIMD_HOURLY_LIMIT}. */
+  readonly clientMetadataHourlyLimit?: number;
   /** RFC 7591 registration at `/oauth/register`; `false` = off (404, no `registration_endpoint`). Default on (D-68). */
   readonly registration?: boolean;
   /** Live dynamic registrations at once. Default {@link OAUTH_DEFAULT_DCR_MAX_CLIENTS}; 1-500. */
   readonly registrationMaxClients?: number;
   /** Registrations one address may make per hour. Default {@link OAUTH_DEFAULT_DCR_IP_LIMIT}. */
   readonly registrationIpLimit?: number;
+  /** Registrations the whole deployment accepts per hour. Default {@link OAUTH_DEFAULT_DCR_HOURLY_LIMIT}. */
+  readonly registrationHourlyLimit?: number;
+  /** Per 10 minutes: authorization requests (`authorizeIpLimit` per address, `authorizeLimit` in all). */
+  readonly authorizeIpLimit?: number;
+  readonly authorizeLimit?: number;
+  /** Per 10 minutes: consent form posts. */
+  readonly consentIpLimit?: number;
+  readonly consentLimit?: number;
+  /** Per 10 minutes: failed token requests (the deployment-wide one only turns away addresses that already failed). */
+  readonly tokenFailureIpLimit?: number;
+  readonly tokenFailureLimit?: number;
   /** When set, `https` redirect hosts of a dynamic client must be on this list (loopback always allowed). */
   readonly registrationRedirectHosts?: readonly string[];
   /** Lifetime of a registration that never exchanged a code, seconds (1 h - 7 d). Default 24 h. */
@@ -387,6 +414,15 @@ export interface OAuthRuntime {
   prepare(c: Context, params: URLSearchParams): Promise<Response | OAuthConsentApi>;
   token(c: Context, onRevocation: () => void): Promise<Response>;
   register(c: Context): Promise<Response>;
+  /**
+   * Abuse controls at the route edge (P5-09): `run` is the endpoint; a refusal is `429` with `Retry-After` and `run` is
+   * not called, so nothing is stored, fetched or read for it.
+   */
+  guard(
+    surface: 'authorize' | 'consent' | 'token',
+    c: Context,
+    run: () => Promise<Response>,
+  ): Promise<Response>;
   /** The apps this person approved (at most {@link MAX_OAUTH_DEVICES_PER_USER}), newest first. */
   devices(userId: string): Promise<OAuthDevice[]>;
   /**
@@ -446,6 +482,36 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     options.registrationIpLimit ?? OAUTH_DEFAULT_DCR_IP_LIMIT,
     1,
     10_000,
+  );
+  const limit = (name: string, value: number | undefined, fallback: number): number =>
+    checkInt(`oauth.${name}`, value ?? fallback, 1, 100_000);
+  const dcrHourlyLimit = limit(
+    'registrationHourlyLimit',
+    options.registrationHourlyLimit,
+    OAUTH_DEFAULT_DCR_HOURLY_LIMIT,
+  );
+  const cimdHourlyLimit = limit(
+    'clientMetadataHourlyLimit',
+    options.clientMetadataHourlyLimit,
+    OAUTH_DEFAULT_CIMD_HOURLY_LIMIT,
+  );
+  const authorizeIpLimit = limit(
+    'authorizeIpLimit',
+    options.authorizeIpLimit,
+    OAUTH_DEFAULT_AUTHORIZE_IP_LIMIT,
+  );
+  const authorizeLimit = limit('authorizeLimit', options.authorizeLimit, OAUTH_DEFAULT_AUTHORIZE_LIMIT);
+  const consentIpLimit = limit('consentIpLimit', options.consentIpLimit, OAUTH_DEFAULT_CONSENT_IP_LIMIT);
+  const consentLimit = limit('consentLimit', options.consentLimit, OAUTH_DEFAULT_CONSENT_LIMIT);
+  const tokenFailureIpLimit = limit(
+    'tokenFailureIpLimit',
+    options.tokenFailureIpLimit,
+    OAUTH_DEFAULT_TOKEN_FAILURE_IP_LIMIT,
+  );
+  const tokenFailureLimit = limit(
+    'tokenFailureLimit',
+    options.tokenFailureLimit,
+    OAUTH_DEFAULT_TOKEN_FAILURE_LIMIT,
   );
   const unusedRegistrationTtl = checkInt(
     'oauth.registrationUnusedTtlSeconds',
@@ -712,6 +778,88 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       audit(event, c);
     }
   };
+  /** The abuse controls of the interactive and token endpoints and the deployment-wide registration and fetch budgets (P5-09). */
+  const abuse = createAbuseGuard({
+    kv: storage.kv,
+    now: () => clock.now(),
+    onError: (surface, error) =>
+      logger.warn('oauth abuse limiter failed; allowing the request', {
+        surface,
+        error: (error as Error).name,
+      }),
+  });
+  const SURFACE_REASON: Record<AbuseSurface, string> = {
+    authorize: 'authorize_limit',
+    consent: 'consent_limit',
+    token_failure: 'token_failure_limit',
+    registration: 'dcr_hourly_limit',
+    metadata_fetch: 'fetch_hourly_limit',
+  };
+  /** Logs and audits a refusal once per window (the guard says which one is first), and answers it as `429`. */
+  const refuseAbuse = (c: Context, refusal: AbuseRefusal): Response => {
+    if (refusal.first) {
+      logger.warn('oauth limit reached', {
+        surface: refusal.surface,
+        scope: refusal.scope,
+        limit: refusal.limit,
+      });
+      audit(
+        {
+          action: 'oauth.request.refused',
+          status: 'denied',
+          requestId: requestIdOf(c),
+          reason: `${SURFACE_REASON[refusal.surface]}_${refusal.scope}`,
+          details: { surface: refusal.surface, scope: refusal.scope, limit: refusal.limit },
+        },
+        c,
+      );
+    }
+    return rateLimited(refusal.retryAfterSeconds, 'Too many requests; retry later.');
+  };
+  /**
+   * The route edge of `/oauth/authorize`, the consent post and `/oauth/token` (P5-09): authorization and consent take a
+   * unit from the address and then the deployment before any work; a token request is turned away when the address (or,
+   * for an address that already failed, the deployment) used up its failures, and a `4xx` answer counts as one.
+   */
+  const guard = async (
+    surface: 'authorize' | 'consent' | 'token',
+    c: Context,
+    run: () => Promise<Response>,
+  ): Promise<Response> => {
+    const address = await callerKey(c);
+    if (surface === 'token') {
+      const spec = {
+        surface: 'token_failure' as const,
+        address,
+        addressLimit: tokenFailureIpLimit,
+        deploymentLimit: tokenFailureLimit,
+        windowSeconds: ABUSE_WINDOW_S,
+      };
+      const blocked = await abuse.blocked(spec);
+      if (blocked !== null) return refuseAbuse(c, blocked);
+      const response = await run();
+      if (response.status >= 400 && response.status < 500 && response.status !== 429) await abuse.fail(spec);
+      return response;
+    }
+    const refusal = await abuse.take(
+      surface === 'authorize'
+        ? {
+            surface,
+            address,
+            addressLimit: authorizeIpLimit,
+            deploymentLimit: authorizeLimit,
+            windowSeconds: ABUSE_WINDOW_S,
+          }
+        : {
+            surface,
+            address,
+            addressLimit: consentIpLimit,
+            deploymentLimit: consentLimit,
+            windowSeconds: ABUSE_WINDOW_S,
+          },
+    );
+    return refusal === null ? run() : refuseAbuse(c, refusal);
+  };
   /** Live dynamic registrations and stored document clients (record keys the provider wrote, from the `kv` table). */
   const countClients = async (): Promise<{ dynamic: number; documents: number }> => {
     const names = await storage.kv.list(CLIENT_RECORD_PREFIX, { limit: KV_LIST_MAX });
@@ -766,6 +914,15 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       });
       return 'fetch_budget';
     }
+    const total = await abuse.take({
+      surface: 'metadata_fetch',
+      deploymentLimit: cimdHourlyLimit,
+      windowSeconds: CAP_WINDOW_S,
+    });
+    if (total !== null) {
+      refuseAbuse(c, total);
+      return 'fetch_budget';
+    }
     try {
       const { client, ttlSeconds } = await fetchMetadataDocument(
         clientId,
@@ -809,26 +966,10 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
   const registrations: OAuthRegistrations = Object.freeze({
     count: countClients,
     async sweep() {
-      const now = Math.floor(clock.now() / 1000);
-      const names = await storage.kv.list(CLIENT_RECORD_PREFIX, { limit: KV_LIST_MAX });
-      let removed = 0;
-      for (const name of names) {
-        if (name.startsWith(DOCUMENT_CLIENT_PREFIX)) continue;
-        const key = name.slice(OAUTH_KV_PREFIX.length);
-        const record = (await env.OAUTH_KV.get(key, { type: 'json' })) as {
-          readonly registrationDate?: unknown;
-          readonly registrationExpiresAt?: unknown;
-        } | null;
-        if (record === null || typeof record.registrationDate !== 'number') continue;
-        if (typeof record.registrationExpiresAt !== 'number') continue;
-        // Unused: the expiry stamp is still the short one the registration was given (a token exchange renews it to the
-        // long registration lifetime), and the unused lifetime configured now has run out.
-        const unused = record.registrationExpiresAt - record.registrationDate <= 7 * 86_400;
-        if (unused && record.registrationDate + unusedRegistrationTtl <= now) {
-          await env.OAUTH_KV.delete(key);
-          removed += 1;
-        }
-      }
+      const { removed } = await sweepRegistrations(storage, {
+        now: () => clock.now(),
+        unusedTtlSeconds: unusedRegistrationTtl,
+      });
       return { removed };
     },
   });
@@ -987,6 +1128,7 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
   const runtime: OAuthRuntime = {
     issuer,
     registrations,
+    guard,
     clientMetadataDocuments: cimd !== undefined,
     resourceUrl,
     resourceMetadataUrl,
@@ -1115,7 +1257,14 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
           'Too many client registrations from this address; retry later.',
         );
       }
-      // Then the deployment's cap on live registrations. Reads, so a burst may overshoot by its concurrency, which the
+      // Then the deployment's registrations per hour (a bound on churn), then its cap on live ones.
+      const churn = await abuse.take({
+        surface: 'registration',
+        deploymentLimit: dcrHourlyLimit,
+        windowSeconds: CAP_WINDOW_S,
+      });
+      if (churn !== null) return refuseAbuse(c, churn);
+      // The deployment's cap on live registrations. Reads, so a burst may overshoot by its concurrency, which the
       // per-address limit and the request limiter bound.
       if ((await countClients()).dynamic >= dcrMaxClients) {
         logger.warn('oauth registration cap reached', { limit: dcrMaxClients });
