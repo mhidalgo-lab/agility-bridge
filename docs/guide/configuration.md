@@ -105,6 +105,9 @@ follows in the self-hosting guide.
 | `AB_AUDIT_RETENTION_DAYS` | `90` | Days the [audit log](audit-log.md) keeps rows; `0` keeps them forever |
 | `AB_CREDENTIAL_REVALIDATION_HOURS` | `24` | Hours between revalidations of stored Agility tokens ([access model](access-model.md#credential-validation)); `0` = never |
 | `AB_ADMIN_TOKEN_FILE` or `AB_ADMIN_TOKEN` | unset | The break-glass admin token from `agility-bridge admin-token`; turns on the [admin API](../reference/admin-api.md) (`404` without it). Hand-made values are refused |
+| `AB_OAUTH` | `off` | The OAuth 2.1 server for MCP clients ([how it works](../dev/oauth.md)). `on` needs `AB_PUBLIC_URL` (the issuer). Not usable yet: it is refused at start until the consent screen of P5-04 exists |
+| `AB_OAUTH_ACCESS_TTL` | `1h` | Access-token lifetime: seconds, or a number with `s`, `m`, `h`, `d` (60 s to 24 h) |
+| `AB_OAUTH_REFRESH_TTL` | `30d` | Absolute lifetime of a device authorization's refresh tokens (1 h to 365 d, not shorter than the access lifetime) |
 | `AB_PASSTHROUGH` | `off` | `on` lets [pass-through workspaces](self-hosting.md#pass-through-workspaces-optional) accept the caller's own Agility token (`X-Agility-Token`, HTTPS only, read-only) |
 | `AB_INSTANCE_PRIVATE_ADDRESSES` | `allow` | `refuse` accepts only instances at public addresses: a host that is, or resolves to, a loopback, private, link-local (cloud metadata) or reserved address is refused when the instance is added or retargeted, and again at every connection (so a DNS answer that changes later is refused too). Keep `allow` for on-premises instances on a private network |
 | `AB_ALLOW_HTTP_INSTANCES` | `off` | `on` accepts plain-HTTP loopback instance URLs (`http://127.0.0.1/…`), for tests and the local synthetic Agility only; logged as a warning |

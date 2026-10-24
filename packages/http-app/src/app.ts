@@ -42,10 +42,20 @@ import { AccessCache } from './access-cache.ts';
 import { ADMIN_BASE, type AdminApiOptions, adminAuthenticator, createAdminApi } from './admin/api.ts';
 import { errorBody } from './admin/errors.ts';
 import { ADMIN_UI_BASE, type AdminUiModule, adminUiDeps, loadAdminUiModule } from './admin-ui.ts';
-import type { LoginEvent } from './audit.ts';
+import type { LoginEvent, OAuthEvent } from './audit.ts';
 import { createEdge, type EdgeOptions } from './edge.ts';
 import { createIdentityRoutes, IDENTITY_BASE, type IdentityOptions } from './identity.ts';
 import { type ClassifiedRequest, classifyMcpMessage, jsonRpcError, readMcpBody } from './mcp-request.ts';
+import {
+  createOAuthRuntime,
+  looksLikeOAuthToken,
+  OAUTH_AUTHORIZE_PATH,
+  OAUTH_METADATA_PATH,
+  OAUTH_REGISTER_PATH,
+  OAUTH_TOKEN_PATH,
+  type OAuthOptions,
+  type OAuthRuntime,
+} from './oauth/server.ts';
 import { createSessionManager, type SessionManager, type SessionOptions } from './session.ts';
 
 /** 1 MiB (ARCHITECTURE §5 step 1). */
@@ -150,6 +160,15 @@ export interface HttpAppOptions extends EdgeOptions {
     readonly secure: (c: Context) => boolean;
     /** Seconds a validated token's identity is reused (default 300). */
     readonly identityTtlSeconds?: number;
+  };
+  /**
+   * The OAuth 2.1 authorization server (P5-01): metadata, `/oauth/authorize`, `/oauth/token`, `/oauth/register`, and
+   * OAuth access tokens accepted on `/w/{slug}/mcp` next to device tokens. Absent = those routes answer 404 and only
+   * device tokens work. Needs `publicUrl` (the issuer).
+   */
+  readonly oauth?: OAuthOptions & {
+    /** Records OAuth steps as `auth` audit rows (`AuditWriter.oauth`). */
+    readonly audit?: (event: OAuthEvent) => unknown;
   };
   /** The admin API at `/api/admin/v1` (P2-09); absent = the whole API answers 404. */
   readonly admin?: Pick<AdminApiOptions, 'services' | 'audit' | 'authenticate'>;
@@ -561,6 +580,49 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     app.all(`${ADMIN_UI_BASE}/*`, servePanel);
   }
 
+  // OAuth 2.1 authorization server (P5-01): unauthenticated routes, limited per IP before any work, bodies capped by
+  // the runtime. All state is in storage (L-086); the runtime holds configuration only (L-013, L-096).
+  let oauth: OAuthRuntime | undefined;
+  if (options.oauth !== undefined) {
+    const { audit: oauthAudit, ...oauthOptions } = options.oauth;
+    if (options.publicUrl === undefined) throw new TypeError('oauth needs publicUrl: it is the issuer');
+    oauth = createOAuthRuntime({
+      options: oauthOptions,
+      issuer: options.publicUrl,
+      storage: options.storage,
+      access: options.access,
+      clock: services.clock,
+      logger: services.logger,
+      runInBackground: (c, work) => keepAlive(c, work),
+      ...(oauthAudit === undefined
+        ? {}
+        : {
+            audit: (event: OAuthEvent) => {
+              const work = oauthAudit(event);
+              if (work instanceof Promise) return work;
+              return undefined;
+            },
+          }),
+    });
+    const runtime = oauth;
+    const limited = async (c: Context, run: () => Promise<Response>): Promise<Response> => {
+      const now = services.clock.now();
+      const decision = await options.limits?.beforeAuth?.(clientIp(c), now);
+      if (decision !== undefined && !decision.ok) {
+        return c.json(
+          { error: 'temporarily_unavailable', error_description: 'Too many requests; retry later.' },
+          429,
+          { 'retry-after': String(Math.max(1, Math.ceil(decision.retryAfterSeconds))) },
+        );
+      }
+      return run();
+    };
+    app.get(OAUTH_METADATA_PATH, (c) => limited(c, () => runtime.metadata(c)));
+    app.get(OAUTH_AUTHORIZE_PATH, (c) => limited(c, () => runtime.authorize(c)));
+    app.post(OAUTH_TOKEN_PATH, (c) => limited(c, () => runtime.token(c, () => cache.clear())));
+    app.post(OAUTH_REGISTER_PATH, (c) => limited(c, () => runtime.register(c)));
+  }
+
   // Liveness and version only (L-151).
   app.get('/health', (c) => c.json({ status: 'ok' }));
   app.get('/version', (c) => c.json({ version: options.version }));
@@ -673,10 +735,9 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
           'unavailable',
         );
       }
-    } else {
-      if (presented === null || !isWellFormedDeviceToken(presented, options.access.environment)) {
-        return unauthorized(presented === null ? 'no_token' : 'token_malformed');
-      }
+    } else if (presented === null) {
+      return unauthorized('no_token');
+    } else if (isWellFormedDeviceToken(presented, options.access.environment)) {
       try {
         const hash = await hashDeviceToken(presented);
         access = cache.get(hash, slug, started) ?? null;
@@ -699,6 +760,27 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
           'unavailable',
         );
       }
+    } else if (oauth !== undefined && looksLikeOAuthToken(presented)) {
+      // An OAuth access token (P5-01): valid for this workspace's resource only, its grant resolved like a device
+      // token's (same cache keyed by the token's hash and the slug, same single 401 for every denial).
+      try {
+        const hash = await hashDeviceToken(presented);
+        access = cache.get(hash, slug, started) ?? null;
+        if (access === null) {
+          const outcome = await oauth.authenticate(presented, slug);
+          if (!outcome.ok) return unauthorized(outcome.reason);
+          access = outcome.access;
+          cache.set(hash, slug, access, started);
+        }
+      } catch (error) {
+        services.logger.error('access resolution failed', { requestId, error: (error as Error).name });
+        return finish(
+          c.json({ error: 'temporarily unavailable' }, 503, { 'retry-after': '5' }),
+          'unavailable',
+        );
+      }
+    } else {
+      return unauthorized('token_malformed');
     }
 
     if (c.req.method !== 'POST') {

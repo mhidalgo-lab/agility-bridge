@@ -9,7 +9,7 @@ export {
   StorageError,
   type StorageErrorCode,
 } from './errors.ts';
-export { STATS_SCAN_CAP } from './fields.ts';
+export { SLUG_RE, STATS_SCAN_CAP } from './fields.ts';
 export { createMemoryStorage, type MemoryStorageOptions } from './memory.ts';
 export { MIGRATIONS, type Migration } from './migrations/index.ts';
 export { readOnlyStorage } from './read-only.ts';

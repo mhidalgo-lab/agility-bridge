@@ -99,6 +99,8 @@ const KNOWN_ENV = new Set([
   'AB_ALLOW_HTTP_INSTANCES',
   'AB_INSTANCE_PRIVATE_ADDRESSES',
   'AB_OAUTH',
+  'AB_OAUTH_ACCESS_TTL',
+  'AB_OAUTH_REFRESH_TTL',
   'AB_PLAN',
   // Sign-in (P4-01): the provider settings, their secrets as 0600 files, and the IdP address policy.
   ...IDENTITY_SETTING_NAMES,

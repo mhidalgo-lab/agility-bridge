@@ -68,7 +68,13 @@ export interface World {
     instance: string;
     owner: string;
     admin: string;
+    workspaceB: string;
+    aliceGrantB: string;
+    bob: string;
+    bobGrant: string;
   };
+  /** The domain services over the same storage (fixtures: no validator). */
+  services: ReturnType<typeof accessServices>;
   requests: RequestEvent[];
   toolCalls: ToolCallRecord[];
   app: ReturnType<typeof createHttpApp>;
@@ -99,9 +105,24 @@ export async function world(
      * `reject` names tokens the fake answers 401 for (the validation then ends `invalid`).
      */
     validate?: { reject?: (token: string) => boolean };
+    /**
+     * Time is the real one (read at each use): for code that also reads `Date.now()` itself, like the OAuth provider.
+     * Tests move it with `vi.setSystemTime`; `now.t` cannot be assigned.
+     */
+    liveClock?: boolean;
   } = {},
 ): Promise<World> {
-  const now = { t: Date.UTC(2026, 9, 21, 12) };
+  const now: { t: number } =
+    options.liveClock === true
+      ? {
+          get t() {
+            return Date.now();
+          },
+          set t(_v: number) {
+            throw new Error('the live clock moves with vi.setSystemTime');
+          },
+        }
+      : { t: Date.UTC(2026, 9, 21, 12) };
   const storage = createMemoryStorage({ now: () => now.t });
   const keyring = await Keyring.create(generateMasterKey(1));
   const toolInfo = options.tools ?? TOOL_INFO;
@@ -254,6 +275,8 @@ export async function world(
     }),
     version: '0.0.0-test',
     ...over,
+    // OAuth steps are audited like the real hosts do (`assembleServer`).
+    ...(over.oauth === undefined ? {} : { oauth: { audit: (e) => audit.oauth(e), ...over.oauth } }),
   });
   return {
     storage,
@@ -270,7 +293,12 @@ export async function world(
       instance: instance.id,
       owner: ownerUser.id,
       admin: adminUser.id,
+      workspaceB: wsB.id,
+      aliceGrantB: aliceGrantB.id,
+      bob: bob.id,
+      bobGrant: bobGrant.id,
     },
+    services: fixtureSvc,
     requests,
     toolCalls,
     app,

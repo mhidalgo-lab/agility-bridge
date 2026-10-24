@@ -21,8 +21,17 @@ export default defineProject({
       '@agility-bridge/storage-sqlite': fileURLToPath(
         new URL('../../packages/storage-sqlite/src/index.ts', import.meta.url),
       ),
+      // The OAuth provider imports `WorkerEntrypoint` for `instanceof` checks only (ADR-0009).
+      'cloudflare:workers': fileURLToPath(
+        new URL('../../packages/http-app/src/oauth/cloudflare-workers-shim.ts', import.meta.url),
+      ),
     },
   },
   // Real servers, SQLite files and child processes: the Windows runner needs well over the 5 s default.
-  test: { name: 'cli', testTimeout: 30_000 },
+  test: {
+    name: 'cli',
+    testTimeout: 30_000,
+    // Transformed by Vite (not loaded by Node) so the `cloudflare:workers` alias applies inside it.
+    server: { deps: { inline: ['@cloudflare/workers-oauth-provider'] } },
+  },
 });

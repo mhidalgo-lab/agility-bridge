@@ -12,7 +12,13 @@ export default defineProject({
       '@agility-bridge/auth': src('auth'),
       '@agility-bridge/core': src('core'),
       '@agility-bridge/storage': src('storage'),
+      // The OAuth provider imports `WorkerEntrypoint` for `instanceof` checks only (ADR-0009).
+      'cloudflare:workers': fileURLToPath(new URL('./src/oauth/cloudflare-workers-shim.ts', import.meta.url)),
     },
   },
-  test: { name: 'http-app' },
+  test: {
+    name: 'http-app',
+    // Transformed by Vite (not loaded by Node) so the `cloudflare:workers` alias applies inside it.
+    server: { deps: { inline: ['@cloudflare/workers-oauth-provider'] } },
+  },
 });

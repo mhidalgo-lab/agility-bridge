@@ -33,7 +33,7 @@ How to use it:
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242, L-243 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -1183,6 +1183,20 @@ is the backstop for the day someone logs a request or an error message. Name eac
 three forms (a `name=value` string, an object key, a URL query), and keep a plain `code` or `state` key unredacted: error
 codes live under that name.
 *Applied in:* P4-11 review, `packages/core/src/redact.ts`, `packages/core/test/redact.test.ts`.
+
+**L-242 — A library's own rule is not a test of ours: prove each guard with a case the library lets through.**
+`workers-oauth-provider` insists on PKCE for public clients, validates `resource` and the content type of token
+requests itself, so our checks for the same things looked tested while a mutation of them survived. A guard is only
+proven by a client the library would accept without it (a confidential client without a challenge, a foreign `resource`
+that must not spend the code, a refresh after the grant ended). Keep the library's check and ours both, and say in the
+test which one it exercises; where only the library can fail (a forged props block), record the mutant as equivalent.
+*Applied in:* P5-01 (mutation checks recorded in the task Outcome).
+
+**L-243 — The OAuth library's time is `Date.now()`, ours is injected: give tests one clock.**
+Codes expire by the `kv` TTL (our clock) while token records carry the provider's own timestamps, so a test that moves
+only the injected clock sees one half expire. Memory-backed tests run on a live clock moved with `vi.setSystemTime`;
+a store that captured `Date.now` at open (SQLite) cannot be moved, so those hosts skip the time-travel cases.
+*Applied in:* P5-01.
 
 ## Q. Testing, evals and live verification
 

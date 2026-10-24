@@ -20,6 +20,8 @@ No telemetry leaves the process (OpenTelemetry is P8-07, off by default).
 
 - agility-bridge tokens (`ab_live_`, `ab_test_`, `ab_admin_`), `Bearer` credentials, `Authorization` headers of any
   scheme, key/value assignments whose name looks secret (`AB_MASTER_KEY=…`, `token=…`, `password=…`, …).
+- OAuth codes, access tokens and refresh tokens (`<user id>:<grant id>:<secret>`; the two ids stay, the secret goes), also
+  as `refresh_token=…`, `authorizationCode` and `?code=…` (P5-01).
 - JWTs, AWS keys, GitHub/Slack/Stripe/OpenAI-style tokens, master keys (`v<N>:<base64>`), credentials in URLs, PEM
   private keys.
 - Object keys that are always secret (`authorization`, `token`, `password`, `secret`, `master_key`, `cookie`, …).
@@ -58,6 +60,12 @@ carry `requestId`.
 | warn | `identity hash failed` | `event` | [identity.ts](../../packages/http-app/src/identity.ts) |
 | error | `login failed` | `requestId`, `provider`, `error` (class); never codes, tokens, cookies or the email | [identity.ts](../../packages/http-app/src/identity.ts) |
 | warn | `GitHub token revocation failed` | `requestId`, `provider`, `reason` (`status` or `network`), `status` (never the token) | [github.ts](../../packages/auth/src/identity/github.ts) |
+| debug | `oauth error response` | `code`, `status`, `reason` (stable provider reason, never the request) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| debug | `oauth authorize request refused` | `error` (class) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| info | `oauth token refused; device revoked` | `reason` (resolver deny reason), `oauthGrant` (provider grant id), `grantType` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| warn | `oauth authorization code replayed; grant revoked` | `oauthGrant`; never the code | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| warn | `oauth tokens issued for a revoked device; revoked again` | `oauthGrant` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| warn | `oauth audit failed` | `error` (class) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | error | `audit write failed` | `action`, `error` (class) | [audit.ts](../../packages/http-app/src/audit.ts) |
 | error | `audit queue full; rows dropped` | `dropped` | [audit.ts](../../packages/http-app/src/audit.ts) |
 | info | `audit retention` | `deleted`, `retentionDays` | [audit.ts](../../packages/http-app/src/audit.ts) |

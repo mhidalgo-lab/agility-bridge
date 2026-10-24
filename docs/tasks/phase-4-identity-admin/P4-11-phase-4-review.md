@@ -2,7 +2,7 @@
 id: P4-11
 title: Phase 4 review
 phase: 4
-status: review
+status: done
 priority: high
 depends_on: [P4-08, P4-09, P4-10]
 adr: []

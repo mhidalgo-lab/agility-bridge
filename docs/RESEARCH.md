@@ -415,6 +415,24 @@ status is in [client-compatibility](reference/client-compatibility.md#remote-sni
   1.142.0 register through CIMD (`https://claude.ai/oauth/claude-code-client-metadata`,
   `https://vscode.dev/oauth/client-metadata.json`), MCP Inspector CLI 2.11.0 through DCR. *live*
 
+- **P5-01 (2026-10-24), `workers-oauth-provider` 1.2.3 as built into the server.** Confirmed against the package's own
+  documentation ([storage-schema.md](https://github.com/cloudflare/workers-oauth-provider/blob/main/storage-schema.md),
+  [AGENTS.md](https://github.com/cloudflare/workers-oauth-provider/blob/main/AGENTS.md); read through Context7) and by
+  the P5-01 suites on Node (memory, SQLite) and workerd (D1): codes, access tokens and refresh tokens are stored as
+  SHA-256 hashes (client secrets too; PKCE keeps only the challenge); `props` are AES-GCM encrypted with a per-grant key
+  wrapped under the code, the refresh token and each access token, so only a token holder can open them; tokens are
+  `userId:grantId:secret` (secret 32 characters). **Public clients** get PKCE enforced by the provider; the provider also
+  refused a confidential client without `code_challenge` in the tests, and our own check stands behind it. **Refresh
+  rotation keeps the previous refresh token usable** until the new one is first used (a lost response must not strand a
+  client): the previous token still answered `200` after a rotation, so strict reuse detection is ours to build (P5-05).
+  Expiry of codes rests on the key's TTL in `kv`, not a timestamp the provider checks. The library prints a
+  `console.warn` about CIMD when it is loaded without Workers' `global_fetch_strictly_public` flag (harmless: we turn its
+  CIMD off, P5-03 supplies our own). The `@modelcontextprotocol/client` 2.3.1 OAuth functions (`discoverAuthorizationServerMetadata`,
+  `registerClient`, `startAuthorization`, `exchangeAuthorization` with the RFC 9207 `iss` check, `refreshAuthorization`,
+  `auth()`) drive the server as written; without a protected resource metadata document the SDK does not send `resource`
+  (P5-02) unless the client provider names it through `validateResourceURL`. 1.2.4 was published 2026-10-22 and is not
+  used yet (3-day release age). *live (local, workerd and Node)*
+
 ## 5. Cloudflare Workers platform
 
 Checked 2026-10 in Cloudflare documentation; P0-09 measures with Agility-shaped payloads.

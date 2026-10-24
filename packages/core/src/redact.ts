@@ -25,7 +25,7 @@ const VALUE_PATTERNS: ReadonlyArray<[RegExp, (match: string, ...groups: string[]
   // client_secret=v, access_token=v. A name prefix is allowed; only its last 40 characters are matched (bounded).
   // csrf, verifier, nonce and setup[_-]code cover the admin sign-in values (P4-01, P4-02: `_csrf=`, `code_verifier=`).
   [
-    /([A-Za-z0-9_.-]{0,40}?(?:api[_-]?key|(?:master|access|private)[_-]?key|passw(?:or)?d|secret|token|credentials?|cookie|csrf|verifier|nonce|setup[_-]?code))("?\s*[:=]\s*"?)([^\s",;}&]+)/gi,
+    /([A-Za-z0-9_.-]{0,40}?(?:api[_-]?key|(?:master|access|private)[_-]?key|passw(?:or)?d|secret|token|credentials?|cookie|csrf|verifier|(?:authorization|auth)[_-]?code|nonce|setup[_-]?code))("?\s*[:=]\s*"?)([^\s",;}&]+)/gi,
     (_m, name, sep) => `${name}${sep}${REDACTED}`,
   ],
   // The OAuth authorization code in a callback URL's query string (`?code=…`, `&code=…`), single use but still a grant.
@@ -49,6 +49,9 @@ const FREE_TEXT_PATTERNS: ReadonlyArray<[RegExp, string]> = [
   [/\bv[0-9]{1,3}:[A-Za-z0-9+/]{43}=/g, '[REDACTED_MASTER_KEY]'],
   // Credentials in URLs: scheme://user:password@host.
   [/([a-z][a-z0-9+.-]{0,31}:\/\/)[^\s/:@]+:[^\s/@]+@/gi, '$1[REDACTED]@'],
+  // OAuth authorization codes, access tokens and refresh tokens (P5-01): `<user id>:<grant id, 16>:<secret, 32>`. The two
+  // ids are not secret and stay, so a log line can still be matched to a device.
+  [/\b([A-Za-z0-9_-]{1,64}:[A-Za-z0-9_-]{16}:)[A-Za-z0-9_-]{32}(?![A-Za-z0-9_-])/g, '$1[REDACTED]'],
   // PEM private key bodies.
   [
     /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g,
@@ -58,7 +61,7 @@ const FREE_TEXT_PATTERNS: ReadonlyArray<[RegExp, string]> = [
 
 /** Object keys whose values are always redacted, whatever they contain. */
 const SECRET_KEY_RE =
-  /^(api[-_]?key|x-api-key|authorization|proxy-authorization|token|access[-_]?token|refresh[-_]?token|id[-_]?token|password|secret|client[-_]?secret|master[-_]?key|cookie|set-cookie|x-csrf-token|csrf|_csrf|csrf[-_]?token|code[-_]?verifier|nonce|setup[-_]?code|session[-_]?(?:secret|token)|client[-_]?secret)$/i;
+  /^(api[-_]?key|x-api-key|authorization|proxy-authorization|token|access[-_]?token|refresh[-_]?token|id[-_]?token|password|secret|client[-_]?secret|master[-_]?key|cookie|set-cookie|x-csrf-token|csrf|_csrf|csrf[-_]?token|code[-_]?verifier|(?:authorization|auth)[-_]?code|nonce|setup[-_]?code|session[-_]?(?:secret|token)|client[-_]?secret)$/i;
 
 export function isSecretKeyName(key: string): boolean {
   return SECRET_KEY_RE.test(key);

@@ -175,7 +175,9 @@ export const LIMITS = Object.freeze({
   jsonBytes: 65_536,
 });
 
-const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+/** A workspace slug: what `/w/{slug}/mcp` names. */
+export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const SLUG = SLUG_RE;
 const HASH = /^[0-9a-f]{64}$/;
 const PREFIX = /^ab_(?:live|test)_[0-9A-Za-z]{4}$/;
 // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what this refuses

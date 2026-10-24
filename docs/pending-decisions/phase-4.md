@@ -238,4 +238,4 @@
 - **Recommendation:** (a). Nothing in Phase 5's first tasks (metadata, dynamic client registration, the token endpoint)
   needs a real provider, and a provider defect shows up at the sign-in step whatever the order. Switch to (b) before the
   consent page task (the first one that signs a person in), and do the follow-ups by priority, not as a gate.
-- **Owner:** _pending_.
+- **Owner (2026-10-24):** Decided: (a), go for Phase 5 now.

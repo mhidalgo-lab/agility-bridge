@@ -6,5 +6,8 @@
     "declaration": false,
     "isolatedDeclarations": false
   },
-  "include": ["src", "test"]
+  "include": ["src", "test"],
+  // The shared OAuth suite imports the MCP client, whose `source` export condition pulls third-party TypeScript sources
+  // that do not compile under this configuration; vitest still runs the file.
+  "exclude": ["test/oauth.test.ts", "test/fixtures/oauth-entry.ts"]
 }

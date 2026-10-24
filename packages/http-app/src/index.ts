@@ -30,6 +30,7 @@ export {
   type AuditOptions,
   AuditWriter,
   type LoginEvent,
+  type OAuthEvent,
   purgeAudit,
   scheduleAuditRetention,
 } from './audit.ts';
@@ -50,6 +51,30 @@ export {
   readMcpBody,
 } from './mcp-request.ts';
 export {
+  createOAuthRuntime,
+  looksLikeOAuthToken,
+  MCP_SCOPE,
+  OAUTH_AUTHORIZE_PATH,
+  OAUTH_METADATA_PATH,
+  OAUTH_REGISTER_PATH,
+  OAUTH_SCOPES,
+  OAUTH_TOKEN_PATH,
+  type OAuthApproval,
+  type OAuthAuthentication,
+  type OAuthAuthorizationRequest,
+  type OAuthConsentApi,
+  type OAuthConsentHandler,
+  type OAuthGrantProps,
+  type OAuthOptions,
+  type OAuthRuntime,
+} from './oauth/server.ts';
+export {
+  OAUTH_SETTING_NAMES,
+  OAuthConfigError,
+  type OAuthSettings,
+  oauthSettingsFromEnv,
+} from './oauth/settings.ts';
+export {
   addressKey,
   clientAddress,
   createRequestLimits,
@@ -62,6 +87,7 @@ export {
 export {
   type AssembledServer,
   assembleServer,
+  type HostFeatures,
   parseServerSettings,
   parseSessionSettings,
   revalidateOnAuthErrors,

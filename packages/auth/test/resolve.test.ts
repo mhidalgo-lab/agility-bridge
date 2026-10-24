@@ -146,6 +146,8 @@ describe('resolveAccess: denies by default', () => {
     denied('wrong_workspace', records({ grant: null, credential: null }), device(), 'team-b');
     denied('wrong_workspace', records(), {
       kind: 'oauth',
+      tokenId: 'oauth_test',
+      clientId: 'client-1',
       grantId: 'g-alice',
       workspaceId: 'w-2',
       writeScope: false,
@@ -220,6 +222,8 @@ describe('resolveAccess: denies by default', () => {
   it('an expired OAuth session denies', () => {
     denied('token_expired', records(), {
       kind: 'oauth',
+      tokenId: 'oauth_test',
+      clientId: 'client-1',
       grantId: 'g-alice',
       workspaceId: 'w-1',
       writeScope: true,
@@ -274,6 +278,8 @@ describe('resolveAccess: write tools (ADR-0008, ADR-0013)', () => {
     expect(allowed(writeRecords({ ws: { writePolicy: {} } })).writeTools).toEqual([]);
     const oauth = (writeScope: boolean): Principal => ({
       kind: 'oauth',
+      tokenId: 'oauth_test',
+      clientId: 'client-1',
       grantId: 'g-alice',
       workspaceId: 'w-1',
       writeScope,

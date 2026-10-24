@@ -228,6 +228,23 @@ From the [Phase 3 review](reviews/phase-3-review.md). The Cloudflare Worker (mod
 | T34 | verified | `cf:setup` and `cf:migrate` refuse another deployment's config; only production issues `ab_live_` tokens |
 | A9 | verified | Workers reach only public instances with trusted certificates; Node's public-only mode covers embedded IPv4 forms (review L4) |
 
+## 8d. Status after P5-01 (2026-10-24)
+
+The OAuth 2.1 authorization server ([dev/oauth.md](dev/oauth.md)) is built and off by default (`AB_OAUTH`); no host
+can turn it on before the consent screen (P5-04).
+
+| Id | Status | Evidence |
+|---|---|---|
+| T2 | verified (OAuth) | The token's audience is one `/w/{slug}/mcp`; a token for A at B or at an unknown slug is the same `401` as no token (`oauth_invalid`); the resolver checks the workspace id of the token's props; refresh cannot retarget (`invalid_target`) |
+| T8 | verified | Provider-shaped tokens (`<user>:<grant>:<secret>`) redacted in text, JSON and URLs; storage, a SQLite file copy, logs and audit scanned for codes, tokens, refresh tokens and verifiers after full flows |
+| T9 | partly verified | PKCE S256 for every client (public and confidential), exact redirect matching by the provider, `iss` on every response, codes single use through an atomic `kv.take` marker (replay and 6-way concurrency tests; a replay revokes the grant, tombstone first), hash-only storage, props encrypted by the provider. **Open:** a rotated refresh token stays usable once more (provider rule) until P5-05 |
+| T15 | verified (OAuth) | Same cache as device tokens, never past the token's expiry; RFC 7009 revocation clears it; a revoked grant ends the token within the cache lifetime |
+| T19 | verified (OAuth) | One `401` body and challenge for every denial, including OAuth ones; `resource` for an unknown workspace is refused at approval like any other grant problem |
+| T21 | verified | No request data in module state; provider objects hold configuration only; the suites also run per-request-isolated and on workerd |
+| T25 | implemented | Opaque ids only in grant metadata (the access grant id); props encrypted; no email in any key or value (asserted) |
+
+Residual: registration is uncapped until P5-03 and P5-09; `AB_OAUTH=on` is refused until P5-04.
+
 ## 9. Maintenance
 
 - Update this file in the same PR as any security-relevant change (AGENTS.md).

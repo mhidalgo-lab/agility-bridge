@@ -163,6 +163,36 @@ describe('redactValue and Secret', () => {
     expect(redact('ID token nonce does not match the login')).toBe('ID token nonce does not match the login');
   });
 
+  it('removes OAuth codes and tokens in the provider shape, in text, JSON and keys (P5-01, L-240)', () => {
+    const user = `usr_${fake(32, '0123456789abcdef')}`;
+    const grant = fake(16, `${B62}-_`);
+    const secret = fake(32, `${B62}-_`);
+    const token = `${user}:${grant}:${secret}`;
+    for (const line of [
+      `token ${token} refused`,
+      `{"access_token":"${token}","refresh_token":"${token}"}`,
+      `refresh_token=${token}&client_id=c`,
+      `authorizationCode=${secret}`,
+      `GET /oauth/callback?code=${token}&state=s`,
+    ]) {
+      const out = redact(line);
+      expect(out).not.toContain(secret);
+      expect(out).toContain(REDACTED);
+    }
+    // The two ids stay, so a line can still be matched to a device.
+    expect(redact(`device ${token} revoked`)).toBe(`device ${user}:${grant}:${REDACTED} revoked`);
+    expect(
+      redactValue({ authorizationCode: secret, authCode: secret, accessToken: token, code: 'E_X' }),
+    ).toEqual({
+      authorizationCode: REDACTED,
+      authCode: REDACTED,
+      accessToken: REDACTED,
+      code: 'E_X',
+    });
+    // Times and addresses are not tokens.
+    expect(redact('at 12:34:56 from 2001:db8:0:0:0:0:0:1')).toBe('at 12:34:56 from 2001:db8:0:0:0:0:0:1');
+  });
+
   it('cuts cycles and depth', () => {
     const a: Record<string, unknown> = { name: 'a' };
     a['self'] = a;
