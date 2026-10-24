@@ -31,7 +31,8 @@ async function pkce(): Promise<{ verifier: string; challenge: string }> {
 }
 
 async function server() {
-  const t = await setup({ oauth: {} });
+  // Many registrations from one address: the per-address registration limit (P5-03) is not under test here.
+  const t = await setup({ oauth: { registrationIpLimit: 1000, registrationMaxClients: 500 } });
   return t;
 }
 

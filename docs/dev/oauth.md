@@ -93,7 +93,7 @@ Tests scan `kv`, audit rows, logs and a SQLite file copy for codes, tokens and v
   `handle_mismatch`, `grant_not_offered`). Approve needs one of the person's own offered grants, then `approve()`;
   Deny is `api.deny()`. The answer is a `303` to the validated redirect URI (an `http://[::1]` target gets a same-origin
   page with `Refresh` instead, L-249).
-- **Not built:** remembered consent (D-66), write consent (Phase 7), CIMD identification (P5-03).
+- **Not built:** remembered consent (D-66), write consent (Phase 7), CIMD identification (built in P5-03, not yet shown on the page).
 
 ### Phishing review (T10)
 
@@ -124,17 +124,71 @@ A **device** is one provider grant: an app approved by one person for one worksp
   clears the access cache and writes `oauth.device.revoke` (`via: my_access`). A refresh token or access token of a
   disconnected device is refused at once (tests).
 
+## Client registration (P5-03)
+
+Two ways for a client to get a `client_id`; both end as an `oauth:client:<id>` record the provider reads, so redirect
+matching and grants work the same for either.
+
+**Client ID Metadata Documents (CIMD).** A `client_id` that is an https URL names a JSON document. We resolve it ourselves
+(`clientIdMetadataDocumentEnabled` stays `false` in the provider: its fetcher follows redirects and needs the Workers flag).
+`resolveClient` runs at `/oauth/authorize` and `/oauth/token`, before the provider looks the client up and before a code is
+consumed:
+
+1. The id is checked **before any fetch**: at most 400 characters, canonical (`URL.href` equals the string: no dot
+   segments, uppercase host, `:443`, backslash), https, a path, no userinfo, fragment or port (stricter than the draft,
+   which allows a port), a DNS name with a dot (no IP literal in any spelling, no `.local`, `.internal`, `.test`, ...),
+   not our own host.
+2. A stored record (`client:<url>`) means no fetch. Otherwise the stored-document cap (`AB_OAUTH_CIMD_MAX_CLIENTS`, 200) and
+   the per-address budget (`AB_OAUTH_CIMD_FETCH_LIMIT`, 20 an hour, an atomic `kv.increment` with `max`, keyed by a hash of
+   the address) are checked, then the fetch counts, success or not.
+3. The fetch is `GET`, `Accept: application/json`, no redirects (a 3xx is a failure), 5 s for headers and body together
+   (raced, so a fetcher that ignores its signal cannot hold the request), 200 and a JSON media type, 5 KiB declared and
+   streamed, UTF-8. **The guard is the host's fetcher**: Node refuses any non-public address at connect time
+   (`createClientMetadataFetch`, the P2-19 guard: every answer of the lookup is checked, so a rebinding answer or a mixed
+   answer is refused; address literals before DNS); Workers use `global_fetch_strictly_public` (`wrangler.jsonc`, read
+   from the runtime) and `redirect: 'manual'`. A host without a guard turns CIMD off (metadata says so).
+4. The document must name exactly its URL in `client_id`, have a safe `client_name`, no `client_secret*`, no auth method
+   but `none`, the code grant, and redirect URIs; only `https` on the client id's host and `http` on loopback are kept
+   (RFC 8252; the provider matches any port on a loopback redirect), the rest are dropped; none left is a refusal.
+5. The record is stored with the `Cache-Control` lifetime clamped to 5 min - 24 h (1 h default). Errors are never cached.
+
+A refusal is a `400 invalid_client` JSON answer with one generic sentence, never a redirect and never a 500; the reason
+and the id's host go to the log and to an `oauth.client.refused` audit row.
+
+**Dynamic Client Registration (RFC 7591)**, on by default (`AB_OAUTH_DCR`, D-68). The request is parsed and **rebuilt**:
+only `redirect_uris`, `client_name`, `token_endpoint_auth_method` (`none`, `client_secret_basic`, `client_secret_post`),
+`grant_types` and `response_types` reach the provider; `logo_uri`, `client_uri`, `jwks_uri`, `software_statement`,
+contacts and the rest are dropped, so nothing a client names is stored, fetched or shown. Unsupported grants or auth
+methods are refused, not silently dropped. Redirect URIs: 1-10, 2,000 characters, no fragment, wildcard, userinfo or
+whitespace; `https` on a DNS name or `http` on loopback; `javascript:`, `data:` and the like are refused; private-use
+schemes are dropped (D-69), and a request left with none is refused; `AB_OAUTH_DCR_REDIRECT_HOSTS` limits https hosts.
+Caps, in this order: per address and hour (`AB_OAUTH_DCR_IP_LIMIT`, 10; atomic counter, so a flood stops at its own
+limit and cannot use up the deployment cap for others), then live registrations per deployment
+(`AB_OAUTH_DCR_MAX_CLIENTS`, 200, counted from the `kv` table; a concurrent burst may overshoot by its concurrency). Over
+either: `429` and `Retry-After`; the first refusal per window and reason is audited, not each one (T20). An unused
+registration lives 24 h (`AB_OAUTH_DCR_UNUSED_TTL`); the first token exchange renews it to the registration lifetime
+(the provider's half-life rule), so a flood nobody completes is gone in a day.
+
+**Cleanup hooks** (`HttpApp.oauthRegistrations`): `count()` (live dynamic registrations and stored documents) and
+`sweep()` (deletes unused registrations older than the unused lifetime now configured: lowering
+`AB_OAUTH_DCR_UNUSED_TTL` applies to existing ones). Expired rows are purged by the store's own housekeeping. P5-08 and
+P5-09 build admin lists and scheduled sweeps on these.
+
+**Client names are untrusted text.** They are checked on the way in (length, no control, bidi, zero-width or separator
+characters, no Latin/Cyrillic/Greek mixed words) and still go through the escaping of every output path (P5-04 shows them
+on the consent screen, marked unverified for dynamic clients, with the vouching host for documents).
+
 ## Audit
 
 `auth` rows: `oauth.authorize` (ok or denied, with the deny reason; a deny names the person), `oauth.token.issued`,
-`oauth.token.refused`, `oauth.token.revoked`, `oauth.code.replayed`, `oauth.device.replaced`, `oauth.device.revoke`;
+`oauth.token.refused`, `oauth.token.revoked`, `oauth.code.replayed`, `oauth.device.replaced`, `oauth.device.revoke`, and for clients `oauth.client.registered`, `oauth.client.fetched`, `oauth.client.refused` (kind, host, limit, stable reason; never a document);
 `admin` rows: `oauth.consent.refused` (the handle and grant refusals above); the device is `oauth_<provider grant id>` in `token_id`, the client in
 `client_id`. Tool-call rows of OAuth requests carry the same two ids.
 
 ## Plugging in the other tasks
 
-- **P5-03** replaces the open `register()` with caps and expiry and turns CIMD on (`clientIdMetadataDocumentEnabled`,
-  `client_id_metadata_document_supported`); `OAuthAuthorizationRequest` gains the client kind.
+- **P5-03** (done, see [Client registration](#client-registration-p5-03)): caps and expiry for dynamic registration,
+  Client ID Metadata Documents, `OAuthAuthorizationRequest.clientKind` and `clientHost` for the consent screen.
 - **P5-04** (built) supplies the consent handler and lifts the `AB_OAUTH=on` refusal; `oauthConsent` on
   `parseServerSettings`/`assembleServer` is now only a test stand-in.
 - **P5-05** builds refresh families and the reuse window over the provider's one-generation rule (D-63).
@@ -142,6 +196,12 @@ A **device** is one provider grant: an app approved by one person for one worksp
   per-IP `beforeAuth` limit applies).
 
 ## Testing
+
+Client registration (P5-03) has a second shared suite (`clients-suite.ts`) on the same three hosts, with a fake origin of
+metadata documents (`documents.ts`: injected fetcher on Node, Miniflare `outboundService` in workerd, so nothing touches
+the network), plus unit tests of the policy and the bounded fetch (`clients.test.ts`), settings and caps with time
+travel (`clients-memory.test.ts`), the Node fetcher over real local HTTP and the public-only guard with a replaced
+resolver (`apps/cli/test/client-metadata-*.test.ts`).
 
 One suite (`packages/http-app/test/oauth/suite.ts`), run on memory storage (also in the Workers shape), SQLite
 (`apps/cli/test/oauth.test.ts`) and workerd with D1 (`apps/worker/test/oauth.test.ts`, bundling

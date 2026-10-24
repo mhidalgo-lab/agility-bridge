@@ -33,7 +33,7 @@ How to use it:
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-249 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-252 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -1246,6 +1246,28 @@ cache header silently ends up with `no-store`, so a "cacheable" metadata documen
 policy an exception on purpose (with a reason) or keep the default and assert it; the document is small and rate limited,
 so the default stays (D-65).
 *Applied in:* P5-02.
+
+**L-250 — An id a stranger chooses is a storage key: size it to the key limit before it is stored.**
+A `client_id` goes into `client:<id>` keys. A URL id near the store's 512-character key limit would make our own `put` of
+its validated document throw once the `oauth:client:` prefix is added, so ids are capped at 400 characters before any
+fetch. The provider already turns a lookup the store rejects into a `400`, and the KV adapter now also answers `null` for
+reads and deletes of keys the store cannot hold; that second guard is defence in depth (a mutation of it survives, as the
+provider's own error handling covers it, L-242). Test the long id on every host.
+*Applied in:* P5-03, `kv-namespace.ts`, `clients-suite.ts`.
+
+**L-251 — Cap anonymous writes per source first, and by what is stored, not by a shared window.**
+relic-bridge's deployment-wide registration window let one address use it up and lock everyone out. Count attempts per
+source with an atomic counter that refuses at its own maximum (`kv.increment` with `max`), then cap what is alive (live
+registrations, stored documents), and the flood stops at its own limit. A refusal that writes an audit row per request
+turns the cap into a storage flood, so audit the first refusal per window and reason.
+*Applied in:* P5-03 (relic-bridge Phase 5 review M1 and L4), P5-09.
+
+**L-252 — Rebuild a registration request from an allowlist of fields; do not filter what the client sent.**
+RFC 7591 clients send `logo_uri`, `jwks_uri`, `client_uri`, contacts and statements. Anything stored may later be fetched,
+shown or trusted by a feature written after this one. Parse, validate, and hand the provider a new body holding only the
+fields we use; refuse unsupported grants and auth methods instead of dropping them so the client does not believe it has
+them. The same rule keeps metadata-document clients to a name and the callbacks on their own host.
+*Applied in:* P5-03, `clients.ts` (`checkRegistration`).
 
 ## Q. Testing, evals and live verification
 

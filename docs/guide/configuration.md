@@ -108,6 +108,12 @@ follows in the self-hosting guide.
 | `AB_OAUTH` | `off` | The OAuth 2.1 server for MCP clients ([how it works](../dev/oauth.md), [connect a phone](oauth-phone.md)). `on` needs `AB_PUBLIC_URL` (the issuer) and [sign-in](identity-providers.md): people approve an app on a consent screen after signing in. Without a sign-in provider the server refuses to start |
 | `AB_OAUTH_ACCESS_TTL` | `1h` | Access-token lifetime: seconds, or a number with `s`, `m`, `h`, `d` (60 s to 24 h) |
 | `AB_OAUTH_REFRESH_TTL` | `30d` | Absolute lifetime of a device authorization's refresh tokens (1 h to 365 d, not shorter than the access lifetime) |
+| `AB_OAUTH_CIMD` | `on` | Client ID Metadata Documents: clients named by an https URL. The server fetches the document (public addresses only, no redirects, 5 KiB, 5 s). On Workers it needs the `global_fetch_strictly_public` flag, already in `wrangler.jsonc`; without a guarded fetch it stays off |
+| `AB_OAUTH_CIMD_MAX_CLIENTS`, `AB_OAUTH_CIMD_FETCH_LIMIT` | `200`, `20` | Stored document clients at once (1-500); fetches one address may cause per hour (1-10000) |
+| `AB_OAUTH_DCR` | `on` | Dynamic client registration (RFC 7591) at `/oauth/register`, for clients that do not use metadata documents. `off` answers `404` |
+| `AB_OAUTH_DCR_MAX_CLIENTS`, `AB_OAUTH_DCR_IP_LIMIT` | `200`, `10` | Live registrations at once (1-500); registrations one address may make per hour (1-10000). Over either: `429` |
+| `AB_OAUTH_DCR_REDIRECT_HOSTS` | any | Comma-separated host names: the only https hosts a dynamic client may redirect to (loopback is always allowed) |
+| `AB_OAUTH_DCR_UNUSED_TTL` | `24h` | How long a registration that never exchanged a code is kept (1 h to 7 d) |
 | `AB_PASSTHROUGH` | `off` | `on` lets [pass-through workspaces](self-hosting.md#pass-through-workspaces-optional) accept the caller's own Agility token (`X-Agility-Token`, HTTPS only, read-only) |
 | `AB_INSTANCE_PRIVATE_ADDRESSES` | `allow` | `refuse` accepts only instances at public addresses: a host that is, or resolves to, a loopback, private, link-local (cloud metadata) or reserved address is refused when the instance is added or retargeted, and again at every connection (so a DNS answer that changes later is refused too). Keep `allow` for on-premises instances on a private network |
 | `AB_ALLOW_HTTP_INSTANCES` | `off` | `on` accepts plain-HTTP loopback instance URLs (`http://127.0.0.1/…`), for tests and the local synthetic Agility only; logged as a warning |

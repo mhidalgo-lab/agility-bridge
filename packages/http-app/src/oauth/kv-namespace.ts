@@ -41,9 +41,13 @@ export function oauthKvNamespace(kv: KvStore, now: () => number): OAuthKvNamespa
     if (typeof key !== 'string' || key === '') throw new TypeError('kv key must be a non-empty string');
     return `${OAUTH_KV_PREFIX}${key}`;
   };
+  // The provider looks clients up by whatever `client_id` a caller sent: a key the store cannot hold reads as absent
+  // (and deletes nothing) instead of failing the request.
+  const storable = (key: string): boolean => /^[\x21-\x7e]{1,512}$/.test(`${OAUTH_KV_PREFIX}${key}`);
   return Object.freeze({
     async get(key: string, options?: GetType | { readonly type?: GetType }): Promise<unknown> {
       const type = typeof options === 'string' ? options : (options?.type ?? 'text');
+      if (typeof key === 'string' && key !== '' && !storable(key)) return null;
       const value = await kv.get(full(key));
       if (value === null) return null;
       if (type === 'json') return JSON.parse(value) as unknown;
@@ -66,6 +70,7 @@ export function oauthKvNamespace(kv: KvStore, now: () => number): OAuthKvNamespa
       await kv.set(full(key), value, { expiresAt });
     },
     async delete(key: string): Promise<void> {
+      if (typeof key === 'string' && key !== '' && !storable(key)) return;
       await kv.delete(full(key));
     },
     async list(

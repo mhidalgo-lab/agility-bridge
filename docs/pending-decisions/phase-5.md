@@ -81,3 +81,24 @@
   replacement keeps "reconnect" from needing a manual disconnect. A person who connects the same app twice on purpose gives
   the second one another registration (dynamic clients register per installation) or accepts the replacement.
 - **Owner:** _pending_ (implemented as (a)).
+
+### D-68 — Dynamic client registration stays on by default, capped *(P5-03)*
+- **Context:** the MCP authorization spec prefers metadata documents (CIMD) and keeps DCR as a compatibility path. DCR is an
+  anonymous write endpoint, so it is the main storage and phishing surface of an OAuth deployment (T10); many clients
+  (editors, CLIs, older SDKs) still only register dynamically.
+- **Options:** (a) on by default with caps (10 per address and hour, 200 live, 24 h while unused, optional redirect host
+  allowlist) and `AB_OAUTH_DCR=off` to close it; (b) off by default, so every deployment must opt in.
+- **Recommendation:** (a): OAuth itself is opt-in (`AB_OAUTH=on`), so a deployment that turns it on wants clients to
+  connect; (b) breaks the clients that cannot use CIMD without telling anyone why (L-089). Turn DCR off once the client
+  matrix (P5-06) shows your clients use documents.
+- **Owner:** _pending_ (implemented as (a)).
+
+### D-69 — Private-use scheme redirects (`cursor://...`) are not usable *(P5-03)*
+- **Context:** some desktop clients list a private-use scheme callback. Any local app can claim a scheme, and the provider
+  itself only sends codes to https and loopback http (`allowPrivateUseRedirectUris` is off).
+- **Options:** (a) drop them from registrations and documents and refuse a request left with no https or loopback
+  callback; (b) turn on the provider's `allowPrivateUseRedirectUris` and accept them (PKCE protects the code, consent shows
+  the callback).
+- **Recommendation:** (a) now, as relic-bridge; P5-06 (client matrix) decides whether a client we want needs (b), and then
+  P5-04's consent screen must show the scheme.
+- **Owner:** _pending_ (implemented as (a)).

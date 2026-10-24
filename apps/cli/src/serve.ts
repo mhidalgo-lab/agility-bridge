@@ -24,6 +24,7 @@ import {
 import {
   type AuditWriter,
   assembleServer,
+  type ClientMetadataFetch,
   clientAddress,
   type HostFeatures,
   type HttpApp,
@@ -44,7 +45,7 @@ import {
 } from '@agility-bridge/storage-sqlite';
 import { serve as serveNode } from '@hono/node-server';
 import pkg from '../package.json' with { type: 'json' };
-import { checkPublicHost, createNodeFetch } from './agility-fetch.ts';
+import { checkPublicHost, createClientMetadataFetch, createNodeFetch } from './agility-fetch.ts';
 import { ConfigError, checkEnvNames, DEFAULTS } from './config.ts';
 import { isInside, readMasterKeys } from './master-key.ts';
 
@@ -151,6 +152,8 @@ export async function startServe(
     sink?: (line: string) => void;
     /** A stand-in for the OAuth consent step (tests); the shipped host uses the built-in screen (P5-04). */
     oauthConsent?: OAuthConsentHandler;
+    /** Tests only: a fake origin of client metadata documents in place of the public-only fetcher (P5-03). */
+    clientMetadataFetch?: ClientMetadataFetch;
   } = {},
 ): Promise<RunningServer> {
   const config = loadServeConfig(env, { oauthConsent: options.oauthConsent !== undefined });
@@ -196,6 +199,8 @@ export async function startServe(
     ...(config.privateAddresses === 'refuse' ? { checkInstanceHost: checkPublicHost } : {}),
     // Identity providers are reached over public addresses only, checked at connect time (THREAT_MODEL T11).
     identityFetch: createNodeFetch({ publicOnly: config.identityPrivateAddresses === 'refuse' }),
+    // OAuth client metadata documents: public addresses only, checked at connect time, no switch (P5-03, T11).
+    clientMetadataFetch: options.clientMetadataFetch ?? createClientMetadataFetch(),
     clientIp: (c) =>
       clientAddress(
         (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming?.socket

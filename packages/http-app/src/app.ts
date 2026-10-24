@@ -56,6 +56,7 @@ import {
   OAUTH_RESOURCE_METADATA_PREFIX,
   OAUTH_TOKEN_PATH,
   type OAuthOptions,
+  type OAuthRegistrations,
   type OAuthRuntime,
 } from './oauth/server.ts';
 import { createSessionManager, type SessionManager, type SessionOptions } from './session.ts';
@@ -211,6 +212,8 @@ export interface HttpApp {
   ) => Response | Promise<Response>;
   /** Forget cached access decisions (call after local admin changes). */
   clearAccessCache(): void;
+  /** Counts and cleanup of OAuth client registrations (P5-03); absent when OAuth is off. */
+  readonly oauthRegistrations?: OAuthRegistrations;
 }
 
 interface PreparedRequest {
@@ -455,6 +458,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       clock: services.clock,
       logger: services.logger,
       runInBackground: (c, work) => keepAlive(c, work),
+      clientIp,
       onRevocation: () => cache.clear(),
       ...(oauthAudit === undefined
         ? {}
@@ -958,5 +962,6 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     fetch: (request, env, executionCtx) =>
       executionCtx === undefined ? app.fetch(request, env) : app.fetch(request, env, executionCtx as never),
     clearAccessCache: () => cache.clear(),
+    ...(oauth === undefined ? {} : { oauthRegistrations: oauth.registrations }),
   };
 }

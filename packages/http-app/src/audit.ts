@@ -59,7 +59,8 @@ export interface LoginEvent {
 
 /**
  * One step of the OAuth server (P5-01): `oauth.authorize`, `oauth.token.issued`, `oauth.token.refused`,
- * `oauth.token.revoked`, `oauth.code.replayed`. Ids and stable reasons only: never a code, token or verifier.
+ * `oauth.token.revoked`, `oauth.code.replayed`; client registration (P5-03): `oauth.client.registered`,
+ * `oauth.client.fetched`, `oauth.client.refused` (details: `kind`, host, limits; never the document). Ids and stable reasons only: never a code, token or verifier.
  */
 export interface OAuthEvent {
   readonly action: string;
