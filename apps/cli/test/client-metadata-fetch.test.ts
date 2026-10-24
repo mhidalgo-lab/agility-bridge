@@ -52,7 +52,9 @@ const routes = new Map(Object.entries(handlers));
 beforeAll(async () => {
   server = createServer((req, res) => {
     seen.push({ url: req.url ?? '', accept: req.headers['accept'], method: req.method });
-    (routes.get(req.url ?? '') ?? ((_r, s) => s.writeHead(404).end()))(req, res);
+    const handler = routes.get(req.url ?? '');
+    if (typeof handler === 'function') handler(req, res);
+    else res.writeHead(404).end();
   });
   server.on('connection', (s) => {
     sockets.add(s);
