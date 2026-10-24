@@ -1,5 +1,80 @@
 # agility-bridge
 
+## 0.4.0
+
+### Minor Changes
+
+- 66d6630: Admin panel scaffold (P4-03): a server-rendered, phone-friendly panel at `/admin` on `serve` and on the Worker, built with
+  Hono JSX under a strict content security policy (no inline script or style, hashed assets with SRI, no framing, Trusted
+  Types) and a page and form kit with session, role, CSRF and fetch-metadata checks. Changes go through the admin API in
+  process, so its guards, re-authentication rule and audit rows apply unchanged. Sign-in now lands on `/admin` (overview and
+  account pages); `/auth/account` redirects to `/admin/account`, and the sign-in pages share the panel's layout.
+- 02511c3: Admin screens (P4-04): the panel at `/admin` now manages instances, credentials, workspaces, grants, device tokens and
+  users for owners and admins, on `serve` and on the Worker. Every change goes through the admin API as the signed-in person
+  (same role rules, re-authentication and audit rows); controls appear only when the API would allow them. Agility tokens are
+  typed once into a password field and never shown again; a new device token is shown once, behind a single-use form handle,
+  so a reload never makes a second one; origin changes, token replacement, write settings and owner changes ask for a recent
+  sign-in; the last active owner is protected with a clear message. The admin API gains `GET /tools`, and last-owner refusals
+  carry `error.detail: "last_owner"`.
+- a5bafcb: Admin sessions, roles, CSRF and re-authentication (P4-02): a finished sign-in starts a browser session (`__Host-`
+  cookie, only a hash in the database, idle 30 min / absolute 12 h, at most 20 per user, rotated at every sign-in) that the
+  admin API accepts as the signed-in user, with a CSRF token plus `Origin` and `Sec-Fetch-Site` checks on every change.
+  Owner-only management and the last-owner rule apply unchanged; high-impact changes (instance origin, key retirement,
+  owners and admins, credential replacement, write enablement) need a sign-in from the last 10 minutes
+  (`403 reauth_required`, `/auth/reauth`). `POST /auth/logout`, `GET /auth/account`, `GET /api/admin/v1/session`,
+  `POST /api/admin/v1/users/{id}/sessions/revoke` and `agility-bridge user end-sessions`. New settings
+  `AB_SESSION_IDLE_MINUTES`, `AB_SESSION_MAX_HOURS`, `AB_SESSION_MAX_PER_USER` and `AB_LOGOUT_CLEAR_SITE_DATA`.
+- d51cfa1: Audit viewer and usage statistics (P4-05): the panel at `/admin` gains an audit log (filters for time, kind, outcome, tool or
+  action, workspace and user; keyset paging; every stored string shown as text; a formula-safe CSV download of the newest 1,000
+  matching rows) and, for owners and admins, usage statistics (calls, errors, denials, Agility requests and durations per tool,
+  workspace, grant, user or day). Members see only their own audit rows: `GET /api/admin/v1/audit` is now open to them and scoped
+  to their user id by the server (another `userId` is refused), and it gains an `action` filter. New `GET
+  /api/admin/v1/audit/stats` (owner and admin) aggregates at most the newest 10,000 tool calls of a window and reports when it
+  stopped there. Storage gains `audit.stats` on memory, SQLite and D1, with no schema change.
+- f8b6cdb: Connect page (P4-06): every grant has a "Connect a client" page in the admin panel (under My access for the person who holds
+  it, and on the grant for owners and admins) with the workspace's MCP endpoint and a copy-paste configuration for GitHub Copilot
+  in VS Code, JetBrains and the CLI, Claude Code, Cursor, Windsurf / Devin Desktop and the MCP Inspector. The page never holds a
+  token; the one-time page that creates a device token repeats the snippets and fills the token in only where a client cannot read
+  it from a prompt or an environment variable. The client setup guide gains the same remote snippets.
+- abbcdba: Admin sign-in (P4-01): Google, GitHub, Cloudflare Access and any OpenID Connect provider at `/auth/*`, deny by default
+  with allowlists and optional auto-provisioning, one identity per user. The first owner is created with a single-use
+  setup link (`agility-bridge setup-link`, `POST /api/admin/v1/setup-links`) whose code travels in the URL fragment. New
+  settings `AB_GOOGLE_*`, `AB_GITHUB_*`, `AB_OIDC_*`, `AB_CF_ACCESS_*`, `AB_LOGIN_*`, `AB_RATE_LIMIT_SIGN_IN` and
+  `AB_IDENTITY_PRIVATE_ADDRESSES`; client secrets may come from `*_FILE`. Browser sessions follow in the next release.
+- 8281ec2: Member self-service (P4-07): every signed-in person has "My access" in the panel (`/admin/me`) to add, check, replace, revoke and
+  delete their own personal Agility token (checked against Agility at once, never shown again), choose which of their grants
+  uses it, and issue and revoke their own device tokens, without an administrator handling the secret. Everything goes
+  through the admin API as the signed-in person: another person's or a shared credential, a grant or device token that is not
+  theirs, and an instance they have no grant on are refused with no effect. The admin API gains `GET /me/grants`, `POST
+  /me/grants/{id}/credential` and `GET /me/audit`; a member may now delete their own personal credential; caps of 10 personal
+  credentials per person and 20 live device tokens per grant apply to every writer.
+- a3ff7a3: Move a user to another sign-in provider on purpose (P4-12): owners (and the break-glass admin token) can clear a user's
+  provider identity with `agility-bridge user unbind <user-id> --confirm <email>`, `POST /users/{id}/unbind` or the "Move to
+  another provider" page of the admin panel, so the next verified sign-in with that email binds again. It needs a recent
+  sign-in, the user's email typed again and never works on your own account through a session; the clear is one compare-and-set
+  step, the user's browser sessions end, and the audit log records `user.unbind` with the previous provider only.
+- 4cf065a: Panel follow-ups (P4-15): a disabled user can be enabled again (`POST /api/admin/v1/users/{id}/enable`, `agility-bridge user
+  enable`, an Enable button on the user's page: owners for anyone with a recent sign-in for owners and admins, admins for members);
+  `GET /api/admin/v1/tokens` and a Device tokens page list every device token (prefix, label, dates and grant, never a hash), filtered
+  by person or grant and paged by cursor, with revoke; and an instance's number prefixes are validated on every path and editable
+  in the panel (`Type=PREFIX`, one per line). Stored prefixes are not applied to number lookups yet (P4-30).
+
+### Patch Changes
+
+- 23ab704: Fixes found by running the admin panel in a real browser (P4-08): a table that scrolls sideways on a narrow screen can now
+  be reached with the keyboard (it is a focusable, named region), and an admin API request that sends an empty body as JSON
+  is answered `400 bad_request` instead of `500 internal error`.
+- c1334b9: Admin security review (P4-09): setting an instance's TLS trust (a CA file) through the admin API needs an owner with a recent
+  sign-in, as the panel already said; adding projects, child projects or asset types to a workspace or grant that has write
+  tools, making a workspace pass-through, and issuing a device token that lasts more than 90 days (or never expires) need a
+  recent sign-in (owner for the first three); a device token issued while its grant moves to a personal token is revoked; a
+  credential validation that started before a token replacement can no longer vouch for the new token; the admin API stops
+  reading a request body at its 64 KiB cap; and audit rows of admin changes now record the role (and previous role), project
+  and tool lists, write switches, the token id and end, and the instance host.
+- 5effbc1: Log redaction now also covers the admin sign-in values (P4-11): the CSRF token and `_csrf` form field, the PKCE verifier, the
+  nonce, the setup code, the session secret as an object key, and the OAuth `code` in a callback URL's query string.
+- 827d13e: Updates undici to 7.30.1 for GHSA-xjj6-f33q-929c (a denial of service through a response with too many content encodings).
+
 ## 0.3.0
 
 ### Minor Changes
