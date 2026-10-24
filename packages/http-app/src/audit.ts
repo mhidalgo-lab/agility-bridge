@@ -57,6 +57,26 @@ export interface LoginEvent {
   readonly previousRole?: string | null;
 }
 
+/**
+ * One step of the OAuth server (P5-01): `oauth.authorize`, `oauth.token.issued`, `oauth.token.refused`,
+ * `oauth.token.revoked`, `oauth.code.replayed`. Ids and stable reasons only: never a code, token or verifier.
+ */
+export interface OAuthEvent {
+  readonly action: string;
+  readonly status: AuditStatus;
+  readonly requestId?: string | null;
+  readonly userId?: string | null;
+  /** The access grant the person approved. */
+  readonly grantId?: string | null;
+  readonly workspaceId?: string | null;
+  readonly clientId?: string | null;
+  /** The OAuth device authorization (`oauth_<provider grant id>`). */
+  readonly tokenId?: string | null;
+  /** A stable deny reason. */
+  readonly reason?: string | null;
+  readonly details?: JsonObject;
+}
+
 /** Refusals that are worth a row: authentication and limits, not malformed bodies from an authenticated caller. */
 const AUDITED_REFUSALS = new Set([401, 429]);
 
@@ -138,6 +158,7 @@ export class AuditWriter {
       userId: e.access.grant.userId,
       grantId: e.access.grant.id,
       tokenId: e.access.tokenId,
+      clientId: e.access.clientId,
       workspaceId: e.access.workspace.id,
       instanceId: e.access.instance.id,
       assetNumbers: e.assetNumbers.length > 0 ? [...e.assetNumbers] : null,
@@ -173,6 +194,7 @@ export class AuditWriter {
       userId: e.access?.grant.userId ?? null,
       grantId: e.access?.grant.id ?? null,
       tokenId: e.access?.tokenId ?? null,
+      clientId: e.access?.clientId ?? null,
       workspaceId: e.access?.workspace.id ?? null,
       instanceId: e.access?.instance.id ?? null,
       durationMs: Math.max(0, Math.round(e.durationMs)),
@@ -206,6 +228,25 @@ export class AuditWriter {
         ...(e.identityHash == null ? {} : { identityHash: e.identityHash }),
         ...(e.previousRole == null ? {} : { previousRole: e.previousRole }),
       },
+    });
+  }
+
+  /** An OAuth server step: an `auth` row (`oauth.*`). */
+  oauth(e: OAuthEvent): Promise<void> | undefined {
+    return this.enqueue({
+      kind: 'auth',
+      action: e.action.slice(0, 100),
+      status: e.status,
+      requestId: e.requestId ?? null,
+      userId: e.userId ?? null,
+      grantId: e.grantId ?? null,
+      tokenId: e.tokenId ?? null,
+      clientId: e.clientId === undefined || e.clientId === null ? null : e.clientId.slice(0, 200),
+      workspaceId: e.workspaceId ?? null,
+      errorCode: e.status === 'ok' ? null : (e.reason ?? null),
+      targetType: 'oauth_device',
+      targetId: e.tokenId ?? null,
+      details: { ...(e.details ?? {}), ...(e.reason == null ? {} : { reason: e.reason.slice(0, 64) }) },
     });
   }
 

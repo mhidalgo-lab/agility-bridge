@@ -23,8 +23,10 @@ import {
 } from '@agility-bridge/core';
 import {
   assembleServer,
+  type HostFeatures,
   type HttpApp,
   MemoryRateLimiter,
+  type OAuthConsentHandler,
   parseServerSettings,
   SERVER_SETTING_NAMES,
   type ServerSettings,
@@ -110,11 +112,17 @@ export function workerSettings(env: WorkerEnv): Record<string, string> {
   return out;
 }
 
-export async function boot(env: WorkerEnv, version: string): Promise<Booted> {
+export async function boot(
+  env: WorkerEnv,
+  version: string,
+  /** The consent screen of the OAuth server (P5-04): the shipped Worker has none yet; tests give a stand-in. */
+  oauthConsent?: OAuthConsentHandler,
+): Promise<Booted> {
   const settingsEnv = workerSettings(env);
   const plan = workersPlan(settingsEnv);
   const preset = PLAN_PRESETS[plan];
-  const settings = parseServerSettings(settingsEnv, preset);
+  const features: HostFeatures = { oauthConsent: oauthConsent !== undefined };
+  const settings = parseServerSettings(settingsEnv, preset, features);
   if (preset.ceiling && settings.callBudget > preset.callBudget) {
     throw new BootError(`AB_CALL_BUDGET above ${preset.callBudget} does not fit the Workers ${plan} plan.`);
   }
@@ -181,6 +189,7 @@ export async function boot(env: WorkerEnv, version: string): Promise<Booted> {
     isolation: 'request',
     registry: REGISTRY,
     background: (c, work) => c.executionCtx.waitUntil(work),
+    ...(oauthConsent === undefined ? {} : { oauthConsent }),
     ...(adminVerifier === undefined ? {} : { adminVerifier }),
     ...(preset.ceiling
       ? { ceilings: { callBudget: preset.callBudget, maxResponseBytes: preset.maxResponseBytes } }

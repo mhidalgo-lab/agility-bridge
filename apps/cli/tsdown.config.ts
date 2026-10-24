@@ -23,6 +23,10 @@ export default defineConfig({
     '@agility-bridge/storage-sqlite': fileURLToPath(
       new URL('../../packages/storage-sqlite/src/index.ts', import.meta.url),
     ),
+    // The bundled OAuth provider imports `WorkerEntrypoint` for `instanceof` checks only (ADR-0009, P5-01).
+    'cloudflare:workers': fileURLToPath(
+      new URL('../../packages/http-app/src/oauth/cloudflare-workers-shim.ts', import.meta.url),
+    ),
   },
   deps: { alwaysBundle: [/^@agility-bridge\//] },
   // One published file (scripts/check-package.ts): the admin panel is imported lazily (`import()`), and stays inside it.

@@ -1,0 +1,184 @@
+// SPDX-License-Identifier: Apache-2.0
+// The OAuth suite on Node with SQLite storage (P5-01): `agility-bridge serve` started as the CLI starts it, with OAuth
+// on and the consent stand-in, called in process through its app (the issuer is the configured public URL, so no
+// socket is needed), plus the settings checks of the shipped host and a scan of the database file itself.
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { accessServices, generateMasterKey, Keyring } from '@agility-bridge/auth';
+import { CORE_TOOLS } from '@agility-bridge/core';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { testConsent } from '../../../packages/http-app/test/oauth/consent.ts';
+import { defineOAuthSuite, type OAuthHost } from '../../../packages/http-app/test/oauth/suite.ts';
+import { type FixtureAgility, startFixtureAgility } from '../../../scripts/fixture-agility.ts';
+import { ConfigError } from '../src/config.ts';
+import { loadServeConfig, startServe } from '../src/serve.ts';
+
+const ORIGIN = 'http://127.0.0.1:8787';
+let agility: FixtureAgility;
+beforeAll(async () => {
+  agility = await startFixtureAgility();
+});
+afterAll(() => agility.close());
+
+async function sqliteHost(): Promise<OAuthHost> {
+  const dir = mkdtempSync(join(tmpdir(), 'ab-oauth-'));
+  const key = generateMasterKey(1);
+  writeFileSync(join(dir, 'master.key'), key, { mode: 0o600 });
+  const lines: string[] = [];
+  const running = await startServe(
+    {
+      AB_DATA_DIR: join(dir, 'data'),
+      AB_MASTER_KEY_FILE: join(dir, 'master.key'),
+      AB_PORT: '0',
+      AB_PUBLIC_URL: ORIGIN,
+      AB_OAUTH: 'on',
+      AB_ACCESS_CACHE_TTL: '0',
+      AB_ALLOW_HTTP_INSTANCES: 'on',
+      AB_ENVIRONMENT: 'production',
+    },
+    { sink: (l) => lines.push(l), oauthConsent: testConsent },
+  );
+  const svc = accessServices({
+    storage: running.storage,
+    keyring: await Keyring.create(key),
+    tools: new Map(CORE_TOOLS.map((t) => [t.name, { kind: t.kind, group: t.group }])),
+    instanceUrls: { httpLoopback: true },
+  });
+  const alice = await svc.users.create({ email: 'alice@example.test', role: 'member' });
+  const bob = await svc.users.create({ email: 'bob@example.test', role: 'member' });
+  const instance = await svc.instances.create({ label: 'Synthetic', baseUrl: agility.url });
+  const credential = async (owner: string | null, token: string) => {
+    const c = await svc.credentials.create({
+      instanceId: instance.id,
+      ownerUserId: owner,
+      label: 'c',
+      token,
+    });
+    await running.storage.credentials.update(c.id, { validationStatus: 'valid' });
+    return c;
+  };
+  const aliceCred = await credential(alice.id, '1.AliceAgilityTokenNotRealAbCdEfGh0001');
+  const bobCred = await credential(bob.id, '1.BobAgilityTokenNotRealAbCdEfGhIj0002');
+  const shared = await credential(null, '1.SharedAgilityTokenNotRealAbCdEfGh0003');
+  const wsA = await svc.workspaces.create({
+    slug: 'team-a',
+    name: 'Team A',
+    instanceId: instance.id,
+    allowedScopeIds: ['Scope:1001'],
+  });
+  const wsB = await svc.workspaces.create({
+    slug: 'team-b',
+    name: 'Team B',
+    instanceId: instance.id,
+    allowedScopeIds: ['Scope:1001'],
+  });
+  const grant = async (workspaceId: string, userId: string | null, credentialId: string) =>
+    (
+      await svc.grants.create({
+        workspaceId,
+        userId,
+        credentialId,
+        ...(userId === null ? { label: 'ci' } : {}),
+      })
+    ).record;
+  const aliceGrantA = await grant(wsA.id, alice.id, aliceCred.id);
+  const aliceGrantB = await grant(wsB.id, alice.id, aliceCred.id);
+  const bobGrantB = await grant(wsB.id, bob.id, bobCred.id);
+  const serviceGrantA = await grant(wsA.id, null, shared.id);
+  const { token } = await svc.tokens.issue({ grantId: aliceGrantA.id, label: 'laptop' });
+  return {
+    origin: ORIGIN,
+    call: (url, init) => Promise.resolve(running.app.fetch(new Request(url, init))),
+    storage: running.storage,
+    ids: {
+      alice: alice.id,
+      bob: bob.id,
+      workspaceA: wsA.id,
+      workspaceB: wsB.id,
+      aliceGrantA: aliceGrantA.id,
+      aliceGrantB: aliceGrantB.id,
+      bobGrantB: bobGrantB.id,
+      serviceGrantA: serviceGrantA.id,
+      aliceDeviceTokenA: token,
+    },
+    agilityRequests: () => agility.requests(),
+    logs: () => lines,
+    // The database as bytes (and its write-ahead log): a copy of it must hold no bearer value either.
+    rawDatabase: () =>
+      [running.storage.path, `${running.storage.path}-wal`]
+        .map((p) => {
+          try {
+            return readFileSync(p).toString('latin1');
+          } catch {
+            return '';
+          }
+        })
+        .join('\n'),
+    // No `advance`: the SQLite storage reads its clock when it opens, so a mocked clock cannot expire its rows.
+    close: async () => {
+      await running.close();
+      try {
+        rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
+      } catch {
+        // Windows may keep the database locked a moment longer (L-104).
+      }
+    },
+  };
+}
+
+defineOAuthSuite('SQLite storage (agility-bridge serve)', sqliteHost);
+
+describe('OAuth settings on the shipped host', () => {
+  it('is off by default and refuses AB_OAUTH=on until the consent screen exists (P5-04)', () => {
+    expect(loadServeConfig({ AB_DATA_DIR: '/d' }).oauth).toBeUndefined();
+    expect(() => loadServeConfig({ AB_OAUTH: 'on', AB_PUBLIC_URL: ORIGIN })).toThrow(/consent screen/);
+    expect(loadServeConfig({ AB_OAUTH: 'on', AB_PUBLIC_URL: ORIGIN }, { oauthConsent: true }).oauth).toEqual(
+      {},
+    );
+    expect(
+      loadServeConfig(
+        { AB_OAUTH: 'on', AB_PUBLIC_URL: ORIGIN, AB_OAUTH_ACCESS_TTL: '30m', AB_OAUTH_REFRESH_TTL: '7d' },
+        { oauthConsent: true },
+      ).oauth,
+    ).toEqual({ accessTokenTtlSeconds: 1800, refreshTokenTtlSeconds: 604_800 });
+  });
+
+  it('checks the values, and needs AB_PUBLIC_URL (the issuer)', () => {
+    const on = { AB_OAUTH: 'on', AB_PUBLIC_URL: ORIGIN };
+    const features = { oauthConsent: true };
+    for (const bad of [
+      { AB_OAUTH: 'yes' },
+      { AB_OAUTH: 'on' },
+      { ...on, AB_OAUTH_ACCESS_TTL: '10s' },
+      { ...on, AB_OAUTH_ACCESS_TTL: '2d' },
+      { ...on, AB_OAUTH_REFRESH_TTL: '30m' },
+      { ...on, AB_OAUTH_REFRESH_TTL: '400d' },
+      { ...on, AB_OAUTH_REFRESH_TTL: 'soon' },
+      { ...on, AB_OAUTH_ACCESS_TTL: '12h', AB_OAUTH_REFRESH_TTL: '2h' },
+    ]) {
+      expect(() => loadServeConfig(bad, features), JSON.stringify(bad)).toThrow(ConfigError);
+    }
+    // Values are checked even when OAuth is off, so a typo does not wait for the day it is switched on.
+    expect(() => loadServeConfig({ AB_OAUTH_ACCESS_TTL: '1s' })).toThrow(ConfigError);
+  });
+
+  it('refuses to start with AB_OAUTH=on and no consent screen, before opening any storage', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ab-oauth-off-'));
+    mkdirSync(join(dir, 'data'));
+    writeFileSync(join(dir, 'master.key'), generateMasterKey(1), { mode: 0o600 });
+    try {
+      await expect(
+        startServe({
+          AB_DATA_DIR: join(dir, 'data'),
+          AB_MASTER_KEY_FILE: join(dir, 'master.key'),
+          AB_PORT: '0',
+          AB_PUBLIC_URL: ORIGIN,
+          AB_OAUTH: 'on',
+        }),
+      ).rejects.toThrow(/P5-04/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
+    }
+  });
+});

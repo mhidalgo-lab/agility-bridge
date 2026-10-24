@@ -29,6 +29,13 @@ import type { Context } from 'hono';
 import { adminTokenAuthenticator } from './admin/api.ts';
 import { createHttpApp, type HostServices, type HttpApp } from './app.ts';
 import { AuditWriter } from './audit.ts';
+import type { OAuthConsentHandler } from './oauth/server.ts';
+import {
+  OAUTH_SETTING_NAMES,
+  OAuthConfigError,
+  type OAuthSettings,
+  oauthSettingsFromEnv,
+} from './oauth/settings.ts';
 import {
   createRequestLimits,
   DEFAULT_RATE_LIMITS,
@@ -71,7 +78,17 @@ export const SERVER_SETTING_NAMES: readonly string[] = Object.freeze([
   'AB_WRITE_TOOLS',
   'AB_ALLOW_HTTP_INSTANCES',
   ...IDENTITY_SETTING_NAMES,
+  ...OAUTH_SETTING_NAMES,
 ]);
+
+/**
+ * What the host brings that some settings need. `oauthConsent`: the host has the consent screen OAuth needs to approve a
+ * client (P5-04). No host has it yet, so `AB_OAUTH=on` is refused at start: a server nobody can authorize against is
+ * worse than an off switch.
+ */
+export interface HostFeatures {
+  readonly oauthConsent?: boolean;
+}
 
 export interface ServerSettings {
   readonly publicUrl?: string;
@@ -95,6 +112,8 @@ export interface ServerSettings {
   readonly identity?: IdentitySettings;
   /** Admin session timeouts, cap and logout behaviour (P4-02); only used with sign-in. */
   readonly session: SessionOptions;
+  /** `AB_OAUTH=on` (P5-01): the OAuth 2.1 authorization server; absent = device tokens only. */
+  readonly oauth?: OAuthSettings;
 }
 
 /** Host defaults: ADR-0010 presets (Node 1,000 requests and 8 MiB; Workers Free 45 and 512 KiB). */
@@ -132,7 +151,11 @@ function onOff(name: string, value: string | undefined, fallback: boolean): bool
 }
 
 /** Parses and checks the shared settings. Throws `SettingsError` naming the first bad one. */
-export function parseServerSettings(env: Env, defaults: SettingDefaults): ServerSettings {
+export function parseServerSettings(
+  env: Env,
+  defaults: SettingDefaults,
+  features: HostFeatures = {},
+): ServerSettings {
   const level = env['AB_LOG_LEVEL'] ?? 'info';
   if (!['debug', 'info', 'warn', 'error'].includes(level))
     throw new SettingsError('AB_LOG_LEVEL must be debug, info, warn or error.');
@@ -165,6 +188,19 @@ export function parseServerSettings(env: Env, defaults: SettingDefaults): Server
     }
   }
   const int = settingInteger;
+  let oauth: OAuthSettings | null;
+  try {
+    oauth = oauthSettingsFromEnv(env, publicUrl !== undefined);
+  } catch (error) {
+    // The message names the variable, never its value.
+    if (error instanceof OAuthConfigError) throw new SettingsError(error.message);
+    throw error;
+  }
+  if (oauth !== null && features.oauthConsent !== true) {
+    throw new SettingsError(
+      'AB_OAUTH=on is not available yet: people approve apps on a consent screen that arrives with task P5-04.',
+    );
+  }
   let identity: IdentitySettings | null;
   try {
     identity = identitySettingsFromEnv(env);
@@ -244,6 +280,7 @@ export function parseServerSettings(env: Env, defaults: SettingDefaults): Server
     passthrough: onOff('AB_PASSTHROUGH', env['AB_PASSTHROUGH'], false),
     allowHttpInstances: onOff('AB_ALLOW_HTTP_INSTANCES', env['AB_ALLOW_HTTP_INSTANCES'], false),
     ...(identity === null ? {} : { identity }),
+    ...(oauth === null ? {} : { oauth }),
     session: parseSessionSettings(env),
   };
 }
@@ -353,6 +390,8 @@ export interface ServerParts {
   readonly checkInstanceHost?: (hostname: string) => Promise<void>;
   /** The tool registry built once (Workers: at module scope, P3-14). */
   readonly registry?: ToolRegistry;
+  /** The interactive step of `/oauth/authorize` (P5-04). Needed when `settings.oauth` is set. */
+  readonly oauthConsent?: OAuthConsentHandler;
 }
 
 export interface AssembledServer {
@@ -384,6 +423,9 @@ export function assembleServer(parts: ServerParts): AssembledServer {
       ...(parts.checkInstanceHost === undefined ? {} : { checkHost: parts.checkInstanceHost }),
     },
   });
+  if (settings.oauth !== undefined && parts.oauthConsent === undefined) {
+    throw new SettingsError('AB_OAUTH=on needs the consent screen, which this host does not have.');
+  }
   const authErrors = revalidateOnAuthErrors(services, logger, () => host.clock.now());
   const app = createHttpApp({
     storage,
@@ -436,6 +478,15 @@ export function assembleServer(parts: ServerParts): AssembledServer {
             policy: settings.identity.policy,
             audit: (event) => audit.login(event),
             auditAdmin: (change) => audit.admin(change),
+          },
+        }),
+    ...(settings.oauth === undefined || parts.oauthConsent === undefined
+      ? {}
+      : {
+          oauth: {
+            ...settings.oauth,
+            consent: parts.oauthConsent,
+            audit: (event) => audit.oauth(event),
           },
         }),
     clientIp: parts.clientIp,

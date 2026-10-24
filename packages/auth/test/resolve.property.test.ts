@@ -99,6 +99,8 @@ function build(w: World) {
       ? { kind: 'device_token', token: token({ expiresAt: w.tokenExpires }) }
       : {
           kind: 'oauth',
+          tokenId: 'oauth_test',
+          clientId: 'client-1',
           grantId: 'g-alice',
           workspaceId: 'w-1',
           writeScope: w.oauthWrite,

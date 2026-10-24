@@ -2,7 +2,7 @@
 id: P5-01
 title: OAuth 2.1 authorization server
 phase: 5
-status: in-progress
+status: review
 priority: high
 depends_on: [P4-11]
 adr: ["0009"]
@@ -69,21 +69,40 @@ builds the server they plug into.
   verifier.
 
 ## Acceptance criteria
-- [ ] Conformance tests with SDK-shaped clients (the MCP TypeScript SDK's own OAuth client functions: discovery
+- [x] Conformance tests with SDK-shaped clients (the MCP TypeScript SDK's own OAuth client functions: discovery
   metadata, registration, authorization URL, code exchange, refresh) on Node (memory storage and SQLite) and workerd (D1),
   from one shared suite; replayed and concurrently redeemed codes yield at most one token set.
-- [ ] Refused: PKCE `plain` and missing, wrong verifier, wrong redirect URI, wrong client, wrong or unknown workspace
+- [x] Refused: PKCE `plain` and missing, wrong verifier, wrong redirect URI, wrong client, wrong or unknown workspace
   (`resource`), expired code, a repeated parameter, a JSON token request, an out-of-range verifier; refresh cannot retarget.
-- [ ] Token props bound to workspace, user, grant and client; a token for workspace A fails at B; a revoked grant, a
+- [x] Token props bound to workspace, user, grant and client; a token for workspace A fails at B; a revoked grant, a
   disabled user, another user's grant, a service grant and an expired grant all answer the generic `401` with no Agility
   request and no tool data (negative authorization, L-121); device tokens keep working with OAuth on.
-- [ ] Codes, access and refresh tokens are stored hash-only and grant properties encrypted; a scan of storage (kv, audit,
+- [x] Codes, access and refresh tokens are stored hash-only and grant properties encrypted; a scan of storage (kv, audit,
   a SQLite file copy), logs and audit finds no plaintext bearer value (ADR-0009).
-- [ ] `AB_OAUTH` settings parsed and checked on both hosts; `on` without `AB_PUBLIC_URL`, or without the consent screen,
+- [x] `AB_OAUTH` settings parsed and checked on both hosts; `on` without `AB_PUBLIC_URL`, or without the consent screen,
   refuses to start; off by default.
-- [ ] Security tests are mutation-checked (L-121), recorded under Outcome.
-- [ ] `docs/dev/oauth.md` (new), THREAT_MODEL T9 and T25, ARCHITECTURE, RESEARCH, the configuration reference, a
+- [x] Security tests are mutation-checked (L-121), recorded under Outcome.
+- [x] `docs/dev/oauth.md` (new), THREAT_MODEL T9 and T25, ARCHITECTURE, RESEARCH, the configuration reference, a
   changeset, and new lessons are done.
+
+## Outcome
+- Built as scoped, with the provider's own encryption of grant props instead of a keyring purpose (D-62), the consent
+  seam and the boot refusal of `AB_OAUTH=on` (D-60), `resource` lenient at the token endpoint (D-61) and the provider's
+  one-generation refresh rule left for P5-05 (D-63). `Principal` (oauth) now carries `tokenId` and `clientId`, and
+  `EffectiveAccess` a `clientId`, so audit rows and rate limits see the device and client.
+- relic-bridge findings folded in up front: the single-use marker consumed before the provider (and the replay
+  tombstone), the RFC 7636 verifier check before the code is spent (L1), PKCE required by us as well as by the provider,
+  `iss` from configuration, errors before redirect validation as `400` pages (H1's replace-on-redeem and the CIMD/DCR
+  and device-cap findings belong to P5-03/04/05/09/11 and are not built here).
+- Suites: 32 conformance cases (one shared suite, fewer where time cannot move) on memory, memory in the Workers shape, SQLite and workerd/D1, 2 cache cases, 10 unit
+  cases, redaction and resolver updates.
+- Mutation checks (L-121), each reverted: single-use marker (6 fail), resource optional (2), `userId` of the grant not checked
+  (2), issuance check off (2), replay does not revoke (2), verifier format (2), token `resource` check (2, after adding the
+  "code not spent" case), approval ignoring the access decision (4), revocation not clearing the cache (1), resource slug
+  syntax (2), repeated parameters at authorize and token (2 each), kv adapter without prefix (3), no expired-grant refusal (2),
+  tombstone check (2, after adding a deterministic case), no `oauth.token.refused` row (4), OAuth path without the access
+  decision (3). Survivors, all equivalent because the provider enforces the same rule independently: PKCE required by us
+  (it refuses a missing challenge for confidential clients too), form media type, props cross-check (L-242).
 
 ## Security notes
 THREAT_MODEL T9, T25 (T2, T8, T15, T19, T21 touched).

@@ -25,8 +25,10 @@ import {
   type AuditWriter,
   assembleServer,
   clientAddress,
+  type HostFeatures,
   type HttpApp,
   MemoryRateLimiter,
+  type OAuthConsentHandler,
   parseServerSettings,
   type ServerSettings,
   SettingsError,
@@ -114,11 +116,11 @@ export function withSecretFiles(env: Env, dir: string): Env {
 }
 
 /** The shared settings (checked by `parseServerSettings`, P3-01) plus the Node-only ones. */
-export function loadServeConfig(env: Env): ServeConfig {
+export function loadServeConfig(env: Env, features: HostFeatures = {}): ServeConfig {
   checkEnvNames(env);
   try {
     const dbPath = env['AB_DB_PATH'] || join(env['AB_DATA_DIR'] || dataDir(env), 'agility-bridge.db');
-    const settings = parseServerSettings(withSecretFiles(env, dirname(dbPath)), DEFAULTS);
+    const settings = parseServerSettings(withSecretFiles(env, dirname(dbPath)), DEFAULTS, features);
     return {
       ...settings,
       dbPath,
@@ -145,9 +147,13 @@ export interface RunningServer {
 /** Opens storage, checks the master key, and listens. Throws ConfigError before listening on any problem. */
 export async function startServe(
   env: Env,
-  options: { sink?: (line: string) => void } = {},
+  options: {
+    sink?: (line: string) => void;
+    /** The consent screen of the OAuth server (P5-04). Tests give a stand-in; the shipped host has none yet. */
+    oauthConsent?: OAuthConsentHandler;
+  } = {},
 ): Promise<RunningServer> {
-  const config = loadServeConfig(env);
+  const config = loadServeConfig(env, { oauthConsent: options.oauthConsent !== undefined });
   const logger = createLogger({
     level: config.logLevel,
     sink: options.sink ?? stderrSink,
@@ -186,6 +192,7 @@ export async function startServe(
     version: pkg.version,
     isolation: 'process',
     ...(adminVerifier === undefined ? {} : { adminVerifier }),
+    ...(options.oauthConsent === undefined ? {} : { oauthConsent: options.oauthConsent }),
     ...(config.privateAddresses === 'refuse' ? { checkInstanceHost: checkPublicHost } : {}),
     // Identity providers are reached over public addresses only, checked at connect time (THREAT_MODEL T11).
     identityFetch: createNodeFetch({ publicOnly: config.identityPrivateAddresses === 'refuse' }),

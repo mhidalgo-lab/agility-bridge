@@ -35,6 +35,10 @@ export type Principal =
   /** OAuth (Phase 5): the provider's grant props, already validated for this workspace's resource. */
   | {
       readonly kind: 'oauth';
+      /** The OAuth device authorization (`oauth_<provider grant id>`): what audit rows and rate limits call the token. */
+      readonly tokenId: string;
+      /** The OAuth client the token was issued to. */
+      readonly clientId: string;
       readonly grantId: string;
       readonly workspaceId: string;
       readonly writeScope: boolean;
@@ -78,8 +82,10 @@ export interface EffectiveAccess {
   readonly workspace: { readonly id: string; readonly slug: string; readonly name: string };
   readonly instance: { readonly id: string; readonly baseUrl: string; readonly tls: Instance['tls'] };
   readonly grant: { readonly id: string; readonly userId: string | null; readonly label: string | null };
-  /** The device token, when the caller used one. */
+  /** The device token, or the OAuth device authorization (`oauth_…`), when the caller used one. */
   readonly tokenId: string | null;
+  /** The OAuth client of an OAuth request; `null` otherwise. */
+  readonly clientId: string | null;
   readonly credential: {
     readonly id: string;
     readonly kind: 'personal' | 'shared';
@@ -258,7 +264,8 @@ export function resolveAccess(
       workspace: { id: workspace.id, slug: workspace.slug, name: workspace.name },
       instance: { id: instance.id, baseUrl: instance.baseUrl, tls: instance.tls },
       grant: { id: grant.id, userId: grant.userId, label: grant.label },
-      tokenId: principal.kind === 'device_token' ? principal.token.id : null,
+      tokenId: principal.kind === 'device_token' ? principal.token.id : principal.tokenId,
+      clientId: principal.kind === 'oauth' ? principal.clientId : null,
       credential: {
         id: credential.id,
         kind,
@@ -316,6 +323,7 @@ export function resolvePassthroughAccess(
       instance: { id: instance.id, baseUrl: instance.baseUrl, tls: instance.tls },
       grant: { id: `passthrough:${id}`, userId: null, label: 'pass-through' },
       tokenId: `pt:${id}`,
+      clientId: null,
       credential: { id: `pt:${id}`, kind: 'personal' as const, sealed: null },
       tools: Object.freeze(tools),
       writeTools: Object.freeze([]),

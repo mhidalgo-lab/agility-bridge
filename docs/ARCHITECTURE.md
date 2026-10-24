@@ -188,8 +188,8 @@ TLS trust while it has unrevoked credentials (P2-01).
    JSON-RPC batches refused.
 2. **Authenticate**: device token (format and checksum offline, then hash lookup, constant-time compare, revoked,
    expired) or, with OAuth on, a provider-issued access token validated for this slug's resource only (RFC 8707), with
-   its props cross-checked. Every failure is the same 401 (with OAuth on, `WWW-Authenticate` names the slug's RFC 9728
-   metadata).
+   its props cross-checked and its grant resolved as an `oauth` principal by the same `resolveAccess` (P5-01, [dev/oauth.md](dev/oauth.md)).
+   Every failure is the same 401 (P5-02 makes `WWW-Authenticate` name the slug's RFC 9728 metadata).
 3. **Resolve access**: effective tools, scopes, asset types, limits and credential (`resolveAccess`; one storage call,
    one D1 `batch()` on Workers), cached for at most 60 s (default 30 s), never past the token's or grant's expiry,
    keyed by token hash + slug, holding no plaintext token. Storage errors are 503.
@@ -478,7 +478,8 @@ validate input + metadata (operation allowed, attributes writable, values typed)
 | `AB_AUDIT_RETENTION_DAYS` | `90` | `0` keeps forever |
 | `AB_RATE_LIMIT`, `AB_RATE_LIMIT_IP_PER_MINUTE`, `…_AUTH_FAILURES`, `…_TOKEN_PER_MINUTE`, `…_GRANT_PER_MINUTE` | `on`, 600, 10 per 5 min, 120, 300 | edge rate limits (P2-07, [configuration](guide/configuration.md#rate-limits)) |
 | `AB_PASSTHROUGH` | `off` | enable mode E |
-| `AB_OAUTH` | `off` | enable OAuth 2.1 (Phase 5) |
+| `AB_OAUTH` | `off` | enable OAuth 2.1 (Phase 5; `on` needs `AB_PUBLIC_URL` and, until P5-04, is refused: no consent screen yet) |
+| `AB_OAUTH_ACCESS_TTL` / `AB_OAUTH_REFRESH_TTL` | `1h` / `30d` | OAuth token lifetimes (60 s-24 h / 1 h-365 d) |
 | `AB_PLAN` | `free` | Workers presets: `free` \| `paid` |
 | `AB_LIVE_AGILITY_URL`, `AB_LIVE_AGILITY_TOKEN`, `AB_LIVE_SCOPE` | unset | live test suite only |
 
