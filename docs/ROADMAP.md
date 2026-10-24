@@ -235,7 +235,7 @@ Status lives in each task file.
 | P5-01 | [OAuth 2.1 authorization server](tasks/phase-5-oauth/P5-01-oauth-server.md) | high | P4-11 | done |
 | P5-02 | [Protected resource metadata per workspace](tasks/phase-5-oauth/P5-02-protected-resource-metadata.md) | high | P5-01 | review |
 | P5-03 | [Client registration: CIMD and DCR](tasks/phase-5-oauth/P5-03-client-registration.md) | high | P5-01 | todo |
-| P5-04 | [Consent screen and device handling](tasks/phase-5-oauth/P5-04-consent-devices.md) | high | P5-01 | todo |
+| P5-04 | [Consent screen and device handling](tasks/phase-5-oauth/P5-04-consent-devices.md) | high | P5-01 | review |
 | P5-05 | [Token lifecycle and refresh concurrency](tasks/phase-5-oauth/P5-05-token-lifecycle.md) | high | P5-01 | todo |
 | P5-06 | [Real-client compatibility matrix (OAuth)](tasks/phase-5-oauth/P5-06-client-matrix-oauth.md) | high | P5-02, P5-03, P5-04, P5-05 | todo |
 | P5-07 | [OAuth documentation](tasks/phase-5-oauth/P5-07-oauth-docs.md) | medium | P5-06 | todo |

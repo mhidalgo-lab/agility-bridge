@@ -6,6 +6,7 @@
 // endpoint, and Disconnect on "My access" ends it. Every page load is watched for CSP violations (the redirect after the
 // post is subject to `form-action`), console errors and uncaught errors.
 import { createHash, randomBytes } from 'node:crypto';
+import { createServer, type Server } from 'node:http';
 import { expect, type Page, test } from '@playwright/test';
 import { expectAccessible, expectNoHorizontalScroll, visit } from './helpers.ts';
 import { OWNER, startServer, type TestServer } from './server.ts';
@@ -22,8 +23,17 @@ const WHOAMI = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'w
 
 test.beforeAll(async () => {
   server = await startServer({ env: { AB_OAUTH: 'on' } });
+  app = createServer((req, res) => {
+    const u = new URL(req.url ?? '/', 'http://127.0.0.1:53999');
+    res.writeHead(200, { 'content-type': 'text/plain' }).end('app');
+    const next = waiting;
+    waiting = [];
+    for (const w of next) w(u);
+  });
+  await new Promise<void>((r) => app.listen(53999, '127.0.0.1', r));
 });
 test.afterAll(async () => {
+  await new Promise<void>((r) => (app ? app.close(() => r()) : r()));
   await server?.stop();
 });
 
@@ -61,17 +71,29 @@ function request(clientId: string) {
   return { url, verifier, state };
 }
 
-/** The client's redirect URI is answered by the test, so the browser's navigation ends there. */
-async function catchCallback(page: Page): Promise<() => Promise<URL>> {
-  let resolve: (u: URL) => void = () => undefined;
-  const seen = new Promise<URL>((r) => {
-    resolve = r;
+/**
+ * The client's redirect URI is answered by a real loopback listener (Chromium does not route redirect targets through
+ * `page.route`), so the browser's navigation ends there and the test sees exactly what the app would.
+ */
+let app: Server;
+let waiting: Array<(u: URL) => void> = [];
+function catchCallback(page: Page, problems: readonly string[] = []): () => Promise<URL> {
+  const seen = new Promise<URL>((resolve) => {
+    waiting.push(resolve);
   });
-  await page.route('http://127.0.0.1:53999/**', async (route) => {
-    resolve(new URL(route.request().url()));
-    await route.fulfill({ status: 200, contentType: 'text/plain', body: 'app' });
-  });
-  return () => seen;
+  return () =>
+    Promise.race([
+      seen,
+      new Promise<URL>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(`the redirect never reached the app; at ${page.url()}; ${problems.join(' | ')}`),
+            ),
+          20_000,
+        ),
+      ),
+    ]);
 }
 
 async function mcp(token: string): Promise<number> {
@@ -112,7 +134,7 @@ test('a client sends the browser through sign-in to the consent page, and Allow 
   const w = await watch(page);
   const clientId = await register('Phone app');
   const r = request(clientId);
-  const callback = await catchCallback(page);
+  const callback = catchCallback(page, w.problems);
 
   await test.step('signed out, the request goes through sign-in and comes back to the consent page', async () => {
     // Not signed in: the owner's session from the first test lives in another browser context.
@@ -166,7 +188,7 @@ test('Deny returns access_denied, and a hostile, very long app name stays inside
   const w = await watch(page);
   const name = `<img src=x onerror=alert(1)>${'A'.repeat(120)}`;
   const r = request(await register(name));
-  const callback = await catchCallback(page);
+  const callback = catchCallback(page, w.problems);
   await page.goto(`${server.base}/auth/login`);
   await page.getByRole('link', { name: 'Continue with Corp SSO' }).click();
   await page.goto(r.url);
@@ -190,8 +212,8 @@ test('My access lists the connected app and Disconnect ends its tokens at once',
   await page.getByRole('link', { name: 'Continue with Corp SSO' }).click();
   await visit(page, server, '/admin/me');
   await expect(page.getByRole('heading', { name: 'Connected apps' })).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'Phone app' })).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'E2E browser' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Phone app', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'E2E browser', exact: true })).toBeVisible();
   const access = connectedAccess;
   expect(access).not.toBe('');
   expect(await mcp(access)).toBe(200);

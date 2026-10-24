@@ -2,7 +2,7 @@
 id: P5-04
 title: Consent screen and device handling
 phase: 5
-status: todo
+status: review
 priority: high
 depends_on: [P5-01]
 adr: ["0009", "0013"]
@@ -61,20 +61,39 @@ they approved. Operators turn OAuth on with `AB_OAUTH=on`.
   phone), the admin guide, configuration reference, THREAT_MODEL (T9, T10, T13), generated admin API reference.
 
 ## Acceptance criteria
-- [ ] Sign-in round trip: signed out → sign-in → back on the same authorize request → consent page → approve → code at
+- [x] Sign-in round trip: signed out → sign-in → back on the same authorize request → consent page → approve → code at
   the redirect URI → token → MCP call; deny returns `access_denied` with `state` and `iss`.
-- [ ] Consent POST refusals (negative, L-121): no session, cross-site and missing `Origin`, wrong or repeated CSRF,
+- [x] Consent POST refusals (negative, L-121): no session, cross-site and missing `Origin`, wrong or repeated CSRF,
   wrong media type; a replayed form, a form for another request (swapped client, redirect, challenge, resource, state),
   another user's form and an expired handle approve nothing and issue no code.
-- [ ] No live grant on the workspace (revoked, expired, other user's, service grant, disabled user, missing workspace)
+- [x] No live grant on the workspace (revoked, expired, other user's, service grant, disabled user, missing workspace)
   gives the refusal page and no code; hostile client names and redirect hosts render inert.
-- [ ] A silent authorization (`prompt=none`, a repeated authorize navigation) revokes nothing; a device is replaced only
+- [x] A silent authorization (`prompt=none`, a repeated authorize navigation) revokes nothing; a device is replaced only
   after a successful code exchange; the device cap holds under concurrent approvals; revoking a device ends its access
   and refresh tokens; Disconnect cannot touch another user's device.
-- [ ] `AB_OAUTH=on` boots on both hosts (Node `serve`, Worker); the consent page works in a real browser (Playwright, 1280
+- [x] `AB_OAUTH=on` boots on both hosts (Node `serve`, Worker); the consent page works in a real browser (Playwright, 1280
   and 320 px, no CSP violations).
-- [ ] Security tests are mutation-checked (L-121), recorded under Outcome.
-- [ ] Docs, THREAT_MODEL, decisions (D-60 implemented, D-66, D-67), lessons and a changeset are done.
+- [x] Security tests are mutation-checked (L-121), recorded under Outcome.
+- [x] Docs, THREAT_MODEL, decisions (D-60 implemented, D-66, D-67), lessons and a changeset are done.
+
+## Outcome
+- Built as scoped. Remembered consent and write consent are deliberately not built (D-66, new task P5-13); device
+  last-used time and idle expiry are P5-14. D-60 is implemented and superseded; D-67 records the cap and the replacement rule.
+  `AB_OAUTH=on` now needs sign-in (an identity provider) instead of the consent stand-in, which stays for tests.
+- relic-bridge findings folded in: H1 (an authorization request never revokes a device; replacement after the code
+  exchange), M2 (cap per person, listing bound equals the cap, post-insert re-check), L7/L8 (`prompt=none`; no scheme-wide
+  `form-action` for `http://[::1]`), consent CSRF/clickjacking/fetch metadata, no slug probing. Added beyond relic: the
+  single-use handle bound to the exact request (L-248) and a per-person approval lock.
+- Tests: `packages/http-app/test/oauth/consent.test.ts` (26 cases), `e2e/oauth-consent.spec.ts` (4 steps at 1280 px and
+  320 px, axe, CSP and console watch, real loopback redirect), settings tests on both hosts, `pnpm test`: 2,161 passed
+  (the two failures are the offline `npx agility-bridge` documentation tests).
+- Mutation checks (L-121), each reverted: handle not bound to the request (1 failing case), handle not single use (1),
+  handle not per person (15), CSRF unchecked (1), fetch metadata unchecked (1), `prompt=none` shows the page (1), offered
+  grant unchecked (3), `revokeExistingGrants: true` (1), no replacement after the exchange (1), approval lock off (2),
+  overflow undo after the insert off (1, after the test counted stored grants instead of the capped list), cap pre-check off
+  (1), break-glass allowed on device routes (1), revoke without ending tokens (2).
+- Real phones (iOS Safari, Android Chrome) were not available to the agent: the manual check is left to the owner
+  with P5-06.
 
 ## Security notes
 THREAT_MODEL T9, T10, T13 (T14, T15, T25 touched).

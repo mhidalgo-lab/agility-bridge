@@ -721,7 +721,9 @@ describe('devices (P5-04, L-090, T15)', () => {
     try {
       const more = await Promise.all([loose.prepare('x'), loose.prepare('y'), loose.prepare('z')]);
       await Promise.all(more.map((p) => post(loose.t, p.form, loose.cookie, body(p.form))));
-      expect((await loose.listed()).length).toBeLessThanOrEqual(25);
+      // The stored grants themselves (the list is capped, so it could hide a 26th).
+      const stored = await loose.t.w.storage.kv.list(`oauth:grant:${loose.t.w.ids.alice}:`);
+      expect(stored.length).toBeLessThanOrEqual(25);
     } finally {
       spy.mockRestore();
     }
