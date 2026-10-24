@@ -66,6 +66,8 @@ carry `requestId`.
 | warn | `oauth authorization code replayed; grant revoked` | `oauthGrant`; never the code | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | warn | `oauth tokens issued for a revoked device; revoked again` | `oauthGrant` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | warn | `oauth audit failed` | `error` (class) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| warn | `oauth device replacement failed` | `error` (class) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| error | `consent screen error` | `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
 | error | `audit write failed` | `action`, `error` (class) | [audit.ts](../../packages/http-app/src/audit.ts) |
 | error | `audit queue full; rows dropped` | `dropped` | [audit.ts](../../packages/http-app/src/audit.ts) |
 | info | `audit retention` | `deleted`, `retentionDays` | [audit.ts](../../packages/http-app/src/audit.ts) |

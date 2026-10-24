@@ -46,6 +46,7 @@ import type { LoginEvent, OAuthEvent } from './audit.ts';
 import { createEdge, type EdgeOptions } from './edge.ts';
 import { createIdentityRoutes, IDENTITY_BASE, type IdentityOptions } from './identity.ts';
 import { type ClassifiedRequest, classifyMcpMessage, jsonRpcError, readMcpBody } from './mcp-request.ts';
+import { type ConsentScreen, createConsentScreen, OAUTH_CONSENT_PATH } from './oauth/consent.ts';
 import {
   createOAuthRuntime,
   looksLikeOAuthToken,
@@ -409,6 +410,65 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
   });
   app.notFound((c) => c.json({ error: 'not found' }, 404));
 
+  // The OAuth runtime (P5-01) and its consent screen (P5-04): built before the admin API, whose "connected apps" routes
+  // use the runtime, and kept for the routes registered below.
+  let oauth: OAuthRuntime | undefined;
+  let consentScreen: ConsentScreen | undefined;
+  if (options.oauth !== undefined) {
+    const { audit: oauthAudit, ...oauthOptions } = options.oauth;
+    if (options.publicUrl === undefined) throw new TypeError('oauth needs publicUrl: it is the issuer');
+    let consent = oauthOptions.consent;
+    if (consent === undefined) {
+      const identity = options.identity;
+      if (identity === undefined || sessions === undefined) {
+        throw new TypeError(
+          'oauth needs sign-in (identity) for its consent screen, or an oauth.consent handler',
+        );
+      }
+      consentScreen = createConsentScreen({
+        loadUi,
+        ui: adminUiDeps({
+          sessions,
+          kv: options.storage.kv,
+          publicOrigin: new URL(identity.publicUrl).origin,
+          now: () => services.clock.now(),
+          ...(identity.auditAdmin === undefined ? {} : { audit: identity.auditAdmin }),
+          runInBackground: keepAlive,
+          onError: (_c, error) =>
+            services.logger.error('consent screen error', {
+              error: error instanceof Error ? error.name : typeof error,
+            }),
+        }),
+        kv: options.storage.kv,
+        clock: services.clock,
+        logger: services.logger,
+        ...(identity.auditAdmin === undefined ? {} : { audit: identity.auditAdmin }),
+        runInBackground: keepAlive,
+      });
+      consent = consentScreen.handler;
+    }
+    oauth = createOAuthRuntime({
+      options: { ...oauthOptions, consent },
+      issuer: options.publicUrl,
+      storage: options.storage,
+      access: options.access,
+      clock: services.clock,
+      logger: services.logger,
+      runInBackground: (c, work) => keepAlive(c, work),
+      onRevocation: () => cache.clear(),
+      ...(oauthAudit === undefined
+        ? {}
+        : {
+            audit: (event: OAuthEvent) => {
+              const work = oauthAudit(event);
+              if (work instanceof Promise) return work;
+              return undefined;
+            },
+          }),
+    });
+  }
+  const oauthRuntime = oauth;
+
   /** Enters the admin API app in-process (set when the admin API exists): the panel's changes use the API's own handlers. */
   let adminInProcess: ((request: Request, c: Context) => Response | Promise<Response>) | undefined;
 
@@ -432,6 +492,16 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         background: keepAlive,
         keyring: options.keyring,
         ...(options.identity === undefined ? {} : { setupLinks: { publicUrl: options.identity.publicUrl } }),
+        ...(oauthRuntime === undefined
+          ? {}
+          : {
+              oauthDevices: {
+                list: (userId: string) => oauthRuntime.devices(userId),
+                revoke: (ic: Context, userId: string, id: string) =>
+                  oauthRuntime.revokeDevice(ic, userId, id),
+                revokeAll: (ic: Context, userId: string) => oauthRuntime.revokeAllDevices(ic, userId),
+              },
+            }),
         ...(perRequest ? { lightweightRouter: true } : {}),
       });
     // The admin API app is built once, on first use. Workers: on the first admin request, not at every boot, so MCP
@@ -582,29 +652,9 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
   }
 
   // OAuth 2.1 authorization server (P5-01): unauthenticated routes, limited per IP before any work, bodies capped by
-  // the runtime. All state is in storage (L-086); the runtime holds configuration only (L-013, L-096).
-  let oauth: OAuthRuntime | undefined;
-  if (options.oauth !== undefined) {
-    const { audit: oauthAudit, ...oauthOptions } = options.oauth;
-    if (options.publicUrl === undefined) throw new TypeError('oauth needs publicUrl: it is the issuer');
-    oauth = createOAuthRuntime({
-      options: oauthOptions,
-      issuer: options.publicUrl,
-      storage: options.storage,
-      access: options.access,
-      clock: services.clock,
-      logger: services.logger,
-      runInBackground: (c, work) => keepAlive(c, work),
-      ...(oauthAudit === undefined
-        ? {}
-        : {
-            audit: (event: OAuthEvent) => {
-              const work = oauthAudit(event);
-              if (work instanceof Promise) return work;
-              return undefined;
-            },
-          }),
-    });
+  // the runtime. All state is in storage (L-086); the runtime holds configuration only (L-013, L-096). The runtime and
+  // the consent screen are built above (the admin API's connected-apps routes need them).
+  if (oauth !== undefined) {
     const runtime = oauth;
     const limited = async (c: Context, run: () => Promise<Response>): Promise<Response> => {
       const now = services.clock.now();
@@ -627,6 +677,10 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     app.get(OAUTH_AUTHORIZE_PATH, (c) => limited(c, () => runtime.authorize(c)));
     app.post(OAUTH_TOKEN_PATH, (c) => limited(c, () => runtime.token(c, () => cache.clear())));
     app.post(OAUTH_REGISTER_PATH, (c) => limited(c, () => runtime.register(c)));
+    const screen = consentScreen;
+    // The built-in consent screen's form post (P5-04); a stand-in handler has no such route.
+    if (screen !== undefined)
+      app.post(OAUTH_CONSENT_PATH, (c) => limited(c, () => screen.decide(c, runtime)));
   }
 
   // Liveness and version only (L-151).

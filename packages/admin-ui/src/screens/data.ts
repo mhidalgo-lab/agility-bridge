@@ -318,6 +318,39 @@ export function parseMyGrant(r: Row): MyGrant | null {
   };
 }
 
+/** An app the signed-in person connected with OAuth (P5-04; `GET /me/oauth-devices`). The text fields are untrusted. */
+export interface OAuthDevice {
+  /** The provider grant id, posted back to disconnect it. */
+  readonly id: string;
+  readonly clientName: string | null;
+  /** Host of the redirect URI the app was approved for. */
+  readonly redirectHost: string;
+  readonly workspaceName: string | null;
+  readonly workspaceSlug: string | null;
+  /** The device name the person typed on the consent page. */
+  readonly label: string | null;
+  readonly createdAt: number;
+  readonly expiresAt: number | null;
+}
+
+/** The id of an OAuth device: the provider's 16 URL-safe characters. */
+export const OAUTH_DEVICE_ID_RE: RegExp = /^[A-Za-z0-9_-]{16}$/;
+
+export function parseOAuthDevice(r: Row): OAuthDevice | null {
+  const id = str(r['id']);
+  if (!OAUTH_DEVICE_ID_RE.test(id)) return null;
+  return {
+    id,
+    clientName: strOrNull(r['clientName']),
+    redirectHost: str(r['redirectHost']),
+    workspaceName: strOrNull(r['workspaceName']),
+    workspaceSlug: strOrNull(r['workspaceSlug']),
+    label: strOrNull(r['label']),
+    createdAt: int(r['createdAt']),
+    expiresAt: intOrNull(r['expiresAt']),
+  };
+}
+
 /** One line of "my recent changes" (`GET /me/audit`). */
 export interface MyAuditRow {
   readonly id: string;

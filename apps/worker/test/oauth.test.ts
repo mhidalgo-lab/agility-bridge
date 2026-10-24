@@ -137,9 +137,24 @@ describe('OAuth settings on the shipped Worker', () => {
     AB_OAUTH: 'on',
   };
 
-  it('refuses AB_OAUTH=on until the consent screen exists, before touching storage (P5-04)', async () => {
+  it('refuses AB_OAUTH=on without sign-in, before touching storage (P5-04)', async () => {
     // No D1 binding is given: the settings are refused first.
-    await expect(boot({ ...base } as never, '0.0.0-test')).rejects.toThrow(/consent screen/);
+    await expect(boot({ ...base } as never, '0.0.0-test')).rejects.toThrow(/needs sign-in/);
+  });
+
+  it('boots AB_OAUTH=on with a sign-in provider and the built-in consent screen (P5-04)', async () => {
+    // Settings pass; boot then goes on to the missing D1 binding.
+    await expect(
+      boot(
+        {
+          ...base,
+          AB_OIDC_ISSUER: 'https://login.example.test',
+          AB_OIDC_CLIENT_ID: 'client',
+          AB_OIDC_CLIENT_SECRET: 'not-a-real-secret-value',
+        } as never,
+        '0.0.0-test',
+      ),
+    ).rejects.toThrow(/D1 binding/);
   });
 
   it('knows the OAuth variables, so a typo is still caught and the real names are not', async () => {

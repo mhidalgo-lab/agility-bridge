@@ -149,7 +149,7 @@ export async function startServe(
   env: Env,
   options: {
     sink?: (line: string) => void;
-    /** The consent screen of the OAuth server (P5-04). Tests give a stand-in; the shipped host has none yet. */
+    /** A stand-in for the OAuth consent step (tests); the shipped host uses the built-in screen (P5-04). */
     oauthConsent?: OAuthConsentHandler;
   } = {},
 ): Promise<RunningServer> {

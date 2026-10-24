@@ -13,6 +13,7 @@ T13). The frame (P4-03), the management screens (P4-04), the audit viewer (P4-05
 | Assets | `packages/admin-ui/assets/admin.css`, `admin.js` -> `src/assets.generated.ts` | hashed names, SRI, generated |
 | Screens | `src/screens/*.tsx`, registered in `src/app.ts` | `overview.tsx` and `account.tsx` are the references |
 | Server side of the panel | `packages/http-app/src/admin-ui.ts`, `app.ts` | session, in-process admin API calls, mounting |
+| OAuth consent page (P5-04) | `src/consent.tsx` (view), `packages/http-app/src/oauth/consent.ts` (handler), `src/headers.ts` (`consentCsp`) | a pure view; the handler is not a `kit.form` route: it needs the single-use handle bound to the request, and a CSP that also names the client's redirect origin |
 
 The package is web-standard only (no `node:*`, `process`, `Buffer`; `scripts/check-runtime-imports.ts` scans it) and
 imports nothing but `hono` and its own files: it never sees storage, the session record or a secret. What it needs from the

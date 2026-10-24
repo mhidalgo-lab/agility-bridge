@@ -33,7 +33,7 @@ How to use it:
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-246 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-249 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -816,6 +816,34 @@ session (a token past the default 90 days, a setup link, a pass-through workspac
 minutes, as GitHub's "sudo mode" does for access tokens; the ordinary, short-lived action stays frictionless. Decide the rule
 by what survives, not by who is asking, and put it in the guard, so the panel, the API and the command line share it.
 *Applied in:* P4-09.
+
+**L-247 — A library's "helpful" default that revokes on issue turns a navigation into a disconnect.**
+`workers-oauth-provider`'s `completeAuthorization` revokes the user's other grants of the same client when a code is
+*issued*. That is harmless when issuing needs a click, and a zero-click denial of service the day a request can issue a
+code without one (a remembered approval, a silent `prompt`, a replayed form): any page could navigate a victim's browser
+to the authorize URL and end their live app. Read what each helper does besides what you call it for: approval passes
+`revokeExistingGrants: false`, and a device is replaced only after a successful code exchange, by the holder of the code and
+its PKCE verifier, audited as `oauth.device.replaced`. Test it as an attacker would (authorize twice, redeem neither, the
+first token must still work).
+*Applied in:* P5-04 (relic-bridge Phase 5 review H1).
+
+**L-248 — A CSRF token says who posted; a handle bound to the request says what they approved.**
+A consent form is valid for a signed-in person, so session, `Origin` and CSRF all pass for a form carried to another
+authorization request (swapped client, redirect URI, challenge, resource or state) or posted twice. The page therefore stores
+`oauth-consent:<user>:<handle>` = a hash of the canonical request it showed, and the post takes it atomically and compares
+it with the request it re-validated from its own URL: replayed, swapped, cross-user and expired forms find nothing or a
+different hash and approve nothing. Handles are bounded per person by dropping the oldest (an attacker who can flood them
+can only make a stale tab ask again), never written for HEAD, and spent whatever the outcome.
+*Applied in:* P5-04.
+
+**L-249 — `form-action` governs the redirect that answers a form post, so the consent page must name the client's origin.**
+Chromium applies `form-action` to the redirects after a post: with `'self'` only, "Allow" is blocked at the redirect to the
+client's callback. Widening to the redirect URI's origin (only an http(s) host source, validated) fixes it; widening to
+`http:` for an IPv6 loopback redirect, which CSP cannot spell, would let any injected form post to any plain-http site, so
+that one target is answered by a same-origin page that navigates (`Refresh` and a link are not governed by `form-action`).
+The edge keeps a panel CSP only when it is the panel policy plus exactly one such source. A browser test catches this; a unit
+test of the header does not.
+*Applied in:* P5-04 (relic-bridge P5-12/L8).
 
 ## K. Admin UI
 

@@ -7,7 +7,8 @@
 // validation error, a flash, a redirect or a log. Grants are still assigned by administrators; this area only chooses which
 // of my own valid tokens a grant of mine uses.
 //
-//   GET  /admin/me                              my grants, my tokens, my recent changes, how to create a token
+//   GET  /admin/me                              my grants, my tokens, connected apps, my recent changes, how to create a token
+//   POST /admin/me/oauth-devices/:id/revoke     disconnect one OAuth app (P5-04); .../revoke-all disconnects every one
 //   GET  /admin/me/credentials/new              add form       POST /admin/me/credentials          add (checked at once)
 //   GET  /admin/me/credentials/:id              detail         POST .../validate | rename (POST /:id) | revoke | delete
 //   GET  /admin/me/credentials/:id/token        replace form   POST .../token                       replace (recent sign-in)
@@ -33,11 +34,13 @@ import {
   type Instance,
   isId,
   type MyGrant,
+  OAUTH_DEVICE_ID_RE,
   one,
   parseCredential,
   parseInstance,
   parseMyAudit,
   parseMyGrant,
+  parseOAuthDevice,
   parseToken,
   rows,
 } from './data.ts';
@@ -248,11 +251,12 @@ export function registerMe(ui: Hono, kit: UiKit): void {
     '/me',
     kit.page('member', async (c, page) => {
       const { principal } = page;
-      const [grants, credentials, instances, audit] = await Promise.all([
+      const [grants, credentials, instances, audit, devices] = await Promise.all([
         myGrants(c, principal),
         myCredentials(c, principal),
         instanceMap(c, principal),
         load(kit, c, principal, '/me/audit', (b) => rows(b, parseMyAudit), { limit: '10' }),
+        load(kit, c, principal, '/me/oauth-devices', (b) => rows(b, parseOAuthDevice)),
       ]);
       if ('status' in grants) return loadFailed(c, grants, principal);
       if ('status' in credentials) return loadFailed(c, credentials, principal);
@@ -317,6 +321,53 @@ export function registerMe(ui: Hono, kit: UiKit): void {
               ]}
             />
           </section>
+          {/* 404: OAuth is off on this server, so there is nothing to connect or list. */}
+          {devices.ok || devices.result.status !== 404 ? (
+            <section aria-labelledby="apps-heading">
+              <h2 id="apps-heading">Connected apps</h2>
+              {devices.ok ? (
+                <>
+                  <DataTable
+                    caption="Connected apps"
+                    empty="No app is connected with OAuth. Apps you allow on the consent screen are listed here."
+                    rows={devices.value}
+                    columns={[
+                      { header: 'App', cell: (d) => d.clientName ?? 'An unnamed app' },
+                      { header: 'Device', cell: (d) => d.label ?? 'no name' },
+                      { header: 'Workspace', cell: (d) => d.workspaceName ?? d.workspaceSlug ?? 'unknown' },
+                      { header: 'Sends to', cell: (d) => <span class="mono">{d.redirectHost}</span> },
+                      { header: 'Connected', cell: (d) => <When at={d.createdAt} /> },
+                      { header: 'Ends', cell: (d) => <When at={d.expiresAt} none="never" /> },
+                      {
+                        header: 'Actions',
+                        cell: (d) => (
+                          <RowAction
+                            action={`${ME}/oauth-devices/${d.id}/revoke`}
+                            csrf={principal.csrf}
+                            label="Disconnect"
+                            name={`Disconnect ${d.clientName ?? 'an unnamed app'}`}
+                          />
+                        ),
+                      },
+                    ]}
+                  />
+                  {devices.value.length > 0 ? (
+                    <Form
+                      action={`${ME}/oauth-devices/revoke-all`}
+                      csrf={principal.csrf}
+                      label="Disconnect every app"
+                    >
+                      <Button variant="danger">Disconnect all apps</Button>
+                    </Form>
+                  ) : null}
+                </>
+              ) : (
+                <p class="flash flash-error" role="alert">
+                  The connected apps could not be loaded.
+                </p>
+              )}
+            </section>
+          ) : null}
           {audit.ok && audit.value.length > 0 ? (
             <section aria-labelledby="audit-heading">
               <h2 id="audit-heading">My recent changes</h2>
@@ -335,6 +386,36 @@ export function registerMe(ui: Hono, kit: UiKit): void {
           <TokenGuide />
         </Layout>,
       );
+    }),
+  );
+
+  // ---- connected OAuth apps (P5-04) ----------------------------------------------------------------------------------
+
+  ui.post(
+    '/me/oauth-devices/revoke-all',
+    kit.form('member', async (c, principal, form) => {
+      const res = await kit.callAdmin(
+        c,
+        principal,
+        { method: 'POST', path: '/me/oauth-devices/revoke-all' },
+        form,
+      );
+      return isOk(res) ? kit.redirect(ME, 'revoked') : kit.fail(c, principal, res, ME);
+    }),
+  );
+
+  ui.post(
+    '/me/oauth-devices/:id/revoke',
+    kit.form('member', async (c, principal, form) => {
+      const id = c.req.param('id');
+      if (id === undefined || !OAUTH_DEVICE_ID_RE.test(id)) return kit.redirect(ME, 'not_found');
+      const res = await kit.callAdmin(
+        c,
+        principal,
+        { method: 'POST', path: adminPath`/me/oauth-devices/${id}/revoke` },
+        form,
+      );
+      return isOk(res) ? kit.redirect(ME, 'revoked') : kit.fail(c, principal, res, ME);
     }),
   );
 

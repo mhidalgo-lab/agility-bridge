@@ -115,7 +115,7 @@ export function workerSettings(env: WorkerEnv): Record<string, string> {
 export async function boot(
   env: WorkerEnv,
   version: string,
-  /** The consent screen of the OAuth server (P5-04): the shipped Worker has none yet; tests give a stand-in. */
+  /** A stand-in for the OAuth consent step (tests); the shipped Worker uses the built-in screen (P5-04). */
   oauthConsent?: OAuthConsentHandler,
 ): Promise<Booted> {
   const settingsEnv = workerSettings(env);

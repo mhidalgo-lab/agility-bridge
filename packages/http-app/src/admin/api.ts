@@ -58,6 +58,24 @@ async function readCapped(request: Request, max: number): Promise<string | null>
   return new TextDecoder().decode(all);
 }
 
+/** The signed-in person's OAuth devices (P5-04): what `GET /me/oauth-devices` and its revoke routes use. */
+export interface AdminOAuthDevices {
+  list(userId: string): Promise<
+    readonly {
+      readonly id: string;
+      readonly clientName: string | null;
+      readonly redirectHost: string;
+      readonly workspaceId: string | null;
+      readonly label: string | null;
+      readonly createdAt: number;
+      readonly expiresAt: number | null;
+    }[]
+  >;
+  /** False when the id is not one of this person's devices. */
+  revoke(c: Context, userId: string, deviceId: string): Promise<boolean>;
+  revokeAll(c: Context, userId: string): Promise<number>;
+}
+
 export interface AdminApiOptions {
   readonly services: AccessServices;
   readonly storage: Storage;
@@ -86,6 +104,8 @@ export interface AdminApiOptions {
   readonly lightweightRouter?: boolean;
   /** Sign-in is configured (P4-01): owner setup links point at this origin. Absent = `POST /setup-links` is refused. */
   readonly setupLinks?: { readonly publicUrl: string };
+  /** OAuth is on (P5-04): the signed-in person's connected apps. Absent = the `/me/oauth-devices` routes answer 404. */
+  readonly oauthDevices?: AdminOAuthDevices;
 }
 
 /** A request the admin API refuses before any handler (the reason is audited, never the token). */
@@ -1352,6 +1372,86 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
     },
     (c, { id, body }) =>
       services(c).me.setGrantCredential(id, (body as { credentialId: string | null }).credentialId),
+  );
+  const OAuthDeviceOut = z
+    .object({
+      id: z.string().openapi({ description: 'The device id (send it to `/me/oauth-devices/{id}/revoke`).' }),
+      clientName: z
+        .string()
+        .nullable()
+        .openapi({ description: 'The name the app gave itself: untrusted text, never verified.' }),
+      redirectHost: z.string().openapi({ description: 'Host the app was approved to send the answer to.' }),
+      workspaceId: z.string().nullable(),
+      workspaceName: z.string().nullable(),
+      workspaceSlug: z.string().nullable(),
+      label: z.string().nullable().openapi({ description: 'The device name typed on the consent screen.' }),
+      createdAt: z.number(),
+      expiresAt: z.number().nullable(),
+    })
+    .openapi('OAuthDevice');
+  /** The signed-in person's id for the OAuth device routes: a session only, never the break-glass token. */
+  const deviceOwner = (c: Context): { userId: string; devices: AdminOAuthDevices } => {
+    const devices = options.oauthDevices;
+    if (devices === undefined) throw new AdminError('not_found', 'OAuth is not enabled on this server.');
+    const actor = c.get('actor' as never) as Actor;
+    if (actor.kind !== 'user') throw new AdminError('forbidden', 'This needs a signed-in person.');
+    return { userId: actor.userId, devices };
+  };
+  const DEVICE_ID_RE = /^[A-Za-z0-9_-]{16}$/;
+  add(
+    {
+      method: 'get',
+      path: '/me/oauth-devices',
+      ...me,
+      summary: 'The apps I connected with OAuth, newest first (any signed-in role; 404 when OAuth is off)',
+      out: z.array(OAuthDeviceOut),
+    },
+    async (c) => {
+      const { userId, devices } = deviceOwner(c);
+      const list = await devices.list(userId);
+      const names = new Map<string, { name: string; slug: string }>();
+      for (const id of new Set(list.flatMap((d) => (d.workspaceId === null ? [] : [d.workspaceId])))) {
+        const w = await options.storage.workspaces.get(id);
+        if (w !== null) names.set(id, { name: w.name, slug: w.slug });
+      }
+      return list.map((d) => ({
+        ...d,
+        workspaceName: names.get(d.workspaceId ?? '')?.name ?? null,
+        workspaceSlug: names.get(d.workspaceId ?? '')?.slug ?? null,
+      }));
+    },
+  );
+  add(
+    {
+      method: 'post',
+      path: '/me/oauth-devices/revoke-all',
+      ...me,
+      summary:
+        'Disconnect every app I connected with OAuth: their access and refresh tokens stop working at once',
+      out: z.object({ revoked: z.number() }),
+    },
+    async (c) => {
+      const { userId, devices } = deviceOwner(c);
+      return { revoked: await devices.revokeAll(c, userId) };
+    },
+  );
+  add(
+    {
+      method: 'post',
+      path: '/me/oauth-devices/{id}/revoke',
+      ...me,
+      params: true,
+      summary:
+        "Disconnect one of my apps: its access and refresh tokens stop working at once (another person's device answers 404)",
+      out: z.object({ revoked: z.literal(true) }),
+    },
+    async (c, { id }) => {
+      const { userId, devices } = deviceOwner(c);
+      if (!DEVICE_ID_RE.test(id) || !(await devices.revoke(c, userId, id))) {
+        throw new AdminError('not_found', 'No such connected app.');
+      }
+      return { revoked: true as const };
+    },
   );
   add(
     {

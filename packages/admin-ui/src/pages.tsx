@@ -97,9 +97,21 @@ export interface MessagePageProps extends Pick<LayoutProps, 'viewer'> {
   readonly title: string;
   readonly paragraphs: readonly string[];
   readonly link?: { readonly href: string; readonly label: string } | undefined;
+  /**
+   * An absolute http(s) address to continue to (the consent page's answer to a client on this computer, which a CSP
+   * `form-action` source cannot name). Anything else throws.
+   */
+  readonly continueHref?: string | undefined;
   /** Shown so a person can quote it to whoever reads the logs. Nothing else about a failure is shown. */
   readonly requestId?: string | undefined;
   readonly children?: Child;
+}
+
+/** An absolute http(s) URL as the parser normalises it; anything else throws, so a page can never emit `javascript:`. */
+function httpHref(href: string): string {
+  const u = new URL(href);
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new TypeError('not an http(s) address');
+  return u.href;
 }
 
 /** A plain page with a title, a few sentences, an optional link and the request id. */
@@ -115,6 +127,13 @@ export function MessagePage(props: MessagePageProps): JSX.Element {
           <a href={localHref(props.link.href)}>{props.link.label}</a>
         </p>
       ) : null}
+      {props.continueHref === undefined ? null : (
+        <p>
+          <a href={httpHref(props.continueHref)} rel="noreferrer noopener">
+            Continue to the app
+          </a>
+        </p>
+      )}
       {props.requestId ? (
         <p class="muted">
           <small>

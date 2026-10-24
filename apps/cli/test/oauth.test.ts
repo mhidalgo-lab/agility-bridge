@@ -130,9 +130,19 @@ async function sqliteHost(): Promise<OAuthHost> {
 defineOAuthSuite('SQLite storage (agility-bridge serve)', sqliteHost);
 
 describe('OAuth settings on the shipped host', () => {
-  it('is off by default and refuses AB_OAUTH=on until the consent screen exists (P5-04)', () => {
+  it('is off by default, and AB_OAUTH=on needs sign-in for the built-in consent screen (P5-04)', () => {
     expect(loadServeConfig({ AB_DATA_DIR: '/d' }).oauth).toBeUndefined();
-    expect(() => loadServeConfig({ AB_OAUTH: 'on', AB_PUBLIC_URL: ORIGIN })).toThrow(/consent screen/);
+    expect(() => loadServeConfig({ AB_OAUTH: 'on', AB_PUBLIC_URL: ORIGIN })).toThrow(/needs sign-in/);
+    // With a sign-in provider the built-in screen is used: no stand-in needed.
+    expect(
+      loadServeConfig({
+        AB_OAUTH: 'on',
+        AB_PUBLIC_URL: ORIGIN,
+        AB_OIDC_ISSUER: 'https://login.example.test',
+        AB_OIDC_CLIENT_ID: 'client',
+        AB_OIDC_CLIENT_SECRET: 'not-a-real-secret-value',
+      }).oauth,
+    ).toEqual({});
     expect(loadServeConfig({ AB_OAUTH: 'on', AB_PUBLIC_URL: ORIGIN }, { oauthConsent: true }).oauth).toEqual(
       {},
     );
@@ -163,7 +173,7 @@ describe('OAuth settings on the shipped host', () => {
     expect(() => loadServeConfig({ AB_OAUTH_ACCESS_TTL: '1s' })).toThrow(ConfigError);
   });
 
-  it('refuses to start with AB_OAUTH=on and no consent screen, before opening any storage', async () => {
+  it('refuses to start with AB_OAUTH=on and no sign-in, before opening any storage', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'ab-oauth-off-'));
     mkdirSync(join(dir, 'data'));
     writeFileSync(join(dir, 'master.key'), generateMasterKey(1), { mode: 0o600 });
@@ -176,7 +186,7 @@ describe('OAuth settings on the shipped host', () => {
           AB_PUBLIC_URL: ORIGIN,
           AB_OAUTH: 'on',
         }),
-      ).rejects.toThrow(/P5-04/);
+      ).rejects.toThrow(/needs sign-in/);
     } finally {
       rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
     }

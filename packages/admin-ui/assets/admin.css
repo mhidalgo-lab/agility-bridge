@@ -570,3 +570,22 @@ dd > .badge:first-child {
   margin: 0.5rem 0 0;
   padding-left: 1.25rem;
 }
+
+/* The OAuth consent screen (P5-04): client-supplied text is long and unbreakable on purpose (L-218). */
+.consent-client {
+  font-size: 1.25rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.consent-host {
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.grant-option .hint {
+  display: block;
+  overflow-wrap: anywhere;
+}

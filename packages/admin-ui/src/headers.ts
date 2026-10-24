@@ -26,8 +26,51 @@ export const UI_CSP: string = [
  */
 export const UI_CSP_SETUP: string = UI_CSP.replace("form-action 'self'; ", '');
 
-/** Whether a response's CSP is one of the panel's own (kept by the app's edge, replaced otherwise). Compared as a whole. */
-export const isUiCsp = (value: string | null): boolean => value === UI_CSP || value === UI_CSP_SETUP;
+/**
+ * A `form-action` source for an OAuth redirect URI (P5-04), or null when the URI can't be one. Browsers apply
+ * `form-action` to the redirects that follow a form post, so the consent form (posted to us, answered with a redirect to
+ * the client) must also allow the client's origin. CSP host sources can't spell an IPv6 literal, and a scheme-wide
+ * `http:` source would let any injected form post anywhere over plain http (relic-bridge P5-12): an `http://[::1]`
+ * redirect gets no source at all, and the consent post answers it with a same-origin page that navigates instead.
+ */
+export function formActionSource(redirectUri: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(redirectUri);
+  } catch {
+    return null;
+  }
+  if (u.username !== '' || u.password !== '') return null;
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+  if (!/^[a-z0-9.-]{1,253}$/i.test(u.hostname)) return null;
+  return u.origin;
+}
+
+/** A source `formActionSource` can return: an http(s) origin with a plain host name or IPv4 address. */
+const FORM_ACTION_SOURCE_RE = /^https?:\/\/[a-z0-9.-]{1,253}(?::\d{1,5})?$/i;
+const FORM_ACTION_SELF = "form-action 'self'";
+
+/** The panel policy with `form-action` widened to `'self'` and one more source (the consent page, P5-04). */
+export function consentCsp(source: string): string {
+  if (!FORM_ACTION_SOURCE_RE.test(source)) throw new TypeError('not a form-action source');
+  return UI_CSP.replace(FORM_ACTION_SELF, `${FORM_ACTION_SELF} ${source}`);
+}
+
+/**
+ * Whether a response's CSP is one of the panel's own (kept by the app's edge, replaced otherwise): the page policy, the
+ * setup page's, or the consent page's with exactly one more `form-action` source.
+ */
+export function isUiCsp(value: string | null): boolean {
+  if (value === null) return false;
+  if (value === UI_CSP || value === UI_CSP_SETUP) return true;
+  const at = UI_CSP.indexOf(FORM_ACTION_SELF);
+  const before = UI_CSP.slice(0, at);
+  const after = UI_CSP.slice(at + FORM_ACTION_SELF.length);
+  if (!value.startsWith(`${before}${FORM_ACTION_SELF} `) || !value.endsWith(after)) return false;
+  return FORM_ACTION_SOURCE_RE.test(
+    value.slice(before.length + FORM_ACTION_SELF.length + 1, value.length - after.length),
+  );
+}
 
 /** Powerful features the admin never needs. */
 export const PERMISSIONS_POLICY: string = [

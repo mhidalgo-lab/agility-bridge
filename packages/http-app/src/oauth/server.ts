@@ -28,6 +28,7 @@ import { SLUG_RE, type Storage } from '@agility-bridge/storage';
 import type {
   AuthRequest,
   ClientInfo,
+  GrantSummary,
   OAuthAuthorizationServer,
   OAuthHelpers,
   AuthorizationError as ProviderAuthorizationError,
@@ -59,6 +60,23 @@ export const OAUTH_MAX_BODY_BYTES: number = 16 * 1024;
 /** A dynamic registration that exchanges nothing lives this long at least (renewed by the provider on use). */
 export const OAUTH_MIN_REGISTRATION_TTL_S: number = 90 * 86_400;
 
+/** Most OAuth devices (approved apps) one person holds; the list, "disconnect all" and the cap are the same bound. */
+export const MAX_OAUTH_DEVICES_PER_USER = 25;
+/** Longest device name a person can give an app on the consent screen. */
+export const MAX_DEVICE_LABEL_CHARS = 60;
+const DEVICE_LABEL_FORBIDDEN_RE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+/** Held while one approval counts a person's devices and inserts its grant (`oauth-approving:<user>`). */
+const APPROVAL_LOCK_PREFIX = 'oauth-approving:';
+const APPROVAL_LOCK_MS = 15_000;
+/** Pages of grants read for one person's devices (the cap keeps the real number far below). */
+const MAX_DEVICE_PAGES = 6;
+
+/** A device name as stored: trimmed plain text of at most {@link MAX_DEVICE_LABEL_CHARS}, or null when it is not one. */
+export function deviceLabel(text: string): string | null {
+  const t = text.trim();
+  return t === '' || t.length > MAX_DEVICE_LABEL_CHARS || DEVICE_LABEL_FORBIDDEN_RE.test(t) ? null : t;
+}
+
 /** Stable reasons an OAuth bearer is refused on an MCP route (logs and audit only; the client gets the same 401). */
 export type OAuthDenyReason = 'oauth_invalid' | 'oauth_mismatch';
 
@@ -87,9 +105,37 @@ export interface OAuthAuthorizationRequest {
   readonly workspaceSlug: string;
 }
 
+/** An app a person approved: one provider grant (client + user + workspace). Text fields are untrusted. */
+export interface OAuthDevice {
+  /** The provider's grant id (16 URL-safe characters). */
+  readonly id: string;
+  readonly clientId: string;
+  readonly clientName: string | null;
+  /** Host of the redirect URI the app was approved for. */
+  readonly redirectHost: string;
+  readonly workspaceId: string | null;
+  /** The device name typed on the consent screen. */
+  readonly label: string | null;
+  /** Epoch ms. */
+  readonly createdAt: number;
+  /** Epoch ms, or null. */
+  readonly expiresAt: number | null;
+}
+
 export type OAuthApproval =
   | { readonly ok: true; readonly redirectTo: string; readonly scope: readonly string[] }
-  | { readonly ok: false; readonly reason: DenyReason | 'principal_mismatch' };
+  | { readonly ok: false; readonly reason: DenyReason | 'principal_mismatch' | 'device_limit' | 'busy' };
+
+/** One of a person's grants on the requested workspace that an app could be given (it resolves right now). */
+export interface OAuthGrantOption {
+  readonly id: string;
+  readonly label: string | null;
+  /** Tool names of the effective access (read-only: writes are off for OAuth). */
+  readonly tools: readonly string[];
+  readonly projectCount: number;
+  /** Epoch ms the access ends, or null. */
+  readonly expiresAt: number | null;
+}
 
 /** What the consent handler can do with the request. */
 export interface OAuthConsentApi {
@@ -101,9 +147,24 @@ export interface OAuthConsentApi {
    * Approve for a signed-in user and one of their grants on the workspace. Re-checks access first (grant of this user
    * and workspace, live, usable credential); on success returns the redirect carrying the code. At most once.
    */
-  approve(input: { readonly userId: string; readonly grantId: string }): Promise<OAuthApproval>;
-  /** The `access_denied` redirect (with `state` and `iss`). */
-  deny(description?: string): string;
+  /**
+   * The person's own grants on the requested workspace that resolve now, for the consent form to offer. Empty for a
+   * workspace that does not exist, so an unknown slug and a missing grant look the same (no slug probing, T19).
+   */
+  grants(userId: string): Promise<{
+    readonly workspaceName: string | null;
+    readonly options: readonly OAuthGrantOption[];
+  }>;
+  approve(input: {
+    readonly userId: string;
+    readonly grantId: string;
+    /** The device name (already checked with {@link deviceLabel}). */
+    readonly label?: string | null;
+  }): Promise<OAuthApproval>;
+  /** The `access_denied` redirect (with `state` and `iss`). `userId`: who denied, for the audit row. */
+  deny(description?: string, userId?: string): string;
+  /** A redirect to the validated redirect URI with another error (`login_required`, `consent_required`; `state`, `iss`). */
+  refuse(error: 'login_required' | 'consent_required' | 'invalid_request', description: string): string;
 }
 
 /** The interactive step of `/oauth/authorize` (P5-04: sign-in, grant choice, consent). */
@@ -111,8 +172,11 @@ export type OAuthConsentHandler = (c: Context, api: OAuthConsentApi) => Response
 
 /** `createHttpApp({ oauth })`: the issuer is the app's public URL. */
 export interface OAuthOptions {
-  /** The interactive step of `/oauth/authorize`. */
-  readonly consent: OAuthConsentHandler;
+  /**
+   * The interactive step of `/oauth/authorize`. Absent: the built-in sign-in and consent screen (P5-04), which needs
+   * sign-in to be configured (`identity`). Tests inject a stand-in.
+   */
+  readonly consent?: OAuthConsentHandler;
   /** Access-token lifetime in seconds, 60-86400. Default 3600. Capped at the grant's expiry. */
   readonly accessTokenTtlSeconds?: number;
   /** Absolute refresh lifetime in seconds, 3600-31536000. Default 30 days. Capped at the grant's expiry. */
@@ -223,7 +287,7 @@ async function readBounded(request: Request, max: number): Promise<string | null
 }
 
 export interface OAuthRuntimeDeps {
-  readonly options: OAuthOptions;
+  readonly options: Omit<OAuthOptions, 'consent'> & { readonly consent: OAuthConsentHandler };
   /** Issuer origin (`https://bridge.example.com`), from the configured public URL. */
   readonly issuer: string;
   readonly storage: Storage;
@@ -231,6 +295,8 @@ export interface OAuthRuntimeDeps {
   readonly clock: Clock;
   readonly logger: Logger;
   readonly runInBackground: (c: Context, task: Promise<unknown>, what: string) => void;
+  /** Drop cached access decisions (a device was disconnected: it must stop working at once). */
+  readonly onRevocation?: () => void;
   /** `auth` audit rows; never rejects. Called for every OAuth event, with no secret in it. */
   readonly audit?: (event: OAuthEvent) => unknown;
 }
@@ -262,6 +328,15 @@ export interface OAuthRuntime {
   prepare(c: Context, params: URLSearchParams): Promise<Response | OAuthConsentApi>;
   token(c: Context, onRevocation: () => void): Promise<Response>;
   register(c: Context): Promise<Response>;
+  /** The apps this person approved (at most {@link MAX_OAUTH_DEVICES_PER_USER}), newest first. */
+  devices(userId: string): Promise<OAuthDevice[]>;
+  /**
+   * Disconnect one of this person's apps: its access and refresh tokens stop working at once. False when the id is not
+   * one of theirs. Audited (`oauth.device.revoke`).
+   */
+  revokeDevice(c: Context, userId: string, deviceId: string): Promise<boolean>;
+  /** Disconnect every app of this person; the number disconnected. */
+  revokeAllDevices(c: Context, userId: string): Promise<number>;
   /** Validate an OAuth bearer for `/w/{slug}/mcp` and resolve its access. Storage errors propagate (fail closed). */
   authenticate(token: string, slug: string): Promise<OAuthAuthentication>;
 }
@@ -283,6 +358,7 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
   );
   if (typeof options.consent !== 'function') throw new TypeError('oauth.consent must be a function');
   const consent = options.consent;
+  const onRevocation = deps.onRevocation ?? (() => undefined);
   // A registration must outlive every refresh token issued to it: the provider renews it at half-life on each token
   // request, so twice the refresh lifetime is enough.
   const registrationTtl = Math.max(OAUTH_MIN_REGISTRATION_TTL_S, 2 * refreshTtl, 2 * accessTtl);
@@ -548,6 +624,108 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     );
   };
 
+  /** What a grant's metadata says (written by `approve()`; anything else reads as absent). */
+  const metaOf = (g: GrantSummary): { readonly workspace: string | null; readonly label: string | null } => {
+    const m = (typeof g.metadata === 'object' && g.metadata !== null ? g.metadata : {}) as Record<
+      string,
+      unknown
+    >;
+    return {
+      workspace: typeof m['workspace'] === 'string' ? m['workspace'] : null,
+      label: typeof m['label'] === 'string' ? m['label'] : null,
+    };
+  };
+  /** Every grant of a person, a page at a time; the device cap keeps this small. */
+  const allGrants = async (helpers: OAuthHelpers, userId: string): Promise<GrantSummary[]> => {
+    const out: GrantSummary[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < MAX_DEVICE_PAGES; page++) {
+      const result = await helpers.listUserGrants(userId, {
+        limit: 100,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      out.push(...result.items);
+      cursor = result.cursor;
+      if (cursor === undefined) break;
+    }
+    return out;
+  };
+  /** The same app on the same workspace and redirect address: what a new approval replaces once it is redeemed. */
+  const sameApp = (
+    g: GrantSummary,
+    ref: { readonly clientId: string; readonly redirectUri: string; readonly workspaceId: string | null },
+  ): boolean =>
+    g.clientId === ref.clientId &&
+    g.redirectUri === ref.redirectUri &&
+    metaOf(g).workspace === ref.workspaceId;
+  /** Oldest first, ties by id: every concurrent approval sees the same order. */
+  const byAge = (a: GrantSummary, b: GrantSummary): number =>
+    a.createdAt - b.createdAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+  /**
+   * After a successful code exchange: the person's earlier devices of the same app on the same workspace are replaced
+   * (revoked, tombstone first). Only the holder of the code and its PKCE verifier gets here, never a navigation (L-090).
+   */
+  const replaceEarlierDevices = async (c: Context, code: string, helpers: OAuthHelpers): Promise<void> => {
+    const m = PROVIDER_TOKEN_RE.exec(code);
+    if (m === null) return;
+    const [, userId, grantId] = m as unknown as [string, string, string];
+    const grants = await allGrants(helpers, userId);
+    const current = grants.find((g) => g.id === grantId);
+    if (current === undefined || current.redirectUri === undefined) return;
+    const ref = {
+      clientId: current.clientId,
+      redirectUri: current.redirectUri,
+      workspaceId: metaOf(current).workspace,
+    };
+    let replaced = 0;
+    for (const g of grants) {
+      if (g.id === grantId || g.createdAt > current.createdAt || !sameApp(g, ref)) continue;
+      await revokeFamily(userId, g.id, helpers);
+      replaced++;
+      audit(
+        {
+          action: 'oauth.device.replaced',
+          status: 'ok',
+          requestId: requestIdOf(c),
+          userId,
+          workspaceId: ref.workspaceId,
+          clientId: g.clientId,
+          tokenId: `oauth_${g.id}`,
+          details: { by: `oauth_${grantId}` },
+        },
+        c,
+      );
+    }
+    if (replaced > 0) onRevocation();
+  };
+
+  const toDevice = async (helpers: OAuthHelpers, g: GrantSummary): Promise<OAuthDevice> => {
+    let name: string | null = null;
+    try {
+      name = (await helpers.lookupClient(g.clientId))?.clientName ?? null;
+    } catch {
+      name = null;
+    }
+    const meta = metaOf(g);
+    let host = '';
+    try {
+      host = g.redirectUri === undefined ? '' : new URL(g.redirectUri).host;
+    } catch {
+      host = '';
+    }
+    return {
+      id: g.id,
+      clientId: g.clientId,
+      clientName: name,
+      redirectHost: host,
+      workspaceId: meta.workspace,
+      label: meta.label,
+      createdAt: g.createdAt * 1000,
+      expiresAt: g.expiresAt === undefined ? null : g.expiresAt * 1000,
+    };
+  };
+
   const runtime: OAuthRuntime = {
     issuer,
     resourceUrl,
@@ -572,6 +750,60 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     challenge(slug) {
       if (!SLUG_RE.test(slug)) return 'Bearer';
       return `Bearer realm="agility-bridge", resource_metadata="${resourceMetadataUrl(slug)}", scope="${MCP_SCOPE}"`;
+    },
+
+    async devices(userId) {
+      const helpers = (await server([])).getOAuthApi(env);
+      const grants = (await allGrants(helpers, userId))
+        .sort((a, b) => byAge(b, a))
+        .slice(0, MAX_OAUTH_DEVICES_PER_USER);
+      return Promise.all(grants.map((g) => toDevice(helpers, g)));
+    },
+
+    async revokeDevice(c, userId, deviceId) {
+      const helpers = (await server([])).getOAuthApi(env);
+      // Only the caller's own grants are listed under their id: any other id is simply not there.
+      const grant = (await allGrants(helpers, userId)).find((g) => g.id === deviceId);
+      if (grant === undefined) return false;
+      await revokeFamily(userId, grant.id, helpers);
+      onRevocation();
+      audit(
+        {
+          action: 'oauth.device.revoke',
+          status: 'ok',
+          requestId: requestIdOf(c),
+          userId,
+          workspaceId: metaOf(grant).workspace,
+          clientId: grant.clientId,
+          tokenId: `oauth_${grant.id}`,
+          details: { via: 'my_access' },
+        },
+        c,
+      );
+      return true;
+    },
+
+    async revokeAllDevices(c, userId) {
+      const helpers = (await server([])).getOAuthApi(env);
+      const grants = await allGrants(helpers, userId);
+      for (const grant of grants) {
+        await revokeFamily(userId, grant.id, helpers);
+        audit(
+          {
+            action: 'oauth.device.revoke',
+            status: 'ok',
+            requestId: requestIdOf(c),
+            userId,
+            workspaceId: metaOf(grant).workspace,
+            clientId: grant.clientId,
+            tokenId: `oauth_${grant.id}`,
+            details: { via: 'my_access', all: true },
+          },
+          c,
+        );
+      }
+      if (grants.length > 0) onRevocation();
+      return grants.length;
     },
 
     async metadata(c) {
@@ -637,6 +869,14 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       if (grantType === 'authorization_code') {
         if (response.ok && (await revokedMeanwhile(code, helpers))) {
           return jsonError(400, 'invalid_grant', 'Invalid authorization code');
+        }
+        if (response.ok) {
+          // A device is replaced only now, by the holder of the code and verifier, never by an authorization request.
+          await replaceEarlierDevices(c, code, helpers).catch((error: unknown) => {
+            logger.warn('oauth device replacement failed', {
+              error: error instanceof Error ? error.name : 'error',
+            });
+          });
         }
         const m = PROVIDER_TOKEN_RE.exec(code);
         audit(
@@ -751,12 +991,13 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
         request,
         authRequest,
         helpers,
-        deny: (description = 'The user denied the request.') => {
+        deny: (description = 'The user denied the request.', userId?: string) => {
           audit(
             {
               action: 'oauth.authorize',
               status: 'denied',
               requestId: requestIdOf(c),
+              ...(userId === undefined ? {} : { userId }),
               clientId: authRequest.clientId,
               reason: 'user_denied',
             },
@@ -764,11 +1005,54 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
           );
           return mod.authorizationErrorRedirect(authRequest, 'access_denied', description);
         },
-        approve: async ({ userId, grantId }: { readonly userId: string; readonly grantId: string }) => {
+        grants: async (userId: string) => {
+          const workspace = await storage.workspaces.getBySlug(slug);
+          if (workspace === null) return { workspaceName: null, options: [] };
+          const mine = (await storage.grants.list({ workspaceId: workspace.id, userId }))
+            .filter((g) => g.userId === userId && g.revokedAt === null)
+            .slice(0, 20);
+          const options: OAuthGrantOption[] = [];
+          for (const g of mine) {
+            const decision = await decide({ grantId: g.id, workspaceId: workspace.id, userId }, slug, {
+              tokenId: 'oauth_pending',
+              clientId: authRequest.clientId,
+              expiresAt: null,
+            });
+            if (!decision.ok) continue;
+            options.push({
+              id: g.id,
+              label: g.label,
+              tools: decision.access.tools,
+              projectCount: decision.access.projects.allowed.length,
+              expiresAt: decision.access.expiresAt,
+            });
+          }
+          return { workspaceName: options.length > 0 ? workspace.name : null, options };
+        },
+        refuse: (error: string, description: string) => {
+          // The redirect URI was validated by `parseAuthRequest` (exact match against the registration).
+          const u = new URL(authRequest.redirectUri);
+          u.searchParams.set('error', error);
+          u.searchParams.set('error_description', description);
+          if (authRequest.state) u.searchParams.set('state', authRequest.state);
+          u.searchParams.set('iss', issuer);
+          return u.toString();
+        },
+        approve: async ({
+          userId,
+          grantId,
+          label,
+        }: {
+          readonly userId: string;
+          readonly grantId: string;
+          readonly label?: string | null;
+        }) => {
           if (used) throw new Error('an authorization request is approved at most once');
           used = true;
           const workspace = await storage.workspaces.getBySlug(slug);
-          const refused = (reason: DenyReason | 'principal_mismatch'): OAuthApproval => {
+          const refused = (
+            reason: DenyReason | 'principal_mismatch' | 'device_limit' | 'busy',
+          ): OAuthApproval => {
             audit(
               {
                 action: 'oauth.authorize',
@@ -799,17 +1083,58 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
             userId,
             clientId: authRequest.clientId,
           };
-          const { redirectTo } = await helpers.completeAuthorization({
-            request: authRequest,
-            userId,
-            // T25: grant metadata is stored unencrypted: only the access grant id (opaque), never an email or other
-            // personal data.
-            metadata: { grant: grantId },
-            scope: [...scope],
-            props,
-          });
-          const code = new URL(redirectTo).searchParams.get('code');
-          if (code === null) throw new Error('the provider returned no authorization code');
+          const ref = {
+            clientId: authRequest.clientId,
+            redirectUri: authRequest.redirectUri,
+            workspaceId: workspace.id,
+          };
+          // One approval at a time per person: the cap is counted and then a grant inserted, and two interleaved counts
+          // would each see room for the last place. The lock outlives a crash by seconds, never longer.
+          const lock = `${APPROVAL_LOCK_PREFIX}${userId}`;
+          if (!(await storage.kv.setIfAbsent(lock, '1', { expiresAt: clock.now() + APPROVAL_LOCK_MS }))) {
+            return refused('busy');
+          }
+          let redirectTo: string;
+          let code: string;
+          try {
+            // The device cap (T15): the app this approval replaces does not count, as it ends once the new one is
+            // redeemed.
+            const others = (await allGrants(helpers, userId)).filter((g) => !sameApp(g, ref));
+            if (others.length >= MAX_OAUTH_DEVICES_PER_USER) return refused('device_limit');
+            const completed = await helpers.completeAuthorization({
+              request: authRequest,
+              userId,
+              // T25: grant metadata is stored unencrypted: the access grant id and workspace id (opaque) and the device
+              // name the person typed (plain text, length-limited), never an email or other personal data.
+              metadata: { grant: grantId, workspace: workspace.id, ...(label ? { label } : {}) },
+              scope: [...scope],
+              props,
+              // A request alone must never end a device (relic-bridge H1, L-090): replacement waits for the code exchange.
+              revokeExistingGrants: false,
+            });
+            redirectTo = completed.redirectTo;
+            const issued = new URL(redirectTo).searchParams.get('code');
+            if (issued === null) throw new Error('the provider returned no authorization code');
+            code = issued;
+            const newId = PROVIDER_TOKEN_RE.exec(code)?.[2];
+            if (newId === undefined)
+              throw new Error('the provider returned an unexpected authorization code');
+            // After the insert, again: should the lock have lapsed under a slow store, approvals that overlapped each
+            // passed the count above, so the oldest places keep theirs and the rest are undone.
+            const ranked = (await allGrants(helpers, userId))
+              .filter((g) => g.id === newId || !sameApp(g, ref))
+              .sort(byAge);
+            // Whoever sees the overflow undoes it for everyone: a check that ran before the last insert cannot have seen
+            // it, so the later one also revokes the grants past the cap (their approvals already answered; their codes
+            // then fail at the exchange).
+            const over = ranked.slice(MAX_OAUTH_DEVICES_PER_USER);
+            for (const g of over) await revokeFamily(userId, g.id, helpers);
+            if (over.some((g) => g.id === newId) || !ranked.some((g) => g.id === newId)) {
+              return refused('device_limit');
+            }
+          } finally {
+            await storage.kv.delete(lock).catch(() => undefined);
+          }
           await storage.kv.set(await codeMarker(code), '1', {
             expiresAt: clock.now() + OAUTH_CODE_TTL_S * 1000,
           });
