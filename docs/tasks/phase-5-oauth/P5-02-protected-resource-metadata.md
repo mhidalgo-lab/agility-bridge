@@ -2,7 +2,7 @@
 id: P5-02
 title: Protected resource metadata per workspace
 phase: 5
-status: in-progress
+status: review
 priority: high
 depends_on: [P5-01]
 adr: ["0009"]
@@ -40,16 +40,32 @@ authorization endpoint requires.
 - P5-01's `auth()` test drops its `validateResourceURL` workaround.
 
 ## Acceptance criteria
-- [ ] The metadata answers with the exact shape above for existing, unknown and disabled workspaces alike (byte-identical
+- [x] The metadata answers with the exact shape above for existing, unknown and disabled workspaces alike (byte-identical
   apart from the path-derived URL), `404` for an invalid slug, a root request, and with OAuth off; cacheable; limited per IP.
-- [ ] Every `401` of `/w/{slug}/mcp` with OAuth on carries the challenge (device token, OAuth token, none, malformed,
+- [x] Every `401` of `/w/{slug}/mcp` with OAuth on carries the challenge (device token, OAuth token, none, malformed,
   wrong workspace, revoked); identical for known and unknown workspaces; OAuth off unchanged.
-- [ ] The SDK's `auth()` flow, with no workaround, learns the resource from the metadata via the `401` challenge and via
+- [x] The SDK's `auth()` flow, with no workaround, learns the resource from the metadata via the `401` challenge and via
   path insertion, requests the workspace's resource, and completes; on Node (memory, SQLite) and workerd (D1).
-- [ ] A token for workspace A fails at B, and refresh cannot retarget (re-run through the discovered resource).
-- [ ] Security tests are mutation-checked (L-121), recorded under Outcome.
-- [ ] `docs/dev/oauth.md`, THREAT_MODEL T2 and T19, RESEARCH, ARCHITECTURE (if it describes the 401), a changeset and
+- [x] A token for workspace A fails at B, and refresh cannot retarget (re-run through the discovered resource).
+- [x] Security tests are mutation-checked (L-121), recorded under Outcome.
+- [x] `docs/dev/oauth.md`, THREAT_MODEL T2 and T19, RESEARCH, ARCHITECTURE (if it describes the 401), a changeset and
   new lessons are done.
+
+## Outcome
+- Built as scoped. Decisions: the document and the challenge are the same for every slug of valid syntax (D-64, the
+  enumeration answer; the brief's "404 for unknown or disabled" would have listed workspaces next to a `401` that does
+  not), and no cache header, because the app forces `no-store` (D-65, L-246).
+- `OAuthRuntime` gained `resourceMetadata(slug)`, `resourceMetadataUrl(slug)` and `challenge(slug)`; the route is
+  `OAUTH_RESOURCE_METADATA_PREFIX/w/:slug/mcp` behind the same per-IP `limited` wrapper. The MCP route's one
+  `unauthorized()` builds the header, so every denial path (device, OAuth, passthrough, malformed) shares it.
+- Suites (one shared suite on memory, memory in the Workers shape, SQLite and workerd/D1): shape and spoofed `Host`;
+  known, unknown and disabled alike and the invalid-path `404`s; challenge on six kinds of denial plus unknown and
+  invalid slugs; discovery from the challenge to a connected, workspace-bound token (refresh cannot retarget);
+  `auth()` driven by the challenge; P5-01's `auth()` test without the workaround (path insertion); app without OAuth
+  (`404`, plain `Bearer`); per-IP limit.
+- Mutation checks (L-121), each reverted: slug syntax unchecked in the document (2 fail), `offline_access` advertised (2),
+  challenge always plain (6), `error=` in the challenge (2), challenge syntax unchecked (2), `authorization_servers` the
+  resource (8), OAuth denials without the challenge (4), route without the per-IP limit (1).
 
 ## Security notes
 THREAT_MODEL T2, T19.

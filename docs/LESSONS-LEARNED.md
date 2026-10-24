@@ -33,7 +33,7 @@ How to use it:
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242, L-243 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-246 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -1197,6 +1197,27 @@ Codes expire by the `kv` TTL (our clock) while token records carry the provider'
 only the injected clock sees one half expire. Memory-backed tests run on a live clock moved with `vi.setSystemTime`;
 a store that captured `Date.now` at open (SQLite) cannot be moved, so those hosts skip the time-travel cases.
 *Applied in:* P5-01.
+
+**L-244 — Discovery documents and challenges are functions of the path, not of the database.**
+Protected resource metadata and the `WWW-Authenticate` challenge are the first things an unauthenticated caller sees. If
+they depend on whether the workspace exists or is enabled (a `404` for unknown ones, a different challenge for known
+ones), they enumerate workspaces for free next to an MCP route that is careful to answer one `401`. Build both from the
+slug's syntax and the configured public URL only, and test known, unknown and disabled side by side; a slug that is not
+valid syntax is the only `404`.
+*Applied in:* P5-02, `packages/http-app/src/oauth/server.ts`.
+
+**L-245 — A test stand-in for a missing sibling feature carries a task id and goes in that feature's PR.**
+P5-01's SDK `auth()` test named the resource through `validateResourceURL` because discovery did not exist yet. With a
+comment pointing at P5-02, the workaround was found and removed in one place, and the same test now proves that the
+client learns the resource from the server alone. A stand-in without a pointer outlives its reason and hides the gap.
+*Applied in:* P5-02 (suite `auth()` cases).
+
+**L-246 — Per-route cache headers lose to the app-wide response policy: decide, then test the header you get.**
+The app sets `Cache-Control: no-store` on every response except the panel's hashed assets. A route that sets its own
+cache header silently ends up with `no-store`, so a "cacheable" metadata document was never cacheable. Either teach the
+policy an exception on purpose (with a reason) or keep the default and assert it; the document is small and rate limited,
+so the default stays (D-65).
+*Applied in:* P5-02.
 
 ## Q. Testing, evals and live verification
 

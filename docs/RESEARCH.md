@@ -433,6 +433,22 @@ status is in [client-compatibility](reference/client-compatibility.md#remote-sni
   (P5-02) unless the client provider names it through `validateResourceURL`. 1.2.4 was published 2026-10-22 and is not
   used yet (3-day release age). *live (local, workerd and Node)*
 
+- **P5-02 (2026-10-24), discovery as the clients do it.** The MCP authorization pages
+  ([2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization),
+  [2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)) and
+  [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728): a server publishes protected resource metadata and either names it
+  in `WWW-Authenticate: Bearer resource_metadata="…"` on `401` or serves it at the well-known URI; clients use the header
+  first, else try `/.well-known/oauth-protected-resource` with the resource's path inserted (RFC 9728 §3.1), then the root;
+  the document's `resource` must match the URL the client used, and `authorization_servers` lists at least one issuer;
+  `scope` in the challenge is a SHOULD and `offline_access` stays out of it. Read in the `@modelcontextprotocol/client`
+  2.3.1 source and exercised by the P5-02 suites: `extractWWWAuthenticateParams` takes `resource_metadata`, `scope` and
+  `error` from a `Bearer` challenge (it needs a parameter after the scheme, so `realm` is kept); `auth()` without a
+  `resourceMetadataUrl` fetches `/.well-known/oauth-protected-resource/w/{slug}/mcp`, falls back to the root document
+  (our `404`: no resource lives at the root) and then derives the `resource` it sends from the document, so no
+  `validateResourceURL` workaround is needed; it adds `offline_access` to the scope itself when the server metadata lists
+  it. The challenge and the document are the same for every denial and every slug of valid syntax, as the MCP route's
+  own `401` is (T19). *live (local, workerd and Node)*
+
 ## 5. Cloudflare Workers platform
 
 Checked 2026-10 in Cloudflare documentation; P0-09 measures with Agility-shaped payloads.

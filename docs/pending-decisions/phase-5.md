@@ -36,3 +36,21 @@
   refresh token (relic-bridge's P5-05 design, pulled forward).
 - **Recommendation:** (a): P5-05 is next, `AB_OAUTH` cannot be on before P5-04, and the window it builds replaces this rule.
 - **Owner:** _pending_ (implemented as (a)).
+
+### D-64 — Protected resource metadata is the same for known, unknown and disabled workspaces *(P5-02)*
+- **Context:** RFC 9728 clients fetch `/.well-known/oauth-protected-resource/w/{slug}/mcp` before they have a token. The MCP
+  route answers one `401` for a wrong token, an unknown workspace and a disabled one (T19), so a metadata route that
+  answered `404` for the unknown ones would list the workspaces that exist.
+- **Options:** (a) one document and one challenge for every slug of valid syntax, `404` only for invalid syntax; (b) `404`
+  for unknown or disabled workspaces (a database lookup per request, and an enumeration oracle).
+- **Recommendation:** (a), as relic-bridge did. The document names the issuer and a resource URL the caller typed; it
+  holds nothing about the workspace. An authorization request for an unknown workspace is refused at approval as before.
+- **Owner:** _pending_ (implemented as (a)).
+
+### D-65 — The metadata document is not cached *(P5-02)*
+- **Context:** the document is a function of configuration, so it could carry `Cache-Control: public, max-age=…`. The app
+  forces `no-store` on every response by design, and an exception would be a new rule in the security-header path.
+- **Options:** (a) keep `no-store` (clients fetch it once per connection attempt, it is rate limited, and a change of
+  issuer or scope applies at once); (b) add an allow-listed cacheable response.
+- **Recommendation:** (a) until a client matrix run (P5-06) shows one that polls it.
+- **Owner:** _pending_ (implemented as (a)).
