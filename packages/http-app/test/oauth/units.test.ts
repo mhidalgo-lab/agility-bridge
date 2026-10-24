@@ -156,6 +156,8 @@ describe('an app without OAuth', () => {
     const w = await world();
     for (const [method, path] of [
       ['GET', '/.well-known/oauth-authorization-server'],
+      ['GET', '/.well-known/oauth-protected-resource/w/team-a/mcp'],
+      ['GET', '/.well-known/oauth-protected-resource'],
       ['GET', '/oauth/authorize'],
       ['POST', '/oauth/token'],
       ['POST', '/oauth/register'],
@@ -167,6 +169,8 @@ describe('an app without OAuth', () => {
     const res = await post(w, 'team-a', lookalike, { jsonrpc: '2.0', id: 1, method: 'tools/list' });
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: 'unauthorized' });
+    // OAuth off: the plain challenge, no metadata to point at (P5-02).
+    expect(res.headers.get('www-authenticate')).toBe('Bearer');
     expect(w.requests.at(-1)?.refusal).toBe('token_malformed');
     // Device tokens are unchanged.
     const client = await connect(w, 'team-a', w.tokens.alice);
@@ -176,5 +180,29 @@ describe('an app without OAuth', () => {
 
   it('refuses to build the OAuth routes without a public URL: the issuer must be configured, not guessed', async () => {
     await expect(world({ oauth: { consent: async () => new Response(null) } })).rejects.toThrow(/publicUrl/);
+  });
+});
+
+describe('the protected resource metadata route (P5-02)', () => {
+  it('is limited per IP before any work, like the other unauthenticated OAuth routes', async () => {
+    let calls = 0;
+    const w = await world({
+      oauth: { consent: async () => new Response(null) },
+      publicUrl: 'http://127.0.0.1:8787',
+      limits: {
+        beforeAuth: async () => {
+          calls += 1;
+          return calls > 2 ? { ok: false, retryAfterSeconds: 30 } : { ok: true };
+        },
+      },
+    });
+    const get = () =>
+      w.app.fetch(new Request('http://127.0.0.1:8787/.well-known/oauth-protected-resource/w/team-a/mcp'));
+    expect((await get()).status).toBe(200);
+    expect((await get()).status).toBe(200);
+    const limited = await get();
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('retry-after')).toBe('30');
+    expect(JSON.stringify(await limited.json())).not.toContain('authorization_servers');
   });
 });

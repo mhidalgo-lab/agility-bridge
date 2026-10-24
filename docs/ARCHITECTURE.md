@@ -189,7 +189,8 @@ TLS trust while it has unrevoked credentials (P2-01).
 2. **Authenticate**: device token (format and checksum offline, then hash lookup, constant-time compare, revoked,
    expired) or, with OAuth on, a provider-issued access token validated for this slug's resource only (RFC 8707), with
    its props cross-checked and its grant resolved as an `oauth` principal by the same `resolveAccess` (P5-01, [dev/oauth.md](dev/oauth.md)).
-   Every failure is the same 401 (P5-02 makes `WWW-Authenticate` name the slug's RFC 9728 metadata).
+   Every failure is the same 401; with OAuth on its `WWW-Authenticate` names the slug's RFC 9728 metadata
+   (`/.well-known/oauth-protected-resource/w/{slug}/mcp`, the same document for every slug of valid syntax, P5-02).
 3. **Resolve access**: effective tools, scopes, asset types, limits and credential (`resolveAccess`; one storage call,
    one D1 `batch()` on Workers), cached for at most 60 s (default 30 s), never past the token's or grant's expiry,
    keyed by token hash + slug, holding no plaintext token. Storage errors are 503.
@@ -212,7 +213,7 @@ Implemented in `packages/http-app` (`createHttpApp`, P2-06) and served on Node b
 (`apps/cli/src/serve.ts`): only `POST` reaches the SDK (stateless HTTP has no `GET` stream or session to `DELETE`:
 405); the body is read with the cap, parsed, refused if it is a batch, and classified from the body (`tools/call`,
 `subscriptions/listen`, notifications, lists, lifecycle, tasks) before the rate-limit hooks (P2-07) and the observer
-(audit, P2-08) see it. Every denial is the same `401` with `WWW-Authenticate: Bearer`; refusal reasons go only to the
+(audit, P2-08) see it. Every denial is the same `401` with `WWW-Authenticate: Bearer` (with OAuth on, the challenge also carries the workspace's `resource_metadata` URL and `scope`, a function of the path only); refusal reasons go only to the
 observer. Node also bounds sockets (`headersTimeout` 20 s, `requestTimeout` 60 s).
 
 stdio (modes A/B) runs steps 5–7 with a context built once at startup from the environment or YAML file; there is no

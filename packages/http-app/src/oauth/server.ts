@@ -43,6 +43,8 @@ export const OAUTH_TOKEN_PATH = '/oauth/token';
 export const OAUTH_REGISTER_PATH = '/oauth/register';
 /** RFC 8414 metadata of an issuer without a path. */
 export const OAUTH_METADATA_PATH = '/.well-known/oauth-authorization-server';
+/** RFC 9728 §3.1: the well-known prefix is inserted before the resource's path (`…/w/{slug}/mcp`). */
+export const OAUTH_RESOURCE_METADATA_PREFIX = '/.well-known/oauth-protected-resource';
 
 /** The scope every MCP token carries (read-only tools). Grants, not scopes, decide what a token may do. */
 export const MCP_SCOPE = 'mcp:read';
@@ -238,6 +240,19 @@ export interface OAuthRuntime {
   readonly issuer: string;
   /** The resource URL of a workspace slug. */
   resourceUrl(slug: string): string;
+  /** RFC 9728 document URL of a workspace's resource. */
+  resourceMetadataUrl(slug: string): string;
+  /**
+   * RFC 9728 protected resource metadata for `/w/{slug}/mcp`, from the path alone: the same document shape for a known,
+   * unknown and disabled workspace (T19). `null` when the slug is not valid slug syntax (the caller answers 404).
+   */
+  resourceMetadata(slug: string): Response | null;
+  /**
+   * The `WWW-Authenticate` challenge of a `401` on `/w/{slug}/mcp`: a function of the slug's syntax only, so no denial
+   * tells a known workspace from an unknown one or a missing token from a wrong one. Plain `Bearer` for a slug that is
+   * not valid syntax.
+   */
+  challenge(slug: string): string;
   metadata(c: Context): Promise<Response>;
   authorize(c: Context): Promise<Response>;
   /**
@@ -273,6 +288,8 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
   const registrationTtl = Math.max(OAUTH_MIN_REGISTRATION_TTL_S, 2 * refreshTtl, 2 * accessTtl);
   const env: ProviderEnv = Object.freeze({ OAUTH_KV: oauthKvNamespace(storage.kv, () => clock.now()) });
   const resourceUrl = (slug: string): string => `${issuer}/w/${slug}/mcp`;
+  const resourceMetadataUrl = (slug: string): string =>
+    `${issuer}${OAUTH_RESOURCE_METADATA_PREFIX}/w/${slug}/mcp`;
   /** Declared for routes that need no workspace (metadata, registration): never a valid slug, so never a token's. */
   const placeholderResource = `${issuer}/w/-/mcp`;
 
@@ -534,6 +551,28 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
   const runtime: OAuthRuntime = {
     issuer,
     resourceUrl,
+    resourceMetadataUrl,
+
+    resourceMetadata(slug) {
+      if (!SLUG_RE.test(slug)) return null;
+      // RFC 9728. Deliberately no `resource_name`, `jwks_uri` or `resource_documentation`; `offline_access` is not a
+      // scope of the resource (MCP authorization: it stays out of the challenge and the metadata).
+      return new Response(
+        JSON.stringify({
+          resource: resourceUrl(slug),
+          authorization_servers: [issuer],
+          scopes_supported: [MCP_SCOPE],
+          bearer_methods_supported: ['header'],
+        }),
+        // The app's own `no-store` applies to it like to every response (D-65).
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    },
+
+    challenge(slug) {
+      if (!SLUG_RE.test(slug)) return 'Bearer';
+      return `Bearer realm="agility-bridge", resource_metadata="${resourceMetadataUrl(slug)}", scope="${MCP_SCOPE}"`;
+    },
 
     async metadata(c) {
       const response = await fetchProvider(await server([]), c);

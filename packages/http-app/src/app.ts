@@ -52,6 +52,7 @@ import {
   OAUTH_AUTHORIZE_PATH,
   OAUTH_METADATA_PATH,
   OAUTH_REGISTER_PATH,
+  OAUTH_RESOURCE_METADATA_PREFIX,
   OAUTH_TOKEN_PATH,
   type OAuthOptions,
   type OAuthRuntime,
@@ -618,6 +619,11 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       return run();
     };
     app.get(OAUTH_METADATA_PATH, (c) => limited(c, () => runtime.metadata(c)));
+    // RFC 9728: one document per workspace resource, from the path alone (T19). Anything else under the prefix,
+    // the root included, is a 404 like an app without OAuth.
+    app.get(`${OAUTH_RESOURCE_METADATA_PREFIX}/w/:slug/mcp`, (c) =>
+      limited(c, async () => runtime.resourceMetadata(c.req.param('slug')) ?? c.notFound()),
+    );
     app.get(OAUTH_AUTHORIZE_PATH, (c) => limited(c, () => runtime.authorize(c)));
     app.post(OAUTH_TOKEN_PATH, (c) => limited(c, () => runtime.token(c, () => cache.clear())));
     app.post(OAUTH_REGISTER_PATH, (c) => limited(c, () => runtime.register(c)));
@@ -667,7 +673,11 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       return finish(
         new Response(UNAUTHORIZED, {
           status: 401,
-          headers: { 'content-type': 'application/json', 'www-authenticate': 'Bearer' },
+          headers: {
+            'content-type': 'application/json',
+            // With OAuth on, every denial names the workspace's resource metadata (P5-02): a function of the path only.
+            'www-authenticate': oauth === undefined ? 'Bearer' : oauth.challenge(slug),
+          },
         }),
         reason,
       );

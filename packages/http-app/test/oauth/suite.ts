@@ -9,7 +9,9 @@ import {
   type AuthorizationServerMetadata,
   auth,
   discoverAuthorizationServerMetadata,
+  discoverOAuthProtectedResourceMetadata,
   exchangeAuthorization,
+  extractWWWAuthenticateParams,
   type OAuthClientInformationFull,
   type OAuthClientProvider,
   type OAuthTokens,
@@ -282,6 +284,219 @@ export function defineOAuthSuite(name: string, makeHost: () => Promise<OAuthHost
       if (spoof.status === 200) expect(((await spoof.json()) as { issuer: string }).issuer).toBe(h.origin);
     });
 
+    // ------------------------------------------------------------------------- protected resource metadata (P5-02)
+
+    const PRM = (h: OAuthHost, slug: string) =>
+      `${h.origin}/.well-known/oauth-protected-resource/w/${slug}/mcp`;
+
+    it('publishes RFC 9728 metadata per workspace: its own resource, our issuer, one scope, header bearer', async () => {
+      const h = await host();
+      for (const slug of ['team-a', 'team-b']) {
+        const res = await h.call(PRM(h, slug));
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-type')).toContain('application/json');
+        // The app-wide policy (D-65): nothing is cached, so a change of issuer or scope shows at once.
+        expect(res.headers.get('cache-control')).toBe('no-store');
+        expect(await res.json()).toEqual({
+          resource: resourceOf(h, slug),
+          authorization_servers: [h.origin],
+          scopes_supported: ['mcp:read'],
+          bearer_methods_supported: ['header'],
+        });
+      }
+      // The SDK parses it, at the path-insertion URL it derives from the MCP URL.
+      const parsed = await discoverOAuthProtectedResourceMetadata(resourceOf(h, 'team-a'), {}, fetchFn(h));
+      expect(parsed.resource).toBe(resourceOf(h, 'team-a'));
+      // The issuer is the configured public URL, never the Host header.
+      const spoof = await h.call(PRM(h, 'team-a'), { headers: { host: 'evil.example' } });
+      if (spoof.status === 200) expect(JSON.stringify(await spoof.json())).not.toContain('evil.example');
+    });
+
+    it('answers a known, an unknown and a disabled workspace alike; an invalid slug or the root is a 404', async () => {
+      const h = await host();
+      const shape = async (slug: string) => {
+        const res = await h.call(PRM(h, slug));
+        return {
+          status: res.status,
+          type: res.headers.get('content-type'),
+          cache: res.headers.get('cache-control'),
+          body: (await res.text()).replaceAll(slug, '<slug>'),
+        };
+      };
+      const known = await shape('team-a');
+      expect(known.status).toBe(200);
+      // Nothing the MCP route does not already reveal (T19): its 401 is one answer for all of these.
+      expect(await shape('no-such-workspace')).toEqual(known);
+      await h.storage.workspaces.update(h.ids.workspaceA, { disabledAt: Date.now() });
+      expect(await shape('team-a')).toEqual(known);
+      await h.storage.workspaces.update(h.ids.workspaceA, { disabledAt: null });
+      for (const path of [
+        '/.well-known/oauth-protected-resource',
+        '/.well-known/oauth-protected-resource/',
+        '/.well-known/oauth-protected-resource/w/Team-A/mcp',
+        '/.well-known/oauth-protected-resource/w/-bad/mcp',
+        '/.well-known/oauth-protected-resource/w/team-a/mcp/extra',
+        '/.well-known/oauth-protected-resource/w/team-a',
+        `/.well-known/oauth-protected-resource/w/${'a'.repeat(64)}/mcp`,
+      ]) {
+        const res = await h.call(`${h.origin}${path}`);
+        expect(res.status, path).toBe(404);
+        expect(await res.text(), path).not.toContain('authorization_servers');
+      }
+      // Reading only.
+      expect((await h.call(PRM(h, 'team-a'), { method: 'POST', body: '{}' })).status).toBe(404);
+    });
+
+    it('challenges every 401 with the workspace metadata URL, the same for unknown workspaces and every denial', async () => {
+      const h = await host();
+      const expected = (slug: string) =>
+        `Bearer realm="agility-bridge", resource_metadata="${PRM(h, slug)}", scope="mcp:read"`;
+      const neverIssued = `usr_${'a'.repeat(32)}:${'B'.repeat(16)}:${'c'.repeat(32)}`;
+      const a = await connectWorkspace(h, 'team-a');
+      const cases: readonly (readonly [string, string, string | null])[] = [
+        ['no token', 'team-a', null],
+        ['malformed token', 'team-a', 'not-a-token'],
+        ['OAuth-shaped token that was never issued', 'team-a', neverIssued],
+        ['device token of another workspace', 'team-b', h.ids.aliceDeviceTokenA],
+        ['OAuth token of another workspace', 'team-b', a.tokens.access_token],
+        ['an unknown workspace', 'no-such-workspace', a.tokens.access_token],
+      ];
+      for (const [label, slug, token] of cases) {
+        const res = await mcp(h, slug, token, WHOAMI);
+        expect(res.status, label).toBe(401);
+        expect(res.headers.get('www-authenticate'), label).toBe(expected(slug));
+        expect(await res.json(), label).toEqual({ error: 'unauthorized' });
+      }
+      // The SDK reads the URL and the scope out of it; no error code splits a missing token from a wrong one.
+      const params = extractWWWAuthenticateParams(await mcp(h, 'team-a', null, WHOAMI));
+      expect(params.resourceMetadataUrl?.href).toBe(PRM(h, 'team-a'));
+      expect(params.scope).toBe('mcp:read');
+      expect(params.error).toBeUndefined();
+      // A slug that is not valid syntax has nothing to point at: the plain challenge.
+      const bad = await h.call(`${h.origin}/w/Bad_Slug/mcp`, {
+        method: 'POST',
+        headers: MCP_HEADERS,
+        body: '{}',
+      });
+      expect(bad.status).toBe(401);
+      expect(bad.headers.get('www-authenticate')).toBe('Bearer');
+    });
+
+    it('a client that starts from the MCP URL follows the challenge to the resource, authorizes and connects', async () => {
+      const h = await host();
+      const url = resourceOf(h, 'team-a');
+      // The spec's first step: an unauthenticated request, a 401, and a challenge naming the document.
+      const { resourceMetadataUrl, scope } = extractWWWAuthenticateParams(await mcp(h, 'team-a', null, LIST));
+      expect(resourceMetadataUrl).toBeDefined();
+      const doc = await discoverOAuthProtectedResourceMetadata(
+        url,
+        { resourceMetadataUrl: resourceMetadataUrl as URL },
+        fetchFn(h),
+      );
+      expect(doc.resource).toBe(url);
+      expect(doc.authorization_servers).toEqual([h.origin]);
+      // Authorization server metadata from the issuer the document names, then the flow with the document's resource.
+      const as = await discoverAuthorizationServerMetadata(doc.authorization_servers?.[0] as string, {
+        fetchFn: fetchFn(h),
+      });
+      expect(as?.issuer).toBe(h.origin);
+      const client = await register(h);
+      const a = await authorize(h, client, { resource: doc.resource, scope: scope ?? '' });
+      expect(a.code, `authorize answered ${a.response.status}`).not.toBeNull();
+      const tokens = await exchangeAuthorization(h.origin, {
+        metadata: await metadata(h),
+        clientInformation: client,
+        authorizationCode: a.code as string,
+        ...issOf(a),
+        codeVerifier: a.verifier,
+        redirectUri: a.redirect,
+        resource: new URL(doc.resource),
+        fetchFn: fetchFn(h),
+      });
+      expect((await mcp(h, 'team-a', tokens.access_token)).status).toBe(200);
+      // The audience is the one workspace the document named (T2).
+      expect((await mcp(h, 'team-b', tokens.access_token)).status).toBe(401);
+      // And refresh cannot retarget it.
+      const retarget = await tokenEndpoint(h, {
+        grant_type: 'refresh_token',
+        refresh_token: tokens.refresh_token as string,
+        client_id: client.client_id,
+        resource: resourceOf(h, 'team-b'),
+      });
+      expect(retarget.status).toBeGreaterThanOrEqual(400);
+    });
+
+    it("the SDK's auth() driven by the challenge's resource_metadata URL connects to another workspace", async () => {
+      const h = await host();
+      const slug = 'team-b';
+      const serverUrl = resourceOf(h, slug);
+      let saved: OAuthTokens | undefined;
+      let info: OAuthClientInformationFull | undefined;
+      let verifier = '';
+      let redirected: URL | undefined;
+      const provider: OAuthClientProvider = {
+        get redirectUrl() {
+          return REDIRECT;
+        },
+        get clientMetadata() {
+          return {
+            client_name: 'SDK challenge client',
+            redirect_uris: [REDIRECT],
+            grant_types: ['authorization_code', 'refresh_token'],
+            response_types: ['code'],
+            token_endpoint_auth_method: 'none',
+          };
+        },
+        clientInformation: () => info,
+        saveClientInformation: (i) => {
+          info = i as OAuthClientInformationFull;
+        },
+        tokens: () => saved,
+        saveTokens: (t) => {
+          saved = t;
+        },
+        redirectToAuthorization: (u) => {
+          redirected = u;
+        },
+        saveCodeVerifier: (v) => {
+          verifier = v;
+        },
+        codeVerifier: () => verifier,
+      };
+      const challenge = extractWWWAuthenticateParams(await mcp(h, slug, null, LIST));
+      const resourceMetadataUrl = challenge.resourceMetadataUrl as URL;
+      expect(resourceMetadataUrl.href).toBe(PRM(h, slug));
+      expect(
+        await auth(provider, {
+          serverUrl,
+          resourceMetadataUrl,
+          ...(challenge.scope === undefined ? {} : { scope: challenge.scope }),
+          fetchFn: fetchFn(h),
+        }),
+      ).toBe('REDIRECT');
+      const url = redirected as URL;
+      expect(url.searchParams.get('resource')).toBe(serverUrl);
+      // The scope of the challenge (the SDK adds `offline_access` itself when the server supports it).
+      expect(url.searchParams.get('scope')?.split(' ')).toContain('mcp:read');
+      const res = await h.call(url.href, {
+        redirect: 'manual',
+        headers: { [APPROVE_HEADER]: `${h.ids.alice}|${h.ids.aliceGrantB}` },
+      });
+      const back = new URL(res.headers.get('location') as string);
+      expect(
+        await auth(provider, {
+          serverUrl,
+          resourceMetadataUrl,
+          authorizationCode: back.searchParams.get('code') as string,
+          ...issOf({ location: back }),
+          fetchFn: fetchFn(h),
+        }),
+      ).toBe('AUTHORIZED');
+      const token = (saved as OAuthTokens).access_token;
+      expect((await mcp(h, slug, token, WHOAMI)).status).toBe(200);
+      expect((await mcp(h, 'team-a', token, WHOAMI)).status).toBe(401);
+    });
+
     // ------------------------------------------------------------------------------------------------ the flow
 
     it('an SDK client registers, authorizes one workspace, exchanges the code, calls MCP and refreshes', async () => {
@@ -380,13 +595,11 @@ export function defineOAuthSuite(name: string, makeHost: () => Promise<OAuthHost
           verifier = v;
         },
         codeVerifier: () => verifier,
-        // Without a protected resource metadata document (P5-02) the SDK does not know the resource: this client
-        // names the MCP URL it was given, as RFC 8707 clients do.
-        validateResourceURL: async (url) => new URL(url),
       };
       const serverUrl = resourceOf(h, slug);
       expect(await auth(provider, { serverUrl, fetchFn: fetchFn(h) })).toBe('REDIRECT');
       const url = redirected as URL;
+      // The resource comes from the protected resource metadata the SDK discovered (P5-02): no workaround names it.
       expect(url.searchParams.get('resource')).toBe(serverUrl);
       expect(url.searchParams.get('code_challenge_method')).toBe('S256');
       const res = await h.call(url.href, {
