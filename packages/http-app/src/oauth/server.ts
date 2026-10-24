@@ -187,6 +187,54 @@ export interface OAuthDevice {
   readonly expiresAt: number | null;
 }
 
+/** A device of any person, for the administrators' list (P5-08). */
+export interface OAuthAdminDevice extends OAuthDevice {
+  readonly userId: string;
+}
+
+/** One page of every person's devices; `next` is the cursor of the following page. */
+export interface OAuthDevicePage {
+  readonly devices: readonly OAuthAdminDevice[];
+  readonly next: string | null;
+}
+
+/** A registered client (a dynamic registration or a stored metadata document), for the owners' list (P5-08). Text is untrusted. */
+export interface OAuthClientSummary {
+  readonly clientId: string;
+  readonly kind: 'dynamic' | 'metadata_document';
+  readonly name: string | null;
+  readonly redirectHosts: readonly string[];
+  /** Epoch ms, or null when the record carries no date. */
+  readonly createdAt: number | null;
+  /** The newest approval among the devices counted, epoch ms; null when none was counted. */
+  readonly lastApprovedAt: number | null;
+  /** Devices counted (see {@link OAuthClientPage.devicesTruncated}); null when the count could not be made. */
+  readonly devices: number | null;
+}
+
+/** A client an owner revoked: its id stays refused until it is restored (metadata documents) or its tokens have all expired (dynamic). */
+export interface OAuthBlockedClient {
+  readonly clientId: string;
+  readonly kind: 'dynamic' | 'metadata_document';
+  readonly name: string | null;
+  readonly at: number;
+}
+
+export interface OAuthClientPage {
+  readonly clients: readonly OAuthClientSummary[];
+  readonly blocked: readonly OAuthBlockedClient[];
+  readonly next: string | null;
+  /** More devices exist than were read, so the counts are lower bounds. */
+  readonly devicesTruncated: boolean;
+}
+
+export interface OAuthClientRevocation {
+  /** Devices ended now. */
+  readonly devices: number;
+  /** False when more grants exist than one call reads: the client is refused anyway, press revoke again to end the rest. */
+  readonly complete: boolean;
+}
+
 export type OAuthApproval =
   | { readonly ok: true; readonly redirectTo: string; readonly scope: readonly string[] }
   | { readonly ok: false; readonly reason: DenyReason | 'principal_mismatch' | 'device_limit' | 'busy' };
@@ -323,6 +371,25 @@ const CODE_MARKER_PREFIX = 'oauth-code:';
  * back: the token endpoint looks for the tombstone after the provider answered and revokes again.
  */
 const TOMBSTONE_PREFIX = 'oauth-revoked:';
+/**
+ * Revoked clients, `oauth-client-blocked:<sha-256 of the client id>` (P5-08): written before anything else is ended, so a
+ * half-finished revocation never leaves the client usable. Authorization, every token request and every MCP request
+ * of a blocked client is refused. A dynamic client's block expires once every token it could hold has (its record is
+ * deleted, and a new registration is a new id, D-74); a metadata document's block stays until an owner restores it.
+ */
+const CLIENT_BLOCK_PREFIX = 'oauth-client-blocked:';
+/** Grants one client revocation reads (each is a storage read); the block makes the rest refused anyway. */
+const CLIENT_REVOKE_SCAN_MAX = 1000;
+/** Grants read to count devices per client on the owners' list (a Free-plan request has 50 D1 queries, L-097). */
+const CLIENT_COUNT_SCAN_MAX = 100;
+const CLIENT_PAGE_DEFAULT = 10;
+const CLIENT_PAGE_MAX = 25;
+const BLOCKED_LIST_MAX = 20;
+const DEVICE_PAGE_DEFAULT = 10;
+const DEVICE_PAGE_MAX = 50;
+/** `userId:grantId` as the device list's cursor and a grant key's tail. */
+const GRANT_TAIL_RE = /^([A-Za-z0-9_-]{1,128}):([A-Za-z0-9_-]{16})$/;
+const CLIENT_ID_KEY_RE = /^[\x21-\x7e]{1,512}$/;
 /** RFC 7636 §4.1 `code-verifier = 43*128unreserved`. */
 const PKCE_VERIFIER_RE = /^[A-Za-z0-9._~-]{43,128}$/;
 
@@ -453,6 +520,25 @@ export interface OAuthRuntime {
   revokeDevice(c: Context, userId: string, deviceId: string): Promise<boolean>;
   /** Disconnect every app of this person; the number disconnected. */
   revokeAllDevices(c: Context, userId: string): Promise<number>;
+  /**
+   * Every person's apps for the administrators (P5-08), in storage order, a page at a time (`after` is a previous
+   * page's `next`). Reads at most `limit` grants (default 10, at most 50): each is a storage read.
+   */
+  allDevices(page: { readonly after?: string; readonly limit?: number }): Promise<OAuthDevicePage>;
+  /**
+   * An administrator ends one person's app (the caller has authorized it): tokens stop at once, audited
+   * (`oauth.device.revoke`, `via: admin`, `by`). False when that person has no such device.
+   */
+  revokeDeviceFor(c: Context, userId: string, deviceId: string, by: string | null): Promise<boolean>;
+  /** Registered clients and revoked ones, a page at a time (owners; the caller has authorized it). */
+  clients(page: { readonly after?: string; readonly limit?: number }): Promise<OAuthClientPage>;
+  /**
+   * An owner revokes a client: blocks it first (no new authorization, no refresh, no access token passes), then ends
+   * its devices and deletes its record. Null when no such client exists. Audited.
+   */
+  revokeClient(c: Context, clientId: string, by: string | null): Promise<OAuthClientRevocation | null>;
+  /** Lifts a block (a metadata-document client may be used again); false when the client was not blocked. */
+  restoreClient(c: Context, clientId: string, by: string | null): Promise<boolean>;
   /** Validate an OAuth bearer for `/w/{slug}/mcp` and resolve its access. Storage errors propagate (fail closed). */
   authenticate(token: string, slug: string): Promise<OAuthAuthentication>;
   /** Client registrations: counts and cleanup (the hooks P5-08 and P5-09 build on). */
@@ -719,6 +805,8 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       });
       throw new mod.OAuthError('invalid_grant', { description: 'The authorization is no longer valid.' });
     };
+    // A revoked client gets nothing new, whatever its grants say (P5-08): refused here, the provider revokes the device.
+    if (await isBlocked(o.clientId)) return refuse('client_revoked', null);
     const props = o.props as Partial<OAuthGrantProps> | null;
     const slug = typeof o.resource === 'string' ? slugOf(o.resource) : null;
     if (
@@ -897,6 +985,11 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     const documents = names.filter((n) => n.startsWith(DOCUMENT_CLIENT_PREFIX)).length;
     return { dynamic: names.length - documents, documents };
   };
+  const blockKey = async (clientId: string): Promise<string> =>
+    `${CLIENT_BLOCK_PREFIX}${await sha256Hex(clientId)}`;
+  /** Whether an owner revoked this client (P5-08). One read; a storage error propagates (fail closed). */
+  const isBlocked = async (clientId: string): Promise<boolean> =>
+    (await storage.kv.get(await blockKey(clientId))) !== null;
   const hostOf = (clientId: string): string | null => {
     try {
       return new URL(clientId).hostname;
@@ -911,7 +1004,9 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
    * are never cached; a validated document is stored for its (bounded) HTTP cache lifetime, in shared storage.
    */
   const resolveClient = async (clientId: string | null | undefined, c: Context): Promise<string | null> => {
-    if (clientId === null || clientId === undefined || !looksLikeClientIdUrl(clientId)) return null;
+    if (clientId === null || clientId === undefined) return null;
+    if (await isBlocked(clientId)) return 'client_revoked';
+    if (!looksLikeClientIdUrl(clientId)) return null;
     if (cimd === undefined) return 'cimd_disabled';
     const problem = clientIdUrlProblem(clientId, issuerHost);
     if (problem !== null) return problem;
@@ -991,6 +1086,9 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
   const refusedClient = (clientId: string, reason: string): Response => {
     // The client id is public (a URL or a random id); log its host only, never the document.
     logger.info('oauth client refused', { reason, clientHost: hostOf(clientId) });
+    if (reason === 'client_revoked') {
+      return jsonError(400, 'invalid_client', 'This client was revoked by an administrator.');
+    }
     return jsonError(400, 'invalid_client', 'The client metadata document could not be used.');
   };
 
@@ -1366,12 +1464,19 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     if (replaced > 0) onRevocation();
   };
 
-  const toDevice = async (helpers: OAuthHelpers, g: GrantSummary): Promise<OAuthDevice> => {
-    let name: string | null = null;
-    try {
-      name = (await helpers.lookupClient(g.clientId))?.clientName ?? null;
-    } catch {
-      name = null;
+  const toDevice = async (
+    helpers: OAuthHelpers,
+    g: GrantSummary,
+    names?: Map<string, string | null>,
+  ): Promise<OAuthDevice> => {
+    let name: string | null = names?.get(g.clientId) ?? null;
+    if (names === undefined || !names.has(g.clientId)) {
+      try {
+        name = (await helpers.lookupClient(g.clientId))?.clientName ?? null;
+      } catch {
+        name = null;
+      }
+      names?.set(g.clientId, name);
     }
     const meta = metaOf(g);
     let host = '';
@@ -1390,6 +1495,35 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       createdAt: g.createdAt * 1000,
       expiresAt: g.expiresAt === undefined ? null : g.expiresAt * 1000,
     };
+  };
+
+  /** Ends one of `userId`'s devices (the caller decided that it may): tombstone, tokens, cache, audit row. */
+  const revokeOneDevice = async (
+    c: Context,
+    userId: string,
+    deviceId: string,
+    via: { readonly via: string; readonly by?: string },
+  ): Promise<boolean> => {
+    const helpers = (await server([])).getOAuthApi(env);
+    // Only grants listed under this person's id are there: any other id is simply not found.
+    const grant = (await allGrants(helpers, userId)).find((g) => g.id === deviceId);
+    if (grant === undefined) return false;
+    await revokeFamily(userId, grant.id, helpers);
+    onRevocation();
+    audit(
+      {
+        action: 'oauth.device.revoke',
+        status: 'ok',
+        requestId: requestIdOf(c),
+        userId,
+        workspaceId: metaOf(grant).workspace,
+        clientId: grant.clientId,
+        tokenId: `oauth_${grant.id}`,
+        details: { ...via },
+      },
+      c,
+    );
+    return true;
   };
 
   const runtime: OAuthRuntime = {
@@ -1430,22 +1564,233 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     },
 
     async revokeDevice(c, userId, deviceId) {
+      return revokeOneDevice(c, userId, deviceId, { via: 'my_access' });
+    },
+
+    async revokeDeviceFor(c, userId, deviceId, by) {
+      return revokeOneDevice(c, userId, deviceId, { via: 'admin', ...(by === null ? {} : { by }) });
+    },
+
+    async allDevices(page) {
+      const limit = Math.min(Math.max(1, Math.floor(page.limit ?? DEVICE_PAGE_DEFAULT)), DEVICE_PAGE_MAX);
+      const grantPrefix = `${OAUTH_KV_PREFIX}grant:`;
+      const after =
+        page.after !== undefined && GRANT_TAIL_RE.test(page.after)
+          ? `${grantPrefix}${page.after}`
+          : undefined;
+      const keys = await storage.kv.list(grantPrefix, {
+        limit: limit + 1,
+        ...(after === undefined ? {} : { after }),
+      });
+      const mine = keys.slice(0, limit);
       const helpers = (await server([])).getOAuthApi(env);
-      // Only the caller's own grants are listed under their id: any other id is simply not there.
-      const grant = (await allGrants(helpers, userId)).find((g) => g.id === deviceId);
-      if (grant === undefined) return false;
-      await revokeFamily(userId, grant.id, helpers);
+      const names = new Map<string, string | null>();
+      const devices: OAuthAdminDevice[] = [];
+      for (const key of mine) {
+        const m = GRANT_TAIL_RE.exec(key.slice(grantPrefix.length));
+        // Other keys under `grant:` (none today) are skipped, not shown.
+        if (m === null) continue;
+        const record = (await env.OAUTH_KV.get(key.slice(OAUTH_KV_PREFIX.length), {
+          type: 'json',
+        })) as Partial<GrantSummary> | null;
+        if (record === null || typeof record !== 'object' || typeof record.clientId !== 'string') continue;
+        const summary: GrantSummary = {
+          id: m[2] as string,
+          clientId: record.clientId,
+          userId: m[1] as string,
+          scope: Array.isArray(record.scope) ? record.scope : [],
+          metadata: record.metadata,
+          createdAt: typeof record.createdAt === 'number' ? record.createdAt : 0,
+          ...(typeof record.expiresAt === 'number' ? { expiresAt: record.expiresAt } : {}),
+          ...(typeof record.redirectUri === 'string' ? { redirectUri: record.redirectUri } : {}),
+        };
+        devices.push({ ...(await toDevice(helpers, summary, names)), userId: summary.userId });
+      }
+      const last = mine[mine.length - 1];
+      return {
+        devices,
+        next: keys.length > limit && last !== undefined ? last.slice(grantPrefix.length) : null,
+      };
+    },
+
+    async clients(page) {
+      const limit = Math.min(Math.max(1, Math.floor(page.limit ?? CLIENT_PAGE_DEFAULT)), CLIENT_PAGE_MAX);
+      const after =
+        page.after !== undefined && CLIENT_ID_KEY_RE.test(page.after)
+          ? `${CLIENT_RECORD_PREFIX}${page.after}`
+          : undefined;
+      const keys = await storage.kv.list(CLIENT_RECORD_PREFIX, {
+        limit: limit + 1,
+        ...(after === undefined ? {} : { after }),
+      });
+      const mine = keys.slice(0, limit);
+      const rows: { clientId: string; name: string | null; hosts: string[]; createdAt: number | null }[] = [];
+      for (const key of mine) {
+        const clientId = key.slice(CLIENT_RECORD_PREFIX.length);
+        const record = (await env.OAUTH_KV.get(key.slice(OAUTH_KV_PREFIX.length), {
+          type: 'json',
+        })) as {
+          readonly clientName?: unknown;
+          readonly redirectUris?: unknown;
+          readonly registrationDate?: unknown;
+        } | null;
+        if (record === null || typeof record !== 'object') continue;
+        const hosts = new Set<string>();
+        for (const uri of Array.isArray(record.redirectUris) ? record.redirectUris.slice(0, 20) : []) {
+          try {
+            if (typeof uri === 'string') hosts.add(new URL(uri).host);
+          } catch {
+            // not a URL: nothing to show
+          }
+        }
+        rows.push({
+          clientId,
+          name: typeof record.clientName === 'string' ? record.clientName.slice(0, 200) : null,
+          hosts: [...hosts],
+          createdAt: typeof record.registrationDate === 'number' ? record.registrationDate * 1000 : null,
+        });
+      }
+      // Devices per client: the grants are keyed by person, so this reads them (a bounded number: L-097). A failure
+      // leaves the counts unknown rather than the list unavailable.
+      const counts = new Map<string, { n: number; last: number }>();
+      let counted = true;
+      let truncated = false;
+      try {
+        const grantPrefix = `${OAUTH_KV_PREFIX}grant:`;
+        const grantKeys = await storage.kv.list(grantPrefix, { limit: CLIENT_COUNT_SCAN_MAX + 1 });
+        truncated = grantKeys.length > CLIENT_COUNT_SCAN_MAX;
+        for (const key of grantKeys.slice(0, CLIENT_COUNT_SCAN_MAX)) {
+          if (!GRANT_TAIL_RE.test(key.slice(grantPrefix.length))) continue;
+          const record = (await env.OAUTH_KV.get(key.slice(OAUTH_KV_PREFIX.length), {
+            type: 'json',
+          })) as { readonly clientId?: unknown; readonly createdAt?: unknown } | null;
+          if (record === null || typeof record.clientId !== 'string') continue;
+          const at = typeof record.createdAt === 'number' ? record.createdAt * 1000 : 0;
+          const seen = counts.get(record.clientId) ?? { n: 0, last: 0 };
+          counts.set(record.clientId, { n: seen.n + 1, last: Math.max(seen.last, at) });
+        }
+      } catch {
+        counted = false;
+        logger.warn('oauth client device counts unavailable');
+      }
+      const blockedKeys = await storage.kv.list(CLIENT_BLOCK_PREFIX, { limit: BLOCKED_LIST_MAX });
+      const blocked: OAuthBlockedClient[] = [];
+      for (const key of blockedKeys) {
+        const raw = await storage.kv.get(key);
+        try {
+          const v = JSON.parse(raw ?? 'null') as {
+            clientId?: unknown;
+            kind?: unknown;
+            name?: unknown;
+            at?: unknown;
+          } | null;
+          if (v === null || typeof v.clientId !== 'string') continue;
+          blocked.push({
+            clientId: v.clientId,
+            kind: v.kind === 'metadata_document' ? 'metadata_document' : 'dynamic',
+            name: typeof v.name === 'string' ? v.name.slice(0, 200) : null,
+            at: typeof v.at === 'number' ? v.at : 0,
+          });
+        } catch {
+          // a row we did not write: not shown
+        }
+      }
+      const last = mine[mine.length - 1];
+      return {
+        clients: rows.map((r) => {
+          const seen = counts.get(r.clientId);
+          return {
+            clientId: r.clientId,
+            kind: looksLikeClientIdUrl(r.clientId) ? 'metadata_document' : 'dynamic',
+            name: r.name,
+            redirectHosts: r.hosts,
+            createdAt: r.createdAt,
+            lastApprovedAt: seen === undefined || seen.last === 0 ? null : seen.last,
+            devices: counted ? (seen?.n ?? 0) : null,
+          } satisfies OAuthClientSummary;
+        }),
+        blocked,
+        next: keys.length > limit && last !== undefined ? last.slice(CLIENT_RECORD_PREFIX.length) : null,
+        devicesTruncated: truncated,
+      };
+    },
+
+    async revokeClient(c, clientId, by) {
+      if (!CLIENT_ID_KEY_RE.test(clientId)) return null;
+      const record = (await env.OAUTH_KV.get(`client:${clientId}`, { type: 'json' })) as {
+        readonly clientName?: unknown;
+      } | null;
+      const kind = looksLikeClientIdUrl(clientId) ? 'metadata_document' : 'dynamic';
+      const already = await isBlocked(clientId);
+      // Nothing to revoke: no such client, and it was not revoked before either (a second press finishes the first).
+      if (record === null && !already) return null;
+      const name = typeof record?.clientName === 'string' ? record.clientName.slice(0, 200) : null;
+      // Block first: whatever fails after this, the client is already refused everywhere.
+      await storage.kv.set(
+        await blockKey(clientId),
+        JSON.stringify({ clientId, kind, name, at: clock.now() }),
+        kind === 'dynamic' ? { expiresAt: clock.now() + tombstoneTtlMs + 120_000 } : {},
+      );
+      await env.OAUTH_KV.delete(`client:${clientId}`);
+      const helpers = (await server([])).getOAuthApi(env);
+      const grantPrefix = `${OAUTH_KV_PREFIX}grant:`;
+      const grantKeys = await storage.kv.list(grantPrefix, { limit: CLIENT_REVOKE_SCAN_MAX });
+      let ended = 0;
+      for (const key of grantKeys) {
+        const m = GRANT_TAIL_RE.exec(key.slice(grantPrefix.length));
+        if (m === null) continue;
+        const grant = (await env.OAUTH_KV.get(key.slice(OAUTH_KV_PREFIX.length), {
+          type: 'json',
+        })) as { readonly clientId?: unknown; readonly metadata?: unknown } | null;
+        if (grant === null || grant.clientId !== clientId) continue;
+        const userId = m[1] as string;
+        const grantId = m[2] as string;
+        await revokeFamily(userId, grantId, helpers);
+        ended++;
+        audit(
+          {
+            action: 'oauth.device.revoke',
+            status: 'ok',
+            requestId: requestIdOf(c),
+            userId,
+            workspaceId: metaOf({ metadata: grant.metadata } as GrantSummary).workspace,
+            clientId,
+            tokenId: `oauth_${grantId}`,
+            details: { via: 'client_revoke', ...(by === null ? {} : { by }) },
+          },
+          c,
+        );
+      }
       onRevocation();
+      const complete = grantKeys.length < CLIENT_REVOKE_SCAN_MAX;
       audit(
         {
-          action: 'oauth.device.revoke',
+          action: 'oauth.client.revoked',
           status: 'ok',
           requestId: requestIdOf(c),
-          userId,
-          workspaceId: metaOf(grant).workspace,
-          clientId: grant.clientId,
-          tokenId: `oauth_${grant.id}`,
-          details: { via: 'my_access' },
+          clientId,
+          details: { kind, host: hostOf(clientId), devices: ended, complete, ...(by === null ? {} : { by }) },
+        },
+        c,
+      );
+      return { devices: ended, complete };
+    },
+
+    async restoreClient(c, clientId, by) {
+      if (!CLIENT_ID_KEY_RE.test(clientId)) return false;
+      const removed = await storage.kv.delete(await blockKey(clientId));
+      if (!removed) return false;
+      audit(
+        {
+          action: 'oauth.client.restored',
+          status: 'ok',
+          requestId: requestIdOf(c),
+          clientId,
+          details: {
+            kind: looksLikeClientIdUrl(clientId) ? 'metadata_document' : 'dynamic',
+            host: hostOf(clientId),
+            ...(by === null ? {} : { by }),
+          },
         },
         c,
       );
@@ -1932,6 +2277,8 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       }
       const providerGrant = (PROVIDER_TOKEN_RE.exec(token) as RegExpExecArray)[2] as string;
       const tokenId = `oauth_${providerGrant}`;
+      // An owner revoked this client (P5-08): its access tokens stop here even if a grant is still waiting to be ended.
+      if (await isBlocked(validated.clientId)) return { ok: false, stage: 'token', reason: 'oauth_invalid' };
       const decision = await decide(
         { grantId: props.grantId, workspaceId: props.workspaceId, userId: props.userId },
         slug,

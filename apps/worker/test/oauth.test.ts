@@ -6,12 +6,13 @@
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { accessServices, generateMasterKey, Keyring } from '@agility-bridge/auth';
+import { accessServices, generateAdminToken, generateMasterKey, Keyring } from '@agility-bridge/auth';
 import { CORE_TOOLS } from '@agility-bridge/core';
 import { createD1Driver, type D1Database, openSqlStorage } from '@agility-bridge/storage';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { defineOAuthAbuseSuite } from '../../../packages/http-app/test/oauth/abuse-suite.ts';
+import { defineOAuthAdminSuite } from '../../../packages/http-app/test/oauth/admin-suite.ts';
 import { defineOAuthClientSuite } from '../../../packages/http-app/test/oauth/clients-suite.ts';
 import { createFakeDocuments } from '../../../packages/http-app/test/oauth/documents.ts';
 import {
@@ -45,6 +46,7 @@ afterEach(async () => {
 
 async function workerHost(shape?: RefreshHostShape): Promise<OAuthHost> {
   const key = generateMasterKey(1);
+  const adminToken = generateAdminToken();
   const documents = createFakeDocuments({ observesRedirectMode: false });
   const mf = new Miniflare(
     convertV4MiniflareOptions({
@@ -72,6 +74,7 @@ async function workerHost(shape?: RefreshHostShape): Promise<OAuthHost> {
       bindings: {
         AB_ENVIRONMENT: 'test',
         AB_MASTER_KEY: key,
+        AB_ADMIN_TOKEN: adminToken,
         AB_ALLOW_HTTP_INSTANCES: 'on',
         AB_PUBLIC_URL: ORIGIN,
         AB_OAUTH: 'on',
@@ -149,6 +152,16 @@ async function workerHost(shape?: RefreshHostShape): Promise<OAuthHost> {
       aliceDeviceTokenA: token,
     },
     agilityRequests: () => agility.requests(),
+    adminApi: async (method, path, body) =>
+      (await mf.dispatchFetch(`${ORIGIN}/api/admin/v1${path}`, {
+        method,
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          'cf-connecting-ip': '203.0.113.9',
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      } as never)) as unknown as Response,
     address: (ip) => ({ 'cf-connecting-ip': ip }),
     // The Worker's console is not captured here; the redaction corpus and the Node suites cover the log lines.
     logs: () => [],
@@ -161,6 +174,7 @@ async function workerHost(shape?: RefreshHostShape): Promise<OAuthHost> {
 defineOAuthSuite('workerd with D1 (Worker)', () => workerHost());
 defineRefreshFamilySuite('workerd with D1 (Worker)', workerHost);
 defineOAuthClientSuite('workerd with D1 (Worker)', workerHost, { matrix: false });
+defineOAuthAdminSuite('workerd with D1 (Worker)', workerHost);
 defineOAuthAbuseSuite('workerd with D1 (Worker)', workerHost);
 
 describe('OAuth settings on the shipped Worker', () => {

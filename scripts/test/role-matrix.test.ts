@@ -176,6 +176,10 @@ const PROBES: Record<string, (g: Guarded, i: Ids) => unknown> = {
     g.tokens.issue({ grantId: i.bobGrant, label: 'laptop', expiresInDays: 'never' }),
   "Issue a device token on someone else's grant": (g, i) =>
     g.tokens.issue({ grantId: i.bobGrant, label: 'laptop' }),
+  "See every person's connected OAuth apps": (g) => g.oauth.authorizeDeviceList(),
+  "Disconnect a member's connected OAuth app": (g, i) => g.oauth.authorizeDeviceRevoke(i.bob),
+  "Disconnect an admin's connected OAuth app": (g, i) => g.oauth.authorizeDeviceRevoke(i.admin2),
+  'See and revoke registered OAuth apps': (g) => g.oauth.authorizeClients(),
   'Create an owner setup link': (g) => g.setupLinks.authorize(),
   'Retire a master-key version': (g) => g.keys.retire(1, 'test'),
 };

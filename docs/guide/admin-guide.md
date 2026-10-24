@@ -83,6 +83,10 @@ pass-through, owner accounts, keys). The break-glass admin token acts as an owne
 | Widen a grant that has write tools | no | no | recent |
 | Issue a device token that never expires | no | recent | recent |
 | Issue a device token on someone else's grant | no | yes | yes |
+| See every person's connected OAuth apps | no | yes | yes |
+| Disconnect a member's connected OAuth app | no | yes | yes |
+| Disconnect an admin's connected OAuth app | no | no | yes |
+| See and revoke registered OAuth apps | no | no | yes |
 | Create an owner setup link | no | no | recent |
 | Retire a master-key version | no | no | recent |
 

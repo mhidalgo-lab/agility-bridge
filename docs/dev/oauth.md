@@ -166,6 +166,36 @@ A **device** is one provider grant: an app approved by one person for one worksp
   clears the access cache and writes `oauth.device.revoke` (`via: my_access`). A refresh token or access token of a
   disconnected device is refused at once (tests).
 
+## Administrators: connected apps and registered clients (P5-08)
+
+`My access` lists a person's own devices; owners and admins also see everyone's, and owners see the clients.
+
+- **Routes** (tag `oauth`, the admin API; `404` when OAuth is off, after the role check): `GET /oauth/devices` (owner, admin),
+  `POST /oauth/devices/{id}/revoke` with `{userId}` (owner: anyone's; admin: a member's or their own; `guardedServices(...).oauth`, the
+  rule of `authorizeEndSessions`; a device that is not under that person is `404`), `GET /oauth/clients`,
+  `POST /oauth/clients/revoke` and `POST /oauth/clients/restore` with `{clientId}` (owner). The panel posts the same
+  through `/admin/oauth/*` with CSRF, `Origin` and fetch metadata. Nothing here is a GET that changes anything (L-090).
+- **Storage reads are bounded** (L-097): the device list reads `limit` (10 by default, 50 at most) grant keys from `oauth:grant:` after
+  a cursor and one record each, resolving each app's name once; the client list reads `limit` (10, 25 at most) records
+  after a cursor, then at most 100 grants to count devices (a failure there gives `devices: null`, not an error), then up to 20
+  block rows. Revoking a client reads at most 1,000 grants.
+- **Revoking a client** writes `oauth-client-blocked:<sha256 of the client id>` first, deletes `oauth:client:<id>`, then
+  revokes every grant of the client (tombstone first, like any revoke). The block is checked in `resolveClient`
+  (authorize, consent re-validation and token endpoint, one read), in the issuance check (a refresh revokes the device) and
+  in `authenticate` (an access token stops even when a grant is still waiting to be ended). A dynamic client's block row
+  expires when every token it could hold has; a metadata-document client's stays until `restore` (D-74).
+- **Disconnect and the access cache.** `authenticate` validates the token against the provider's store on a cache miss and
+  caches the decision for `AB_ACCESS_CACHE_TTL` (30 s default, 60 s at most; keyed by token hash and slug). The revoking process
+  clears its cache; other processes serve a cached token until its entry ends, so a disconnect takes effect within the TTL.
+  Refresh has no cache: the tombstone and the grant are read on every refresh. `defineOAuthCacheSuite` proves both (a second
+  process is played by changing the shared store without clearing the cache).
+- **Audit**: `oauth.device.revoke` (`auth` row for the device's person; `details.via` is `admin` or `client_revoke`, `by` the
+  administrator's user id), `oauth.client.revoked` (kind, host, devices, complete), `oauth.client.restored`; and `admin` rows
+  `oauth_device.revoke`, `oauth_client.revoke`, `oauth_client.restore` (target, `userId` or `clientId`, role of the actor). No token,
+  code or secret in any of them.
+- Tests: `test/oauth/admin-suite.ts` on memory (both shapes), SQLite and workerd/D1 (the break-glass token as the owner);
+  `admin-oauth.test.ts` (roles, CSRF, panel, hostile names); `e2e/oauth-consent.spec.ts` (1280 and 320 px).
+
 ## Client registration (P5-03)
 
 Two ways for a client to get a `client_id`; both end as an `oauth:client:<id>` record the provider reads, so redirect
@@ -270,7 +300,7 @@ runtime is not involved. Stored document clients expire by their own TTL (5 min 
 
 `auth` rows: `oauth.authorize` (ok or denied, with the deny reason; a deny names the person), `oauth.token.issued`,
 `oauth.token.refused`, `oauth.token.revoked`, `oauth.code.replayed`, `oauth.refresh.reuse` (a spent refresh token reused after
-the window: the device was revoked; `details` carry the window, never a token), `oauth.device.replaced`, `oauth.device.revoke`, and for clients `oauth.client.registered`, `oauth.client.fetched`, `oauth.client.refused` (kind, host, limit, stable reason; never a document);
+the window: the device was revoked; `details` carry the window, never a token), `oauth.device.replaced`, `oauth.device.revoke`, `oauth.client.revoked`, `oauth.client.restored`, and for clients `oauth.client.registered`, `oauth.client.fetched`, `oauth.client.refused` (kind, host, limit, stable reason; never a document);
 `oauth.token.issued` rows of a refresh say `reused: true` when the reuse window answered them;
 `admin` rows: `oauth.consent.refused` (the handle and grant refusals above); `auth` rows `oauth.request.refused` (P5-09: a limit was reached; reason, surface, scope and limit, once per window, never an address); the device is `oauth_<provider grant id>` in `token_id`, the client in
 `client_id`. Tool-call rows of OAuth requests carry the same two ids.

@@ -3,6 +3,7 @@
 // the provider's own `Date.now()` and ours agree, and the consent stand-in.
 import { vi } from 'vitest';
 import type { OAuthOptions } from '../../src/index.ts';
+import { ADMIN_BASE } from '../../src/index.ts';
 import { ORIGIN, world } from '../helpers/world.ts';
 import { testConsent } from './consent.ts';
 import { createFakeDocuments } from './documents.ts';
@@ -22,7 +23,7 @@ export async function memoryHost(
       // The Workers shape (L-096): per-request isolation, linear routers, a detached audit writer.
       ...(shape.request === true ? { isolation: 'request' as const } : {}),
     },
-    { liveClock: true, ...(shape.request === true ? { detachedAudit: true } : {}) },
+    { admin: true, liveClock: true, ...(shape.request === true ? { detachedAudit: true } : {}) },
   );
   // A service grant (no user) on a shared, read-only credential: OAuth must never bind a token to one.
   const shared = await w.services.credentials.create({
@@ -59,6 +60,19 @@ export async function memoryHost(
     },
     agilityRequests: () => w.agilityTokens.length,
     logs: () => w.logs,
+    adminApi: (method, path, body) =>
+      Promise.resolve(
+        w.app.fetch(
+          new Request(`${ORIGIN}${ADMIN_BASE}${path}`, {
+            method,
+            headers: {
+              'x-test-actor': 'break_glass',
+              ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+            },
+            ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+          }),
+        ),
+      ),
     address: (ip) => ({ 'x-test-ip': ip }),
     advance: (ms) => vi.setSystemTime(Date.now() + ms),
     close: async () => {

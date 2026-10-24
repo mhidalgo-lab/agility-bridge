@@ -168,7 +168,7 @@ async function main(): Promise<number> {
   mkdirSync(OUT, { recursive: true });
   chmodSync(OUT, 0o777); // the container's `zap` user writes the reports
   const cleanup = globalSetup();
-  const server = await startServer();
+  const server = await startServer({ env: { AB_OAUTH: 'on' } });
   const desktop = dockerIsDesktop();
   if (desktop) startRelay(Number(new URL(server.base).port));
   const secrets: string[] = [server.adminToken];

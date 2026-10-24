@@ -71,6 +71,7 @@ carry `requestId`.
 | warn | `oauth device replacement failed` | `error` (class) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | error | `consent screen error` | `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
 | info | `oauth client refused` | `reason` (stable code), `clientHost` (host of the client id URL; never the document) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| warn | `oauth client device counts unavailable` | none | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | info | `oauth registration refused` | `reason` (stable code); never the request body | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | warn | `oauth registration per-address limit reached` | `limit` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | warn | `oauth registration cap reached` | `limit` | [server.ts](../../packages/http-app/src/oauth/server.ts) |

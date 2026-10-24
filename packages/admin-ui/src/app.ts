@@ -5,6 +5,7 @@
 //   GET /admin                     overview (any signed-in role)
 //   GET /admin/account             the signed-in person's session and two small forms (any role; the name form: owners)
 //   /admin/me/*                    "My access": my personal Agility token, grants and devices (any role, P4-07)
+//   /admin/oauth/*                 connected apps of everyone (owner, admin) and registered OAuth apps (owner), P5-08
 //   /admin/instances, /credentials, /workspaces, /grants (with their device tokens) and /users: P4-04, owners and admins
 //   GET /admin/assets/:file        static assets (public, hashed names, immutable)
 //   ALL /admin/*                   signed-in 404 page (everyone else: sign-in redirect)
@@ -21,6 +22,7 @@ import { registerCredentials } from './screens/credentials.tsx';
 import { registerGrants } from './screens/grants.tsx';
 import { registerInstances } from './screens/instances.tsx';
 import { registerMe } from './screens/me.tsx';
+import { registerOAuthAdmin } from './screens/oauth-admin.tsx';
 import { registerOverview } from './screens/overview.tsx';
 import { registerTokens } from './screens/tokens.tsx';
 import { registerUsage } from './screens/usage.tsx';
@@ -41,6 +43,7 @@ function registerScreens(ui: Hono, kit: UiKit): void {
   registerGrants(ui, kit);
   registerTokens(ui, kit);
   registerAllTokens(ui, kit);
+  registerOAuthAdmin(ui, kit);
   registerUsers(ui, kit);
   registerAudit(ui, kit);
   registerUsage(ui, kit);
