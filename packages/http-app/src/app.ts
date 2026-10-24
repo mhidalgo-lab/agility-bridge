@@ -505,6 +505,13 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
                   oauthRuntime.revokeDevice(ic, userId, id),
                 revokeAll: (ic: Context, userId: string) => oauthRuntime.revokeAllDevices(ic, userId),
               },
+              oauthAdmin: {
+                devices: (page) => oauthRuntime.allDevices(page),
+                revokeDevice: (ic, userId, id, by) => oauthRuntime.revokeDeviceFor(ic, userId, id, by),
+                clients: (page) => oauthRuntime.clients(page),
+                revokeClient: (ic, clientId, by) => oauthRuntime.revokeClient(ic, clientId, by),
+                restoreClient: (ic, clientId, by) => oauthRuntime.restoreClient(ic, clientId, by),
+              },
             }),
         ...(perRequest ? { lightweightRouter: true } : {}),
       });

@@ -25,6 +25,8 @@ same audit row (`via: api`). A button appears only when the API would allow it f
 | Workspaces | `/admin/workspaces` | yes | yes | One MCP endpoint each: projects, tools, asset types, limits. Write settings and pass-through: owner only |
 | Grants | `/admin/grants` | yes | yes | Who may use which workspace, with which credential, tools, projects, limits, rate and expiry; their device tokens |
 | Device tokens | `/admin/tokens` | yes | yes | Every device token of every grant in one list, filtered by person or grant; revoke a lost device |
+| Connected apps | `/admin/oauth/devices` | yes | yes | Apps people connected with [OAuth](oauth-phone.md), everyone's; disconnect one (owners: anyone's; admins: a member's) |
+| OAuth apps | `/admin/oauth/clients` | yes | no | The apps registered to connect with OAuth, where they send people, and how many devices use each; revoke one |
 | Users | `/admin/users` | yes | yes | Who can sign in and as what; members for admins, everyone for owners |
 | Audit log | `/admin/audit` | yes | yes | Every tool call, refusal and change, filtered and paged; **members see their own rows** here |
 | Usage | `/admin/usage` | yes | yes | Calls, errors, denials, Agility requests and durations per tool, workspace, grant, user or day |
@@ -102,6 +104,28 @@ revoked alone). The page that follows shows the token **once**:
   by person or by grant; each row shows the device name, the first characters of the token, the grant it belongs to, its status,
   when it was last used and when it expires, with **Revoke…** for live ones. Never a hash and never a token.
 
+### Connected apps and OAuth apps (OAuth only)
+
+With [OAuth](oauth-phone.md) on, two more screens show what people connected. Without it they say so and show nothing.
+
+- **Connected apps** (`/admin/oauth/devices`, owners and admins): every person's connected apps, ten to a page (**Next
+  page** follows the list), each with the person and their role, the name the app gave itself (not verified), the device
+  name, the workspace, where the app sends its answers, and when it was connected and ends. **Disconnect** ends that app's
+  access and refresh tokens at once. An owner disconnects anyone's app; an admin a member's (and their own), the same rule as
+  ending someone's sessions. The person can connect the app again. It is a button that posts, never a link.
+- **OAuth apps** (`/admin/oauth/clients`, owners): every registered client, from dynamic registration or from a metadata
+  document, with its name (not verified: anyone can register under any name, so judge an app by the **Sends to** address),
+  when it registered, when a device of it was last approved, and how many devices use it. **Revoke…** (behind a confirmation)
+  blocks the app, deletes its registration and ends every device of it: nothing new is authorized, no token is refreshed, and
+  its access tokens stop. A dynamic app that registers again is a new app (revoke it too, or switch dynamic registration off);
+  a metadata-document app is listed under **Revoked apps** with **Allow again**, because its address is public. Device counts
+  read at most a hundred devices (a Cloudflare Free plan request has 50 database queries), so on a busy server they say "at
+  least".
+
+Disconnecting takes effect at once for the refresh token and for the access token on the server that did it; on another
+server process (a second node, a Worker isolate) the access token may work until its cached decision ends, at most
+`AB_ACCESS_CACHE_TTL` seconds (30 by default, 60 at most). Both write audit rows (see [audit log](audit-log.md)).
+
 ### Users
 
 Owners see and manage everyone; admins can add and manage **members** only (name, email, disable, end sessions) and see
@@ -146,7 +170,7 @@ owner or an admin sees the same pages, not other people's, and manages other peo
 - **Connected apps** (only when [OAuth](oauth-phone.md) is on): the apps you allowed on the consent screen, with the
   name the app gave itself (not verified), the device name you typed, the workspace, where it sends its answers, when you
   connected it and when its access ends. **Disconnect** ends that app's access and refresh tokens at once; **Disconnect
-  all apps** does it for every one. You see and disconnect only your own; administrators do not see these yet.
+  all apps** does it for every one. You see and disconnect only your own; administrators and owners see everyone's on [Connected apps](#connected-apps-and-oauth-apps-oauth-only).
 - **My recent changes**: your own last administrative changes (what and when, never a secret).
 
 ### Connect a client

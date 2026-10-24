@@ -675,8 +675,33 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     },
   };
 
+  /**
+   * Connected OAuth apps of other people and the registered clients (P5-08, THREAT_MODEL T15). Listing devices and ending
+   * a member's device: owners and admins; ending an owner's or an admin's device, and everything about registered
+   * clients (they are shared by the whole server): owners. Disconnecting only removes access, so no recent sign-in
+   * (L-093). The break-glass token counts as an owner. These throw, and touch nothing themselves.
+   */
+  const oauth = {
+    authorizeDeviceList(): void {
+      needManager(actor);
+    },
+    /** An admin may end a member's device, an owner anyone's; a person who no longer exists is an owner's call. */
+    async authorizeDeviceRevoke(userId: string): Promise<void> {
+      needManager(actor);
+      if (userId === self) return;
+      const target = await storage.users.get(userId);
+      if (target === null || target.role !== 'member') {
+        needOwner(actor, "end an owner's or an admin's connected app");
+      }
+    },
+    authorizeClients(): void {
+      needOwner(actor, 'manage the registered OAuth apps');
+    },
+  };
+
   return Object.freeze({
     actor,
+    oauth,
     users,
     instances,
     credentials,

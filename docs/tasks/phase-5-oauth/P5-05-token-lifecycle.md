@@ -2,7 +2,7 @@
 id: P5-05
 title: Token lifecycle and refresh concurrency
 phase: 5
-status: review
+status: done
 priority: high
 depends_on: [P5-01]
 adr: ["0009"]

@@ -223,3 +223,86 @@ test('My access lists the connected app and Disconnect ends its tokens at once',
   await expectNoHorizontalScroll(page);
   w.assertClean();
 });
+
+/** The person's browser connects an app: the consent page, Allow, the code exchange. Returns the tokens. */
+async function connectInBrowser(page: Page, w: { problems: readonly string[] }, name: string, label: string) {
+  const clientId = await register(name);
+  const r = request(clientId);
+  const callback = catchCallback(page, w.problems);
+  await page.goto(r.url);
+  await page.getByLabel('Device name (optional)').fill(label);
+  await page.getByRole('button', { name: 'Allow' }).click();
+  const code = (await callback()).searchParams.get('code') ?? '';
+  const tokens = await fetch(`${server.base}/oauth/token`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: CALLBACK,
+      client_id: clientId,
+      code_verifier: r.verifier,
+      resource: `${server.base}/w/${SLUG}/mcp`,
+    }),
+  });
+  expect(tokens.status).toBe(200);
+  const json = (await tokens.json()) as { access_token: string; refresh_token: string };
+  return { clientId, access: json.access_token, refresh: json.refresh_token };
+}
+
+test('P5-08: the owner sees every connected app, disconnects one, and revokes a client, hostile names inert', async ({
+  page,
+}) => {
+  const w = await watch(page);
+  const hostile = `<img src=x onerror=alert(1)>${'B'.repeat(70)}`;
+  await page.goto(`${server.base}/auth/login`);
+  await page.getByRole('link', { name: 'Continue with Corp SSO' }).click();
+  const tablet = await connectInBrowser(page, w, 'Tablet app', 'E2E tablet');
+  const hostileApp = await connectInBrowser(page, w, hostile, 'E2E hostile');
+  expect(await mcp(tablet.access)).toBe(200);
+  expect(await mcp(hostileApp.access)).toBe(200);
+
+  await test.step('Connected apps lists them, escaped, and fits the screen', async () => {
+    await visit(page, server, '/admin/oauth/devices');
+    await expect(page.getByRole('heading', { level: 1, name: 'Connected apps' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'Tablet app', exact: true })).toBeVisible();
+    await expect(page.locator('main img')).toHaveCount(0);
+    await expect(page.locator('main')).toContainText('<img src=x onerror=alert(1)>');
+  });
+
+  await test.step('Disconnect ends the app at once; the refresh token is dead too', async () => {
+    await page.getByRole('button', { name: /^Disconnect Tablet app of / }).click();
+    await expect(page.getByText('Revoked').first()).toBeVisible();
+    expect(await mcp(tablet.access)).toBe(401);
+    const refused = await fetch(`${server.base}/oauth/token`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: tablet.refresh,
+        client_id: tablet.clientId,
+      }),
+    });
+    expect(refused.status).toBe(400);
+    expect(await mcp(hostileApp.access)).toBe(200);
+    await expectNoHorizontalScroll(page);
+  });
+
+  await test.step('OAuth apps lists the clients, with where they send people, and revoking one ends its devices', async () => {
+    await visit(page, server, '/admin/oauth/clients');
+    await expect(page.getByRole('heading', { level: 1, name: 'OAuth apps' })).toBeVisible();
+    await expect(page.locator('main img')).toHaveCount(0);
+    await expect(page.getByText('127.0.0.1:53999').first()).toBeVisible();
+    await expect(page.getByText('Name (not verified)').first()).toBeVisible();
+    // The confirmation sits behind a disclosure; the first activation only opens it.
+    const row = page.getByRole('row').filter({ hasText: 'BBBBBBBB' });
+    await row.locator('summary').click();
+    await row.getByRole('button', { name: 'Revoke this app' }).click();
+    await expect(page.getByText('Revoked').first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Revoked apps' })).toBeVisible();
+    expect(await mcp(hostileApp.access)).toBe(401);
+    await expectNoHorizontalScroll(page);
+    await expectAccessible(page);
+  });
+  w.assertClean();
+});

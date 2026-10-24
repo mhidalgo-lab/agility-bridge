@@ -53,6 +53,8 @@ export interface OAuthHost {
   readonly documents: FakeDocuments;
   /** The app's registration hooks (in-process hosts only). */
   readonly registrations?: OAuthRegistrations;
+  /** The admin API as the break-glass token (an owner), for the P5-08 suite: `path` is below the API's base path. */
+  adminApi?(method: 'GET' | 'POST', path: string, body?: unknown): Promise<Response>;
   /** The request headers that make the caller look like this client address (how each host reads it). */
   address(ip: string): Record<string, string>;
   /** Moves time (Node hosts, in process); absent in workerd. */
@@ -1305,6 +1307,55 @@ export function defineOAuthCacheSuite(name: string, makeHost: () => Promise<OAut
       // ...and refused once the cache entry is older than its lifetime (30 s by default).
       h.advance(31_000);
       await expectDenied(h, 'team-a', tokens.access_token, 'grant_revoked');
+    });
+
+    it('a device disconnected in the panel ends in the process that did it at once, and in another within the cache lifetime (P5-08, T15)', async () => {
+      const h = await makeHost();
+      open.push(h);
+      if (h.advance === undefined || h.adminApi === undefined) return;
+      const { tokens, client } = await connectWorkspace(h);
+      expect((await mcp(h, 'team-a', tokens.access_token)).status).toBe(200);
+      // This process: the admin API clears its cache, so the very next request is refused.
+      const list = (await (await h.adminApi('GET', '/oauth/devices')).json()) as {
+        data: { id: string; userId: string }[];
+      };
+      const device = list.data[0] as { id: string; userId: string };
+      const res = await h.adminApi('POST', `/oauth/devices/${device.id}/revoke`, { userId: device.userId });
+      expect(res.status).toBe(200);
+      expect((await mcp(h, 'team-a', tokens.access_token)).status).toBe(401);
+      expect(
+        (
+          await tokenEndpoint(h, {
+            grant_type: 'refresh_token',
+            refresh_token: tokens.refresh_token as string,
+            client_id: client.client_id,
+          })
+        ).status,
+      ).toBe(400);
+
+      // Another process sharing the store: it leaves the tombstone and deletes the grant and its tokens (what a disconnect
+      // does to storage) but cannot clear this process's cache.
+      const second = await connectWorkspace(h);
+      expect((await mcp(h, 'team-a', second.tokens.access_token)).status).toBe(200);
+      const [key] = await h.storage.kv.list('oauth:grant:');
+      const [, userId, grantId] = /^oauth:grant:([^:]+):([^:]+)$/.exec(key as string) as RegExpExecArray;
+      await h.storage.kv.set(`oauth-revoked:${userId}:${grantId}`, '1', {
+        expiresAt: Date.now() + 3_600_000,
+      });
+      await h.storage.kv.deletePrefix(`oauth:grant:${userId}:${grantId}`);
+      await h.storage.kv.deletePrefix(`oauth:token:${userId}:${grantId}:`);
+      // The refresh path has no cache: it fails at once.
+      const refused = await tokenEndpoint(h, {
+        grant_type: 'refresh_token',
+        refresh_token: second.tokens.refresh_token as string,
+        client_id: second.client.client_id,
+      });
+      expect(refused.status).toBe(400);
+      // The access token is served from the cache for the rest of its lifetime (at most the TTL)...
+      expect((await mcp(h, 'team-a', second.tokens.access_token)).status).toBe(200);
+      // ...and not a moment after.
+      h.advance(31_000);
+      await expectDenied(h, 'team-a', second.tokens.access_token, 'oauth_invalid');
     });
   });
 }

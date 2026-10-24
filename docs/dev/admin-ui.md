@@ -230,6 +230,11 @@ The audit viewer and the connect page are above; the owner-only unbind (P4-12) i
   forwards `next` only when it matches `TOKEN_CURSOR_RE`, and the screen forwards `after`, `grant` and `user` only when they have
   the shape the API accepts (anything else is the first page). Revoke posts to the grant's own revoke route (one confirmation
   page, one implementation). There is no `previous`: keyset lists offer *Newest entries* (`Pager first`).
+- **Connected apps and OAuth apps** (P5-08): `screens/oauth-admin.tsx`, own parsers (`parseOAuthAdminDevicePage`,
+  `parseOAuthClientPage`, cursors checked by `OAUTH_DEVICE_CURSOR_RE` and `OAUTH_CLIENT_ID_RE`). Devices need `admin`, clients
+  `owner` (also for the posts); the API decides again. A `404` from the API (OAuth off) renders an explanation page, not an
+  error. Every name is text in a `mono` span, never a link; the revoke of a client sits behind `ConfirmAction`, the
+  disconnect of a device is a `POST` form with the person's id as a hidden field.
 - **Number prefixes**: `GET/POST /admin/instances/{id}/prefixes` in `screens/instances.tsx`; `parsePrefixText` checks only the
   shape (one `=`, no repeated type, at most 64 lines), the rules (`ASSET_TYPE_NAME_RE`, `NUMBER_PREFIX_RE`) are the admin API's
   and shown as its 422 sentence. Only a changed value is sent, empty clears (`null`). `TextAreaField` is the multi-line field.
