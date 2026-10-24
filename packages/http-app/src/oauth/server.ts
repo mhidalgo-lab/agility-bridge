@@ -280,6 +280,7 @@ export interface OAuthOptions {
   readonly registrationRedirectHosts?: readonly string[];
   /** Lifetime of a registration that never exchanged a code, seconds (1 h - 7 d). Default 24 h. */
   readonly registrationUnusedTtlSeconds?: number;
+  /**
    * Seconds in which a refresh token that was just spent is answered with the same successor again (parallel refreshes,
    * a lost response), 0-120, not longer than the access lifetime. Default 30; 0 = strict single use. A repeat after the
    * window revokes the device (P5-05).

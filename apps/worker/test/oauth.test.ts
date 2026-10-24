@@ -203,6 +203,6 @@ describe('OAuth settings on the shipped Worker', () => {
     ).rejects.toThrow(/D1 binding/);
     await expect(
       boot({ AB_OAUTH: 'off', AB_OAUTH_REFRESH_REUSE_WINDOW: '500' } as never, '0.0.0-test'),
-    ).rejects.toThrow(BootError);
+    ).rejects.toThrow(/AB_OAUTH_REFRESH_REUSE_WINDOW/);
   });
 });
