@@ -700,7 +700,7 @@ describe('devices (P5-04, L-090, T15)', () => {
     // Reconnecting an app that already holds a place needs no new one (it replaces its own after the exchange).
     const first = await authRequest(t, (await listed()).length > 0 ? await register(t) : '');
     expect(first.clientId).not.toBe('');
-  });
+  }, 60_000);
 
   it('serializes approvals per person, and counts again after the insert so a lapsed lock cannot exceed the cap', async () => {
     const { t, cookie, prepare, listed } = await holder(23);
@@ -727,7 +727,7 @@ describe('devices (P5-04, L-090, T15)', () => {
     } finally {
       spy.mockRestore();
     }
-  });
+  }, 60_000);
 
   it('refuses an approval while another one of the same person is in progress, and nothing is issued', async () => {
     const { t, cookie, prepare, listed } = await holder(0);

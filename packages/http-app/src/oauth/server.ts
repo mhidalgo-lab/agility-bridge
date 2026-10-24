@@ -1124,9 +1124,12 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
             const ranked = (await allGrants(helpers, userId))
               .filter((g) => g.id === newId || !sameApp(g, ref))
               .sort(byAge);
-            const rank = ranked.findIndex((g) => g.id === newId);
-            if (rank < 0 || rank >= MAX_OAUTH_DEVICES_PER_USER) {
-              await revokeFamily(userId, newId, helpers);
+            // Whoever sees the overflow undoes it for everyone: a check that ran before the last insert cannot have seen
+            // it, so the later one also revokes the grants past the cap (their approvals already answered; their codes
+            // then fail at the exchange).
+            const over = ranked.slice(MAX_OAUTH_DEVICES_PER_USER);
+            for (const g of over) await revokeFamily(userId, g.id, helpers);
+            if (over.some((g) => g.id === newId) || !ranked.some((g) => g.id === newId)) {
               return refused('device_limit');
             }
           } finally {
