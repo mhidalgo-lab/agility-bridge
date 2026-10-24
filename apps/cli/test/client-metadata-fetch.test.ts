@@ -47,10 +47,12 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => vo
   },
 };
 
+const routes = new Map(Object.entries(handlers));
+
 beforeAll(async () => {
   server = createServer((req, res) => {
     seen.push({ url: req.url ?? '', accept: req.headers['accept'], method: req.method });
-    (handlers[req.url ?? ''] ?? ((_r, s) => s.writeHead(404).end()))(req, res);
+    (routes.get(req.url ?? '') ?? ((_r, s) => s.writeHead(404).end()))(req, res);
   });
   server.on('connection', (s) => {
     sockets.add(s);
