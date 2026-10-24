@@ -43,6 +43,11 @@ Normal use is a handful of writes per connected app. The Free plan allows 100,00
 minutes (authorize 30, token failures 20 and consent 30, each on two counters) and the deployment-wide caps bound the sum. The cron
 sweeps 20 unused registrations per run (one read each, at most 50 D1 queries per run together with the purge).
 
+The panel's **Connected apps** and **OAuth apps** pages (P5-08) read one database row per app they show: ten apps a page, and
+the device counts of the OAuth apps page read at most 100 grants (the page says "at least" beyond that, or "unknown" when
+the plan's 50 queries per request run out). Revoking a client reads at most 1,000 grants; the client is blocked first, so a
+cut-short revoke still refuses everything and pressing it again ends the rest.
+
 ## Where usage shows
 
 - **Audit log**: every tool call's row holds `agilityRequests`, the requests it used (`GET /api/admin/v1/audit`,

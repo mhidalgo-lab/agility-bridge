@@ -2,7 +2,7 @@
 id: P5-08
 title: "Admin: connected apps and devices"
 phase: 5
-status: in-progress
+status: review
 priority: medium
 depends_on: [P5-05]
 adr: ["0009", "0013"]
@@ -62,20 +62,42 @@ new is authorized. Disconnecting always takes effect within the access-cache lif
   reference, `docs/guide/cloudflare-limits.md` (the bounded reads), a changeset.
 
 ## Acceptance criteria
-- [ ] Owners and admins list every person's connected apps and disconnect one; an admin cannot end an owner's or an
+- [x] Owners and admins list every person's connected apps and disconnect one; an admin cannot end an owner's or an
   admin's device; a member, an unauthenticated caller and the break-glass token's absence are refused with no data and no
   effect; a device under another person's id is 404 and stays connected.
-- [ ] Owners list registered clients (kind, escaped name, redirect hosts, dates, device counts) and revoke one: its
+- [x] Owners list registered clients (kind, escaped name, redirect hosts, dates, device counts) and revoke one: its
   devices' access and refresh tokens end, a new authorization, token request and refresh are refused, the record is gone;
   a metadata-document client can be allowed again; admins and members get nothing.
-- [ ] Every change is a POST through the panel's CSRF, `Origin` and fetch-metadata checks; a GET, a missing or wrong
+- [x] Every change is a POST through the panel's CSRF, `Origin` and fetch-metadata checks; a GET, a missing or wrong
   CSRF token and a cross-site post change nothing; audit rows exist and hold no token material.
-- [ ] Disconnect: the refresh fails immediately; the access token stops working within the access-cache TTL (tested with
+- [x] Disconnect: the refresh fails immediately; the access token stops working within the access-cache TTL (tested with
   a second process sharing the store) and at once in the process that revoked.
-- [ ] Hostile client, device and person names render inert at 1280 and 320 px (E2E), the CSP holds, axe is clean.
-- [ ] The admin suite runs on memory (both shapes), SQLite and workerd/D1; negative authorization tests for every route;
+- [x] Hostile client, device and person names render inert at 1280 and 320 px (E2E), the CSP holds, axe is clean.
+- [x] The admin suite runs on memory (both shapes), SQLite and workerd/D1; negative authorization tests for every route;
   security tests are mutation-checked (L-121), recorded under Outcome.
-- [ ] Docs, THREAT_MODEL, decisions D-74 and D-75, lessons and a changeset are done.
+- [x] Docs, THREAT_MODEL, decisions D-74 and D-75, lessons and a changeset are done.
+
+## Outcome
+- Built as scoped. Decisions D-74 (a revoked dynamic client may register again as a new client; a revoked metadata-document
+  client stays refused until allowed) and D-75 (owners and admins list devices; an admin ends a member's, an owner anyone's;
+  clients are owners') are built at the recommended default. Lessons L-259 to L-261. No new task files were needed.
+- Deviation from the brief: "last used" of a client is "last approved" (newest approval among its devices) because no per-token
+  last-used time exists until P5-14; the column says so.
+- Cache proof: the second process is simulated by changing the shared store (tombstone, grant and token rows) without
+  clearing the cache, in `defineOAuthCacheSuite` (memory only: time cannot move on SQLite or workerd). Refresh failing at once
+  and the revoking process refusing at once are asserted in the same test.
+- Tests: `admin-suite.ts` (7 cases) on memory (both shapes), SQLite and workerd/D1; `admin-oauth.test.ts` (9 cases: roles, 401,
+  CSRF, cross-site, GET, panel forms, hostile names, OAuth off); role-matrix rows; E2E `oauth-consent.spec.ts` new test at
+  1280 and 320 px (axe, no horizontal scroll, CSP watch) passed in local Chromium; ZAP (`pnpm scan:zap`, with `AB_OAUTH=on`
+  added to its server) ran: login, admin and API scans each 0 new alerts, no `.zap/rules.tsv` change.
+- Mutation checks (L-121), each reverted: devices list without a role check (killed, 2 failing), admin may end an owner's or an
+  admin's device (1), device revoke without any role check (1), clients open to admins (1), revoke route / clients route /
+  device list skipping the guard (2 each), device revoke ending no tokens (3), client revoke writing no block (4), block not
+  checked at authorize and token (6), at the MCP route (2), client revoke keeping the record (2), ending no devices (survived
+  first, killed after asserting the device list afterwards: 2), device found without matching the person (2), panel Disconnect
+  offered to everyone (1). Survived, equivalent: block not checked in the refresh issuance check (the token endpoint refuses
+  the blocked client earlier in `resolveClient`; kept as a second line), and the panel's own role gate on the clients page and
+  its revoke form (the admin API refuses an admin anyway; kept as a first line).
 
 ## Security notes
 THREAT_MODEL T15 (device and client revocation), §8e; T9 and T10 touched (a revoked client stays refused); T3, T21, T23

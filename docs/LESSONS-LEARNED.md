@@ -33,7 +33,7 @@ How to use it:
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-258 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-261 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -1314,6 +1314,26 @@ protection (the sum of failures is bounded) without turning it into a denial of 
 guard a shared resource and cannot work this way (authorize, consent, registration) are documented as deployment-wide, with
 the setting that raises them.
 *Applied in:* P5-09, `abuse.ts` (`blocked`).
+
+**L-259 — Revoke the principal first, then its parts, and make every path look at the revocation.**
+Ending a client means ending many devices, and a store without transactions can stop halfway (a timeout, a plan's query
+limit). Writing the block on the client before touching anything, and having authorization, the token endpoint, the
+refresh check and the resource route all read it, turns a half-finished revoke into a finished refusal; pressing the button
+again only tidies up. A revoke that works from the leaves up leaves a window in which the rest still works.
+*Applied in:* P5-08, `server.ts` (`revokeClient`, `isBlocked`).
+
+**L-260 — The cache lifetime is the disconnect promise: say it, and test both sides of it.**
+"Disconnect takes effect within N seconds" is true only where the cache is cleared at once (the process that revoked) and
+where it ends by itself (every other process). Test it by changing the shared store without clearing the cache: the token
+still works inside the lifetime and not a moment after, and the path that has no cache (refresh) fails immediately.
+Documenting only "at once" would be a lie on every second replica.
+*Applied in:* P5-08, `defineOAuthCacheSuite`.
+
+**L-261 — A list across people over storage keyed by person needs its own read budget, and its counts must degrade.**
+The provider keys grants by person, so "every device" or "devices per client" is a scan, one read per record. Page the list
+by a cursor over the key order, cap the pages and the counting scan to what the cheapest plan allows, say "at least" when the
+cap was hit and "unknown" when the reads fail, and never let a decoration (a count) take the page down.
+*Applied in:* P5-08, `allDevices`, `clients`.
 
 ## Q. Testing, evals and live verification
 

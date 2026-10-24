@@ -76,6 +76,49 @@ export interface AdminOAuthDevices {
   revokeAll(c: Context, userId: string): Promise<number>;
 }
 
+/** Every person's OAuth apps and the registered clients (P5-08): what the `/oauth/*` routes use. Callers are authorized before these run. */
+export interface AdminOAuthAdmin {
+  devices(page: { readonly after?: string; readonly limit?: number }): Promise<{
+    readonly devices: readonly {
+      readonly id: string;
+      readonly userId: string;
+      readonly clientName: string | null;
+      readonly redirectHost: string;
+      readonly workspaceId: string | null;
+      readonly label: string | null;
+      readonly createdAt: number;
+      readonly expiresAt: number | null;
+    }[];
+    readonly next: string | null;
+  }>;
+  revokeDevice(c: Context, userId: string, deviceId: string, by: string | null): Promise<boolean>;
+  clients(page: { readonly after?: string; readonly limit?: number }): Promise<{
+    readonly clients: readonly {
+      readonly clientId: string;
+      readonly kind: 'dynamic' | 'metadata_document';
+      readonly name: string | null;
+      readonly redirectHosts: readonly string[];
+      readonly createdAt: number | null;
+      readonly lastApprovedAt: number | null;
+      readonly devices: number | null;
+    }[];
+    readonly blocked: readonly {
+      readonly clientId: string;
+      readonly kind: 'dynamic' | 'metadata_document';
+      readonly name: string | null;
+      readonly at: number;
+    }[];
+    readonly next: string | null;
+    readonly devicesTruncated: boolean;
+  }>;
+  revokeClient(
+    c: Context,
+    clientId: string,
+    by: string | null,
+  ): Promise<{ readonly devices: number; readonly complete: boolean } | null>;
+  restoreClient(c: Context, clientId: string, by: string | null): Promise<boolean>;
+}
+
 export interface AdminApiOptions {
   readonly services: AccessServices;
   readonly storage: Storage;
@@ -106,6 +149,8 @@ export interface AdminApiOptions {
   readonly setupLinks?: { readonly publicUrl: string };
   /** OAuth is on (P5-04): the signed-in person's connected apps. Absent = the `/me/oauth-devices` routes answer 404. */
   readonly oauthDevices?: AdminOAuthDevices;
+  /** OAuth is on (P5-08): every person's apps and the registered clients. Absent = the `/oauth/*` routes answer 404. */
+  readonly oauthAdmin?: AdminOAuthAdmin;
 }
 
 /** A request the admin API refuses before any handler (the reason is audited, never the token). */
@@ -1451,6 +1496,220 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
         throw new AdminError('not_found', 'No such connected app.');
       }
       return { revoked: true as const };
+    },
+  );
+  // Connected apps of everyone and registered clients (P5-08, THREAT_MODEL T15). The guard runs first: a refused caller
+  // learns nothing, not even whether OAuth is on. Every change is a POST (L-090) with the panel's CSRF checks and an audit row.
+  const oauthTag = { tag: 'oauth' };
+  const OAuthAdminDeviceOut = z
+    .object({
+      id: z
+        .string()
+        .openapi({ description: 'The device id (send it with `userId` to `/oauth/devices/{id}/revoke`).' }),
+      userId: z.string(),
+      userEmail: z.string().nullable(),
+      userName: z.string().nullable(),
+      userRole: z.enum(['owner', 'admin', 'member']).nullable(),
+      clientName: z
+        .string()
+        .nullable()
+        .openapi({ description: 'The name the app gave itself: untrusted text, never verified.' }),
+      redirectHost: z.string(),
+      workspaceId: z.string().nullable(),
+      workspaceName: z.string().nullable(),
+      workspaceSlug: z.string().nullable(),
+      label: z.string().nullable(),
+      createdAt: z.number(),
+      expiresAt: z.number().nullable(),
+    })
+    .openapi('OAuthAdminDevice');
+  const OAuthClientOut = z
+    .object({
+      clientId: z.string(),
+      kind: z.enum(['dynamic', 'metadata_document']),
+      name: z
+        .string()
+        .nullable()
+        .openapi({ description: 'Untrusted text the client chose; never verified.' }),
+      redirectHosts: z.array(z.string()),
+      createdAt: z.number().nullable(),
+      lastApprovedAt: z.number().nullable().openapi({
+        description: 'The newest approval among the devices counted (not the last time a token was used).',
+      }),
+      devices: z.number().nullable().openapi({ description: 'Null when the count could not be made.' }),
+    })
+    .openapi('OAuthClient');
+  const oauthAdmin = (): AdminOAuthAdmin => {
+    const admin = options.oauthAdmin;
+    if (admin === undefined) throw new AdminError('not_found', 'OAuth is not enabled on this server.');
+    return admin;
+  };
+  const actorUserId = (c: Context): string | null => {
+    const actor = c.get('actor' as never) as Actor;
+    return actor.kind === 'user' ? actor.userId : null;
+  };
+  const DEVICE_CURSOR_RE = /^[A-Za-z0-9_-]{1,128}:[A-Za-z0-9_-]{16}$/;
+  const CLIENT_CURSOR_RE = /^[\x21-\x7e]{1,512}$/;
+  const OAuthDeviceListQuery = z.object({
+    after: z.string().regex(DEVICE_CURSOR_RE).optional(),
+    limit: z.coerce.number().int().min(1).max(50).optional(),
+  });
+  const OAuthClientListQuery = z.object({
+    after: z.string().regex(CLIENT_CURSOR_RE).optional(),
+    limit: z.coerce.number().int().min(1).max(25).optional(),
+  });
+  const ClientIdBody = z.strictObject({ clientId: z.string().regex(CLIENT_CURSOR_RE) });
+  add(
+    {
+      method: 'get',
+      path: '/oauth/devices',
+      ...oauthTag,
+      summary:
+        "Every person's connected OAuth apps, one page at a time in storage order (owners and admins; 404 when OAuth is off). Never a token",
+      query: OAuthDeviceListQuery,
+      out: z.object({
+        data: z.array(OAuthAdminDeviceOut),
+        next: z
+          .string()
+          .nullable()
+          .openapi({ description: 'Pass as `after` for the next page; null on the last.' }),
+      }),
+    },
+    async (c, { query }) => {
+      services(c).oauth.authorizeDeviceList();
+      const admin = oauthAdmin();
+      const q = query as z.infer<typeof OAuthDeviceListQuery>;
+      const page = await admin.devices({
+        ...(q.after === undefined ? {} : { after: q.after }),
+        ...(q.limit === undefined ? {} : { limit: q.limit }),
+      });
+      const [people, spaces] = await Promise.all([
+        options.storage.users.list(),
+        options.storage.workspaces.list(),
+      ]);
+      const byUser = new Map(people.map((u) => [u.id, u]));
+      const bySpace = new Map(spaces.map((w) => [w.id, w]));
+      return {
+        data: page.devices.map((d) => {
+          const u = byUser.get(d.userId);
+          const w = bySpace.get(d.workspaceId ?? '');
+          return {
+            ...d,
+            userEmail: u?.email ?? null,
+            userName: u?.displayName ?? null,
+            userRole: u?.role ?? null,
+            workspaceName: w?.name ?? null,
+            workspaceSlug: w?.slug ?? null,
+          };
+        }),
+        next: page.next,
+      };
+    },
+  );
+  add(
+    {
+      method: 'post',
+      path: '/oauth/devices/{id}/revoke',
+      ...oauthTag,
+      params: true,
+      summary:
+        "Disconnect one person's app: its access and refresh tokens stop working at once (owners: anyone's; admins: a member's). An unknown device answers 404",
+      body: z.strictObject({ userId: Id }),
+      out: z.object({ revoked: z.literal(true) }),
+      audit: { action: 'oauth_device.revoke', targetType: 'oauth_device' },
+      auditBody: ['userId'],
+    },
+    async (c, { id, body }) => {
+      const { userId } = body as { userId: string };
+      await services(c).oauth.authorizeDeviceRevoke(userId);
+      const admin = oauthAdmin();
+      if (!DEVICE_ID_RE.test(id) || !(await admin.revokeDevice(c, userId, id, actorUserId(c)))) {
+        throw new AdminError('not_found', 'No such connected app.');
+      }
+      return { revoked: true as const };
+    },
+  );
+  add(
+    {
+      method: 'get',
+      path: '/oauth/clients',
+      ...oauthTag,
+      summary:
+        'Registered OAuth clients (dynamic registrations and metadata documents) and revoked ones, a page at a time (owners; 404 when OAuth is off)',
+      query: OAuthClientListQuery,
+      out: z.object({
+        data: z.array(OAuthClientOut),
+        blocked: z.array(
+          z.object({
+            clientId: z.string(),
+            kind: z.enum(['dynamic', 'metadata_document']),
+            name: z.string().nullable(),
+            at: z.number(),
+          }),
+        ),
+        next: z.string().nullable(),
+        devicesTruncated: z.boolean().openapi({
+          description: 'More devices exist than were counted: the counts are lower bounds.',
+        }),
+      }),
+    },
+    async (c, { query }) => {
+      services(c).oauth.authorizeClients();
+      const admin = oauthAdmin();
+      const q = query as z.infer<typeof OAuthClientListQuery>;
+      const page = await admin.clients({
+        ...(q.after === undefined ? {} : { after: q.after }),
+        ...(q.limit === undefined ? {} : { limit: q.limit }),
+      });
+      return {
+        data: page.clients,
+        blocked: page.blocked,
+        next: page.next,
+        devicesTruncated: page.devicesTruncated,
+      };
+    },
+  );
+  add(
+    {
+      method: 'post',
+      path: '/oauth/clients/revoke',
+      ...oauthTag,
+      summary:
+        'Revoke an OAuth client (owners): no new authorization, no refresh and no access token of it passes, its devices end and its registration is deleted. A new registration is a new client',
+      body: ClientIdBody,
+      out: z.object({ id: z.string(), revoked: z.literal(true), devices: z.number(), complete: z.boolean() }),
+      audit: { action: 'oauth_client.revoke', targetType: 'oauth_client' },
+      auditBody: ['clientId'],
+    },
+    async (c, { body }) => {
+      services(c).oauth.authorizeClients();
+      const admin = oauthAdmin();
+      const { clientId } = body as { clientId: string };
+      const result = await admin.revokeClient(c, clientId, actorUserId(c));
+      if (result === null) throw new AdminError('not_found', 'No such client.');
+      return { id: clientId, revoked: true as const, ...result };
+    },
+  );
+  add(
+    {
+      method: 'post',
+      path: '/oauth/clients/restore',
+      ...oauthTag,
+      summary:
+        'Lift the revocation of a client (owners): a metadata-document client may be used again, a deleted dynamic registration does not come back',
+      body: ClientIdBody,
+      out: z.object({ id: z.string(), restored: z.literal(true) }),
+      audit: { action: 'oauth_client.restore', targetType: 'oauth_client' },
+      auditBody: ['clientId'],
+    },
+    async (c, { body }) => {
+      services(c).oauth.authorizeClients();
+      const admin = oauthAdmin();
+      const { clientId } = body as { clientId: string };
+      if (!(await admin.restoreClient(c, clientId, actorUserId(c)))) {
+        throw new AdminError('not_found', 'That client is not revoked.');
+      }
+      return { id: clientId, restored: true as const };
     },
   );
   add(

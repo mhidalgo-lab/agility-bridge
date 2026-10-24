@@ -75,6 +75,16 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | `POST` | `/me/oauth-devices/{id}/revoke` | Disconnect one of my apps: its access and refresh tokens stop working at once (another person's device answers 404) | — | 200 object |
 | `GET` | `/me/audit` | My recent administrative changes (newest first, at most 50) | — | 200 AuditEntry[] |
 
+## oauth
+
+| Method | Path | What | Body | Response |
+|---|---|---|---|---|
+| `GET` | `/oauth/devices` | Every person's connected OAuth apps, one page at a time in storage order (owners and admins; 404 when OAuth is off). Never a token | — | 200 object |
+| `POST` | `/oauth/devices/{id}/revoke` | Disconnect one person's app: its access and refresh tokens stop working at once (owners: anyone's; admins: a member's). An unknown device answers 404 | `userId`: string | 200 object |
+| `GET` | `/oauth/clients` | Registered OAuth clients (dynamic registrations and metadata documents) and revoked ones, a page at a time (owners; 404 when OAuth is off) | — | 200 object |
+| `POST` | `/oauth/clients/revoke` | Revoke an OAuth client (owners): no new authorization, no refresh and no access token of it passes, its devices end and its registration is deleted. A new registration is a new client | `clientId`: string | 200 object |
+| `POST` | `/oauth/clients/restore` | Lift the revocation of a client (owners): a metadata-document client may be used again, a deleted dynamic registration does not come back | `clientId`: string | 200 object |
+
 ## session
 
 | Method | Path | What | Body | Response |
@@ -131,6 +141,8 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 - **Instance**: `id`: string, `label`: string, `baseUrl`: string, `tls`: object \| null, `numberPrefixes`: object \| null, `metaFingerprint`: string \| null, `createdAt`: number, `updatedAt`: number, `disabledAt`: number \| null
 - **KeyVersion**: `version`: number, `credentials`: number, `loaded`: boolean, `current`: boolean, `retired`: boolean
 - **MyGrant**: `grant`: Grant, `workspace`: object \| null
+- **OAuthAdminDevice**: `id`: string, `userId`: string, `userEmail`: string \| null, `userName`: string \| null, `userRole`: "owner" \| "admin" \| "member" \| null, `clientName`: string \| null, `redirectHost`: string, `workspaceId`: string \| null, `workspaceName`: string \| null, `workspaceSlug`: string \| null, `label`: string \| null, `createdAt`: number, `expiresAt`: number \| null
+- **OAuthClient**: `clientId`: string, `kind`: "dynamic" \| "metadata_document", `name`: string \| null, `redirectHosts`: string[], `createdAt`: number \| null, `lastApprovedAt`: number \| null, `devices`: number \| null
 - **OAuthDevice**: `id`: string, `clientName`: string \| null, `redirectHost`: string, `workspaceId`: string \| null, `workspaceName`: string \| null, `workspaceSlug`: string \| null, `label`: string \| null, `createdAt`: number, `expiresAt`: number \| null
 - **Session**: `actor`: "session" \| "break_glass" \| "user", `user`: object \| null, `recentAuth`: boolean, `signedInAt`: number \| null, `idleExpiresAt`: number \| null, `expiresAt`: number \| null, `csrfToken`: string \| null
 - **SetupLink**: `id`: string, `url`: string, `expiresAt`: number

@@ -144,3 +144,27 @@
   shared office address (a 10-person team connecting at once is well within 30 per ten minutes) while the deployment caps stop
   sustained floods at a bounded number of writes. Raise `AB_OAUTH_*_LIMIT` for a large organisation behind one address.
 - **Owner:** _pending_ (implemented as (a)).
+
+### D-74 — A revoked dynamic client may register again, as a new client; a revoked metadata-document client stays refused until allowed *(P5-08)*
+- **Context:** an owner revokes an OAuth client that turned out to be hostile or abandoned. A dynamic client's id is chosen by
+  the server, so an app that registers again is a different client with a new random id; a metadata-document client's id is
+  its public URL, so the same app can present itself again at once.
+- **Options:** (a) revoke the id (block row, record deleted, devices ended); dynamic registration stays open and the owner
+  may switch it off (`AB_OAUTH_DCR=off`) or narrow redirect hosts; a document client stays blocked until the owner restores
+  it; (b) also block by name or redirect host (cheap to evade, and it would block honest apps that share a host such as
+  `127.0.0.1`); (c) revoking a dynamic client turns dynamic registration off until the owner turns it back on.
+- **Recommendation:** (a). Names are unverified and loopback hosts are shared by every desktop app, so blocking on them
+  hurts honest users and stops no one; the real controls for a hostile registrant are the consent screen, the redirect host
+  allowlist and the caps of P5-03 and P5-09. The block of a dynamic client expires once every token it could hold has.
+- **Owner:** _pending_ (implemented as (a)).
+
+### D-75 — Who may see and end other people's connected apps, and who sees clients *(P5-08)*
+- **Context:** ending a device only removes access, but seeing everyone's apps shows who works with which workspace, and a
+  client is shared by the whole server.
+- **Options:** (a) owners and admins list everyone's devices; an owner ends anyone's, an admin a member's (and their own),
+  the same rule as ending sessions; clients are the owners' only; (b) owners only for everything; (c) admins also end
+  owners' and admins' devices.
+- **Recommendation:** (a): it follows the panel's existing role model (admins manage members, owners everyone), needs no new
+  concept, and keeps an admin from cutting an owner's access. No recent sign-in is asked: disconnecting only removes access
+  (L-093).
+- **Owner:** _pending_ (implemented as (a)).

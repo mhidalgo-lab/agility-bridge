@@ -5,10 +5,11 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { accessServices, generateMasterKey, Keyring } from '@agility-bridge/auth';
+import { accessServices, generateAdminToken, generateMasterKey, Keyring } from '@agility-bridge/auth';
 import { CORE_TOOLS } from '@agility-bridge/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { defineOAuthAbuseSuite } from '../../../packages/http-app/test/oauth/abuse-suite.ts';
+import { defineOAuthAdminSuite } from '../../../packages/http-app/test/oauth/admin-suite.ts';
 import { defineOAuthClientSuite } from '../../../packages/http-app/test/oauth/clients-suite.ts';
 import { testConsent } from '../../../packages/http-app/test/oauth/consent.ts';
 import { createFakeDocuments } from '../../../packages/http-app/test/oauth/documents.ts';
@@ -34,6 +35,7 @@ async function sqliteHost(shape?: RefreshHostShape): Promise<OAuthHost> {
   const key = generateMasterKey(1);
   writeFileSync(join(dir, 'master.key'), key, { mode: 0o600 });
   const lines: string[] = [];
+  const adminToken = generateAdminToken();
   const documents = createFakeDocuments();
   const running = await startServe(
     {
@@ -42,6 +44,7 @@ async function sqliteHost(shape?: RefreshHostShape): Promise<OAuthHost> {
       AB_PORT: '0',
       AB_PUBLIC_URL: ORIGIN,
       AB_OAUTH: 'on',
+      AB_ADMIN_TOKEN: adminToken,
       ...(shape === undefined ? {} : { AB_OAUTH_REFRESH_REUSE_WINDOW: String(shape.reuseWindowSeconds) }),
       AB_ACCESS_CACHE_TTL: '0',
       AB_ALLOW_HTTP_INSTANCES: 'on',
@@ -128,6 +131,19 @@ async function sqliteHost(shape?: RefreshHostShape): Promise<OAuthHost> {
           }
         })
         .join('\n'),
+    adminApi: (method, path, body) =>
+      Promise.resolve(
+        running.app.fetch(
+          new Request(`${ORIGIN}/api/admin/v1${path}`, {
+            method,
+            headers: {
+              authorization: `Bearer ${adminToken}`,
+              ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+            },
+            ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+          }),
+        ),
+      ),
     address: (ip) => ({ 'x-forwarded-for': ip }),
     // No `advance`: the SQLite storage reads its clock when it opens, so a mocked clock cannot expire its rows.
     close: async () => {
@@ -144,6 +160,7 @@ async function sqliteHost(shape?: RefreshHostShape): Promise<OAuthHost> {
 defineOAuthSuite('SQLite storage (agility-bridge serve)', () => sqliteHost());
 defineRefreshFamilySuite('SQLite storage (agility-bridge serve)', sqliteHost);
 defineOAuthClientSuite('SQLite storage (agility-bridge serve)', sqliteHost);
+defineOAuthAdminSuite('SQLite storage (agility-bridge serve)', sqliteHost);
 defineOAuthAbuseSuite('SQLite storage (agility-bridge serve)', sqliteHost);
 
 describe('OAuth settings on the shipped host', () => {
