@@ -2,7 +2,7 @@
 id: P5-02
 title: Protected resource metadata per workspace
 phase: 5
-status: review
+status: done
 priority: high
 depends_on: [P5-01]
 adr: ["0009"]
