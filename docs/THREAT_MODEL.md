@@ -243,7 +243,22 @@ can turn it on before the consent screen (P5-04).
 | T21 | verified | No request data in module state; provider objects hold configuration only; the suites also run per-request-isolated and on workerd |
 | T25 | implemented | Opaque ids only in grant metadata (the access grant id); props encrypted; no email in any key or value (asserted) |
 
-Residual: registration is uncapped until P5-03 and P5-09; `AB_OAUTH=on` is refused until P5-04.
+Residual: `AB_OAUTH=on` is refused until P5-04.
+
+## 8e. Status after P5-03 (2026-10-24)
+
+Client registration ([dev/oauth.md](dev/oauth.md#client-registration-p5-03)): Client ID Metadata Documents and dynamic
+registration, both with caps. Still unreachable before P5-04.
+
+| Id | Status | Evidence |
+|---|---|---|
+| T9 | verified (redirects) | Document clients keep only https on their own host and loopback http; dynamic clients: no wildcard, fragment, userinfo, remote http, IP literal or code-running scheme, private-use schemes dropped (D-69), optional host allowlist; unusable callbacks are removed before storage, and a callback outside the list is refused before any redirect (suites on memory, SQLite, D1) |
+| T10 | implemented (caps) | Dynamic registration: per address and hour (default 10, atomic, hashed address) checked first, then live registrations per deployment (default 200), `429` with `Retry-After`, first refusal per window audited; unused registrations expire in 24 h; only allowlisted fields stored. Documents: stored clients capped (200). P5-09 tunes and adds flood tests; one source cannot use up the deployment cap (relic-bridge M1); the cap itself can still be filled by many addresses for a day (accepted, `AB_OAUTH_DCR=off` closes it) |
+| T11 | verified (CIMD) | The client id is checked before any fetch (canonical https URL, DNS name only, no IP literal in any spelling, no internal suffix, no port, not ourselves); fetch: no redirects, 5 s, 5 KiB declared and streamed, JSON only, `client_id` must equal the URL; Node refuses every non-public address at connect time (all lookup answers, address literals before DNS, tested with loopback, private, CGNAT, link-local and metadata, mapped, NAT64, 6to4, ULA, a mixed answer and a changing answer); Workers need `global_fetch_strictly_public` or CIMD stays off; per-address fetch budget (20 an hour) and a cap on stored documents; errors never cached; the refusal text names nothing |
+| T20 | partly verified | `/oauth/register` and the fetch path are behind the per-IP limiter plus the caps above; flood tests are P5-09 |
+| T25 | implemented | Counters are keyed by a hash of the address; audit rows carry client id, host and reason only |
+
+Residual: a client name is untrusted text: P5-04 must escape it and mark dynamic clients unverified.
 
 ## 8e. Status after P5-04 (2026-10-24)
 

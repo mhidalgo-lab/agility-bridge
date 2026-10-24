@@ -29,6 +29,7 @@ import type { Context } from 'hono';
 import { adminTokenAuthenticator } from './admin/api.ts';
 import { createHttpApp, type HostServices, type HttpApp } from './app.ts';
 import { AuditWriter } from './audit.ts';
+import type { ClientMetadataFetch } from './oauth/clients.ts';
 import type { OAuthConsentHandler } from './oauth/server.ts';
 import {
   OAUTH_SETTING_NAMES,
@@ -386,6 +387,11 @@ export interface ServerParts {
    * Node pins it to public addresses at connect time; default: the global `fetch`.
    */
   readonly identityFetch?: FetchLike;
+  /**
+   * The guarded `fetch` for OAuth client metadata documents (P5-03): it must refuse non-public destinations and not follow
+   * redirects (Node: connect-time address check; Workers: `global_fetch_strictly_public`). Absent = CIMD off.
+   */
+  readonly clientMetadataFetch?: ClientMetadataFetch;
   /** Refuses an instance host by throwing (Node: one resolving to a private address, P2-19). */
   readonly checkInstanceHost?: (hostname: string) => Promise<void>;
   /** The tool registry built once (Workers: at module scope, P3-14). */
@@ -488,6 +494,9 @@ export function assembleServer(parts: ServerParts): AssembledServer {
           oauth: {
             ...settings.oauth,
             ...(parts.oauthConsent === undefined ? {} : { consent: parts.oauthConsent }),
+            ...(parts.clientMetadataFetch === undefined
+              ? {}
+              : { clientMetadataFetch: parts.clientMetadataFetch }),
             audit: (event) => audit.oauth(event),
           },
         }),

@@ -6,6 +6,7 @@ import { lookup as dnsLookup, type LookupAddress } from 'node:dns';
 import { readFileSync } from 'node:fs';
 import { rootCertificates } from 'node:tls';
 import { addressClass } from '@agility-bridge/core';
+import type { ClientMetadataFetch } from '@agility-bridge/http-app';
 import { Agent } from 'undici';
 
 export type FetchLike = (request: Request) => Promise<Response>;
@@ -66,6 +67,26 @@ export async function checkPublicHost(hostname: string): Promise<void> {
   await new Promise<void>((resolve, reject) =>
     publicOnlyLookup(host, { all: true }, (error) => (error === null ? resolve() : reject(error))),
   );
+}
+
+/**
+ * The fetcher for OAuth client metadata documents (P5-03, T11): GET with `Accept: application/json` and no redirects
+ * (a 3xx comes back as it is, and the http-app treats it as a failure), through the public-only connect-time guard.
+ * `publicOnly: false` exists for tests that serve a document from a local server; the shipped host never sets it.
+ */
+export function createClientMetadataFetch(
+  options: { readonly publicOnly?: boolean } = {},
+): ClientMetadataFetch {
+  const send = createNodeFetch({ publicOnly: options.publicOnly !== false });
+  return (url, init) =>
+    send(
+      new Request(url, {
+        method: 'GET',
+        headers: { accept: 'application/json' },
+        redirect: 'manual',
+        signal: init.signal,
+      }),
+    );
 }
 
 export function createNodeFetch(options: NodeFetchOptions = {}): FetchLike {

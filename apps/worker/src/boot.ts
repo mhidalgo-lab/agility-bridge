@@ -34,6 +34,7 @@ import {
   settingWarnings,
 } from '@agility-bridge/http-app';
 import { createD1Driver, type D1Database, openSqlStorage, type Storage } from '@agility-bridge/storage';
+import { strictlyPublicClientMetadataFetch } from './cimd-fetch.ts';
 import { BackstopRateLimiter, type RateLimitBinding } from './rate-limit.ts';
 
 /** The Worker's bindings: `DB` (D1), the rate-limit backstops, the secrets and the `AB_*` variables. */
@@ -170,6 +171,17 @@ export async function boot(
     clock: systemClock,
     random: webCryptoRandom,
   };
+  // Client metadata documents (P5-03) only where the platform guarantees a public-only fetch.
+  const clientMetadataFetch = settings.oauth === undefined ? null : strictlyPublicClientMetadataFetch();
+  if (
+    settings.oauth !== undefined &&
+    clientMetadataFetch === null &&
+    settings.oauth.clientMetadataDocuments !== false
+  ) {
+    logger.warn(
+      'OAuth client metadata documents are off: the global_fetch_strictly_public compatibility flag is not set. Dynamic registration still works.',
+    );
+  }
   const { app, services } = assembleServer({
     settings,
     storage,
@@ -190,6 +202,7 @@ export async function boot(
     registry: REGISTRY,
     background: (c, work) => c.executionCtx.waitUntil(work),
     ...(oauthConsent === undefined ? {} : { oauthConsent }),
+    ...(clientMetadataFetch === null ? {} : { clientMetadataFetch }),
     ...(adminVerifier === undefined ? {} : { adminVerifier }),
     ...(preset.ceiling
       ? { ceilings: { callBudget: preset.callBudget, maxResponseBytes: preset.maxResponseBytes } }

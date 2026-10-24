@@ -20,7 +20,9 @@ import {
   startAuthorization,
 } from '@modelcontextprotocol/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { OAuthRegistrations } from '../../src/index.ts';
 import { APPROVE_HEADER } from './consent.ts';
+import type { FakeDocuments } from './documents.ts';
 
 /** What the suite needs from a running server with OAuth on, two workspaces and the users of `world()`. */
 export interface OAuthHost {
@@ -47,38 +49,47 @@ export interface OAuthHost {
   logs(): readonly string[];
   /** The database file's bytes, where there is one (SQLite): for the "no plaintext in a copy" scan. */
   rawDatabase?(): string;
+  /** The fake origin of client metadata documents (P5-03): what the host's guarded fetcher talks to. */
+  readonly documents: FakeDocuments;
+  /** The app's registration hooks (in-process hosts only). */
+  readonly registrations?: OAuthRegistrations;
   /** Moves time (Node hosts, in process); absent in workerd. */
   advance?(ms: number): void;
   close(): Promise<void>;
 }
 
-const REDIRECT = 'http://127.0.0.1:53682/callback';
-const MCP_HEADERS = {
+export const REDIRECT = 'http://127.0.0.1:53682/callback';
+export const MCP_HEADERS = {
   'content-type': 'application/json',
   accept: 'application/json, text/event-stream',
   'mcp-protocol-version': '2025-11-25',
 };
 const LIST = { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} };
-const WHOAMI = { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'whoami', arguments: {} } };
+export const WHOAMI = {
+  jsonrpc: '2.0',
+  id: 2,
+  method: 'tools/call',
+  params: { name: 'whoami', arguments: {} },
+};
 const sha256 = async (text: string): Promise<string> =>
   [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))]
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
-const issOf = (a: { location: URL | null }) => {
+export const issOf = (a: { location: URL | null }) => {
   const iss = a.location?.searchParams.get('iss');
   return iss === null || iss === undefined ? {} : { iss };
 };
 
-const fetchFn = (h: OAuthHost) => (url: string | URL, init?: RequestInit) => h.call(String(url), init);
-const resourceOf = (h: OAuthHost, slug: string) => `${h.origin}/w/${slug}/mcp`;
+export const fetchFn = (h: OAuthHost) => (url: string | URL, init?: RequestInit) => h.call(String(url), init);
+export const resourceOf = (h: OAuthHost, slug: string) => `${h.origin}/w/${slug}/mcp`;
 
-async function metadata(h: OAuthHost): Promise<AuthorizationServerMetadata> {
+export async function metadata(h: OAuthHost): Promise<AuthorizationServerMetadata> {
   const m = await discoverAuthorizationServerMetadata(h.origin, { fetchFn: fetchFn(h) });
   if (m === undefined) throw new Error('no authorization server metadata');
   return m;
 }
 
-async function register(
+export async function register(
   h: OAuthHost,
   over: { redirect?: string; name?: string; confidential?: boolean } = {},
 ): Promise<OAuthClientInformationFull> {
@@ -95,7 +106,7 @@ async function register(
   });
 }
 
-interface Authorized {
+export interface Authorized {
   readonly response: Response;
   readonly location: URL | null;
   readonly code: string | null;
@@ -106,7 +117,7 @@ interface Authorized {
 }
 
 /** The SDK's authorization URL for a workspace, requested as a browser would, approved as `who` says. */
-async function authorize(
+export async function authorize(
   h: OAuthHost,
   client: OAuthClientInformationFull,
   options: {
@@ -148,13 +159,16 @@ async function authorize(
   };
 }
 
-const form = (params: Record<string, string>) => ({
+export const form = (params: Record<string, string>) => ({
   method: 'POST',
   headers: { 'content-type': 'application/x-www-form-urlencoded' },
   body: new URLSearchParams(params).toString(),
 });
-const tokenEndpoint = (h: OAuthHost, params: Record<string, string>, init: RequestInit = form(params)) =>
-  h.call(`${h.origin}/oauth/token`, init);
+export const tokenEndpoint = (
+  h: OAuthHost,
+  params: Record<string, string>,
+  init: RequestInit = form(params),
+) => h.call(`${h.origin}/oauth/token`, init);
 
 const exchangeParams = (a: Authorized, slug = 'team-a', h?: OAuthHost): Record<string, string> => ({
   grant_type: 'authorization_code',
@@ -166,7 +180,7 @@ const exchangeParams = (a: Authorized, slug = 'team-a', h?: OAuthHost): Record<s
 });
 
 /** Authorize and exchange through the SDK; returns the tokens. */
-async function connectWorkspace(
+export async function connectWorkspace(
   h: OAuthHost,
   slug = 'team-a',
   who?: string,
@@ -188,14 +202,14 @@ async function connectWorkspace(
   return { tokens, client: c, a };
 }
 
-const mcp = (h: OAuthHost, slug: string, token: string | null, body: unknown = LIST) =>
+export const mcp = (h: OAuthHost, slug: string, token: string | null, body: unknown = LIST) =>
   h.call(`${h.origin}/w/${slug}/mcp`, {
     method: 'POST',
     headers: { ...MCP_HEADERS, ...(token === null ? {} : { authorization: `Bearer ${token}` }) },
     body: JSON.stringify(body),
   });
 
-async function auditRows(h: OAuthHost, wanted: (row: { action: string }) => boolean, minimum = 1) {
+export async function auditRows(h: OAuthHost, wanted: (row: { action: string }) => boolean, minimum = 1) {
   // Rows are written in the background (and through waitUntil in workerd): wait for them.
   for (let i = 0; i < 100; i++) {
     const rows = (await h.storage.audit.query({ limit: 1000 })).filter(wanted);
@@ -206,7 +220,7 @@ async function auditRows(h: OAuthHost, wanted: (row: { action: string }) => bool
 }
 
 /** Every `kv` row, as text. */
-async function kvText(h: OAuthHost): Promise<string> {
+export async function kvText(h: OAuthHost): Promise<string> {
   const out: string[] = [];
   let after: string | undefined;
   for (;;) {
@@ -266,7 +280,8 @@ export function defineOAuthSuite(name: string, makeHost: () => Promise<OAuthHost
         registration_endpoint: `${h.origin}/oauth/register`,
         code_challenge_methods_supported: ['S256'],
         authorization_response_iss_parameter_supported: true,
-        client_id_metadata_document_supported: false,
+        // Client ID Metadata Documents (P5-03): advertised because every host here has a guarded fetcher.
+        client_id_metadata_document_supported: true,
       });
       expect(m['response_types_supported']).toEqual(['code']);
       expect(m['grant_types_supported']).toEqual(

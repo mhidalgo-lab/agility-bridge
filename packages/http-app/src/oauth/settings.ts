@@ -4,6 +4,14 @@
 //   AB_OAUTH                 on | off (default off): the OAuth 2.1 server (needs AB_PUBLIC_URL, which is the issuer)
 //   AB_OAUTH_ACCESS_TTL      access-token lifetime (default 1h; 60s-24h)
 //   AB_OAUTH_REFRESH_TTL     absolute refresh lifetime of a device authorization (default 30d; 1h-365d)
+//   AB_OAUTH_CIMD            on | off (default on): Client ID Metadata Documents (P5-03); needs a guarded fetcher
+//   AB_OAUTH_CIMD_MAX_CLIENTS   stored document clients at once (default 200; 1-500)
+//   AB_OAUTH_CIMD_FETCH_LIMIT   document fetches one address may cause per hour (default 20; 1-10000)
+//   AB_OAUTH_DCR             on | off (default on): Dynamic Client Registration, RFC 7591 (P5-03, D-68)
+//   AB_OAUTH_DCR_MAX_CLIENTS    live dynamic registrations at once (default 200; 1-500)
+//   AB_OAUTH_DCR_IP_LIMIT       registrations one address may make per hour (default 10; 1-10000)
+//   AB_OAUTH_DCR_REDIRECT_HOSTS comma list: https redirect hosts a dynamic client may use (default: any; loopback always)
+//   AB_OAUTH_DCR_UNUSED_TTL     how long a registration that never exchanged a code lives (default 24h; 1h-7d)
 // Durations: a number of seconds, or a number with s, m, h or d (`90m`, `12h`, `30d`).
 
 /** A refused `AB_OAUTH*` value; `variable` names it for the host's error message. */
@@ -20,6 +28,16 @@ export class OAuthConfigError extends Error {
 export interface OAuthSettings {
   readonly accessTokenTtlSeconds?: number;
   readonly refreshTokenTtlSeconds?: number;
+  /** `AB_OAUTH_CIMD=off`: never resolve a URL `client_id` (default: on when the host can fetch safely). */
+  readonly clientMetadataDocuments?: boolean;
+  readonly clientMetadataMaxClients?: number;
+  readonly clientMetadataFetchLimit?: number;
+  /** `AB_OAUTH_DCR=off`: no `/oauth/register` (default on). */
+  readonly registration?: boolean;
+  readonly registrationMaxClients?: number;
+  readonly registrationIpLimit?: number;
+  readonly registrationRedirectHosts?: readonly string[];
+  readonly registrationUnusedTtlSeconds?: number;
 }
 
 export type OAuthEnv = Readonly<Record<string, string | undefined>>;
@@ -29,6 +47,14 @@ export const OAUTH_SETTING_NAMES: readonly string[] = Object.freeze([
   'AB_OAUTH',
   'AB_OAUTH_ACCESS_TTL',
   'AB_OAUTH_REFRESH_TTL',
+  'AB_OAUTH_CIMD',
+  'AB_OAUTH_CIMD_MAX_CLIENTS',
+  'AB_OAUTH_CIMD_FETCH_LIMIT',
+  'AB_OAUTH_DCR',
+  'AB_OAUTH_DCR_MAX_CLIENTS',
+  'AB_OAUTH_DCR_IP_LIMIT',
+  'AB_OAUTH_DCR_REDIRECT_HOSTS',
+  'AB_OAUTH_DCR_UNUSED_TTL',
 ]);
 
 const DURATION_RE = /^(\d{1,8})([smhd]?)$/;
@@ -54,6 +80,42 @@ function duration(env: OAuthEnv, name: string, min: number, max: number, range: 
   return seconds;
 }
 
+function switchSetting(env: OAuthEnv, name: string): boolean | undefined {
+  const raw = text(env, name)?.toLowerCase();
+  if (raw === undefined) return undefined;
+  if (raw !== 'on' && raw !== 'off') throw new OAuthConfigError(name, `${name} must be on or off.`);
+  return raw === 'on';
+}
+
+function count(env: OAuthEnv, name: string, min: number, max: number): number | undefined {
+  const raw = text(env, name);
+  if (raw === undefined) return undefined;
+  const n = /^\d{1,6}$/.test(raw) ? Number(raw) : Number.NaN;
+  if (!Number.isSafeInteger(n) || n < min || n > max) {
+    throw new OAuthConfigError(name, `${name} must be a whole number between ${min} and ${max}.`);
+  }
+  return n;
+}
+
+/** A host name list: lowercase DNS names (no scheme, port or path), at most 50. */
+function hostList(env: OAuthEnv, name: string): readonly string[] | undefined {
+  const raw = text(env, name);
+  if (raw === undefined) return undefined;
+  const hosts = raw
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter((h) => h !== '');
+  const valid = hosts.every(
+    (h) =>
+      h.length <= 253 &&
+      /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/.test(h),
+  );
+  if (hosts.length === 0 || hosts.length > 50 || !valid) {
+    throw new OAuthConfigError(name, `${name} must be a comma-separated list of host names (at most 50).`);
+  }
+  return [...new Set(hosts)];
+}
+
 /**
  * The OAuth settings, or null when `AB_OAUTH` is off (the default). `publicUrl`: whether `AB_PUBLIC_URL` is set; it is
  * the issuer every token and metadata document names, so OAuth cannot run without it.
@@ -75,6 +137,20 @@ export function oauthSettingsFromEnv(env: OAuthEnv, publicUrl: boolean): OAuthSe
       'AB_OAUTH_REFRESH_TTL must not be shorter than AB_OAUTH_ACCESS_TTL.',
     );
   }
+  const clientMetadataDocuments = switchSetting(env, 'AB_OAUTH_CIMD');
+  const clientMetadataMaxClients = count(env, 'AB_OAUTH_CIMD_MAX_CLIENTS', 1, 500);
+  const clientMetadataFetchLimit = count(env, 'AB_OAUTH_CIMD_FETCH_LIMIT', 1, 10_000);
+  const registration = switchSetting(env, 'AB_OAUTH_DCR');
+  const registrationMaxClients = count(env, 'AB_OAUTH_DCR_MAX_CLIENTS', 1, 500);
+  const registrationIpLimit = count(env, 'AB_OAUTH_DCR_IP_LIMIT', 1, 10_000);
+  const registrationRedirectHosts = hostList(env, 'AB_OAUTH_DCR_REDIRECT_HOSTS');
+  const registrationUnusedTtlSeconds = duration(
+    env,
+    'AB_OAUTH_DCR_UNUSED_TTL',
+    3_600,
+    7 * 86_400,
+    '1h and 7d',
+  );
   if (flag !== 'on') return null;
   if (!publicUrl) {
     throw new OAuthConfigError(
@@ -85,5 +161,13 @@ export function oauthSettingsFromEnv(env: OAuthEnv, publicUrl: boolean): OAuthSe
   return {
     ...(accessTokenTtlSeconds === undefined ? {} : { accessTokenTtlSeconds }),
     ...(refreshTokenTtlSeconds === undefined ? {} : { refreshTokenTtlSeconds }),
+    ...(clientMetadataDocuments === undefined ? {} : { clientMetadataDocuments }),
+    ...(clientMetadataMaxClients === undefined ? {} : { clientMetadataMaxClients }),
+    ...(clientMetadataFetchLimit === undefined ? {} : { clientMetadataFetchLimit }),
+    ...(registration === undefined ? {} : { registration }),
+    ...(registrationMaxClients === undefined ? {} : { registrationMaxClients }),
+    ...(registrationIpLimit === undefined ? {} : { registrationIpLimit }),
+    ...(registrationRedirectHosts === undefined ? {} : { registrationRedirectHosts }),
+    ...(registrationUnusedTtlSeconds === undefined ? {} : { registrationUnusedTtlSeconds }),
   };
 }

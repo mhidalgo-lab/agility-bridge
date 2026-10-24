@@ -449,6 +449,19 @@ status is in [client-compatibility](reference/client-compatibility.md#remote-sni
   it. The challenge and the document are the same for every denial and every slug of valid syntax, as the MCP route's
   own `401` is (T19). *live (local, workerd and Node)*
 
+- **Client ID Metadata Documents (P5-03, 2026-10-24).** `draft-ietf-oauth-client-id-metadata-document-02` (6 July 2026,
+  <https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document>) and the MCP authorization spec
+  (2025-11-25 and 2026-07-28, <https://modelcontextprotocol.io/specification/draft/basic/authorization>): the client id is an
+  https URL with a path, no userinfo, dot segments or fragment (a port is allowed, we refuse it); the document's `client_id`
+  must equal the URL by simple string comparison; only a `200` is success and redirects must not be followed; read at most
+  about 5 KB; caching optional, follow HTTP cache headers within server bounds, never cache errors; `token_endpoint_auth_method`
+  must not be a shared-secret method and `client_secret*` must not appear; the server must not fetch a URL that resolves
+  to a special-use address (loopback only for development with a loopback server); redirect URIs compare exactly (the
+  provider adds RFC 8252 any-port matching for loopback). MCP names metadata documents as the preferred method and keeps
+  DCR (RFC 7591) as a compatibility path. The provider (1.2.3) with `allowPrivateUseRedirectUris` off sends codes only to
+  https and loopback http redirects. *Spec read 2026-10-24; behaviour exercised by the P5-03 suites, no real client yet
+  (P5-06)*; client behaviour (which clients send which metadata) is *unverified*.
+
 ## 5. Cloudflare Workers platform
 
 Checked 2026-10 in Cloudflare documentation; P0-09 measures with Agility-shaped payloads.

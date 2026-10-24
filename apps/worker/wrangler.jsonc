@@ -7,6 +7,9 @@
   "main": "src/index.ts",
   // No `nodejs_compat`: every package is web-standard (docs/adr/0004-typescript-runtime-agnostic-core.md).
   "compatibility_date": "2026-09-26",
+  // OAuth client metadata documents (P5-03): the Worker's `fetch` reaches public addresses only, and its own zone through
+  // the front door. Without it the Worker keeps CIMD off.
+  "compatibility_flags": ["global_fetch_strictly_public"],
   "workers_dev": false,
   "send_metrics": false,
   // The workspace packages are bundled from their sources (no build of the packages first).

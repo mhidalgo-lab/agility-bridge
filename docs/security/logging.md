@@ -68,6 +68,12 @@ carry `requestId`.
 | warn | `oauth audit failed` | `error` (class) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | warn | `oauth device replacement failed` | `error` (class) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | error | `consent screen error` | `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
+| info | `oauth client refused` | `reason` (stable code), `clientHost` (host of the client id URL; never the document) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| info | `oauth registration refused` | `reason` (stable code); never the request body | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| warn | `oauth registration per-address limit reached` | `limit` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| warn | `oauth registration cap reached` | `limit` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| warn | `oauth metadata document client cap reached` | `limit` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| warn | `OAuth client metadata documents are off: the global_fetch_strictly_public compatibility flag is not set. Dynamic registration still works.` | none (Worker start) | [boot.ts](../../apps/worker/src/boot.ts) |
 | error | `audit write failed` | `action`, `error` (class) | [audit.ts](../../packages/http-app/src/audit.ts) |
 | error | `audit queue full; rows dropped` | `dropped` | [audit.ts](../../packages/http-app/src/audit.ts) |
 | info | `audit retention` | `deleted`, `retentionDays` | [audit.ts](../../packages/http-app/src/audit.ts) |

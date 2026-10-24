@@ -8,7 +8,9 @@ import { join } from 'node:path';
 import { accessServices, generateMasterKey, Keyring } from '@agility-bridge/auth';
 import { CORE_TOOLS } from '@agility-bridge/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { defineOAuthClientSuite } from '../../../packages/http-app/test/oauth/clients-suite.ts';
 import { testConsent } from '../../../packages/http-app/test/oauth/consent.ts';
+import { createFakeDocuments } from '../../../packages/http-app/test/oauth/documents.ts';
 import { defineOAuthSuite, type OAuthHost } from '../../../packages/http-app/test/oauth/suite.ts';
 import { type FixtureAgility, startFixtureAgility } from '../../../scripts/fixture-agility.ts';
 import { ConfigError } from '../src/config.ts';
@@ -26,6 +28,7 @@ async function sqliteHost(): Promise<OAuthHost> {
   const key = generateMasterKey(1);
   writeFileSync(join(dir, 'master.key'), key, { mode: 0o600 });
   const lines: string[] = [];
+  const documents = createFakeDocuments();
   const running = await startServe(
     {
       AB_DATA_DIR: join(dir, 'data'),
@@ -37,7 +40,7 @@ async function sqliteHost(): Promise<OAuthHost> {
       AB_ALLOW_HTTP_INSTANCES: 'on',
       AB_ENVIRONMENT: 'production',
     },
-    { sink: (l) => lines.push(l), oauthConsent: testConsent },
+    { sink: (l) => lines.push(l), oauthConsent: testConsent, clientMetadataFetch: documents.fetcher },
   );
   const svc = accessServices({
     storage: running.storage,
@@ -89,6 +92,7 @@ async function sqliteHost(): Promise<OAuthHost> {
   const { token } = await svc.tokens.issue({ grantId: aliceGrantA.id, label: 'laptop' });
   return {
     origin: ORIGIN,
+    documents,
     call: (url, init) => Promise.resolve(running.app.fetch(new Request(url, init))),
     storage: running.storage,
     ids: {
@@ -128,6 +132,7 @@ async function sqliteHost(): Promise<OAuthHost> {
 }
 
 defineOAuthSuite('SQLite storage (agility-bridge serve)', sqliteHost);
+defineOAuthClientSuite('SQLite storage (agility-bridge serve)', sqliteHost);
 
 describe('OAuth settings on the shipped host', () => {
   it('is off by default, and AB_OAUTH=on needs sign-in for the built-in consent screen (P5-04)', () => {

@@ -11,6 +11,8 @@ import { CORE_TOOLS } from '@agility-bridge/core';
 import { createD1Driver, type D1Database, openSqlStorage } from '@agility-bridge/storage';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { defineOAuthClientSuite } from '../../../packages/http-app/test/oauth/clients-suite.ts';
+import { createFakeDocuments } from '../../../packages/http-app/test/oauth/documents.ts';
 import { defineOAuthSuite, type OAuthHost } from '../../../packages/http-app/test/oauth/suite.ts';
 import { type FixtureAgility, startFixtureAgility } from '../../../scripts/fixture-agility.ts';
 import { BootError, boot } from '../src/boot.ts';
@@ -37,11 +39,29 @@ afterEach(async () => {
 
 async function workerHost(): Promise<OAuthHost> {
   const key = generateMasterKey(1);
+  const documents = createFakeDocuments({ observesRedirectMode: false });
   const mf = new Miniflare(
     convertV4MiniflareOptions({
       modules: true,
       scriptPath: SCRIPT,
       compatibilityDate: '2026-09-26',
+      // As in wrangler.jsonc: the Worker only resolves client metadata documents with a public-only fetch.
+      compatibilityFlags: ['global_fetch_strictly_public'],
+      // The Worker's outbound requests (client metadata documents) go to the fake origin, never to the network.
+      outboundService: async (request) => {
+        const incoming = request as unknown as Request;
+        // The fixture Agility is a real local server; only client metadata documents come from the fake origin.
+        if (!incoming.url.startsWith(agility.url)) return (await documents.handle(incoming)) as never;
+        const hasBody = incoming.method !== 'GET' && incoming.method !== 'HEAD';
+        const headers = new Headers(incoming.headers);
+        for (const name of ['host', 'content-length', 'connection', 'accept-encoding']) headers.delete(name);
+        const upstream = await fetch(incoming.url, {
+          method: incoming.method,
+          headers,
+          ...(hasBody ? { body: await incoming.text() } : {}),
+        });
+        return upstream as never;
+      },
       d1Databases: ['DB'],
       bindings: {
         AB_ENVIRONMENT: 'test',
@@ -102,6 +122,7 @@ async function workerHost(): Promise<OAuthHost> {
   const { token } = await svc.tokens.issue({ grantId: aliceGrantA.id, label: 'laptop' });
   return {
     origin: ORIGIN,
+    documents,
     call: async (url, init) =>
       (await mf.dispatchFetch(url, {
         ...init,
@@ -129,6 +150,7 @@ async function workerHost(): Promise<OAuthHost> {
 }
 
 defineOAuthSuite('workerd with D1 (Worker)', workerHost);
+defineOAuthClientSuite('workerd with D1 (Worker)', workerHost, { matrix: false });
 
 describe('OAuth settings on the shipped Worker', () => {
   const base = {

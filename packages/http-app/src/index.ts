@@ -51,6 +51,13 @@ export {
   readMcpBody,
 } from './mcp-request.ts';
 export {
+  CIMD_MAX_BYTES,
+  CIMD_TIMEOUT_MS,
+  ClientMetadataError,
+  type ClientMetadataFetch,
+  fetchMetadataDocument,
+} from './oauth/clients.ts';
+export {
   createOAuthRuntime,
   looksLikeOAuthToken,
   MCP_SCOPE,
@@ -67,6 +74,7 @@ export {
   type OAuthConsentHandler,
   type OAuthGrantProps,
   type OAuthOptions,
+  type OAuthRegistrations,
   type OAuthRuntime,
 } from './oauth/server.ts';
 export {
