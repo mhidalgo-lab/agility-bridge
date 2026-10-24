@@ -186,7 +186,7 @@ test('Deny returns access_denied, and a hostile, very long app name stays inside
   page,
 }) => {
   const w = await watch(page);
-  const name = `<img src=x onerror=alert(1)>${'A'.repeat(120)}`;
+  const name = `<img src=x onerror=alert(1)>${'A'.repeat(70)}`; // under the 100-character cap (P5-03)
   const r = request(await register(name));
   const callback = catchCallback(page, w.problems);
   await page.goto(`${server.base}/auth/login`);
