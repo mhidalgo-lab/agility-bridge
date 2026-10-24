@@ -17,6 +17,8 @@
 //   AB_OAUTH_CONSENT_IP_LIMIT, AB_OAUTH_CONSENT_LIMIT       consent form posts per 10 minutes, per address / in all (30, 300)
 //   AB_OAUTH_TOKEN_FAILURE_IP_LIMIT, AB_OAUTH_TOKEN_FAILURE_LIMIT   failed token requests per 10 minutes (20, 300)
 //   AB_OAUTH_DCR_UNUSED_TTL     how long a registration that never exchanged a code lives (default 24h; 1h-7d)
+//   AB_OAUTH_REFRESH_REUSE_WINDOW  how long a spent refresh token is answered with the same successor (default 30s;
+//                            0-120s, 0 = strict single use, not longer than the access lifetime); later reuse revokes
 // Durations: a number of seconds, or a number with s, m, h or d (`90m`, `12h`, `30d`).
 
 /** A refused `AB_OAUTH*` value; `variable` names it for the host's error message. */
@@ -51,6 +53,7 @@ export interface OAuthSettings {
   readonly consentLimit?: number;
   readonly tokenFailureIpLimit?: number;
   readonly tokenFailureLimit?: number;
+  readonly refreshReuseWindowSeconds?: number;
 }
 
 export type OAuthEnv = Readonly<Record<string, string | undefined>>;
@@ -76,6 +79,7 @@ export const OAUTH_SETTING_NAMES: readonly string[] = Object.freeze([
   'AB_OAUTH_CONSENT_LIMIT',
   'AB_OAUTH_TOKEN_FAILURE_IP_LIMIT',
   'AB_OAUTH_TOKEN_FAILURE_LIMIT',
+  'AB_OAUTH_REFRESH_REUSE_WINDOW',
 ]);
 
 const DURATION_RE = /^(\d{1,8})([smhd]?)$/;
@@ -180,6 +184,16 @@ export function oauthSettingsFromEnv(env: OAuthEnv, publicUrl: boolean): OAuthSe
   const consentLimit = count(env, 'AB_OAUTH_CONSENT_LIMIT', 1, 100_000);
   const tokenFailureIpLimit = count(env, 'AB_OAUTH_TOKEN_FAILURE_IP_LIMIT', 1, 100_000);
   const tokenFailureLimit = count(env, 'AB_OAUTH_TOKEN_FAILURE_LIMIT', 1, 100_000);
+  const refreshReuseWindowSeconds = duration(env, 'AB_OAUTH_REFRESH_REUSE_WINDOW', 0, 120, '0s and 120s');
+  if (
+    refreshReuseWindowSeconds !== undefined &&
+    refreshReuseWindowSeconds > (accessTokenTtlSeconds ?? 3_600)
+  ) {
+    throw new OAuthConfigError(
+      'AB_OAUTH_REFRESH_REUSE_WINDOW',
+      'AB_OAUTH_REFRESH_REUSE_WINDOW must not be longer than AB_OAUTH_ACCESS_TTL.',
+    );
+  }
   if (flag !== 'on') return null;
   if (!publicUrl) {
     throw new OAuthConfigError(
@@ -206,5 +220,6 @@ export function oauthSettingsFromEnv(env: OAuthEnv, publicUrl: boolean): OAuthSe
     ...(consentLimit === undefined ? {} : { consentLimit }),
     ...(tokenFailureIpLimit === undefined ? {} : { tokenFailureIpLimit }),
     ...(tokenFailureLimit === undefined ? {} : { tokenFailureLimit }),
+    ...(refreshReuseWindowSeconds === undefined ? {} : { refreshReuseWindowSeconds }),
   };
 }

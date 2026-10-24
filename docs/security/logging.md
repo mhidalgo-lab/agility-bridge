@@ -62,6 +62,8 @@ carry `requestId`.
 | warn | `GitHub token revocation failed` | `requestId`, `provider`, `reason` (`status` or `network`), `status` (never the token) | [github.ts](../../packages/auth/src/identity/github.ts) |
 | debug | `oauth error response` | `code`, `status`, `reason` (stable provider reason, never the request) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | debug | `oauth authorize request refused` | `error` (class) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| warn | `oauth refresh token reused; device revoked` | `oauthGrant` (provider grant id) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| error | `oauth refresh successor unreadable` | `oauthGrant` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | info | `oauth token refused; device revoked` | `reason` (resolver deny reason), `oauthGrant` (provider grant id), `grantType` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | warn | `oauth authorization code replayed; grant revoked` | `oauthGrant`; never the code | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | warn | `oauth tokens issued for a revoked device; revoked again` | `oauthGrant` | [server.ts](../../packages/http-app/src/oauth/server.ts) |

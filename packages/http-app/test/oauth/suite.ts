@@ -93,7 +93,7 @@ export async function metadata(h: OAuthHost): Promise<AuthorizationServerMetadat
 
 export async function register(
   h: OAuthHost,
-  over: { redirect?: string; name?: string; confidential?: boolean } = {},
+  over: { redirect?: string; name?: string; confidential?: boolean | 'basic' } = {},
 ): Promise<OAuthClientInformationFull> {
   return registerClient(h.origin, {
     metadata: await metadata(h),
@@ -102,7 +102,12 @@ export async function register(
       redirect_uris: [over.redirect ?? REDIRECT],
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
-      token_endpoint_auth_method: over.confidential === true ? 'client_secret_post' : 'none',
+      token_endpoint_auth_method:
+        over.confidential === 'basic'
+          ? 'client_secret_basic'
+          : over.confidential === true
+            ? 'client_secret_post'
+            : 'none',
     },
     fetchFn: fetchFn(h),
   });
@@ -1300,6 +1305,429 @@ export function defineOAuthCacheSuite(name: string, makeHost: () => Promise<OAut
       // ...and refused once the cache entry is older than its lifetime (30 s by default).
       h.advance(31_000);
       await expectDenied(h, 'team-a', tokens.access_token, 'grant_revoked');
+    });
+  });
+}
+
+/** What a host is built with for the refresh family suite. */
+export interface RefreshHostShape {
+  /** `AB_OAUTH_REFRESH_REUSE_WINDOW` in seconds. */
+  readonly reuseWindowSeconds: number;
+}
+
+const ROTATED = 'oauth-rotated:';
+const SUCCESSOR = 'oauth-successor:';
+
+/**
+ * Refresh token lifecycle (P5-05, D-63, D-70, THREAT_MODEL T9, T15): parallel refreshes keep the device and share one
+ * successor, a spent token is answered with that successor only inside the reuse window and revokes the device after
+ * it, the successor is stored sealed, and a device that is gone cannot refresh. Run with the default window (30 s) and
+ * with a strict one (0), so the revocation paths run where time cannot be moved (SQLite, workerd) as well.
+ */
+export function defineRefreshFamilySuite(
+  name: string,
+  makeHost: (shape: RefreshHostShape) => Promise<OAuthHost>,
+): void {
+  describe(`OAuth refresh token lifecycle: ${name}`, () => {
+    const open: OAuthHost[] = [];
+    afterEach(async () => {
+      vi.useRealTimers();
+      await Promise.all(open.splice(0).map((h) => h.close()));
+    });
+    const hostWith = async (reuseWindowSeconds: number): Promise<OAuthHost> => {
+      const h = await makeHost({ reuseWindowSeconds });
+      open.push(h);
+      return h;
+    };
+
+    interface Rotated {
+      readonly access_token: string;
+      readonly refresh_token: string;
+      readonly expires_in: number;
+    }
+    const refresh = (
+      h: OAuthHost,
+      client: OAuthClientInformationFull,
+      token: string,
+      extra: Record<string, string> = {},
+    ) =>
+      tokenEndpoint(h, {
+        grant_type: 'refresh_token',
+        refresh_token: token,
+        client_id: client.client_id,
+        ...extra,
+      });
+    const rotate = async (h: OAuthHost, client: OAuthClientInformationFull, token: string) => {
+      const res = await refresh(h, client, token);
+      expect(res.status).toBe(200);
+      return (await res.json()) as Rotated;
+    };
+    const errorOf = async (res: Response) => ((await res.json()) as { error: string }).error;
+    const reuseRows = (h: OAuthHost) => auditRows(h, (r) => r.action === 'oauth.refresh.reuse');
+
+    // ------------------------------------------------------------------------------------- the reuse window
+
+    it('parallel refreshes with one token all get the same working successor and the device stays', async () => {
+      const h = await hostWith(30);
+      const { tokens, client } = await connectWorkspace(h);
+      const results = await Promise.all(
+        Array.from({ length: 6 }, () => refresh(h, client, tokens.refresh_token as string)),
+      );
+      const bodies: Rotated[] = [];
+      for (const res of results) {
+        expect(res.status).toBe(200);
+        bodies.push((await res.json()) as Rotated);
+      }
+      // One rotation: every caller holds the same successor (a second one would orphan the others' tokens, L-164).
+      expect(new Set(bodies.map((b) => b.refresh_token)).size).toBe(1);
+      expect(new Set(bodies.map((b) => b.access_token)).size).toBe(1);
+      const successor = bodies[0] as Rotated;
+      expect(successor.refresh_token).not.toBe(tokens.refresh_token);
+      expect(successor.expires_in).toBeGreaterThan(0);
+      expect(successor.expires_in).toBeLessThanOrEqual(3600);
+      expect((await mcp(h, 'team-a', successor.access_token)).status).toBe(200);
+      // The successor rotates again, and so does what it produced.
+      const next = await rotate(h, client, successor.refresh_token);
+      expect(next.refresh_token).not.toBe(successor.refresh_token);
+      expect((await mcp(h, 'team-a', next.access_token)).status).toBe(200);
+      expect((await reuseRows(h)).length).toBe(0);
+      // One token set was issued by the provider, the other five repeats are marked as reused.
+      const issued = await auditRows(
+        h,
+        (r) =>
+          r.action === 'oauth.token.issued' &&
+          (r as { details?: { grantType?: string } }).details?.grantType === 'refresh_token',
+        7,
+      );
+      const reused = issued.filter((r) => (r as { details?: { reused?: boolean } }).details?.reused === true);
+      expect(reused.length).toBe(5);
+    });
+
+    it('a repeat after the first answer, still inside the window, is answered with the same successor', async () => {
+      const h = await hostWith(30);
+      const { tokens, client } = await connectWorkspace(h);
+      const first = await rotate(h, client, tokens.refresh_token as string);
+      const again = await rotate(h, client, tokens.refresh_token as string);
+      expect(again.refresh_token).toBe(first.refresh_token);
+      expect(again.access_token).toBe(first.access_token);
+      // ...also after the successor itself was used.
+      const next = await rotate(h, client, first.refresh_token);
+      const late = await rotate(h, client, tokens.refresh_token as string);
+      expect(late.refresh_token).toBe(first.refresh_token);
+      expect(next.refresh_token).not.toBe(first.refresh_token);
+      expect((await mcp(h, 'team-a', late.access_token)).status).toBe(200);
+    });
+
+    it('a repeat after the window revokes the device: access and refresh tokens of every generation fail', async () => {
+      const h = await hostWith(30);
+      if (h.advance === undefined) return;
+      const { tokens, client } = await connectWorkspace(h);
+      const first = await rotate(h, client, tokens.refresh_token as string);
+      expect((await mcp(h, 'team-a', first.access_token)).status).toBe(200);
+      h.advance(31_000);
+      const replay = await refresh(h, client, tokens.refresh_token as string);
+      expect(replay.status).toBe(400);
+      expect(await errorOf(replay)).toBe('invalid_grant');
+      for (const access of [tokens.access_token, first.access_token]) {
+        expect((await mcp(h, 'team-a', access)).status).toBe(401);
+      }
+      const successor = await refresh(h, client, first.refresh_token);
+      expect(successor.status).toBe(400);
+      expect(await errorOf(successor)).toBe('invalid_grant');
+      const rows = await reuseRows(h);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ status: 'denied', userId: h.ids.alice, errorCode: 'refresh_reuse' });
+      expect(JSON.stringify(rows)).not.toContain((tokens.refresh_token as string).split(':')[2]);
+      expect(JSON.stringify(rows)).not.toContain(first.refresh_token.split(':')[2]);
+    });
+
+    it('just inside the window the repeat is answered, just after it it revokes', async () => {
+      const h = await hostWith(30);
+      if (h.advance === undefined) return;
+      const { tokens, client } = await connectWorkspace(h);
+      const first = await rotate(h, client, tokens.refresh_token as string);
+      h.advance(29_000);
+      expect((await rotate(h, client, tokens.refresh_token as string)).refresh_token).toBe(
+        first.refresh_token,
+      );
+      h.advance(1_500);
+      expect((await refresh(h, client, tokens.refresh_token as string)).status).toBe(400);
+      expect((await reuseRows(h)).length).toBe(1);
+    });
+
+    it('the failed-exchange counter (P5-09) counts a revoking reuse, not a repeat the window answered', async () => {
+      const h = await hostWith(30);
+      if (h.advance === undefined) return;
+      const failures = async (): Promise<number> =>
+        (await h.storage.kv.list('oauth-abuse:token_failure:', { limit: 1000 })).length;
+      const { tokens, client } = await connectWorkspace(h);
+      const first = await rotate(h, client, tokens.refresh_token as string);
+      const before = await failures();
+      // The repeat inside the window answers 200 (the route guard ran first and let it through): no failure counted.
+      expect((await rotate(h, client, tokens.refresh_token as string)).refresh_token).toBe(
+        first.refresh_token,
+      );
+      expect(await failures()).toBe(before);
+      // After the window the repeat is a 400 and the revocation counts as a failure (the address and the deployment).
+      h.advance(31_000);
+      expect((await refresh(h, client, tokens.refresh_token as string)).status).toBe(400);
+      expect(await failures()).toBe(before + 2);
+    });
+
+    it('window 0 is strict single use: the second use of a spent token revokes the device', async () => {
+      const h = await hostWith(0);
+      const { tokens, client } = await connectWorkspace(h);
+      const first = await rotate(h, client, tokens.refresh_token as string);
+      expect((await mcp(h, 'team-a', first.access_token)).status).toBe(200);
+      const replay = await refresh(h, client, tokens.refresh_token as string);
+      expect(replay.status).toBe(400);
+      expect(await errorOf(replay)).toBe('invalid_grant');
+      expect((await mcp(h, 'team-a', first.access_token)).status).toBe(401);
+      expect((await mcp(h, 'team-a', tokens.access_token)).status).toBe(401);
+      expect((await refresh(h, client, first.refresh_token)).status).toBe(400);
+      expect(await reuseRows(h)).toHaveLength(1);
+      // No successor was ever kept.
+      expect((await kvText(h)).includes(SUCCESSOR)).toBe(false);
+    });
+
+    it('window 0 and parallel refreshes: one token set is issued, the repeats cost the device', async () => {
+      const h = await hostWith(0);
+      const { tokens, client } = await connectWorkspace(h);
+      const results = await Promise.all(
+        Array.from({ length: 4 }, () => refresh(h, client, tokens.refresh_token as string)),
+      );
+      const ok = results.filter((r) => r.status === 200);
+      expect(ok).toHaveLength(1);
+      expect(results.filter((r) => r.status === 400)).toHaveLength(3);
+      const won = (await (ok[0] as Response).json()) as Rotated;
+      expect((await mcp(h, 'team-a', won.access_token)).status).toBe(401);
+      expect((await reuseRows(h)).length).toBeGreaterThanOrEqual(1);
+    });
+
+    // ------------------------------------------------------------------------------------------- storage
+
+    it('keeps the successor sealed for the window only: no refresh or access token is stored in the clear', async () => {
+      const h = await hostWith(30);
+      const { tokens, client } = await connectWorkspace(h);
+      const r0 = tokens.refresh_token as string;
+      const first = await rotate(h, client, r0);
+      await rotate(h, client, r0);
+      await mcp(h, 'team-a', first.access_token, WHOAMI);
+      const live = await kvText(h);
+      const hash = await sha256(r0);
+      // The scan is not vacuous: the marker and the sealed successor are there, under the hash of the spent token.
+      expect(live).toContain(`${ROTATED}${hash}=`);
+      expect(live).toContain(`${SUCCESSOR}${hash}=`);
+      const sealed = (await h.storage.kv.get(`${SUCCESSOR}${hash}`)) as string;
+      expect(sealed).not.toMatch(/[:{}"]/);
+      const secrets = [
+        r0,
+        tokens.access_token,
+        first.access_token,
+        first.refresh_token,
+        ...[r0, tokens.access_token, first.access_token, first.refresh_token].map(
+          (t) => t.split(':')[2] as string,
+        ),
+      ];
+      const audit = JSON.stringify(await h.storage.audit.query({ limit: 1000 }));
+      for (const [where, text] of Object.entries({
+        kv: live,
+        audit,
+        logs: h.logs().join('\n'),
+        raw: h.rawDatabase?.() ?? '',
+      })) {
+        for (const secret of secrets) {
+          expect(text.includes(secret), `${where} holds a bearer value`).toBe(false);
+        }
+      }
+      // Only the spent token opens the seal (the token the request is allowed to ask with).
+      const { openSuccessor } = await import('../../src/oauth/refresh-family.ts');
+      expect((await openSuccessor(r0, hash, sealed))?.refreshToken).toBe(first.refresh_token);
+      expect(await openSuccessor(first.refresh_token, hash, sealed)).toBeNull();
+      // The marker records a time and nothing else.
+      expect(JSON.parse((await h.storage.kv.get(`${ROTATED}${hash}`)) as string)).toEqual({
+        at: expect.any(Number),
+      });
+    });
+
+    it('the sealed successor is gone after the window; the marker stays, so a late repeat is recognised', async () => {
+      const h = await hostWith(30);
+      if (h.advance === undefined) return;
+      const { tokens, client } = await connectWorkspace(h);
+      const r0 = tokens.refresh_token as string;
+      await rotate(h, client, r0);
+      const hash = await sha256(r0);
+      expect(await h.storage.kv.get(`${SUCCESSOR}${hash}`)).not.toBeNull();
+      h.advance(31_000);
+      expect(await h.storage.kv.get(`${SUCCESSOR}${hash}`)).toBeNull();
+      expect(await h.storage.kv.get(`${ROTATED}${hash}`)).not.toBeNull();
+    });
+
+    // ---------------------------------------------------------------------------------------- negatives
+
+    it('a disconnected device cannot refresh, inside the window either, and a replay gets nothing back', async () => {
+      const h = await hostWith(30);
+      const { tokens, client } = await connectWorkspace(h);
+      const first = await rotate(h, client, tokens.refresh_token as string);
+      // RFC 7009 on the current refresh token ends the device's grant.
+      const revoked = await tokenEndpoint(h, {
+        token: first.refresh_token,
+        token_type_hint: 'refresh_token',
+        client_id: client.client_id,
+      });
+      expect(revoked.status).toBe(200);
+      const requests = h.agilityRequests();
+      for (const token of [tokens.refresh_token as string, first.refresh_token]) {
+        const res = await refresh(h, client, token);
+        expect(res.status).toBe(400);
+        expect(await errorOf(res)).toBe('invalid_grant');
+      }
+      expect((await mcp(h, 'team-a', first.access_token)).status).toBe(401);
+      expect(h.agilityRequests()).toBe(requests);
+    });
+
+    it('a device with a revocation tombstone cannot refresh while its grant is still there, and is revoked again', async () => {
+      const h = await hostWith(30);
+      const { tokens, client } = await connectWorkspace(h);
+      const [userId, grantId] = (tokens.refresh_token as string).split(':');
+      // A revocation that wrote its tombstone and has not finished deleting the grant (L-073's ordering).
+      await h.storage.kv.set(`oauth-revoked:${userId}:${grantId}`, '1', {
+        expiresAt: Date.now() + 3_600_000,
+      });
+      const res = await refresh(h, client, tokens.refresh_token as string);
+      expect(res.status).toBe(400);
+      expect(await errorOf(res)).toBe('invalid_grant');
+      expect(await h.storage.kv.get(`oauth:grant:${userId}:${grantId}`)).toBeNull();
+      expect((await mcp(h, 'team-a', tokens.access_token)).status).toBe(401);
+    });
+
+    it('a device whose access was withdrawn cannot refresh inside the window, and is revoked', async () => {
+      const h = await hostWith(30);
+      const { tokens, client } = await connectWorkspace(h);
+      const first = await rotate(h, client, tokens.refresh_token as string);
+      await h.storage.grants.delete(h.ids.aliceGrantA);
+      const res = await refresh(h, client, tokens.refresh_token as string);
+      expect(res.status).toBe(400);
+      expect(await errorOf(res)).toBe('invalid_grant');
+      const refused = await auditRows(h, (r) => r.action === 'oauth.token.refused');
+      expect(refused[0]).toMatchObject({ status: 'denied' });
+      // The device is gone: the successor's own refresh fails too.
+      expect((await refresh(h, client, first.refresh_token)).status).toBe(400);
+    });
+
+    it('a repeat inside the window from another client, resource or scope gets no successor', async () => {
+      const h = await hostWith(30);
+      const { tokens, client } = await connectWorkspace(h);
+      const r0 = tokens.refresh_token as string;
+      const first = await rotate(h, client, r0);
+      const other = await register(h, { name: 'Another app' });
+      const texts: string[] = [];
+      const read = async (res: Response): Promise<string> => {
+        const text = await res.text();
+        texts.push(text);
+        return (JSON.parse(text) as { error: string }).error;
+      };
+      const wrongClient = await refresh(h, other, r0);
+      expect(wrongClient.status).toBe(400);
+      expect(await read(wrongClient)).toBe('invalid_grant');
+      const unknown = await tokenEndpoint(h, {
+        grant_type: 'refresh_token',
+        refresh_token: r0,
+        client_id: 'no-such-client',
+      });
+      expect(unknown.status).toBe(401);
+      expect(await read(unknown)).toBe('invalid_client');
+      const wrongResource = await refresh(h, client, r0, { resource: resourceOf(h, 'team-b') });
+      expect(wrongResource.status).toBe(400);
+      expect(await read(wrongResource)).toBe('invalid_target');
+      const wrongScope = await refresh(h, client, r0, { scope: 'admin' });
+      expect(wrongScope.status).toBe(400);
+      expect(await read(wrongScope)).toBe('invalid_scope');
+      for (const text of texts) expect(text).not.toContain(first.refresh_token);
+      // None of it cost the device, and the right request is still answered.
+      expect((await rotate(h, client, r0)).refresh_token).toBe(first.refresh_token);
+      expect((await mcp(h, 'team-a', first.access_token)).status).toBe(200);
+      expect((await reuseRows(h)).length).toBe(0);
+    });
+
+    it('a confidential client must authenticate to get the successor again', async () => {
+      const h = await hostWith(30);
+      const client = await register(h, { confidential: true });
+      const { tokens } = await connectWorkspace(h, 'team-a', undefined, client);
+      const secret = client.client_secret as string;
+      const r0 = tokens.refresh_token as string;
+      const withSecret = (s: string | null) =>
+        tokenEndpoint(h, {
+          grant_type: 'refresh_token',
+          refresh_token: r0,
+          client_id: client.client_id,
+          ...(s === null ? {} : { client_secret: s }),
+        });
+      const first = (await (await withSecret(secret)).json()) as Rotated;
+      expect(first.refresh_token).toBeTruthy();
+      for (const bad of [null, 'wrong-secret-value']) {
+        const res = await withSecret(bad);
+        expect(res.status).toBe(401);
+        expect(await res.clone().text()).not.toContain(first.refresh_token);
+      }
+      const again = (await (await withSecret(secret)).json()) as Rotated;
+      expect(again.refresh_token).toBe(first.refresh_token);
+    });
+
+    it('a client that authenticates with HTTP Basic gets the successor again with the header, and not without it', async () => {
+      const h = await hostWith(30);
+      const client = await register(h, { confidential: 'basic' });
+      const { tokens } = await connectWorkspace(h, 'team-a', undefined, client);
+      const secret = client.client_secret as string;
+      const r0 = tokens.refresh_token as string;
+      const basic = (s: string) =>
+        tokenEndpoint(
+          h,
+          {},
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/x-www-form-urlencoded',
+              authorization: `Basic ${btoa(`${client.client_id}:${s}`)}`,
+            },
+            body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: r0 }).toString(),
+          },
+        );
+      const first = (await (await basic(secret)).json()) as Rotated;
+      expect(first.refresh_token).toBeTruthy();
+      const wrong = await basic('wrong-secret-value');
+      expect(wrong.status).toBe(401);
+      expect(await wrong.text()).not.toContain(first.refresh_token);
+      const again = (await (await basic(secret)).json()) as Rotated;
+      expect(again.refresh_token).toBe(first.refresh_token);
+    });
+
+    it('a forged token of a real device revokes nothing, and a token of a device that does not exist is just refused', async () => {
+      const h = await hostWith(30);
+      const { tokens, client } = await connectWorkspace(h);
+      const [userId, grantId] = (tokens.refresh_token as string).split(':');
+      const forged = `${userId}:${grantId}:${'x'.repeat(32)}`;
+      const nobody = `usr_${'0'.repeat(32)}:${'A'.repeat(16)}:${'y'.repeat(32)}`;
+      for (const token of [forged, nobody, 'not-a-token', `${userId}:${grantId}`]) {
+        const res = await refresh(h, client, token);
+        expect(res.status).toBe(400);
+        expect(await errorOf(res)).toBe('invalid_grant');
+      }
+      expect((await mcp(h, 'team-a', tokens.access_token)).status).toBe(200);
+      expect((await rotate(h, client, tokens.refresh_token as string)).refresh_token).toBeTruthy();
+      expect((await reuseRows(h)).length).toBe(0);
+    });
+
+    it('a spent token of one device never reaches another device’s family', async () => {
+      const h = await hostWith(0);
+      const one = await connectWorkspace(h);
+      const two = await connectWorkspace(h, 'team-b', `${h.ids.bob}|${h.ids.bobGrantB}`);
+      const spent = await rotate(h, one.client, one.tokens.refresh_token as string);
+      const replay = await refresh(h, one.client, one.tokens.refresh_token as string);
+      expect(replay.status).toBe(400);
+      // Only the replayed device paid.
+      expect((await mcp(h, 'team-b', two.tokens.access_token)).status).toBe(200);
+      expect((await mcp(h, 'team-a', spent.access_token)).status).toBe(401);
     });
   });
 }

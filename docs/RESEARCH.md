@@ -415,6 +415,18 @@ status is in [client-compatibility](reference/client-compatibility.md#remote-sni
   1.142.0 register through CIMD (`https://claude.ai/oauth/claude-code-client-metadata`,
   `https://vscode.dev/oauth/client-metadata.json`), MCP Inspector CLI 2.11.0 through DCR. *live*
 
+- **P5-05 (2026-10-24), refresh handling of `workers-oauth-provider` 1.2.3** (read in the package's `dist/oauth-provider.js`,
+  `handleRefreshTokenGrant`, and [storage-schema.md](https://github.com/cloudflare/workers-oauth-provider/blob/main/storage-schema.md)).
+  A grant record holds the current and the previous refresh token ids; a refresh with either is accepted, with no time
+  limit on the previous one, and rotates again (the old "previous" is dropped), so parallel refreshes each mint a
+  successor and only the last survives. The token endpoint authenticates the client (secret, auth method) **before** it
+  dispatches the grant, and the refresh handler checks token, client id, grant expiry and `resource` after that; a refresh
+  with a well-formed but unknown token for an existing grant answers `invalid_grant` without changing anything, which is
+  what the reuse window's client-authentication probe relies on. `unwrapToken(accessToken)` returns the decrypted grant
+  props of a live access token. Okta documents the same pattern (grace period of 0-60 s, default 30 s) for concurrent
+  refresh requests. *Verified against the provider's code and the suites on Node memory, SQLite and workerd/D1; not
+  against a real instance of any MCP client.*
+
 - **P5-01 (2026-10-24), `workers-oauth-provider` 1.2.3 as built into the server.** Confirmed against the package's own
   documentation ([storage-schema.md](https://github.com/cloudflare/workers-oauth-provider/blob/main/storage-schema.md),
   [AGENTS.md](https://github.com/cloudflare/workers-oauth-provider/blob/main/AGENTS.md); read through Context7) and by

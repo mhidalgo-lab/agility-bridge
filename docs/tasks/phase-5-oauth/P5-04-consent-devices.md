@@ -2,7 +2,7 @@
 id: P5-04
 title: Consent screen and device handling
 phase: 5
-status: review
+status: done
 priority: high
 depends_on: [P5-01]
 adr: ["0009", "0013"]
