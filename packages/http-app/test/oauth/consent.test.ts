@@ -261,7 +261,7 @@ describe('sign-in and consent (P5-04)', () => {
     expect(res.headers.get('cache-control')).toContain('no-store');
     const html = await res.text();
     // Every script is an external file; nothing runs inline.
-    for (const m of html.matchAll(/<script\b[^>]*>/g)) expect(m[0]).toContain('src=');
+    for (const m of html.matchAll(/<script\b[^>]*>/gi)) expect(m[0]).toContain('src=');
     expect(html).not.toMatch(/\son[a-z]+=/i);
     expect(html).not.toMatch(/style=/i);
   });
