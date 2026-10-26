@@ -156,6 +156,7 @@ Status lives in each task file.
 | P1-16 | [Phase 1 review and live verification](tasks/phase-1-core-stdio/P1-16-phase-1-review.md) | high | P1-15 | done |
 | P1-17 | [Single-type paging counts upstream positions](tasks/phase-1-core-stdio/P1-17-paging-upstream-positions.md) | low | P1-16 | done |
 | P1-18 | [Bind the cursor's time window and fix sprint timing per first page](tasks/phase-1-core-stdio/P1-18-cursor-window-binding.md) | low | P1-16 | done |
+| P1-19 | [Return every date as UTC, including the non-UTC attribute variants](tasks/phase-1-core-stdio/P1-19-zoneless-dates.md) | medium | P1-16 | todo |
 
 ### Phase 2
 
