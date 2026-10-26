@@ -33,7 +33,7 @@ How to use it:
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-262 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-263 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -1342,6 +1342,14 @@ the first real run failed with `missing_assertion`, then with `not_allowed` on t
 setup code). Derive the path list from the code (every handler that calls the header login), document it, and run the
 bootstrap once against the real provider before calling the provider done.
 *Applied in:* owner run 2026-10-26, `docs/guide/identity-providers.md`, RESEARCH §9.
+
+**L-263 — A task lives in its parent's project: "not found" may be the workspace's project boundary.**
+The first real OAuth run listed the person's sprint tasks but answered "not found" for a task under a release item. The
+release item, and so the task, belonged to a release project outside the workspace's allowed tree, and an out-of-scope
+asset answers exactly like a missing one (T3, L-140). Adding the release project fixed it. When someone reports a missing
+item, check the workspace's projects before the code, and set up workspaces on a parent that covers both the team's
+projects and their releases.
+*Applied in:* P5-06 (owner run 2026-10-26), P6-14.
 
 ## Q. Testing, evals and live verification
 

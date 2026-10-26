@@ -2,7 +2,7 @@
 id: P5-08
 title: "Admin: connected apps and devices"
 phase: 5
-status: review
+status: done
 priority: medium
 depends_on: [P5-05]
 adr: ["0009", "0013"]
