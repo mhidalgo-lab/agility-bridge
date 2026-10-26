@@ -15,6 +15,7 @@
    - GitHub: an unverified primary email must be refused; a pending organization invitation must not count as
      membership; the OAuth app's authorized-applications list should not keep a token after sign-in.
    - Cloudflare Access: confirm the `keys` array of `/cdn-cgi/access/certs` is read (unverified, RESEARCH §9).
+     **Done 2026-10-26** on `agility-bridge` (custom domain): first-owner sign-in works, `keys` array read (L-262).
    The agent run may not create OAuth apps or Access applications.
 
 ## Open decisions

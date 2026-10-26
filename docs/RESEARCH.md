@@ -613,8 +613,10 @@ those flows are tested against local fake providers and stay **unverified** end 
   guaranteed to be passed"); keys come from `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` and rotate about
   every six weeks (never hard-code them); check `aud` against the application's AUD tag, `iss` against the team domain
   and verify RS256. Source:
-  https://developers.cloudflare.com/cloudflare-one/identity/authorization-cookie/validating-json/. *Unverified:* that
-  the endpoint's `keys` array (a JWKS, which `jose` reads) is present next to the documented `public_certs`.
+  https://developers.cloudflare.com/cloudflare-one/identity/authorization-cookie/validating-json/. **Verified
+  2026-10-26** on a real Access application (Worker on a custom domain, Workers Free): the `keys` array is read, the
+  assertion verifies against team, AUD and RS256, and the first-owner sign-in through `/auth/setup` succeeded once that
+  path was inside the Access application (L-262). A path outside it gets no header (`missing_assertion`).
 - **Generic OIDC.** Discovery (`/.well-known/openid-configuration`, exact `issuer` match), PKCE S256, `nonce`, RFC 9207
   `iss` on the authorization response when advertised (`authorization_response_iss_parameter_supported`), client
   authentication by Basic (default) or body, `email_verified` required. Specification-level facts; no vendor was run.
