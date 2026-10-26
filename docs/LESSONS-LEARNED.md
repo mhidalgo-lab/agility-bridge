@@ -33,7 +33,7 @@ How to use it:
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-261 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-262 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -1334,6 +1334,14 @@ The provider keys grants by person, so "every device" or "devices per client" is
 by a cursor over the key order, cap the pages and the counting scan to what the cheapest plan allows, say "at least" when the
 cap was hit and "unknown" when the reads fail, and never let a decoration (a count) take the page down.
 *Applied in:* P5-08, `allDevices`, `clients`.
+
+**L-262 — A header-based identity provider protects paths, not routes: list every route that reads the header.**
+Cloudflare Access adds its assertion only on the paths its application covers. The guide named `/auth/cf-access`, but
+the first-owner form posts to `/auth/setup` and re-authentication goes to `/auth/reauth`, and both read the same header:
+the first real run failed with `missing_assertion`, then with `not_allowed` on the retry (a plain sign-in without the
+setup code). Derive the path list from the code (every handler that calls the header login), document it, and run the
+bootstrap once against the real provider before calling the provider done.
+*Applied in:* owner run 2026-10-26, `docs/guide/identity-providers.md`, RESEARCH §9.
 
 ## Q. Testing, evals and live verification
 

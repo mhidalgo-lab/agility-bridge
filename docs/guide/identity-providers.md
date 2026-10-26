@@ -165,13 +165,19 @@ Redirect URIs are exact, and built from `AB_PUBLIC_URL`:
 
 ### Cloudflare Access
 
-1. Zero Trust, *Access*, *Applications*, *Add an application*, *Self-hosted*, with the hostname of `AB_PUBLIC_URL` and the
-   path `/auth/cf-access`; add a policy that lists who may sign in. Leave the rest of the site (the MCP endpoints, which
-   use device tokens) outside Access.
+1. Zero Trust, *Access*, *Applications*, *Add an application*, *Self-hosted*, with the hostname of `AB_PUBLIC_URL` and
+   **three paths** on that hostname, all in the one application: `/auth/cf-access` (sign-in), `/auth/setup` (the
+   first-owner form posts there and needs the Access header) and `/auth/reauth` (signing in again before a sensitive
+   change). Add a policy that lists who may sign in, and keep the session duration short (15 minutes): re-authentication
+   accepts only an assertion issued in the last 10 minutes. Leave the rest of the site outside Access: the MCP endpoints
+   (`/w/*`), OAuth (`/oauth/*`, `/.well-known/*`) and the panel (`/admin`, which has its own session).
 2. Copy the application's *Application Audience (AUD) tag* into `AB_CF_ACCESS_AUD` and your team name (the part before
    `.cloudflareaccess.com`) into `AB_CF_ACCESS_TEAM`.
 3. Visiting `/auth/login` then offers *Cloudflare Access*. The server trusts only a header it has verified against your
    team's keys, issuer and AUD tag; the `CF_Authorization` cookie is ignored, and service tokens (no email) are refused.
+4. For the first owner, sign in to Access once (open `<AB_PUBLIC_URL>/auth/setup`), then open the setup link. If Access
+   interrupts the link itself to log you in, the code after `#` is lost on the way back and the form is empty: open the
+   link again or paste the code. A refused attempt does not use the link up.
 
 ## Let people in
 
