@@ -31,7 +31,7 @@
 # Luhn check as a card number; the audit page shows random hex ids (`usr_...`, `wsp_...`) and dates, and an id whose
 # hex happens to be all digits next to a year matched (evidence `559187734026 2026`, PR #106). The product handles no
 # card numbers or national ids; personal data shown in the panel is covered by docs/security/logging.md. Re-check the
-# evidence of any new instance before keeping this line.
+# evidence of any new instance before keeping this line. Owner confirmed this IGNORE on 2026-10-26.
 10062	IGNORE	(PII Disclosure)
 # 10063 (Permissions Policy Header Not Set, risk Low): reported for the panel's script asset. Every HTML page carries a
 # closed `Permissions-Policy` (asserted by e2e/security.spec.ts); a script or stylesheet is not a document that can use

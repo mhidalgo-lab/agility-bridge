@@ -16,7 +16,7 @@ Statuses: `proposed` · `accepted` · `accepted (pending spike PX-NN)` · `super
 | [0006](0006-storage-sqlite-d1-yaml.md) | One SQLite schema for Node and D1, YAML for stdio | accepted (2026-10-21, P0-13) |
 | [0007](0007-secrets-envelope-encryption.md) | Envelope encryption of Agility access tokens | accepted (2026-10-21, P0-13) |
 | [0008](0008-access-model.md) | Instances, credentials, workspaces, grants, device tokens; bring-your-own-token | accepted (2026-10-21, P0-13) |
-| [0009](0009-authentication.md) | Device tokens first, OAuth 2.1 next; admin sign-in providers | accepted (2026-10-21, P0-08) |
+| [0009](0009-authentication.md) | Device tokens first, OAuth 2.1 next; admin sign-in providers | accepted (2026-10-21, P0-08); §3 secrets at rest amended by 0017 |
 | [0010](0010-platform-limits-strategy.md) | Budgets, concurrency and retries | accepted (2026-10-21, P0-13) |
 | [0011](0011-agility-api-surface.md) | Agility API surface: which endpoint for what | accepted (2026-10-21, P0-06) |
 | [0012](0012-structured-query-no-raw-passthrough.md) | Validated generic query tool with bound parameters; no raw passthrough | accepted (owner) |
@@ -24,6 +24,7 @@ Statuses: `proposed` · `accepted` · `accepted (pending spike PX-NN)` · `super
 | [0014](0014-supported-agility-installations.md) | Hosted and on-premises instances, HTTPS, custom CA, access tokens | accepted (owner) |
 | [0015](0015-tool-output-contract.md) | Tool output contract and untrusted-data envelope | accepted (2026-10-21, P0-11) |
 | [0016](0016-mcp-client-support.md) | MCP client support policy | accepted (owner) |
+| [0017](0017-oauth-secrets-at-rest.md) | OAuth secrets at rest: token-bound keys instead of the master key | accepted (owner, 2026-10-26) |
 
 "accepted (owner)" means the project owner took the decision on 2026-10-16 while reviewing the initial plan; the
 details of those ADRs can still be refined by the tasks they reference.

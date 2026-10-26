@@ -10,7 +10,7 @@
 - **Options:** (a) parse and validate the settings now, refuse `AB_OAUTH=on` at start with a message naming P5-04, and let
   P5-04 lift the refusal; (b) allow `on` with an authorize endpoint that always answers "not available".
 - **Recommendation:** (a): a boot error is clearer than a half-working feature, and nothing is exposed before it is usable.
-- **Owner:** _pending_ (implemented as (a)). **Superseded by P5-04 (2026-10-24):** the built-in consent screen exists, so
+- **Owner (2026-10-26):** Closed. **Superseded by P5-04 (2026-10-24):** the built-in consent screen exists, so
   `AB_OAUTH=on` boots on both hosts. It now needs sign-in to be configured (an identity provider), because people approve
   apps with a session; without one the start is refused with a message saying so.
 
@@ -21,7 +21,7 @@
   (b) require it on every request like relic-bridge, which fails clients that do not repeat it.
 - **Recommendation:** (a): the grant already fixes the workspace, so requiring it again adds no safety and costs
   compatibility (L-094). Clients that send no `resource` at authorization need P5-02 (metadata) to learn it.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-62 — Grant properties are encrypted by the provider, not by a keyring purpose *(P5-01)*
 - **Context:** ADR-0009 promises envelope-encrypted grant properties. The provider encrypts them with a key wrapped under
@@ -29,7 +29,7 @@
 - **Options:** (a) rely on the provider's scheme (no new `KeyPurpose`); (b) add a keyring purpose and encrypt again.
 - **Recommendation:** (a). Props hold only ids (workspace, access grant, user, client). P5-05's refresh-reuse successor,
   which must be recoverable, gets its own derived key.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-63 — Until P5-05, a rotated refresh token works once more *(P5-01)*
 - **Context:** the provider keeps the previous refresh token valid until the new one is first used, so a lost response
@@ -37,7 +37,7 @@
 - **Options:** (a) accept until P5-05 adds reuse detection and the 30-second window; (b) block now with a marker per
   refresh token (relic-bridge's P5-05 design, pulled forward).
 - **Recommendation:** (a): P5-05 is next, `AB_OAUTH` cannot be on before P5-04, and the window it builds replaces this rule.
-- **Owner:** _pending_ (implemented as (a)). **Superseded by P5-05 (2026-10-24):** every refresh now goes through the refresh
+- **Owner (2026-10-26):** Closed. **Superseded by P5-05 (2026-10-24):** every refresh now goes through the refresh
   family ([D-70](#d-70--refresh-successors-are-sealed-under-a-key-derived-from-the-spent-token-p5-05)): a spent token is
   answered with the same successor for the reuse window (default 30 s) and revokes the device after it; the provider's
   "previous token" rule is never reached for a token we have seen spent.
@@ -50,7 +50,7 @@
   for unknown or disabled workspaces (a database lookup per request, and an enumeration oracle).
 - **Recommendation:** (a), as relic-bridge did. The document names the issuer and a resource URL the caller typed; it
   holds nothing about the workspace. An authorization request for an unknown workspace is refused at approval as before.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-65 — The metadata document is not cached *(P5-02)*
 - **Context:** the document is a function of configuration, so it could carry `Cache-Control: public, max-age=…`. The app
@@ -58,6 +58,7 @@
 - **Options:** (a) keep `no-store` (clients fetch it once per connection attempt, it is rate limited, and a change of
   issuer or scope applies at once); (b) add an allow-listed cacheable response.
 - **Recommendation:** (a) until a client matrix run (P5-06) shows one that polls it.
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-66 — The consent screen does not remember approvals, and has no write consent yet *(P5-04)*
 - **Context:** the original scope had an opt-in "don't ask again" (30 days). relic-bridge built it and its review found
@@ -69,7 +70,7 @@
   clients identified by a metadata document (needs P5-03's CIMD, not available for DCR clients).
 - **Recommendation:** (a) now, (b) later if real clients prove too chatty (P5-06 will tell). Write consent (`mcp:write`)
   belongs to Phase 7 and would never be remembered either way.
-- **Owner:** _pending_ (implemented as (a); P5-13 holds (b)).
+- **Owner (2026-10-26):** Decided: as recommended, (a). P5-13 holds (b) for later.
 
 ### D-67 — Devices: at most 25 per person, and one per app, workspace and redirect address *(P5-04)*
 - **Context:** each approved client + user + workspace is a device the person can see and disconnect. Without a cap a
@@ -83,7 +84,7 @@
 - **Recommendation:** (a). 25 is far above what one person connects (phone, laptops, a few agents) and keeps the page short;
   replacement keeps "reconnect" from needing a manual disconnect. A person who connects the same app twice on purpose gives
   the second one another registration (dynamic clients register per installation) or accepts the replacement.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-68 — Dynamic client registration stays on by default, capped *(P5-03)*
 - **Context:** the MCP authorization spec prefers metadata documents (CIMD) and keeps DCR as a compatibility path. DCR is an
@@ -94,7 +95,7 @@
 - **Recommendation:** (a): OAuth itself is opt-in (`AB_OAUTH=on`), so a deployment that turns it on wants clients to
   connect; (b) breaks the clients that cannot use CIMD without telling anyone why (L-089). Turn DCR off once the client
   matrix (P5-06) shows your clients use documents.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a); revisit after the client matrix (P5-06).
 
 ### D-69 — Private-use scheme redirects (`cursor://...`) are not usable *(P5-03)*
 - **Context:** some desktop clients list a private-use scheme callback. Any local app can claim a scheme, and the provider
@@ -104,6 +105,8 @@
   the callback).
 - **Recommendation:** (a) now, as relic-bridge; P5-06 (client matrix) decides whether a client we want needs (b), and then
   P5-04's consent screen must show the scheme.
+- **Owner (2026-10-26):** Decided: as recommended, (a); P5-06 decides whether a client needs (b) (task P5-15).
+
 ### D-70 — Refresh successors are sealed under a key derived from the spent token, not under the master key *(P5-05)*
 - **Context:** the reuse window answers a repeat of a just-spent refresh token with the same successor, so the successor
   (new refresh token and access token) must be recoverable for up to 120 s. ADR-0009 says a recoverable transient secret
@@ -118,7 +121,7 @@
   new key plumbing. It does not defend against someone who holds the spent token, who by the window's definition may ask
   for the successor anyway. The sealed row lives for the window only; the rotation marker (a hash and a time) lives for the
   refresh lifetime so a late replay is recognised.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a). Recorded in [ADR-0017](../adr/0017-oauth-secrets-at-rest.md), which amends the secrets-at-rest sentence of ADR-0009 (with D-62).
 
 ### D-72 — OAuth abuse counters are fixed windows in the shared `kv` table, and fail open *(P5-09)*
 - **Context:** the limits must be exact across Worker isolates and replicas (L-081) and cheap on D1's Free plan (L-097),
@@ -131,7 +134,7 @@
 - **Recommendation:** (a). Fixed windows allow up to twice a limit around a boundary, which these limits (abuse, not
   quotas) tolerate; (d) would turn a D1 hiccup into a sign-in outage when the request needs the same storage anyway.
   Windows are 10 minutes for the interactive endpoints and an hour for registration and fetches.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-73 — Defaults and the shape of the deployment-wide caps *(P5-09)*
 - **Context:** every deployment-wide cap can be reached by many addresses together and then refuses honest users until the
@@ -143,7 +146,7 @@
 - **Recommendation:** (a). Real use is a few authorizations per person per day, so the address limits leave room for a
   shared office address (a 10-person team connecting at once is well within 30 per ten minutes) while the deployment caps stop
   sustained floods at a bounded number of writes. Raise `AB_OAUTH_*_LIMIT` for a large organisation behind one address.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-74 — A revoked dynamic client may register again, as a new client; a revoked metadata-document client stays refused until allowed *(P5-08)*
 - **Context:** an owner revokes an OAuth client that turned out to be hostile or abandoned. A dynamic client's id is chosen by
@@ -156,7 +159,7 @@
 - **Recommendation:** (a). Names are unverified and loopback hosts are shared by every desktop app, so blocking on them
   hurts honest users and stops no one; the real controls for a hostile registrant are the consent screen, the redirect host
   allowlist and the caps of P5-03 and P5-09. The block of a dynamic client expires once every token it could hold has.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-75 — Who may see and end other people's connected apps, and who sees clients *(P5-08)*
 - **Context:** ending a device only removes access, but seeing everyone's apps shows who works with which workspace, and a
@@ -167,4 +170,4 @@
 - **Recommendation:** (a): it follows the panel's existing role model (admins manage members, owners everyone), needs no new
   concept, and keeps an admin from cutting an owner's access. No recent sign-in is asked: disconnecting only removes access
   (L-093).
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).

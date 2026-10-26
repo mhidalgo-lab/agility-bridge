@@ -25,7 +25,7 @@
 - **Options:** (a) keep: allowlists only matter together with auto-provisioning, and a warning explains it; (b) let an
   allowlisted identity sign in as `member` without a flag.
 - **Recommendation:** (a). Provisioning a user is a decision, and `off` is the safe default.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-30 — Several identities per user *(P4-01)*
 - **Context:** one `(idp, subject)` per user, and an email bound to another identity is refused. A person who wants to
@@ -35,7 +35,7 @@
   by verified email across providers.
 - **Recommendation:** (a): (c) is an account-takeover path when one provider's email checks are weaker, and (b) needs a
   linking flow that proves control of both accounts.
-- **Owner:** _pending_ (implemented as one identity per user).
+- **Owner (2026-10-26):** Decided: as recommended, (a), one identity per user with the owner-only unbind.
 
 ### D-31 — Sign-in limit on Workers *(P4-01)*
 - **Context:** `AB_RATE_LIMIT_SIGN_IN` counts per isolate on Workers, as the other non-backstopped rules do; the
@@ -43,7 +43,7 @@
   write that expires after 10 minutes.
 - **Options:** (a) accept (documented); (b) a binding namespace for sign-in; (c) the exact limiter (P3-12).
 - **Recommendation:** (a) until P3-12 decides the limiter.
-- **Owner:** _pending_.
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-32 — Identity provider calls on Node default to public addresses only *(P4-01)*
 - **Context:** `AB_IDENTITY_PRIVATE_ADDRESSES=refuse` is the default (THREAT_MODEL T11), which blocks an OIDC provider on a
@@ -51,7 +51,7 @@
 - **Options:** (a) refuse by default; (b) allow by default, like `AB_INSTANCE_PRIVATE_ADDRESSES`.
 - **Recommendation:** (a): the issuer's discovery document chooses the other endpoints, so a compromised or mistyped
   issuer should not reach internal addresses by default.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-33 — `Clear-Site-Data: "cookies"` on logout *(P4-02)*
 - **Context:** the task asks logout to send `Clear-Site-Data`. The `"cookies"` directive clears the cookies of the whole
@@ -60,7 +60,7 @@
 - **Options:** (a) send `"cookies"` by default and offer `AB_LOGOUT_CLEAR_SITE_DATA=off`; (b) off by default; (c) never.
 - **Recommendation:** (a): a dedicated host is the common case, the session cookie is cleared and deleted either way, and
   the guide warns about shared domains.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-34 — Re-authentication strength at Google and GitHub *(P4-02)*
 - **Context:** a recent sign-in is required for high-impact changes. OIDC providers are asked for `prompt=login&max_age=0`
@@ -71,7 +71,7 @@
   recency, so those owners use the break-glass token for high-impact changes; (c) add a second factor of our own.
 - **Recommendation:** (a) until a real run (owner step 1) shows what Google does with `prompt=login`: the session was
   already created by a fresh provider round trip, and (b) would lock Google- and GitHub-only teams out of key rotation.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-35 — The owner setup page's policy has no `form-action` *(P4-03)*
 - **Context:** the panel's CSP restricts `form-action` to `'self'`. The owner setup form posts to this server and is answered
@@ -83,7 +83,7 @@
   URL); (c) drop `form-action` from every page.
 - **Recommendation:** (a). The page holds no session and no secret except the code the visitor types, and (b) needs a design
   of its own. Verify in a real browser in the P4-08 run (Chromium and Firefox treat redirects after form posts differently).
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-36 — Validation sentences from the admin API are shown beside panel forms *(P4-04)*
 - **Context:** P4-03 decided that no text from an admin API error body is displayed (it can carry names or upstream text). Forms
@@ -92,7 +92,7 @@
   sentences for every other status; (b) keep P4-03's rule and show only our own client-side messages; (c) show every message.
 - **Recommendation:** (a). A 422 message names the field and the rule from our own validators, never upstream text; the other
   statuses (403, 404, 409, 502) are where names and Agility's words can appear, and they stay fixed.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-37 — No new index for the audit viewer; statistics read the newest 10,000 rows *(P4-05)*
 - **Context:** The viewer filters by user, workspace, kind, outcome and action; statistics group `tool_call` rows. The audit
@@ -104,6 +104,7 @@
   new table, retention to match).
 - **Recommendation:** (a). Reads are the plentiful quota; revisit (b) if the benchmark task (P4-14) or a live server shows
   member views scanning a lot, and (c) only if windows beyond 10,000 calls matter in practice.
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-39 — No per-workspace switch for personal tokens, and no member-created grants *(P4-07)*
 - **Context:** a member brings their own Agility token and chooses which of their grants uses it. Grants (scope, tools, limits)
@@ -115,7 +116,7 @@
 - **Recommendation:** (a). A personal token only changes *whose* Agility permissions answer, never what the workspace allows,
   and relic-bridge decided the same way (2026-10-09). Revisit (c) if a team wants shared-only workspaces: a pass-through or
   shared-only workspace already behaves that way.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-40 — Personal credential caps and where they apply *(P4-07)*
 - **Context:** a member can add personal tokens and device tokens without an administrator. Unbounded, each is a storage row
@@ -125,7 +126,7 @@
   owners and admins.
 - **Recommendation:** (a): the numbers match relic-bridge, apply to every writer (API, panel, command line), and owners and
   admins are people too. Make them settings only if a team asks.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-41 — No third-party bridge for Claude Desktop and claude.ai *(P4-06)*
 - **Context:** Claude Desktop's config file starts stdio servers only, claude.ai and mobile need a connector (OAuth, Phase 5).
@@ -135,7 +136,7 @@
   first-party stdio-to-HTTP proxy mode in the CLI.
 - **Recommendation:** (a). (b) puts an unpinned third-party package, run on every start, between a person and a token that acts as
   them in Agility; (c) is a feature of its own (a new task if a team needs Desktop before Phase 5).
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-42 — Environment variable name and where the client keeps the token *(P4-06)*
 - **Context:** snippets read the device token from a variable instead of a command-line value. The server itself reads `AB_*`
@@ -145,7 +146,7 @@
 - **Recommendation:** (a). `claude mcp add` and `copilot mcp add` still write the expanded value into the client's own file
   (`~/.claude.json`, `~/.copilot/mcp-config.json`, plain text): the snippets say so, and short device-token lifetimes are the
   mitigation (the default is 90 days).
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-47 — What `cf:setup --sign-in` asks and where client secrets go *(P4-13)*
 - **Context:** the first task draft kept the allowlists as dashboard variables and said nothing about `--secrets-file`.
@@ -156,6 +157,7 @@
   dashboard; (c) also write client secrets to `--secrets-file`.
 - **Recommendation:** (a). The identity provider keeps the client secret (rotating it is one click there), while the
   secrets file exists for values only Cloudflare would hold; a second copy of a client secret is one more place to leak.
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-45 — What the unbind audit row records about the old binding *(P4-12)*
 - **Context:** `user.unbind` must let an auditor tell which provider was cleared. The provider subject is a stable identifier of a
@@ -164,7 +166,7 @@
   the subject.
 - **Recommendation:** (a): the user id in the row already says whose account it was, and a short unsalted hash of a guessable
   id can be reversed by anyone who can read the audit log.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-46 — After an unbind, who may claim the account *(P4-12)*
 - **Context:** once the binding is cleared, the next verified sign-in whose email matches binds the account, at any configured
@@ -172,17 +174,19 @@
 - **Options:** (a) ship as is and document the residual (keep configured providers to ones whose email checks you trust);
   (b) let the owner name the provider the next binding must come from, with an expiry (task P4-24).
 - **Recommendation:** (a) now, (b) when a deployment has providers of different strength; it is a small follow-up (P4-24).
+- **Owner (2026-10-26):** Decided: as recommended, (a) now; (b) is P4-24 if providers of different strength are mixed.
+
 ### D-43 — Should the browser E2E and ZAP jobs be required checks? *(P4-08)*
 - **Context:** `.github/workflows/admin-e2e.yml` runs a Playwright job and a ZAP baseline job on pull requests and pushes to `main` that touch the panel, sign-in, the admin API, the CLI, storage or `e2e/`, weekly, and on demand. A workflow filtered by paths does not report on other pull requests, so a required check on it would block every unrelated PR forever.
 - **Options:** (a) keep them non-required and path-filtered (a failure is visible on the PR and on `main`, merging is the owner's call); (b) drop the path filter, run on every pull request and require both (about 5 to 10 minutes of Actions on each PR; a flaky browser run would block merges); (c) required only on `release/*` pull requests.
 - **Recommendation:** (a) until the jobs have been green on `main` for a few weeks; then (b) for the Playwright job only (the ZAP image pull is the slow, network-dependent one), or (c). Changing required checks is a repository setting and an owner step: add the check names to [repository settings](../security/repo-settings.md) in the same change.
-- **Owner:** _pending_ (implemented as (a)). Also an owner step: after the first run on `main`, confirm both jobs are green and tick the last box of P4-08.
+- **Owner (2026-10-26):** Decided: as recommended, (a) for now; revisit (b) for the Playwright job after a few weeks green on `main`. Also an owner step: after the first run on `main`, confirm both jobs are green and tick the last box of P4-08.
 
 ### D-44 — Browser coverage beyond Chromium *(P4-08)*
 - **Context:** the specs run in Chromium (desktop and 320 px). Firefox and WebKit run only the smoke spec, on demand (`AB_E2E_BROWSERS=all`), because the security checks use Chromium-specific facts (Trusted Types enforcement, `chrome-error:` frames, DevTools-level evaluation) and the panel's script is a few lines.
 - **Options:** (a) Chromium for everything, Firefox and WebKit smoke on demand; (b) run the smoke spec in all three browsers in CI on every run (two more browser downloads, a few minutes); (c) port the header and cookie specs to all three.
 - **Recommendation:** (a): the panel works without its script and uses no browser-specific feature; revisit (b) if a user reports a Firefox or Safari problem.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-51 — How `GET /tokens` pages and who sees what *(P4-15)*
 - **Context:** the panel-wide device token list needs a stable page key and a rule for members. The storage lists tokens whole
@@ -192,7 +196,7 @@
   (c) owners and admins only (members keep the per-grant list).
 - **Recommendation:** (a) now, (b) when a deployment holds thousands of tokens. Members already see their own tokens per grant, so
   the API answering the same set through one call costs nothing and the panel screen stays admin-only.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-52 — Number prefixes: edit now, apply later *(P4-15)*
 - **Context:** `instances.numberPrefixes` was stored and shown, never validated, and no host passes it to the metadata service,
@@ -201,32 +205,32 @@
   runtime use them in task P4-30; (b) wire them into the resolver in this task; (c) leave the field out of the panel until P4-30.
 - **Recommendation:** (a): the validator and the form do not depend on the wiring, and P4-30 touches the access resolver and the
   metadata cache, which deserves its own review. Until then the prefixes are an inert, validated record.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 
 ### D-55 — Who may add an instance, and so choose where member tokens are sent *(P4-09)*
 - **Context:** ADR-0008 lets owners and admins define instances. A new instance is a new origin: a rogue or compromised admin who adds one at an address they control, gives a member a grant on a workspace there and asks them to "add your Agility token" receives that token when it is validated (the origin must only answer the tokenless probe like Agility, which a copy does). THREAT_MODEL A14 stops *changing* an origin (owner only, recent sign-in, revokes what depended on it), not adding one. The CA file (`tls`) of a new instance was settable by admins through the API although the panel said owners only; that is fixed in P4-09 (owner with a recent sign-in on every route).
 - **Options:** (a) keep ADR-0008: admins add instances, members see the address before they paste a token, the probe must pass, `AB_INSTANCE_PRIVATE_ADDRESSES=refuse` keeps it public, and every add is an audit row with the host; (b) adding an instance is owner only with a recent sign-in (task P4-34; a new ADR superseding that sentence of ADR-0008).
 - **Recommendation:** (a) for now: a deployment has one or two instances, set up by whoever installs it, and (a) is what the owner approved in ADR-0008. Choose (b) when administrators are not trusted as much as owners (the rogue admin is threat actor 5); it is a small guard, form and docs change.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: (a). Administrators are trusted as much as owners in this deployment, so adding an instance stays an admin action (ADR-0008 unchanged); P4-34 is not needed unless that changes.
 
 ### D-56 — An unused setup link cannot be listed or revoked *(P4-09)*
 - **Context:** `POST /setup-links` returns the link once; it lives in storage for 1 minute to 7 days (default 1 hour), is single use, and nothing lists or cancels it. An owner who pasted one in the wrong chat can only wait for it to expire; whoever opens it first becomes an owner.
 - **Options:** (a) keep, with the short default and the advice (documented) to issue links of the shortest lifetime and to check `login.ok` rows with outcome `owner_bootstrap`; (b) an owner-only list (id, expiry, issuer) and revoke, in the API, the CLI and the panel (task P4-35).
 - **Recommendation:** (a) now: the default is one hour and links are rare (first owner, or a replacement owner). Do (b) before anyone issues links routinely or sets the 7-day maximum.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-57 — Audit rows of admin changes are written after the change and may be lost *(P4-09)*
 - **Context:** the audit writer queues rows and writes them in the background; a failed write is logged, a full queue (10,000 rows) drops rows with an error log, and the row follows the change. The intent of an Agility write is written first and stops the write when it cannot be stored (ADR-0013, L-109); admin changes are not.
 - **Options:** (a) keep: an audit outage must not lock owners out of an incident response (the break-glass token and the CLI still work), and failures are loud in the logs; (b) write the row of every admin change first and refuse the change when it cannot be stored (task P4-36), except for the break-glass token.
 - **Recommendation:** (a) until storage failures are seen in practice: D1 and SQLite fail together with the change itself in the cases that matter, and (b) makes a degraded database a total admin outage.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-58 — What an old session may still do, and the lifetime of an ordinary device token *(P4-09)*
 - **Context:** a session lasts up to 12 hours and a sign-in is "recent" for 10 minutes. After the review, anything that creates a credential outliving the session (a token past 90 days or `never`, a setup link, a pass-through workspace, an owner or admin, write settings, a replaced token, an origin or CA change) needs the recent sign-in. An old session can still issue ordinary device tokens (up to 90 days, at most 20 live per grant), add a shared credential, create grants for read tools and add instances as an administrator.
 - **Options:** (a) as it is: tokens up to 90 days stay frictionless, they are listed, revocable and traced by id in the audit log; (b) every device token needs the recent sign-in (a prompt on most connects); (c) lower the default lifetime (30 days) and keep the rule.
 - **Recommendation:** (a): (b) makes connecting a second device a sign-in event for every member, and the standing-credential cases are covered. Revisit (c) with real usage.
-- **Owner:** _pending_ (implemented as (a)).
+- **Owner (2026-10-26):** Decided: as recommended, (a).
 
 ### D-59 — Go for Phase 5 *(P4-11)*
 - **Context:** Phase 4 is built, reviewed (P4-09 and P4-11) and deployed on staging up to the sign-in routes. The one thing not
