@@ -40,6 +40,7 @@ ChatGPT connectors, Gemini CLI.
 | MCP Inspector CLI | 2.11.0 | 2026-10-21 | **V** the v0.1 stdio CLI (built from `main`, before publishing) against the synthetic fixture upstream (`scripts/fixture-agility.ts`): `tools/list` (13 tools) in the 2025 era, `list_my_work` and `get_work_item` in both eras with `structuredContent` and enveloped text; `-e` passes `AB_AGILITY_URL`/`AB_AGILITY_TOKEN` | P1-14 |
 | MCP Inspector CLI | 2.11.0 | 2026-10-21 | **V** `agility-bridge serve` (v0.2, built from the P2-17 branch) over Streamable HTTP with a device token in a static `Authorization` header, against the synthetic fixture upstream: `initialize`, `tools/list` and a `get_assets` call (2025 era); the stray `GET` gets `405` as designed and a request without the token `401`. Both eras over HTTP ran with the SDK client in-process against the read-only tenant (`live/server.live.test.ts`). VS Code, JetBrains, Copilot CLI, Claude Code and Cursor against `serve` are the owner's runs (P2-17) | P2-17 |
 | GitHub Copilot (desktop) | 2026-10 | 2026-10-02 | listed and called over HTTP | relic-bridge P0-07 (same SDK; not yet re-run against agility-bridge) |
+| Claude Code | 2.1.310 | 2026-10-26 | **V** remote over HTTPS on the Cloudflare deployment (custom domain, Workers Free) with a static device token: tools listed and called | P5-06, owner run |
 
 OAuth 2.1 (P0-08, production on Workers, 2026-10-21): **Claude Code 2.1.304** and **VS Code 1.142.0** sign in through
 **CIMD** (`https://claude.ai/oauth/claude-code-client-metadata`, `https://vscode.dev/oauth/client-metadata.json`), **MCP
@@ -49,6 +50,21 @@ Inspector CLI 2.11.0** through **DCR** (it needs a TTY for interactive OAuth); a
 Measured server-side (P0-07): elicitation can approve a write on **stdio** (either era) and on **2026-07-28 HTTP**, never
 on 2025-era HTTP. The rest of the matrix is the owner's checklist in
 [`spikes/mcp-sdk-v2/client-checklist.md`](../../spikes/mcp-sdk-v2/client-checklist.md).
+
+## OAuth runs (P5-06)
+
+Against the Cloudflare deployment (Worker on a custom domain, Workers Free, sign-in through Cloudflare Access,
+`AB_OAUTH=on`). Evidence: the owner's runs and the audit log (client id, grant type), never tenant content.
+
+| Client | Version | Date | Discovery | Registration | Sign-in and consent | Tools | Refresh | Disconnect / reconnect |
+|---|---|---|---|---|---|---|---|---|
+| claude.ai web | hosted | 2026-10-26 | **V** from the MCP route's `WWW-Authenticate` | **V** client metadata document (`https://claude.ai/oauth/mcp-oauth-client-metadata`) | **V** | **V** | not run | not run |
+| Claude Code | 2.1.310 | 2026-10-26 | **V** | **V** client metadata document (`https://claude.ai/oauth/claude-code-client-metadata`) | **V** | **V** | **V** silent `refresh_token` exchange | not run |
+| Claude mobile, Claude Desktop connectors, VS Code, JetBrains, Copilot CLI, MCP Inspector | — | — | not run yet | | | | | |
+| Cursor, Windsurf / Devin Desktop | — | — | not run (no subscription available) | | | | | |
+
+The rows marked "not run" are [P6-14](../tasks/phase-6-tool-breadth/P6-14-oauth-client-matrix-rest.md). No client has
+used dynamic registration yet (D-68), and none has needed a private-use redirect (D-69).
 
 ## v0.1 client snippets (P1-14)
 

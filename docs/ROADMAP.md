@@ -238,9 +238,9 @@ Status lives in each task file.
 | P5-03 | [Client registration: CIMD and DCR](tasks/phase-5-oauth/P5-03-client-registration.md) | high | P5-02 | done |
 | P5-04 | [Consent screen and device handling](tasks/phase-5-oauth/P5-04-consent-devices.md) | high | P5-01 | done |
 | P5-05 | [Token lifecycle and refresh concurrency](tasks/phase-5-oauth/P5-05-token-lifecycle.md) | high | P5-01 | done |
-| P5-06 | [Real-client compatibility matrix (OAuth)](tasks/phase-5-oauth/P5-06-client-matrix-oauth.md) | high | P5-02, P5-03, P5-04, P5-05 | todo |
+| P5-06 | [Real-client compatibility matrix (OAuth)](tasks/phase-5-oauth/P5-06-client-matrix-oauth.md) | high | P5-02, P5-03, P5-04, P5-05 | review |
 | P5-07 | [OAuth documentation](tasks/phase-5-oauth/P5-07-oauth-docs.md) | medium | P5-06 | todo |
-| P5-08 | [Admin: connected apps and devices](tasks/phase-5-oauth/P5-08-admin-oauth-apps.md) | medium | P5-05 | review |
+| P5-08 | [Admin: connected apps and devices](tasks/phase-5-oauth/P5-08-admin-oauth-apps.md) | medium | P5-05 | done |
 | P5-09 | [Abuse controls for unauthenticated endpoints](tasks/phase-5-oauth/P5-09-oauth-abuse-controls.md) | medium | P5-03 | done |
 | P5-10 | [Phase 5 review](tasks/phase-5-oauth/P5-10-phase-5-review.md) | high | P5-07, P5-08, P5-09 | todo |
 | P5-13 | [Remembered read consent (opt-in)](tasks/phase-5-oauth/P5-13-remembered-consent.md) | low | P5-04, P5-05 | todo |
@@ -267,6 +267,7 @@ Status lives in each task file.
 | P6-11 | [Cost accounting and composite grants](tasks/phase-6-tool-breadth/P6-11-cost-composite-grants.md) | medium | P6-07 | todo |
 | P6-12 | [Consistency pass (arguments, outputs, paging, tool count)](tasks/phase-6-tool-breadth/P6-12-consistency-pass.md) | medium | P6-07, P6-08, P6-09 | todo |
 | P6-13 | [Phase 6 review and live verification](tasks/phase-6-tool-breadth/P6-13-phase-6-review.md) | high | P6-03, P6-04, P6-06, P6-10, P6-11, P6-12 | todo |
+| P6-14 | [OAuth client matrix for the remaining clients](tasks/phase-6-tool-breadth/P6-14-oauth-client-matrix-rest.md) | medium | P5-06 | todo |
 
 ### Phase 7
 
