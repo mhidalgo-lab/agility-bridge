@@ -1,6 +1,7 @@
 # ADR-0009 — Authentication: device tokens first, OAuth 2.1 next; admin sign-in providers
 
-- **Status:** accepted (owner, 2026-10-21, on the P0-08 evidence below)
+- **Status:** accepted (owner, 2026-10-21, on the P0-08 evidence below); the secrets-at-rest sentence of §3 is amended by
+  [ADR-0017](0017-oauth-secrets-at-rest.md) for grant properties and the refresh-reuse successor (2026-10-26)
 - **Date:** 2026-10-16
 - **Related:** P2-05, P4-01, P4-02, P5-01 – P5-09, L-024, L-029, L-066, L-067, L-086 – L-094
 
