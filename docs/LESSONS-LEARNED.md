@@ -27,7 +27,7 @@ How to use it:
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
-| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315 |
+| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315, L-317 – L-320 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280, L-304, L-316 |
@@ -1960,6 +1960,40 @@ field is absent when nothing is wrong.
 catalogue names that pass the tool-name pattern; a hostile or missing field parses to "no siblings". The grant page
 computes from what the grant can really call (its list inside the workspace's), not from its own list alone.
 *Applied in:* P6-11, `screens/shared.tsx` (`compositeNotes`), L-095.
+
+**L-317 — Say a shared argument once, in one schema, and lint every tool against that text.**
+Fifteen tools spelled `project`, `team`, `sprint`, `member` and `time_range` in six different ways ("The owner: me, …" next to
+"Owner: me, …", "within the workspace" on some). `tools/common.ts` now holds one schema and one description per shared name
+(`projectArg`, `currentSprintArg`, `myMemberArg`, `timeRangeArg(default)`, …) and exports `ARGUMENT_VOCABULARY`; the lint
+refuses a tool whose advertised description does not start with one of them, or whose type differs (`limit` an integer,
+`include_closed` a boolean, `format` the four values with default `auto`). A variant that is really a different concept
+(a work-item type enum versus a free asset type) is a second entry in the vocabulary, not an exception. The shared texts
+are also shorter, so the default `tools/list` shrank too.
+*Applied in:* P6-12, `tools/common.ts`, `test/harness/lint.ts` (`lintArgumentShapes`), L-030.
+
+**L-318 — Decode the cursor before anything that can return early.**
+`list_members` returned an empty page before it reached `decodeCursor`, so a cursor from another tool or a forged one was
+accepted when the workspace's projects listed no members, while every other tool refused it with `AB_INPUT_INVALID`. A
+cursor is client input (L-032): check it first, then branch. The consistency test sends a garbage cursor to every tool
+that takes one, and a cursor bound to other filters.
+*Applied in:* P6-12, `tools/planning/members.ts`, `test/tools/consistency.test.ts`, L-032.
+
+**L-319 — `items` is the row array; a count is `<thing>Count`; the lint reads the output schema.**
+`get_sprint` used `items` for a number (`totals.items`, `byStatusCategory[].items`, `committed.items`, burndown points) beside
+`items[]` for rows, so a client could not tell by name what a field held. Counts are `itemCount` (as `childCount` and
+`commentCount` already were). The output lint pins the type of every key the conventions name (`items` array, `partial` and
+`truncated` boolean, `notes` an array of strings, `window` `{ since, until }`), refuses `hasMore`, `next_cursor`, `warnings`
+and snake_case keys at any depth, and requires `partial` and `notes` on every list so the declared schema says what the
+tool can return (a behavioural test checks the result against the declaration).
+*Applied in:* P6-12, `tools/planning/sprint.ts`, `test/harness/lint.ts` (`lintOutputShape`), L-017.
+
+**L-320 — Structure saves more `tools/list` bytes than prose, and the router eval watches the prose.**
+The 3.3 KB won in the default catalogue (39.2 to 35.9 KB) came mostly from structure (advertised output schemas drop
+`additionalProperties: {}` because open is the JSON Schema default; the nested filter inside `any_of` carries no
+descriptions; one-line shared argument texts) and less from descriptions. Trimming words alone cost the lexical router eval 4 points (65.8 to 61.6 % top-1):
+the words people use ("comments", "files attached", "who is on", "which one is current") are what it matches. Descriptions
+were rewritten to keep those words and the baseline rose (75 % top-1, 87 % top-3). Measure both after every trim.
+*Applied in:* P6-12, `server.ts` (`openSchema`), `scripts/evals/baseline.json`, L-155, L-124.
 
 ---
 

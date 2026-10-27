@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { capBudget } from '../../context.ts';
 import { shapeOutput, untrusted } from '../../output/result.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
+import { epicArg } from '../common.ts';
 import { getPortfolioTree } from '../portfolio/get-tree.ts';
 import {
   allQueries,
@@ -44,13 +45,13 @@ export const releaseReadiness: ToolDefinition = defineTool({
   name: NAME,
   title: 'Release readiness',
   description:
-    'Judge whether an epic (a release or initiative) is finished: open backlog items, open defects, unestimated open items and the sub-epics still short of done, from its portfolio tree. Verdict ready only when everything was read and nothing is open; not_ready when open work was seen; otherwise unknown. Not paged. A cold call can make up to 20 Agility requests.',
+    'Judge whether an epic (a release or initiative) is finished: open backlog items, open defects, unestimated open items and sub-epics short of done, from its portfolio tree. Verdict ready only when everything was read and nothing is open; not_ready when open work was seen; otherwise unknown. Not paged. Cold call: up to 20 Agility requests.',
   kind: 'read',
   group: 'reports',
   // get_portfolio_tree, capped at its own cost.
   cost: COST,
   inputSchema: z.object({
-    asset: z.string().min(1).max(64).describe('Epic number (E-01234) or OID token (Epic:1234).'),
+    asset: epicArg,
     depth: z.number().int().min(1).max(4).default(2).describe('Levels of sub-epics below the epic to read.'),
   }),
   outputSchema: reportOutput({

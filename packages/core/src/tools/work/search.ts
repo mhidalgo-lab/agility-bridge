@@ -9,7 +9,20 @@ import type { FilterInput } from '../../query/compiler.ts';
 import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { invalid } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { containsArg, cursorArg, formatArg, includeClosedArg, limitArg, listOutput } from '../common.ts';
+import {
+  containsArg,
+  cursorArg,
+  formatArg,
+  includeClosedArg,
+  limitArg,
+  listOutput,
+  memberArg,
+  projectArg,
+  sprintArg,
+  statusArg,
+  teamArg,
+  workItemTypeArg,
+} from '../common.ts';
 import { identityFor, WORK_ITEM_TYPES, workItem, workItemFields } from './items.ts';
 import { idOf, multiPage, offsetsAfter, type TypedRow } from './multi.ts';
 
@@ -116,35 +129,18 @@ export const searchWorkItems: ToolDefinition = defineTool({
   name: NAME,
   title: 'Search work items',
   description:
-    'Search backlog items (stories), defects, tasks and tests within the workspace by Agility project, team, sprint (name or current/previous/next), owner (member or me), status names, status category or name text. Sorting by recent change costs about a second per call. Paged: pass nextCursor back as cursor. A cold call can make up to 24 Agility requests.',
+    'Find and filter work items (backlog items or stories, defects, tasks and tests) within the workspace by Agility project, team, sprint, owner (member), status, status category or words in the name. Sorting by recent change costs about a second per call. Paged: pass nextCursor back as cursor. Cold call: up to 24 Agility requests.',
   kind: 'read',
   group: 'work',
   // Capped at run time: metadata for the types and their relations, name resolution, the project tree, one page.
   cost: COST,
   inputSchema: z.object({
-    asset_type: z
-      .enum(WORK_ITEM_TYPES)
-      .optional()
-      .describe('Story, Defect, Task or Test; all four when omitted.'),
-    project: z
-      .string()
-      .min(1)
-      .max(200)
-      .optional()
-      .describe('Agility project name or Scope:<id> within the workspace.'),
-    team: z.string().min(1).max(200).optional().describe('Team name or Team:<id>.'),
-    sprint: z
-      .string()
-      .min(1)
-      .max(200)
-      .optional()
-      .describe('Sprint name, Timebox:<id>, or current/previous/next.'),
-    member: z.string().min(1).max(200).optional().describe('Owner: me, a username, a name or Member:<id>.'),
-    status: z
-      .array(z.string().min(1).max(100))
-      .max(20)
-      .optional()
-      .describe('Status names as configured on the instance.'),
+    asset_type: workItemTypeArg(WORK_ITEM_TYPES),
+    project: projectArg,
+    team: teamArg,
+    sprint: sprintArg,
+    member: memberArg,
+    status: statusArg,
     status_category: z
       .enum(['not_started', 'in_progress', 'completed'])
       .optional()
@@ -154,7 +150,7 @@ export const searchWorkItems: ToolDefinition = defineTool({
     sort_by: z
       .enum(['id', 'name', 'recently_changed'])
       .default('id')
-      .describe('id is cheap and stable; recently_changed costs about a second per call.'),
+      .describe('recently_changed costs about a second per call.'),
     limit: limitArg,
     cursor: cursorArg,
     format: formatArg,

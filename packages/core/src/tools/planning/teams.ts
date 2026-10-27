@@ -10,7 +10,15 @@ import { shapeList, shapeOutput, untrusted } from '../../output/result.ts';
 import { compileQuery } from '../../query/compiler.ts';
 import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { containsArg, cursorArg, formatArg, limitArg, listOutput, rowOid } from '../common.ts';
+import {
+  containsArg,
+  cursorArg,
+  formatArg,
+  limitArg,
+  listOutput,
+  requiredTeamArg,
+  rowOid,
+} from '../common.ts';
 
 const LIST_TEAMS = 'list_teams';
 
@@ -18,7 +26,7 @@ export const listTeams: ToolDefinition = defineTool({
   name: LIST_TEAMS,
   title: 'List teams',
   description:
-    'List the teams on the instance by name (teams are not tied to an Agility project); use get_team for a team’s workflow, current sprint and members, and list_sprints for its sprints. Paged: pass nextCursor back as cursor.',
+    'List the teams on the instance by name (teams are not tied to an Agility project); use get_team for one team. Paged: pass nextCursor back as cursor.',
   kind: 'read',
   group: 'planning',
   // Team metadata and the page.
@@ -70,19 +78,21 @@ export const getTeam: ToolDefinition = defineTool({
   name: 'get_team',
   title: 'Get a team',
   description:
-    'Get one team: its own workflow statuses where the instance has them, its current sprint, and its members as derived from assignments (owners of open work items with this team inside the workspace; Agility teams have no roster). Not paged. A cold call can make up to 20 Agility requests.',
+    'Get one team: who is on it (members derived from the owners of open work items in the workspace, as Agility teams have no roster), its workflow statuses where the instance has them, and its current sprint. Not paged. Cold call: up to 20 Agility requests.',
   kind: 'read',
   group: 'planning',
   // Capped at run time: team resolution, status lists, the assignment query, current-sprint resolution (cold cache).
   cost: GET_TEAM_COST,
   inputSchema: z.object({
-    team: z.string().min(1).max(200).describe('Team name or Team:<id>.'),
+    team: requiredTeamArg,
     format: formatArg,
   }),
   outputSchema: z.looseObject({
     team: z.looseObject({ oid: z.string(), name: z.string() }),
     members: z.array(z.looseObject({ oid: z.string() })),
     statuses: z.array(z.looseObject({ oid: z.string(), name: z.string() })),
+    partial: z.boolean().optional(),
+    notes: z.array(z.string()).optional(),
   }),
   handler: async (input, outer) => {
     const ctx = { ...outer, budget: capBudget(outer.budget, GET_TEAM_COST) };

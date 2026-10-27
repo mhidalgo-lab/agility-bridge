@@ -8,20 +8,42 @@ import { compileQuery, FILTER_OPS, type FilterInput } from '../../query/compiler
 import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { invalid } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { cursorArg, formatArg, includeClosedArg, limitArg, listOutput } from '../common.ts';
+import {
+  assetTypeArg,
+  cursorArg,
+  formatArg,
+  includeClosedArg,
+  limitArg,
+  listOutput,
+  minimalOutputArg,
+  projectArg,
+} from '../common.ts';
 import { fieldInfo, IDENTITY_FIELDS, toItem } from './rows.ts';
 
 const NAME = 'query_assets';
 const COST = 12;
 
-const scalar = z.union([z.string().max(1_000), z.number(), z.boolean()]);
-export const filterSchema: z.ZodType<FilterInput> = z.object({
-  field: z.string().min(1).max(200).describe('Attribute path, e.g. Status.Name, Owners.Name, Estimate.'),
+const filterFields = {
+  field: z.string().min(1).max(200),
   op: z.enum(FILTER_OPS as unknown as [FilterInput['op'], ...FilterInput['op'][]]),
-  value: z
-    .union([scalar, z.array(z.union([z.string().max(1_000), z.number()])).max(50)])
+};
+const filterValue = z.union([
+  z.string().max(1_000),
+  z.number(),
+  z.boolean(),
+  z.array(z.union([z.string().max(1_000), z.number()])).max(50),
+]);
+export const filterSchema: z.ZodType<FilterInput> = z.object({
+  ...filterFields,
+  field: filterFields.field.describe('Attribute path, e.g. Status.Name, Owners.Name, Estimate.'),
+  value: filterValue
     .optional()
     .describe('A scalar (no commas) or, for "in", an array. Omit for is_set and is_not_set.'),
+}) as unknown as z.ZodType<FilterInput>;
+/** The same filter inside `any_of`: the description is spent once, on `filters`. */
+const groupFilterSchema = z.object({
+  ...filterFields,
+  value: filterValue.optional(),
 }) as unknown as z.ZodType<FilterInput>;
 
 /** Path of the Agility project for `project` narrowing, per scope strategy. */
@@ -35,17 +57,13 @@ export const queryAssets: ToolDefinition = defineTool({
   name: NAME,
   title: 'Query assets',
   description:
-    'Query any asset type this workspace allows (stories, defects, tasks, tests, epics, issues, requests, regression tests, custom fields) with structured filters, fields and sort; values are always bound and the workspace scope is enforced. Sorting by ChangeDate costs about a second per call. Paged: pass nextCursor back as cursor. A cold call can make up to 12 Agility requests.',
+    'Query any asset type this workspace allows (stories, defects, tasks, tests, epics, issues, requests, custom fields) with structured filters, fields and sort; values are bound and the workspace scope is enforced. Sorting by ChangeDate costs about a second per call. Paged: pass nextCursor back as cursor. Cold call: up to 12 Agility requests.',
   kind: 'read',
   group: 'query',
   // Capped at run time: metadata for the type and every related type on a cold cache, the project tree, the page.
   cost: COST,
   inputSchema: z.object({
-    asset_type: z
-      .string()
-      .min(1)
-      .max(64)
-      .describe('Agility API name, e.g. Story, Defect, Task, Test, Epic, Issue.'),
+    asset_type: assetTypeArg,
     fields: z
       .array(z.string().min(1).max(200))
       .max(30)
@@ -53,16 +71,11 @@ export const queryAssets: ToolDefinition = defineTool({
       .describe('Attribute paths to return; the type’s default tier when omitted.'),
     filters: z.array(filterSchema).max(20).optional().describe('ANDed filters: { field, op, value }.'),
     any_of: z
-      .array(z.array(filterSchema).min(1).max(10))
+      .array(z.array(groupFilterSchema).min(1).max(10))
       .max(3)
       .optional()
-      .describe('OR between groups of filters, AND inside a group.'),
-    project: z
-      .string()
-      .min(1)
-      .max(200)
-      .optional()
-      .describe('One Agility project of the workspace: name or Scope:<id>.'),
+      .describe('OR between groups of filters (same shape as filters), AND inside a group.'),
+    project: projectArg,
     include_child_projects: z
       .boolean()
       .optional()
@@ -74,7 +87,7 @@ export const queryAssets: ToolDefinition = defineTool({
       .optional()
       .describe('Sort fields; ID is the order when omitted and always the last tiebreaker.'),
     as_of: z.string().max(40).optional().describe('ISO 8601 UTC point in time (bounded by the workspace).'),
-    minimal_output: z.boolean().optional().describe('Only the minimal fields (identity and name).'),
+    minimal_output: minimalOutputArg,
     limit: limitArg,
     cursor: cursorArg,
     format: formatArg,

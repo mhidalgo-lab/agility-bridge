@@ -349,3 +349,38 @@
 - **Recommendation:** (a). It keeps the untrusted-data path to one place (the tools) and prompts free of upstream failure
   modes; (b) can be added per prompt later without changing the argument contract.
 - **Owner:** *(open; built as (a))*
+
+### D-114 — One schema and one description per shared argument; the lint has no exceptions list *(P6-12)*
+- **Context:** the review of all 26 tools found `member` described as "The owner: …" on two tools and "Owner: …" on a third,
+  `project` with and without "within the workspace", three spellings of `sprint`, four of `time_range`, a free `asset_type`
+  described differently on `query_assets` and `describe_asset_type`. No released argument had to be renamed: the drift was
+  in descriptions and types of the same names, so no alias (`deprecations.ts` stays empty).
+- **Options:** (a) shared zod schemas in `tools/common.ts` plus a vocabulary the lint checks (the advertised description
+  must start with a known text, the type must match); (b) the registry rewrites descriptions of known names at registration
+  (tools could not drift, but the source would no longer say what is advertised); (c) review by hand.
+- **Recommendation:** (a), built. A legitimately different concept gets its own vocabulary entry (`epicArg`,
+  `workItemArg`, the work-item `asset_type` enum), never an exception.
+- **Owner:** *(open; built as (a))*
+
+### D-115 — Counts are `<thing>Count`; `get_sprint` renamed its numeric `items` fields without an alias *(P6-12)*
+- **Context:** `get_sprint` used `items` for a number (`totals.items`, `byStatusCategory[].items`, `committed.items`,
+  `planned.items`, `carryOver.items`, burndown points) next to `items[]` for rows; the conventions reserve `items` for the
+  row array and use `childCount`, `commentCount` for counts.
+- **Options:** (a) rename to `itemCount` now; (b) keep `items` and document the exception; (c) rename and keep the old key
+  as a deprecated alias for a release.
+- **Recommendation:** (a), built: `get_sprint` is new in this unreleased version (its changeset is still pending), before
+  1.0 renames need only a changelog entry, and `sprint_health` is the only reader and moved with it. (c) would be the rule
+  once an output field has shipped.
+- **Owner:** *(open; built as (a))*
+
+### D-116 — The default `tools/list` has a 36.5 KB target in a test, below the 40 KB cap *(P6-12)*
+- **Context:** the default catalogue was 39,179 of 40,000 bytes; the pass brought it to 35,892 (every group: 47,946 to
+  44,157 of 72,000). Without a lower tripwire the next default tool would eat the headroom silently and the redesign would
+  happen at the cap. Tool count: 20 default, 26 with every read group, 35 with the nine planned Phase 7 write tools
+  (26 + 9), five below the cap of 40 (L-155); the write group is opt-in, so it counts only against the 72 KB budget (about
+  1.8 KB per write tool would bring it to about 60 KB).
+- **Options:** (a) keep only the 40 KB hard cap; (b) add a 36.5 KB target and a 3.6 KB cap per tool to the contract test,
+  so a change that crosses it must say why; (c) lower the hard cap.
+- **Recommendation:** (b), built. (c) would not change what clients accept (Cursor's cap is about the number of tools; the
+  byte budget is ours).
+- **Owner:** *(open; built as (b))*

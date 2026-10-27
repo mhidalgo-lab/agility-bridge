@@ -7,7 +7,7 @@ import { shapeList, untrusted } from '../../output/result.ts';
 import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { invalid } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { cursorArg, formatArg, includeClosedArg, limitArg, listOutput } from '../common.ts';
+import { cursorArg, formatArg, includeClosedArg, limitArg, listOutput, myMemberArg } from '../common.ts';
 import { identityFor, WORK_ITEM_TYPES, workItem, workItemFields } from './items.ts';
 import { idOf, multiPage, offsetsAfter, type TypedRow } from './multi.ts';
 import { readableWorkTypes } from './search.ts';
@@ -25,18 +25,13 @@ export const listMyWork: ToolDefinition = defineTool({
   name: NAME,
   title: 'List my work',
   description:
-    'List the open backlog items, defects, tasks and tests owned by the token’s member (or another member) within the workspace, ordered and grouped by sprint and status. Paged: pass nextCursor back as cursor. A cold call can make up to 20 Agility requests.',
+    'List the open backlog items, defects, tasks and tests of the token’s member (or another member) within the workspace, ordered by sprint and status. Paged: pass nextCursor back as cursor. Cold call: up to 20 Agility requests.',
   kind: 'read',
   group: 'work',
   // Capped at run time: member resolution, metadata for the four types and their relations, one page.
   cost: COST,
   inputSchema: z.object({
-    member: z
-      .string()
-      .min(1)
-      .max(200)
-      .default('me')
-      .describe('The owner: me, a username, a name or Member:<id>.'),
+    member: myMemberArg,
     include_closed: includeClosedArg,
     limit: limitArg,
     cursor: cursorArg,
@@ -105,14 +100,14 @@ export const listMyWork: ToolDefinition = defineTool({
       source: 'work items',
       rows: items,
       columns: [
-        'sprint',
-        'status',
         'number',
         'assetType',
         'oid',
         'state',
         'project',
         'name',
+        'status',
+        'sprint',
         'estimate',
         'toDoHours',
       ],

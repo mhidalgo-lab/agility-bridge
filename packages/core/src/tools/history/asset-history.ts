@@ -13,7 +13,7 @@ import { compileQuery } from '../../query/compiler.ts';
 import { invalid, limitError } from '../../query/limits.ts';
 import { parseTimeRange } from '../../query/time.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { formatArg, limitArg } from '../common.ts';
+import { assetArg, formatArg, limitArg, timeRangeArg } from '../common.ts';
 
 const NAME = 'get_asset_history';
 const COST = 14;
@@ -109,28 +109,19 @@ export const getAssetHistory: ToolDefinition = defineTool({
   name: NAME,
   title: 'Get asset history',
   description:
-    'What changed on one asset (work item or portfolio item) in a bounded window, from the authoritative Agility history: one row per changed field (status, owners, estimate, sprint, name, …) with who and when (UTC), from and to, newest first. Not paged. A cold call can make up to 14 Agility requests.',
+    'Get the change history of one asset (work item or portfolio item) in a bounded window: what changed, who changed it and when (UTC), from and to, one row per changed field (status, owners, estimate, sprint, name, …), newest first. Not paged. Cold call: up to 14 Agility requests.',
   kind: 'read',
   group: 'history',
   // Capped at run time: metadata for the type and the resolver query, the project tree, one Hist request.
   cost: COST,
   inputSchema: z.object({
-    asset: z.string().min(1).max(64).describe('Number (B-01234, D-00012, E-00007) or OID token.'),
-    time_range: z
-      .string()
-      .min(1)
-      .max(100)
-      .default(DEFAULT_WINDOW)
-      .describe(
-        'Window (UTC, bounded by the workspace), e.g. "last 14 days", "since 2026-10-01", "2026-10-01 to 2026-10-15".',
-      ),
+    asset: assetArg,
+    time_range: timeRangeArg(DEFAULT_WINDOW),
     fields: z
       .array(z.string().min(1).max(200))
       .max(MAX_FIELDS)
       .optional()
-      .describe(
-        'Attribute paths to follow (at most 10); when omitted: name, status, owners, estimates, sprint, team, priority and state.',
-      ),
+      .describe('Attribute paths to follow (at most 10); the usual planning fields when omitted.'),
     limit: limitArg,
     format: formatArg,
   }),

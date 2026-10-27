@@ -8,7 +8,7 @@ import { utcIso } from '../../output/text.ts';
 import { compileQuery, type FilterInput } from '../../query/compiler.ts';
 import { bindFixed, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { cursorArg, formatArg, limitArg, listOutput, rowOid } from '../common.ts';
+import { cursorArg, formatArg, limitArg, listOutput, projectArg, rowOid, teamArg } from '../common.ts';
 
 const NAME = 'list_sprints';
 const COST = 10;
@@ -17,24 +17,14 @@ export const listSprints: ToolDefinition = defineTool({
   name: NAME,
   title: 'List sprints',
   description:
-    'List sprints (iterations) of the workspace’s Agility projects with begin and end dates (UTC) and whether each is past, current or future; filter by team, Agility project or timing. Ordered by begin date, newest first. Paged: pass nextCursor back as cursor. A cold call can make up to 10 Agility requests.',
+    'List the sprints of the workspace’s Agility projects or of a team with begin and end dates (UTC) and whether each is past, current or future (which one is current, which starts next); newest first. Paged: pass nextCursor back as cursor. Cold call: up to 10 Agility requests.',
   kind: 'read',
   group: 'planning',
   // Capped at run time: Timebox and related metadata, team or project resolution, the project tree, the page.
   cost: COST,
   inputSchema: z.object({
-    team: z
-      .string()
-      .min(1)
-      .max(200)
-      .optional()
-      .describe('Only sprints with work of this team (name or Team:<id>).'),
-    project: z
-      .string()
-      .min(1)
-      .max(200)
-      .optional()
-      .describe('Only sprints of this Agility project’s schedule.'),
+    team: teamArg,
+    project: projectArg,
     timing: z
       .enum(['current', 'past', 'future', 'all'])
       .default('all')

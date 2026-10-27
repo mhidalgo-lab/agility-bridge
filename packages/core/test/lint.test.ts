@@ -3,7 +3,17 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { CORE_TOOLS, defineTool, type ToolDefinition } from '../src/index.ts';
-import { lintArgumentName, lintDescription, lintSchemas, lintTool, lintToolName } from './harness/lint.ts';
+import {
+  lintArgumentName,
+  lintArgumentShapes,
+  lintDescription,
+  lintOutputShape,
+  lintPagingText,
+  lintSchemas,
+  lintTitle,
+  lintTool,
+  lintToolName,
+} from './harness/lint.ts';
 
 describe('the catalogue passes every lint', () => {
   it.each(CORE_TOOLS.map((t) => [t.name, t] as const))('%s', (_name, tool) => {
@@ -93,8 +103,122 @@ describe('description lint refuses', () => {
       /Changes Agility/,
     );
     expect(lintDescription(tool('List everything. Not paged.', { cost: 9 })).join(';')).toMatch(
-      /state the cost \(9/,
+      /Cold call: up to 9 Agility requests/,
     );
+    expect(
+      lintDescription(
+        tool('List everything. Not paged. A cold call can make up to 9 Agility requests.', { cost: 9 }),
+      ).join(';'),
+    ).toMatch(/Cold call: up to 9 Agility requests/);
+    expect(
+      lintDescription(tool('List everything. Not paged. Cold call: up to 9 Agility requests.', { cost: 9 })),
+    ).toEqual([]);
+    expect(
+      lintDescription(
+        tool('List one thing. Not paged. Cold call: up to 3 Agility requests.', { cost: 3 }),
+      ).join(';'),
+    ).toMatch(/only when it reaches 8/);
+  });
+
+  it.each([
+    'What changed on an asset. Not paged.',
+    'Lists defects. Not paged.',
+    'The defects of a sprint. Not paged.',
+  ])('a description that does not start with an imperative verb: %j', (description) => {
+    expect(lintDescription(tool(description)).join(';')).toMatch(/imperative verb/);
+  });
+});
+
+describe('title lint refuses', () => {
+  it.each([
+    ['list_teams', 'Teams', /starts with "List"/],
+    ['get_team', 'Get A Team', /sentence case/],
+    ['get_team', 'get a team', /capital/],
+    ['get_team', 'Get a team.', /punctuation/],
+    ['get_team', 'Get a team with its workflow, sprint and members and more', /at most 40/],
+  ])('%s: %j', (name, title, rule) => {
+    expect(lintTitle({ name, title }).join(';')).toMatch(rule);
+  });
+  it('accepts sentence case with proper names and noun tools', () => {
+    expect(lintTitle({ name: 'list_projects', title: 'List Agility projects' })).toEqual([]);
+    expect(lintTitle({ name: 'sprint_health', title: 'Sprint health' })).toEqual([]);
+  });
+});
+
+describe('paging text lint refuses', () => {
+  const withCursor = z.object({ cursor: z.string().optional() });
+  const without = z.object({});
+  it('says Paged exactly when there is a cursor', () => {
+    expect(lintPagingText({ description: 'List x. Not paged.', inputSchema: withCursor })).not.toEqual([]);
+    expect(
+      lintPagingText({ description: 'List x. Paged: pass nextCursor back as cursor.', inputSchema: without }),
+    ).not.toEqual([]);
+    expect(lintPagingText({ description: 'List x.', inputSchema: without })).not.toEqual([]);
+    expect(
+      lintPagingText({
+        description: 'List x. Paged: pass nextCursor back as cursor.',
+        inputSchema: withCursor,
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe('argument shape lint refuses', () => {
+  const props = (p: Record<string, unknown>) => ({ properties: p });
+  it.each([
+    [{ team: { type: 'string', description: 'The team.' } }, /argument team: describe it as/],
+    [
+      {
+        project: { type: 'array', description: 'Agility project: name or Scope:<id>, within the workspace.' },
+      },
+      /type string/,
+    ],
+    [{ limit: { type: 'number' } }, /type integer/],
+    [{ include_closed: { type: 'string' } }, /type boolean/],
+    [
+      {
+        format: {
+          type: 'string',
+          enum: ['auto', 'json'],
+          default: 'auto',
+          description: 'auto (a table up to 8 columns, else CSV), table, csv or json.',
+        },
+      },
+      /argument format/,
+    ],
+    [{ contains: { type: 'string', description: 'Substring.' } }, /containsArg/],
+    [{ max_rows: { type: 'string' } }, /max_<things> is an integer/],
+    [{ sort_by: { enum: ['name', 'id'], default: 'name' } }, /sort_by/],
+  ])('%j', (p, rule) => {
+    expect(lintArgumentShapes(props(p)).join(';')).toMatch(rule);
+  });
+});
+
+describe('output shape lint refuses', () => {
+  const list = { type: 'object', properties: { items: { type: 'array' } } };
+  it.each([
+    [{ type: 'object', properties: { hasMore: { type: 'boolean' } } }, /use nextCursor/],
+    [{ type: 'object', properties: { next_cursor: { type: 'string' } } }, /use nextCursor/],
+    [{ type: 'object', properties: { partial: { type: 'string' } } }, /type boolean/],
+    [{ type: 'object', properties: { truncated: { type: 'string' } } }, /type boolean/],
+    [{ type: 'object', properties: { items: { type: 'number' } } }, /type array/],
+    [
+      {
+        type: 'object',
+        properties: { nested: { type: 'object', properties: { item_count: { type: 'number' } } } },
+      },
+      /camelCase/,
+    ],
+    [
+      {
+        type: 'object',
+        properties: { window: { type: 'object', properties: { from: { type: 'string' } } } },
+      },
+      /window/,
+    ],
+    [list, /declares partial/],
+  ])('%j', (schema, rule) => {
+    expect(lintOutputShape(schema).join(';')).toMatch(rule);
   });
 });
 

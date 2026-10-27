@@ -7,6 +7,13 @@ import { rpc } from '../helpers/mcp.ts';
 export const DEFAULT_CATALOGUE_MAX_TOOLS = 25;
 export const DEFAULT_CATALOGUE_MAX_BYTES = 40_000;
 export const FULL_CATALOGUE_MAX_BYTES = 72_000;
+/**
+ * A tripwire below the cap (P6-12, D-116): the default catalogue was 39.2 of 40 KB; the consistency pass left it at about
+ * 35.9 KB. A change that crosses this says why instead of eating the headroom one tool at a time.
+ */
+export const DEFAULT_CATALOGUE_TARGET_BYTES = 36_500;
+/** One tool's entry in `tools/list` (description, input and output schema); the generic `query_assets` is the largest. */
+export const TOOL_MAX_BYTES = 4_000;
 /** Groups a workspace must switch on (docs/reference/tool-catalogue.md): not part of the default catalogue. */
 export const OPT_IN_GROUPS: readonly string[] = ['attachments', 'reports', 'writes'];
 

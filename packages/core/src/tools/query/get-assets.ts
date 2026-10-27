@@ -9,7 +9,7 @@ import { shapeList } from '../../output/result.ts';
 import { compileQuery, type FilterInput } from '../../query/compiler.ts';
 import { limitError } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { formatArg } from '../common.ts';
+import { boundedListOutput, formatArg, minimalOutputArg } from '../common.ts';
 import { fieldInfo, IDENTITY_FIELDS, toItem } from './rows.ts';
 
 const COST = 16;
@@ -27,7 +27,7 @@ export const getAssets: ToolDefinition = defineTool({
   name: 'get_assets',
   title: 'Get assets',
   description:
-    'Get one or more assets of any allowed type by number (B-01234, D-00012, TK-00007, AT-00003) or OID token (Story:1234), with chosen fields; numbers that are not found or not visible are listed in notFound. Not paged. At most 50 per call; a cold call can make up to 16 Agility requests.',
+    'Get assets of any allowed type by number (B-01234, D-00012, TK-00007) or OID token (Story:1234) with chosen fields; numbers not found or not visible are listed in notFound. Not paged. At most 50 per call. Cold call: up to 16 Agility requests.',
   kind: 'read',
   group: 'query',
   // Capped at run time: the prefix sample, metadata per type, one cross-type lookup and one query per type.
@@ -39,13 +39,11 @@ export const getAssets: ToolDefinition = defineTool({
       .max(30)
       .optional()
       .describe('Attribute paths; each type’s default tier when omitted.'),
-    minimal_output: z.boolean().optional().describe('Only the minimal fields (identity and name).'),
+    minimal_output: minimalOutputArg,
     format: formatArg,
   }),
-  outputSchema: z.looseObject({
-    items: z.array(z.looseObject({ assetType: z.string(), oid: z.string() })),
+  outputSchema: boundedListOutput(z.looseObject({ assetType: z.string(), oid: z.string() }), {
     notFound: z.array(z.string()),
-    truncated: z.boolean().optional(),
   }),
   handler: async (input, outer) => {
     const ctx = { ...outer, budget: capBudget(outer.budget, COST) };

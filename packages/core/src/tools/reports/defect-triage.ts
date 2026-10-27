@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { capBudget } from '../../context.ts';
 import { shapeOutput } from '../../output/result.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
+import { projectArg, sprintArg, teamArg } from '../common.ts';
 import { searchWorkItems } from '../work/search.ts';
 import {
   allQueries,
@@ -53,20 +54,15 @@ export const defectTriage: ToolDefinition = defineTool({
   name: NAME,
   title: 'Defect triage',
   description:
-    'Triage the open defects of an Agility project, team or sprint: those with no owner, no sprint or no change for 14 days, and likely duplicates by name similarity. Priority and severity are not read. Reads the first page only (at most 100 defects) and says when more exist. Not paged. A cold call can make up to 24 Agility requests.',
+    'Triage the open defects of an Agility project, team or sprint: those with no owner, no sprint or no change for 14 days, and likely duplicates by name similarity. Priority and severity are not read. Reads the first page only (at most 100 defects) and says when more exist. Not paged. Cold call: up to 24 Agility requests.',
   kind: 'read',
   group: 'reports',
   // search_work_items, capped at its own cost.
   cost: COST,
   inputSchema: z.object({
-    project: z.string().min(1).max(200).optional().describe('Agility project name or Scope:<id>.'),
-    team: z.string().min(1).max(200).optional().describe('Team name or Team:<id>.'),
-    sprint: z
-      .string()
-      .min(1)
-      .max(200)
-      .optional()
-      .describe('Sprint name, Timebox:<id>, or current, previous or next.'),
+    project: projectArg,
+    team: teamArg,
+    sprint: sprintArg,
   }),
   outputSchema: reportOutput({
     counts: z.looseObject({}).optional(),

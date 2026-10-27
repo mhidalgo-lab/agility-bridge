@@ -14,6 +14,7 @@ import { compileQuery } from '../../query/compiler.ts';
 import { invalid } from '../../query/limits.ts';
 import { BACKLOG_ITEM_QUALITY_RUBRIC, type RubricCriterion } from '../../rubric.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
+import { workItemArg } from '../common.ts';
 import { getWorkItem } from '../work/get-item.ts';
 import {
   allQueries,
@@ -202,13 +203,13 @@ export const workItemQuality: ToolDefinition = defineTool({
   name: NAME,
   title: 'Work item quality',
   description:
-    'Score one backlog item or defect against the versioned quality rubric (resource backlog-item-quality): title, stated value, acceptance criteria, size, open questions, readiness. Checks are mechanical; a criterion that cannot be assessed is null and the score becomes a range. Dependencies are not read. Not paged. A cold call can make up to 28 Agility requests.',
+    'Score one backlog item or defect against the versioned quality rubric (resource backlog-item-quality): title, stated value, acceptance criteria, size, open questions, readiness. Checks are mechanical; a criterion that cannot be assessed is null and the score becomes a range. Dependencies are not read. Not paged. Cold call: up to 28 Agility requests.',
   kind: 'read',
   group: 'reports',
   // get_work_item (24) and one guarded priority read, capped here.
   cost: COST,
   inputSchema: z.object({
-    asset: z.string().min(1).max(64).describe('Number (B-01234, D-00012) or OID token (Story:1234).'),
+    asset: workItemArg,
   }),
   outputSchema: reportOutput({
     rubric: z.looseObject({ id: z.string(), version: z.string() }),

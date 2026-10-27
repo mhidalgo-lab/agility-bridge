@@ -81,7 +81,7 @@ export const listAttachments: ToolDefinition = defineTool({
   name: LIST_NAME,
   title: 'List attachments and links of an asset',
   description:
-    'List the attachments of one asset in scope (name, file name, type, size, author, date) and, on the first page, its external links as text. Metadata only: no attachment content is returned or fetched. Paged: pass nextCursor back as cursor. A cold call can make up to 12 Agility requests.',
+    'List the attachments (files) of one asset in scope (name, file name, type, size, author, date) and, on the first page, its external links as text. Metadata only: no attachment content is fetched. Paged: pass nextCursor back as cursor. Cold call: up to 12 Agility requests.',
   kind: 'read',
   group: 'collaboration',
   // Capped at run time: resolving the asset, metadata for Attachment and Link (cold cache), the page, the links.
@@ -188,13 +188,13 @@ export const getAttachment: ToolDefinition = defineTool({
   name: 'get_attachment',
   title: 'Get the text of an attachment',
   description:
-    'Get the text of one attachment of an asset in scope (an attachment id from list_attachments) when the workspace allows download: only allowed text types within the size limit, returned as untrusted data, never rendered or executed. Not paged. Long text is cut. Up to 12 Agility requests.',
+    'Get the text of one attachment (an id from list_attachments) when the workspace allows download: allowed text types within the size limit, returned as untrusted data, never rendered or executed. Not paged. Long text is cut. Cold call: up to 12 Agility requests.',
   kind: 'read',
   group: 'attachments',
   // Capped at run time: the asset, Attachment metadata (cold cache), the attachment row, the content (retried reads).
   cost: GET_COST,
   inputSchema: z.object({
-    asset: assetArg.describe('The asset the attachment belongs to: number or OID token.'),
+    asset: assetArg,
     attachment: z
       .string()
       .regex(ATTACHMENT_ID, 'Use an attachment id from list_attachments (Attachment:1234).')
