@@ -178,20 +178,19 @@ const asofCalls = (calls: readonly FakeCall[]) =>
   );
 
 describe('a closed item with no status category (P6-13)', () => {
-  it('is classified the same way at every burndown point as in the totals', async () => {
-    // A closed story without a status: only its AssetState says it is done. It is selected at every point.
+  it('counts as done now, and the burndown says that earlier points cannot know it', async () => {
+    // A closed story without a status: only its AssetState says it is done. History points do not read the state.
     const closed = () => item(30, 'Story', 42, undefined, 4, { AssetState: 128 });
     const hist = (p: (n: number, plain: string) => string) =>
       snapshots(p).map((snap) => ({ ...snap, rows: [...snap.rows, closed()] }));
-    const base = await call(setup().ctx(), { sprint: 'Sprint 42' });
     const { ctx } = setup(world(false, undefined, hist));
     const r = await call(ctx(), { sprint: 'Sprint 42' });
     expect(r['isError'], text(r)).toBeUndefined();
-    const remaining = (o: Record<string, unknown>) =>
-      (s(o)['burndown'] as Array<{ remaining?: number }>).map((x) => x.remaining);
-    // Done work is never remaining, at any point: the series does not change by adding a finished item.
-    expect(remaining(r)).toEqual(remaining(base));
     expect(s(r)['totals']).toMatchObject({ done: 9 });
+    expect(text(r)).toContain('1 closed item has no status category');
+    // Without such an item there is no note.
+    const plain = await call(setup().ctx(), { sprint: 'Sprint 42' });
+    expect(text(plain)).not.toContain('no status category');
   });
 });
 

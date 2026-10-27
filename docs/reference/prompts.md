@@ -11,7 +11,7 @@ workspace or grant does not exist: it is not listed and getting it fails. The th
 
 | Prompt | Purpose | Uses |
 |---|---|---|
-| `review_backlog_item_quality` | Assess one backlog item, a sprint or a team’s backlog against the versioned quality rubric and propose concrete improvements. | `work_item_quality`, `get_work_item` |
+| `review_backlog_item_quality` | Assess one backlog item, a sprint or a team’s backlog against the versioned quality rubric and propose concrete improvements. | `work_item_quality`, `get_work_item`, `search_work_items` |
 | `sprint_review` | Summarise a sprint for a review or demo: what finished, what did not, and what to show. | `get_sprint`, `search_work_items` |
 | `standup` | Prepare a member’s or team’s daily stand-up notes: done since the last stand-up, in progress, and what needs attention. | `standup_summary` |
 | `triage_defects` | Walk through open defects that need attention and propose priorities and owners for a person to confirm. | `defect_triage`, `get_work_item` |
@@ -23,7 +23,7 @@ workspace or grant does not exist: it is not listed and getting it fails. The th
 
 Assess one backlog item, a sprint or a team’s backlog against the versioned quality rubric and propose concrete improvements.
 
-Uses: [`work_item_quality`](tools.md#work_item_quality), [`get_work_item`](tools.md#get_work_item). Offered only when all of those tools are allowed for the workspace and grant.
+Uses: [`work_item_quality`](tools.md#work_item_quality), [`get_work_item`](tools.md#get_work_item), [`search_work_items`](tools.md#search_work_items). Offered only when all of those tools are allowed for the workspace and grant.
 
 | Argument | Required | Description |
 |---|---|---|

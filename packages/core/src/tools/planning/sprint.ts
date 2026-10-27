@@ -189,11 +189,19 @@ export const getSprint: ToolDefinition = defineTool({
           ...(s.category === undefined ? {} : { category: s.category }),
         });
     }
+    // Closed items whose status has no category count as completed (their state says so). History points cannot read
+    // the state: selecting it on every `asof` query made the real tenant time out (live, P6-13), so those items are
+    // open there and the series says so in a note rather than claiming a consistency it does not have.
+    let closedWithoutCategory = 0;
     const classify = (row: Row): Category => {
       const status = oidsOf(row['Status'])[0];
       const category = status === undefined ? undefined : statusInfo.get(status)?.category;
       if (category !== undefined) return category;
-      return Number(row['AssetState']) === 128 ? 'completed' : 'unknown';
+      if (Number(row['AssetState']) === 128) {
+        closedWithoutCategory++;
+        return 'completed';
+      }
+      return 'unknown';
     };
     const toItem = (row: Row): Item => {
       const estimate = num(row['Estimate']);
@@ -207,9 +215,7 @@ export const getSprint: ToolDefinition = defineTool({
 
     const itemMeta = await md.assetType('PrimaryWorkitem');
     const has = (a: string) => itemMeta.attributes.has(a.split('.')[0] as string);
-    // AssetState too: a closed item with no status category must be classified the same way at every point of the
-    // burndown as in the current totals (otherwise the last point steps down by items that were never reclassified).
-    const light = ['AssetType', 'Status', 'Estimate', 'AssetState'].filter(has);
+    const light = ['AssetType', 'Status', 'Estimate'].filter(has);
     const rich = ['AssetType', 'Number', 'Name', 'Status', 'Status.Name', 'Estimate', 'AssetState'].filter(
       has,
     );
@@ -396,6 +402,10 @@ export const getSprint: ToolDefinition = defineTool({
       }
       if (timing === 'current')
         notes.push('The last burndown point is now; earlier points are daily from the begin date (UTC).');
+      if (closedWithoutCategory > 0)
+        notes.push(
+          `${closedWithoutCategory} closed item${closedWithoutCategory === 1 ? ' has' : 's have'} no status category: counted as done in the totals and the last point, but as remaining at earlier points (history cannot read an item's state).`,
+        );
     }
     const carryOver = timing === 'past' && basis === 'end_of_sprint' ? open : undefined;
     notes.push(

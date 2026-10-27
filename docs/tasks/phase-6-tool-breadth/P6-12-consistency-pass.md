@@ -2,7 +2,7 @@
 id: P6-12
 title: Consistency pass (arguments, outputs, paging, tool count)
 phase: 6
-status: review
+status: done
 priority: medium
 depends_on: [P6-07, P6-08, P6-09]
 adr: ["0015"]

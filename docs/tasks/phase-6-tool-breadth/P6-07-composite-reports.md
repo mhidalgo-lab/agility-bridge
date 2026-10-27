@@ -2,7 +2,7 @@
 id: P6-07
 title: Composite reports
 phase: 6
-status: review
+status: done
 priority: high
 depends_on: [P6-01, P6-02, P6-05]
 adr: ["0015"]

@@ -52,6 +52,14 @@ What it checks (about 40 read requests, one at a time):
   every catalogue tool in `client.live.test.ts`). Assertions are booleans with our own labels (L-274); coarse levels only
   (epics: 100+, tree: 2 levels, items counted: fewer than 100).
 
+- `live/resources.live.test.ts` (P6-09, P6-13): every resource listed and read (the tool-backed ones enveloped), `resources/list` and
+  the prompts with **no upstream request**, every prompt built from invented arguments. The catalogue loop in
+  `client.live.test.ts` runs every tool with valid arguments (the reports with only themselves granted; their sibling reads are in
+  `reports.live.test.ts`) and accepts a clean `AB_AMBIGUOUS` for "the current sprint". Passed 2026-10-27, all 11 files (P6-13). Live tests
+  are not in CI: when a tool's output keys or arguments change, update them in the same PR (three had drifted by Phase 6).
+  Finding: selecting `AssetState` on every `asof` query timed the tenant out (RESEARCH §1.4); run the live suite before merging a change to a
+  query that runs many times per call.
+
 ## Tenant inventory (2026-10-21, Agility 26.0.3.2, hosted)
 
 Recorded by `live/inventory.live.test.ts` as size buckets and published here at a coarser level (the repository is

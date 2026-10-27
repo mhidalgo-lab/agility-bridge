@@ -11,7 +11,7 @@ workspace or grant does not exist: it is not listed and reading it fails. The pl
 |---|---|---|---|---|
 | `agility-bridge://reference/filters` | Structured filter vocabulary | `query_assets` | static | `text/markdown` |
 | `agility-bridge://instance/asset-types` | Asset types of the instance | `list_asset_types` | tool | `text/plain` |
-| `agility-bridge://instance/asset-types/{asset_type}` | One asset type | `describe_asset_type`, `list_asset_types` | tool | `text/plain` |
+| `agility-bridge://instance/asset-types/{asset_type}` | One asset type | `describe_asset_type` | tool | `text/plain` |
 | `agility-bridge://workspace/projects` | Agility projects of this workspace | `list_projects` | tool | `text/plain` |
 | `agility-bridge://rubrics/backlog-item-quality` | Backlog item quality rubric | `get_work_item`, `work_item_quality` | static | `application/json` |
 | `agility-bridge://recipes/tests-and-defects` | Recipe: tests and defects | `query_assets`, `describe_asset_type`, `list_asset_types` | static | `text/markdown` |
@@ -43,7 +43,7 @@ Served through: [`list_asset_types`](tools.md#list_asset_types). Offered only wh
 
 Attributes, operations, statuses and field tiers of one asset type (the output of describe_asset_type).
 
-Served through: [`describe_asset_type`](tools.md#describe_asset_type), [`list_asset_types`](tools.md#list_asset_types). Offered only when all of those tools are allowed for the workspace and grant. A template: `resources/list` shows one URI per readable value.
+Served through: [`describe_asset_type`](tools.md#describe_asset_type). Offered only when that tool is allowed for the workspace and grant. A template: `resources/list` shows one URI per readable value.
 
 ## `workspace_projects`
 

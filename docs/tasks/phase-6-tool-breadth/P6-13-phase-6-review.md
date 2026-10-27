@@ -2,7 +2,7 @@
 id: P6-13
 title: Phase 6 review and live verification
 phase: 6
-status: in-progress
+status: review
 priority: high
 depends_on: [P6-03, P6-04, P6-06, P6-10, P6-11, P6-12]
 adr: []
@@ -36,16 +36,24 @@ and the owner's list for the release.
   Version Packages PR).
 
 ## Acceptance criteria
-- [ ] Every high and medium finding of the three reviews is fixed with a regression test, or dropped or downgraded with a
+- [x] Every high and medium finding of the three reviews is fixed with a regression test, or dropped or downgraded with a
       reason in the review document; every deferred finding has a task.
-- [ ] The two flaky tests are fixed at their root (late body read; property test time) and recorded as lessons.
-- [ ] `pnpm test:live` passes with every Phase 6 tool, resource and prompt exercised; results recorded without tenant data.
-- [ ] `docs/reviews/phase-6-review.md` with scope, method, every finding and verdict, sizes, eval numbers, live results and
+- [x] The two flaky tests are fixed at their root (late body read; property test time) and recorded as lessons.
+- [x] `pnpm test:live` passes with every Phase 6 tool, resource and prompt exercised; results recorded without tenant data.
+- [x] `docs/reviews/phase-6-review.md` with scope, method, every finding and verdict, sizes, eval numbers, live results and
       the owner's steps; `docs/pending-decisions/phase-6.md` has an "Owner steps" section.
-- [ ] THREAT_MODEL, logging docs and RESEARCH updated where the fixes or live facts require; lessons and decisions numbered
+- [x] THREAT_MODEL, logging docs and RESEARCH updated where the fixes or live facts require; lessons and decisions numbered
       consistently; generated references current; a patch changeset is included.
-- [ ] P6-01 … P6-12 are `done`; `pnpm lint && pnpm typecheck && pnpm test && pnpm build` are green.
+- [x] P6-01 … P6-12 are `done`; `pnpm lint && pnpm typecheck && pnpm test && pnpm build` are green.
 - [ ] Release v0.6 (owner: merges the Version Packages PR after P6-14 and P6-33).
+
+## Outcome
+- [docs/reviews/phase-6-review.md](../../reviews/phase-6-review.md): three high, five medium and about twenty low findings from three reviews;
+  all high and medium fixed or narrowed with regression tests (one reviewer fix, `AssetState` on every `asof` query, made the real tenant
+  time out and was replaced by a note), two flaky tests fixed at their roots, ten deferred items filed as P6-39 to P6-48.
+- Live pass: 11 files, 33 tests passed on the real tenant (levels only); the resource list and the prompts make no upstream request.
+- New: lessons L-321 to L-330, decisions D-117 to D-122, tasks P6-39 to P6-48. P6-01 to P6-12 are `done`. The release (v0.6) is the owner's,
+  after P6-14 and P6-33.
 
 ## Security notes
 Security-relevant fixes (attachment error text, history age limit and scope paths, resource listing) update THREAT_MODEL in

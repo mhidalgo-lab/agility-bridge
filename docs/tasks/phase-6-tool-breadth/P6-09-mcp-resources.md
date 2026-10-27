@@ -2,7 +2,7 @@
 id: P6-09
 title: MCP resources
 phase: 6
-status: review
+status: done
 priority: medium
 depends_on: [P2-17]
 adr: ["0015"]

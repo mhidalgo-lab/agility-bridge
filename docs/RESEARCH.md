@@ -149,6 +149,12 @@ except `group`, and adds `op` (POST only). *docs*
   `filter` on the request (the tool fetches all versions and windows them locally), how a deleted or moved asset looks, and
   that history rows match known edits (needs the writable sandbox, P6-21). `ChangeDateUTC >= $since` as a `query.v1`
   filter worked on `Story`, `Defect`, `Task` and `Test` (*live*). The activity stream was not probed (D-89).
+  Selecting `AssetState` in the `asof` (history) queries of `get_sprint` made batched burndown requests time out (30 s) on the
+  third-party tenant on 2026-10-27 (*live*, bisected: the same reads without it passed); the current-state read selects it without
+  trouble. `asof` queries should select the fewest attributes.
+  Size (P6-13, *unverified* on a tenant: measured on a synthetic body of the same shape): about 1 KB per version for 12
+  selected attributes, so an asset with about 500 versions fills the Workers 512 KiB response cap; the tool then fails with a
+  specific message and P6-43 looks for a way to narrow the request.
 
 ### 1.5 Writing data
 

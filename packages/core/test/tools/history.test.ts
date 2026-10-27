@@ -281,6 +281,16 @@ describe('get_asset_history', () => {
     expect(text(r)).toContain('maxAsOfAgeDays');
     expect(hist).toHaveLength(0);
     expect(fake.requests).toBe(0);
+    // A window of exactly the limit ('last 365 days' with the default 365) is allowed; one day more is not.
+    // The clock moves between calls (a real one does): the window and the limit must be judged at one instant.
+    let tick = NOW;
+    const edge = ctx({ limits: { ...DEFAULT_LIMITS, maxAsOfAgeDays: 365 }, clock: { now: () => tick++ } });
+    expect(
+      (await call(getAssetHistory, edge, { asset: 'B-01001', time_range: 'last 365 days' }))['isError'],
+    ).toBeUndefined();
+    expect(
+      (await call(getAssetHistory, edge, { asset: 'B-01001', time_range: 'last 366 days' }))['isError'],
+    ).toBe(true);
     // A window that starts inside the limit still works.
     const ok = await call(getAssetHistory, c, { asset: 'B-01001', time_range: 'last 14 days' });
     expect(ok['isError'], text(ok)).toBeUndefined();

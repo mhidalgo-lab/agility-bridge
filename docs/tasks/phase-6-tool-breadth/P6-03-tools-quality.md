@@ -2,7 +2,7 @@
 id: P6-03
 title: Quality views (tests, regression assets, defects)
 phase: 6
-status: review
+status: done
 priority: medium
 depends_on: [P2-17, P6-09]
 adr: ["0012"]

@@ -149,11 +149,8 @@ export const getAssetHistory: ToolDefinition = defineTool({
   handler: async (input, outer) => {
     const ctx: ToolContext = { ...outer, budget: capBudget(outer.budget, COST) };
     // Everything that bounds the request is checked before the first Agility request (L-060).
-    const window = parseTimeRange(
-      input.time_range ?? DEFAULT_WINDOW,
-      ctx.clock.now(),
-      ctx.limits.maxTimeRangeDays,
-    );
+    const now = ctx.clock.now();
+    const window = parseTimeRange(input.time_range ?? DEFAULT_WINDOW, now, ctx.limits.maxTimeRangeDays);
     const limit = input.limit ?? ctx.limits.defaultRows;
     if (limit > ctx.limits.maxRows) throw limitError('maxRows', ctx.limits.maxRows, 'rows', limit);
     const requested = input.fields === undefined ? undefined : [...new Set(input.fields)];
@@ -174,7 +171,7 @@ export const getAssetHistory: ToolDefinition = defineTool({
     }
     const since = Date.parse(window.since);
     // maxAsOfAgeDays is the furthest point into the past a grant can read, here as for as_of (L-060, THREAT_MODEL A4).
-    const ageDays = (ctx.clock.now() - since) / 86_400_000;
+    const ageDays = (now - since) / 86_400_000;
     if (ageDays > ctx.limits.maxAsOfAgeDays)
       throw limitError('maxAsOfAgeDays', ctx.limits.maxAsOfAgeDays, 'days', Math.ceil(ageDays));
     const until = Date.parse(window.until);
