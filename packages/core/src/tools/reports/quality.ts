@@ -6,7 +6,7 @@
 import { z } from 'zod';
 import { capBudget, type ToolContext } from '../../context.ts';
 import { AbError } from '../../errors.ts';
-import { resolveAsset, runPage } from '../../identity/resolve.ts';
+import { runPage } from '../../identity/resolve.ts';
 import { oidsOf } from '../../identity/scope.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { shapeOutput, untrusted } from '../../output/result.ts';
