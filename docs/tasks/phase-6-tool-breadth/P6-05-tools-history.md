@@ -2,7 +2,7 @@
 id: P6-05
 title: History and activity tools
 phase: 6
-status: in-progress
+status: review
 priority: medium
 depends_on: [P2-17]
 adr: ["0011"]
@@ -32,21 +32,21 @@ Answer "what changed and when" from the authoritative history, with every window
 - `asof` point-in-time reads stay in `query_assets` (`as_of`, bounded by `maxAsOfAgeDays`).
 
 ## Acceptance criteria
-- [ ] `get_asset_history` and `list_recent_changes` follow the tool conventions (names, `time_range`, output contract,
+- [x] `get_asset_history` and `list_recent_changes` follow the tool conventions (names, `time_range`, output contract,
   costs declared and measured, lints green).
-- [ ] Windows and limits are validated before any Agility request: a window longer than `maxTimeRangeDays`, one that
+- [x] Windows and limits are validated before any Agility request: a window longer than `maxTimeRangeDays`, one that
   ends before it starts, an unparseable one, a `limit` above `maxRows` and more than 10 fields each fail with no
   upstream call (unit tests count requests).
-- [ ] History values are untrusted: titles, names, statuses and field values go through the output shaper and envelope
+- [x] History values are untrusted: titles, names, statuses and field values go through the output shaper and envelope
   (poisoned-string probe on both tools); no `node:*`, no string-built queries.
-- [ ] Negative authorization: an asset outside the workspace's projects or of a denied asset type answers not found or
+- [x] Negative authorization: an asset outside the workspace's projects or of a denied asset type answers not found or
   forbidden with no `Hist` request and no data; project and team filters cannot widen the scope; rows an upstream
   returns outside the scope are hidden.
-- [ ] Diffs are correct (first version, unchanged versions, multi-value fields, window edges inclusive/exclusive).
-- [ ] Live (guarded, read-only tenant): the latest history version agrees with the current `Data`/query value of the
+- [x] Diffs are correct (first version, unchanged versions, multi-value fields, window edges inclusive/exclusive).
+- [x] Live (guarded, read-only tenant): the latest history version agrees with the current `Data`/query value of the
   selected fields; shapes and coarse levels only recorded. "History matches known edits" cannot be checked on the
-  third-party tenant: recorded as a gap for the writable sandbox (follow-up task).
-- [ ] `pnpm docs:tools` refreshed; catalogue, RESEARCH (Hist shape, unverified items), lessons and a changeset updated.
+  third-party tenant: recorded as a gap for the writable sandbox ([P6-21](P6-21-history-sandbox-verification.md)).
+- [x] `pnpm docs:tools` refreshed; catalogue, RESEARCH (Hist shape, unverified items), lessons and a changeset updated.
 
 ## Security notes
 THREAT_MODEL T3/T4/T9: scope enforced before and after (resolver and recheck), no string-built URLs (the client

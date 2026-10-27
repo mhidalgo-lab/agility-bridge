@@ -141,6 +141,15 @@ except `group`, and adds `op` (POST only). *docs*
   with status, owners, sprint and project is about 430–460 bytes; **sorting by `ChangeDate` costs about 1.1 s per call**
   against about 0.23 s by `ID` (L-163); sorting by `ID` gives disjoint, repeatable pages.
 
+- **History tools (P6-05, 2026-10-27):** `GET rest-1.v1/Hist/<Type>/<id>?sel=<attrs>` answers JSON `{ Assets: [ { id:
+  "<Type>:<id>:<moment>", Attributes: { "<path>": { value } } } ] }`, one entry per version, and the `sel` selection is
+  honoured (relation paths such as `Status.Name` come back under that key). The `ChangeDateUTC` of a version carries a
+  zone. — *live* (shapes and consistency only: the newest history value of `Name`, `Status.Name` and `Estimate` equals the
+  current `query.v1` value on sampled recently changed assets). **Unverified:** whether `Hist` accepts a date `where` or
+  `filter` on the request (the tool fetches all versions and windows them locally), how a deleted or moved asset looks, and
+  that history rows match known edits (needs the writable sandbox, P6-21). `ChangeDateUTC >= $since` as a `query.v1`
+  filter worked on `Story`, `Defect`, `Task` and `Test` (*live*). The activity stream was not probed (D-89).
+
 ### 1.5 Writing data
 
 - **rest-1.v1 POST** (XML): scalar `<Attribute name="X" act="set">…</Attribute>`; single relation `<Relation name="Owner"

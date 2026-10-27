@@ -56,6 +56,11 @@ Custom attributes exist on backlog items, defects and epics (none on tasks and t
 **Gaps for the writable sandbox:** requests, regression tests, plans and suites, and test sets (no live data here), plus
 every write path and a second member for reader/writer permission differences.
 
+**Gaps for the writable sandbox (history, P6-05):** "history matches known edits" cannot be checked on this tenant (no
+edits of ours to compare against). `live/history.live.test.ts` checks consistency instead: recently changed assets come back
+inside their window, and the newest history value of `Name`, `Status.Name` and `Estimate` equals the current value.
+Recorded as [P6-21](../tasks/phase-6-tool-breadth/P6-21-history-sandbox-verification.md).
+
 **API observations** (recorded in RESEARCH §1): `query.v1` ignores `needTotal` and `rest-1.v1` reports only
 `pageSize`/`pageStart` on this version, so the tenant offers no total count; `rest-1.v1` answers JSON with
 `Accept: application/json`.

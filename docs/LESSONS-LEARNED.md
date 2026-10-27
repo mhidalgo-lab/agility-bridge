@@ -1645,6 +1645,34 @@ whose cost the tool declares. And `needTotal` returned no total on 26.0.3.2: sho
 not a total.
 *Applied in:* [spikes/agility-api](../spikes/agility-api/RESULTS.md), P1-04, P1-08, ADR-0015.
 
+**L-284 — A history diff needs the version before the window.**
+`rest-1.v1/Hist` returns every version of an asset, so a window is applied after the fetch (the request cannot be
+narrowed). Diffing only the versions inside the window makes the first one look like a creation. Diff over the whole
+list and keep the rows whose version falls in the window; an absent `from` then means "was empty", and a first version
+inside the window says it shows initial values.
+*Applied in:* P6-05, [get_asset_history](../packages/core/src/tools/history/asset-history.ts).
+
+**L-285 — History values cannot be scope-guarded, so history follows only what needs no guard.**
+A `Hist` row carries relation values (epic, sprint, parent) without the asset behind them, so the project guard that
+`query.v1` rows get (Phase 1 review H2) cannot run. The history tool compiles the requested paths through the query
+compiler (metadata, hops, member emails, allow lists) and refuses any path with a guard; defaults that need one are left
+out with a note. Anything read for a person must go through the same checks as the generic tools or not be offered.
+*Applied in:* P6-05, THREAT_MODEL T3.
+
+**L-286 — Compare live data after the same normalisation the tool applies.**
+The first live consistency check (newest history value against the current value) failed on a name with a non-ASCII
+character: same length, same letters, different bytes, because the shaper cleans text. The check compared raw to shaped.
+A live "agrees with the source" test applies the tool's own text normalisation to the source side, and reports lengths
+and flags, never the values.
+*Applied in:* P6-05, [live/history.live.test.ts](../live/history.live.test.ts).
+
+**L-287 — The cold cost of a tool is set by the relation types its fields reach.**
+Following ten default attributes (`Status.Name`, `Owners.Name`, `Timebox.Name`, …) loads one `meta.v1` document per
+related type on a cold cache: `get_asset_history` needed 13 requests (the resolver query, metadata for the type and
+each related type, the project tree, one `Hist`). Measure the cold
+cost with the default field set (the cost test does), declare it, and say it in the description.
+*Applied in:* P6-05, [tool conventions](dev/tool-conventions.md).
+
 ---
 
 ## Top 20

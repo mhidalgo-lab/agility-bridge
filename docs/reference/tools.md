@@ -2,7 +2,7 @@
 
 # Tool reference
 
-13 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
+15 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
 later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a cold metadata cache.
 
 | Tool | Group | Cost | Title |
@@ -20,6 +20,8 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 | [`get_team`](#get_team) | planning | 20 | Get a team |
 | [`list_sprints`](#list_sprints) | planning | 10 | List sprints |
 | [`list_members`](#list_members) | people | 6 | List members |
+| [`get_asset_history`](#get_asset_history) | history | 14 | Get asset history |
+| [`list_recent_changes`](#list_recent_changes) | history | 24 | List recent changes |
 
 ## `whoami`
 
@@ -252,3 +254,42 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 | `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
+
+## `get_asset_history`
+
+**Get asset history** · group `history` · read · cost 14 Agility requests at most
+
+What changed on one asset (work item or portfolio item) in a bounded window, from the authoritative Agility history: one row per changed field (status, owners, estimate, sprint, name, …) with who and when (UTC), from and to, newest first. Not paged. A cold call can make up to 14 Agility requests.
+
+Annotations: read-only true, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `asset` | string | yes |  | Number (B-01234, D-00012, E-00007) or OID token. |
+| `time_range` | string |  | `"last 30 days"` | Window (UTC, bounded by the workspace), e.g. "last 14 days", "since 2026-10-01", "2026-10-01 to 2026-10-15". |
+| `fields` | string[] (≤ 10) |  |  | Attribute paths to follow (at most 10); when omitted: name, status, owners, estimates, sprint, team, priority and state. |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+
+`structuredContent`: `asset`, `window`, `items`, `truncated`, `partial`, `notes` (open: more fields may be added).
+
+## `list_recent_changes`
+
+**List recent changes** · group `history` · read · cost 24 Agility requests at most
+
+List work items (backlog items, defects, tasks, tests) changed inside a bounded time_range (last 7 days unless given) in an Agility project, a team or the whole workspace, newest change first, with who changed them. Sorts by change date, which costs about a second per call; use get_asset_history for what changed. Paged: pass nextCursor back as cursor. A cold call can make up to 24 Agility requests.
+
+Annotations: read-only true, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `project` | string |  |  | Agility project name or Scope:<id> within the workspace. |
+| `team` | string |  |  | Team name or Team:<id>. |
+| `asset_type` | `Story` \| `Defect` \| `Task` \| `Test` |  |  | Story, Defect, Task or Test; all four when omitted. |
+| `time_range` | string |  | `"last 7 days"` | Window (UTC, bounded by the workspace), e.g. "last 3 days", "this week", "2026-10-01 to 2026-10-15". |
+| `include_closed` | boolean |  | `false` | Include closed items. |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
+| `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+
+`structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope`, `window` (open: more fields may be added).
