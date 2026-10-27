@@ -1,8 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
-import { type CallToolResult, McpServer, type StandardSchemaWithJSON } from '@modelcontextprotocol/server';
+import {
+  type CallToolResult,
+  McpServer,
+  type ReadResourceResult,
+  ResourceTemplate,
+  type StandardSchemaWithJSON,
+} from '@modelcontextprotocol/server';
 import { freezeContext, type ToolContext } from './context.ts';
-import { ERROR_META_KEY, type ToolErrorOptions, toToolErrorResult } from './errors.ts';
+import {
+  AbError,
+  ERROR_META_KEY,
+  ErrorCode,
+  type ToolErrorOptions,
+  toProtocolError,
+  toToolErrorResult,
+} from './errors.ts';
+import { availableEntries } from './manifest.ts';
 import { envelopeRenderer, newEnvelopeId } from './output/envelope.ts';
+import { isTemplate, RESOURCE_MANIFEST, type ResourceDefinition, type ResourceReader } from './resources.ts';
 import { annotationsFor, type ToolDefinition, type ToolOutput } from './tool.ts';
 import { VERSION } from './version.ts';
 
@@ -15,6 +30,7 @@ export const DEFAULT_SERVER_INFO: ServerInfo = Object.freeze({ name: 'agility-br
 
 /** What one finished tool call looks like to an observer (audit, P2-08). Holds no result rows. */
 export interface ToolCallEvent {
+  /** The tool name, or `resource:<manifest id>` for a resource read (P6-09). */
   readonly tool: string;
   readonly status: 'ok' | 'error';
   readonly errorCode: string | null;
@@ -100,6 +116,11 @@ export interface BuildServerOptions {
    */
   readonly ctx: ToolContext | (() => ToolContext);
   readonly info?: ServerInfo;
+  /**
+   * The resource manifest to serve (default: `RESOURCE_MANIFEST`). Only entries whose tools are all in `tools` are
+   * registered, so a resource exists exactly when the tools it is served through are allowed (L-153).
+   */
+  readonly resources?: readonly ResourceDefinition[];
   /**
    * Advertise `tools.listChanged` (default false). A per-request HTTP server never pushes a change, so it must not
    * promise one (ADR-0005, L-016); stdio may pass true.
@@ -210,6 +231,7 @@ export function buildMcpServer({
   tools,
   ctx: context,
   info = DEFAULT_SERVER_INFO,
+  resources = RESOURCE_MANIFEST,
   listChanged = false,
   errors,
   onToolCall,
@@ -267,5 +289,142 @@ export function buildMcpServer({
       },
     );
   }
+  registerResources(server, {
+    tools,
+    resources: availableEntries(
+      resources,
+      tools.map((t) => t.name),
+    ),
+    contextFor,
+    onToolCall,
+  });
   return server;
+}
+
+interface ResourceRegistration {
+  readonly tools: readonly ToolDefinition[];
+  readonly resources: readonly ResourceDefinition[];
+  readonly contextFor: () => ToolContext;
+  readonly onToolCall: ((event: ToolCallEvent) => void) | undefined;
+}
+
+/**
+ * Registers the manifest's available resources. A read builds a fresh request context, runs the declared tools'
+ * handlers through the reader (same budget, limits, cache and shaping as a tool call) and is observed like one.
+ * Prompts (P6-08) register the same way from the same manifest module.
+ */
+function registerResources(server: McpServer, reg: ResourceRegistration): void {
+  const byName = new Map(reg.tools.map((t) => [t.name, t] as const));
+  /** One fresh context per read or list; `run` is limited to the entry's declared tools. */
+  const readerFor = (def: ResourceDefinition): ResourceReader => {
+    const ctx = freezeContext(reg.contextFor());
+    return {
+      ctx,
+      run: async (name, input = {}) => {
+        const tool = def.uses.includes(name) ? byName.get(name) : undefined;
+        if (tool === undefined) {
+          throw new AbError(ErrorCode.NotFound, `Resource ${def.id} cannot use ${name}.`);
+        }
+        const parsed = tool.inputSchema.safeParse(input);
+        if (!parsed.success) {
+          throw new AbError(ErrorCode.InputInvalid, `The resource address is not valid for ${def.id}.`);
+        }
+        return tool.handler(parsed.data, ctx);
+      },
+    };
+  };
+  const observe = (
+    def: ResourceDefinition,
+    reader: ResourceReader,
+    started: number,
+    outcome: { error: unknown } | { out?: ToolOutput },
+  ): void => {
+    try {
+      if (reg.onToolCall === undefined) return;
+      const failed = 'error' in outcome;
+      reg.onToolCall({
+        tool: `resource:${def.id}`,
+        status: failed ? 'error' : 'ok',
+        errorCode: failed
+          ? outcome.error instanceof AbError
+            ? outcome.error.code
+            : ErrorCode.Internal
+          : null,
+        durationMs: Math.max(0, reader.ctx.clock.now() - started),
+        requestsUsed: reader.ctx.budget.used,
+        ...(failed ? { assetNumbers: [], queries: [] } : auditFacts(outcome.out)),
+      });
+    } catch {
+      // An observer never changes a resource result.
+    }
+  };
+  const read = async (
+    def: ResourceDefinition,
+    uri: URL,
+    variables: Readonly<Record<string, string>>,
+  ): Promise<ReadResourceResult> => {
+    const reader = readerFor(def);
+    const logger = reader.ctx.logger.child({ requestId: reader.ctx.requestId, resource: def.id });
+    const started = reader.ctx.clock.now();
+    try {
+      const body = await def.read(reader, variables);
+      logger.debug('resource ok', { ms: reader.ctx.clock.now() - started, requests: reader.ctx.budget.used });
+      observe(def, reader, started, {
+        out: { text: body.text, ...(body.meta === undefined ? {} : { meta: body.meta }) },
+      });
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: def.mimeType,
+            text: body.text,
+            ...(body.meta === undefined ? {} : { _meta: body.meta }),
+          },
+        ],
+      };
+    } catch (error) {
+      observe(def, reader, started, { error });
+      logger.warn('resource error', { ms: reader.ctx.clock.now() - started, error });
+      throw toProtocolError(error);
+    }
+  };
+  for (const def of reg.resources) {
+    const config = { title: def.title, description: def.description, mimeType: def.mimeType };
+    if (!isTemplate(def)) {
+      server.registerResource(def.id, def.uri, config, (uri) => read(def, uri, {}));
+      continue;
+    }
+    const template = new ResourceTemplate(def.uri, {
+      list: async () => {
+        if (def.list === undefined) return { resources: [] };
+        const reader = readerFor(def);
+        const started = reader.ctx.clock.now();
+        try {
+          const listed = await def.list(reader);
+          observe(def, reader, started, {});
+          return {
+            resources: listed.map((r) => ({
+              uri: r.uri,
+              name: r.name,
+              ...(r.title === undefined ? {} : { title: r.title }),
+              mimeType: def.mimeType,
+            })),
+          };
+        } catch (error) {
+          // A listing that cannot be built (budget, upstream) is empty: it never fails the whole list.
+          observe(def, reader, started, { error });
+          return { resources: [] };
+        }
+      },
+    });
+    server.registerResource(def.id, template, config, (uri, variables) =>
+      read(
+        def,
+        uri,
+        Object.fromEntries(
+          Object.entries(variables).map(([k, v]) => [k, Array.isArray(v) ? (v[0] ?? '') : v]),
+        ),
+      ),
+    );
+  }
 }
