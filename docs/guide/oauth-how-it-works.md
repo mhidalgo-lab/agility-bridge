@@ -72,8 +72,15 @@ have the access it was approved with:
 - You pressed **Disconnect** in **My access** ([connect a phone](oauth-phone.md#see-and-disconnect-your-apps)), or the app
   was replaced by connecting the same app again, or it was one of more than 25 apps and was pushed out: the app cannot
   refresh. It has to be approved again.
-- Your access on the workspace was withdrawn, the workspace was disabled, or your account was: the refresh is refused and
-  the device is disconnected.
+- Your access on the workspace was **withdrawn for good** (the access grant was revoked, ended or deleted, or your account
+  was removed), or the app's registration was revoked: the refresh is refused (`invalid_grant`) and the device is
+  disconnected. The app has to be approved again.
+- Something is **switched off for now**: the workspace, its Agility instance or your account is disabled, the credential
+  was revoked or is not validated, or the access was left with no project or no tool. The refresh is answered `503` with
+  `Retry-After: 60` and **the device is kept**: the app should wait and try again, and once the cause is fixed its next
+  refresh works with no new approval. Meanwhile every request with the app's access token is refused too, so nothing is
+  reachable while the cause holds. (An approval code being exchanged at that moment is spent: the app starts the approval
+  again, and nothing else you connected is affected.)
 - The 30 days are over: the app is asked to sign in again.
 
 ## What is stored

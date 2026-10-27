@@ -2,7 +2,7 @@
 id: P5-21
 title: Keep the device when an issuance refusal can pass
 phase: 5
-status: todo
+status: review
 priority: low
 depends_on: [P5-10]
 adr: ["0009"]
@@ -39,11 +39,11 @@ grant on `invalid_grant`), so each app has to be approved again after the fix.
 - State the rule in the "how it works" guide (what a refresh does for each reason) and the troubleshooting page.
 
 ## Acceptance criteria
-- [ ] Each reason is in exactly one class, and a test fails when a new `DenyReason` is not classified.
-- [ ] A refresh refused for a recoverable reason leaves the device and its refresh token working once the reason is gone, and the
+- [x] Each reason is in exactly one class, and a test fails when a new `DenyReason` is not classified.
+- [x] A refresh refused for a recoverable reason leaves the device and its refresh token working once the reason is gone, and the
   access token is still refused per request meanwhile (negative authorization tests: no upstream call, no data).
-- [ ] A final reason still revokes the device and its tokens at once, as today.
-- [ ] Mutation-checked on memory, SQLite and workerd/D1.
+- [x] A final reason still revokes the device and its tokens at once, as today.
+- [x] Mutation-checked on memory, SQLite and workerd/D1.
 
 ## Security notes
 THREAT_MODEL T9, T15. Nothing is weakened for a device that is kept: every MCP request re-runs the same decision and is refused

@@ -58,8 +58,15 @@ Tests scan `kv`, audit rows, logs and a SQLite file copy for codes, tokens and v
   the code is consumed), `resource` if present must be ours and the grant's own.
 - Codes: `kv.take` on the marker (atomic on memory, SQLite and D1) before the provider sees the code; a replay revokes the
   grant it was issued for (tombstone first) and writes `oauth.code.replayed`.
-- Issuance (code and refresh): `resolveAccess` again; a refusal is `invalid_grant`, revokes the device, writes
-  `oauth.token.refused`; lifetimes are capped at the grant's expiry, and under a minute left refuses.
+- Issuance (code and refresh): `resolveAccess` again, then the reason's class (`DENY_CLASS` in `packages/auth`, ADR-0018,
+  D-77). **Final** reasons (and `principal_mismatch`, `oauth_mismatch`, `client_revoked`, the grant ending within a minute):
+  `invalid_grant`, the device is revoked, `oauth.token.refused` with `revoked: true`. **Recoverable** reasons
+  (`workspace_disabled`, `instance_disabled`, `user_disabled`, `credential_revoked`, `credential_unvalidated`,
+  `no_projects`, `no_tools`): `503 temporarily_unavailable` with `Retry-After: 60` (the provider's `OAuthError` with a
+  status and headers, which does not revoke); the device and the refresh token are untouched (the provider throws before it
+  rotates) and `oauth.token.refused` has `revoked: false`. At a code exchange the code is spent either way. A new
+  `DenyReason` does not compile until classified (`Record<DenyReason, ...>`), and `packages/auth/test/deny-class.test.ts`
+  compares the keys with the union's source. Lifetimes are capped at the grant's expiry, and under a minute left is final.
 - MCP route: OAuth tokens (shape `user:grant:secret`) are tried only when OAuth is on; a device token never matches that
   shape. Every failure is the one `401`. The access cache (keyed by token hash and slug, never past the token's expiry)
   is cleared on RFC 7009 revocation.
@@ -102,7 +109,7 @@ refresh(R) ─▶ tombstone of the device?  yes ▶ invalid_grant (and revoke ag
   client first and answers `invalid_grant` when that worked, `invalid_client` otherwise) and its id (Basic header, else
   `client_id`; assertions are refused) must be the one the successor was issued to; `resource` must be the grant's;
   `scope` must grant something; the grant must exist and not be about to expire; the access decision runs again on the
-  grant's decrypted props (`unwrapToken` of the successor's access token) and a refusal revokes the device like at issuance (L-254).
+  grant's decrypted props (`unwrapToken` of the successor's access token) and a final refusal revokes the device like at issuance (L-254); a recoverable one answers the same `503` and keeps it (ADR-0018).
 - **Reuse** is any repeat with no sealed successor left, i.e. after the window, or at window 0. It revokes the device and
   clears the access cache. Only a token whose hash has a marker can cause it: a forged secret for a real device is the
   provider's `invalid_grant` and costs nothing.
