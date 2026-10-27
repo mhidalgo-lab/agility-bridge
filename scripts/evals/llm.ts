@@ -275,6 +275,8 @@ export async function runHostile(
 
 export interface EvalReport {
   readonly model: string;
+  /** Host of a custom `ANTHROPIC_BASE_URL` (a router may change the model or the request); undefined for the Anthropic API. */
+  readonly endpointHost?: string | undefined;
   readonly date: string;
   readonly toolsListSha256: string;
   readonly toolCount: number;
@@ -298,6 +300,7 @@ export function formatReport(report: EvalReport): string {
     '# LLM tool evaluation report',
     '',
     `- Model: \`${report.model}\``,
+    `- Endpoint: ${report.endpointHost === undefined ? 'Anthropic API' : `custom base URL (host \`${report.endpointHost}\`), not the Anthropic API`}`,
     `- Date: ${report.date}`,
     `- tools/list: ${report.toolCount} tools (full catalogue), sha256 \`${report.toolsListSha256}\``,
     `- Tool choice: **${choicePass}/${report.choice.length}** (${pct(choicePass, report.choice.length)}); lexical router baseline for comparison: top-1 ${(report.routerBaseline.top1 * 100).toFixed(0)}%, top-3 ${(report.routerBaseline.top3 * 100).toFixed(0)}%`,
