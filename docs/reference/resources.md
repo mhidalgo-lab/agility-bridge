@@ -13,7 +13,7 @@ workspace or grant does not exist: it is not listed and reading it fails. The pl
 | `agility-bridge://instance/asset-types` | Asset types of the instance | `list_asset_types` | tool | `text/plain` |
 | `agility-bridge://instance/asset-types/{asset_type}` | One asset type | `describe_asset_type`, `list_asset_types` | tool | `text/plain` |
 | `agility-bridge://workspace/projects` | Agility projects of this workspace | `list_projects` | tool | `text/plain` |
-| `agility-bridge://rubrics/backlog-item-quality` | Backlog item quality rubric | `get_work_item` | static | `application/json` |
+| `agility-bridge://rubrics/backlog-item-quality` | Backlog item quality rubric | `get_work_item`, `work_item_quality` | static | `application/json` |
 | `agility-bridge://recipes/tests-and-defects` | Recipe: tests and defects | `query_assets`, `describe_asset_type`, `list_asset_types` | static | `text/markdown` |
 | `agility-bridge://recipes/regression-assets` | Recipe: regression assets and test sets | `query_assets`, `describe_asset_type`, `list_asset_types` | static | `text/markdown` |
 | `agility-bridge://recipes/issues` | Recipe: issues | `query_assets`, `get_assets` | static | `text/markdown` |
@@ -59,7 +59,7 @@ Served through: [`list_projects`](tools.md#list_projects). Offered only when tha
 
 The versioned rubric (JSON) for judging backlog items: criteria, weights, scale and levels. work_item_quality uses the same rubric.
 
-Served through: [`get_work_item`](tools.md#get_work_item). Offered only when that tool is allowed for the workspace and grant.
+Served through: [`get_work_item`](tools.md#get_work_item), [`work_item_quality`](tools.md#work_item_quality). Offered only when all of those tools are allowed for the workspace and grant.
 
 ## `recipe_tests_and_defects`
 

@@ -153,3 +153,10 @@ Worker (D-01): instances are a synthetic one at an unreachable address and Digit
 Not executed (owner resources): a custom domain on a zone with the WAF exception, and an Agility credential on the
 Worker ([pending decisions](../pending-decisions/phase-3.md)).
 
+**Composite reports (P6-07):** `live/reports.live.test.ts` runs the five reports on the read-only tenant, one request at a time, and
+records shapes and levels only: both sections of `sprint_health` read with a status word that comes with its figures; a
+sibling not granted is skipped with no open-work figures; `standup_summary` returns lists and says blockers are not read;
+`release_readiness` gives a verdict with counts and never `ready` with open or cut work; `defect_triage` counts stay within the
+defects read; `work_item_quality` cites the rubric version, scores 0 to 2 or leaves a criterion unassessed (a missing
+description leaves the open-questions criterion unassessed). A report with no sibling granted makes no request. Every report
+stayed within its declared cost. Priority was readable on the tenant's backlog items; severity is not read (P6-30).

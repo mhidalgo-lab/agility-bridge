@@ -27,10 +27,10 @@ How to use it:
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
-| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296 |
+| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282 |
-| [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280 |
+| [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280, L-304 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267 |
@@ -364,6 +364,36 @@ With no resource available the SDK registers none, and `resources/list` is "meth
 Clients and tests treat both as "nothing"; do not register a placeholder resource to make the list answer.
 *Applied in:* P6-09, `test/resources.test.ts`.
 
+**L-300 — A composite reads only through the tools the caller holds, and the host says which those are.**
+A report that calls its siblings' handlers directly would bypass the grant that hides a sibling from `tools/list`. The
+server therefore gives every handler `ctx.grantedTools` (the names it registered for this caller); a section runs only when
+its tool is in the list, with none meaning none (fail closed, so a test that forgets to set it skips instead of reading).
+A skipped section is a note and a `skipped` status, never a silent gap and never an upstream call; a caller with none of
+the siblings gets a report of skipped sections and zero requests.
+*Applied in:* P6-07, `tools/reports/common.ts`, `server.ts`.
+
+**L-301 — A report's verdict says `ready` only when everything was read; otherwise it says `unknown` or names the lower bound.**
+`release_readiness` can prove "not ready" from one open item even through a cut read, but it can never prove "ready"
+from a cut one; `sprint_health` has a pace status only for a current sprint with a known share done; a count taken from a
+first page carries `lowerBound`. The same rule makes a failed or skipped section absent from the numbers instead of zero,
+and a quality score a range (with a level only when the whole range agrees) when a criterion could not be assessed.
+Tests pin each of the four ways a figure can be missing: not granted, failed, out of budget, cut.
+*Applied in:* P6-07, L-033.
+
+**L-302 — A composite's declared cost is the sum of its sections' costs, each section is capped, and the first error is rethrown only when nothing was read.**
+The report caps the call's budget at the sum and lets each sibling cap itself; metadata one section loads is cached for the
+next, so the measured cold cost is below the declared one, which stays the worst case (L-114). A section that hits the
+budget is `not_run` and the sections already read stay; an error in every attempted section (an unknown sprint, a denied
+type) is the call's error, so a missing sprint is a not-found and not an empty report.
+*Applied in:* P6-07, `tools/reports/*.test`.
+
+**L-303 — A composite can only use what its sibling shows: add the column to the sibling, never recompute around it.**
+`search_work_items` returned rows without their change time (the shaper keeps the columns listed), so staleness and
+"changed since" could not be read from it. The sibling now lists `changedAt` when it is the sort key; the reports sort by
+change date and read it. The alternative, a second query in the report, would duplicate the scope and cost handling the
+sibling already does (L-037).
+*Applied in:* P6-07, `work/search.ts`.
+
 **L-272 — A roll-up over rows you read is exact only when nothing cut the set: mark each aggregate `incomplete`, not the whole answer vaguely.**
 The portfolio tree sums estimates, done items and open defects from the backlog items it fetched. A depth limit, a per-level
 or per-page cap, a request budget that ran out, an item type the workspace does not allow and rows hidden for being outside
@@ -639,6 +669,14 @@ changed (a storage compare-and-swap would close the last milliseconds, P4-37). A
 compares lengths is no cap: read at most the cap and cancel (and do not await the cancel of a `clone()`, whose promise waits
 for the other branch).
 *Applied in:* P4-09.
+
+**L-304 — An opt-in tool group touches seven places; a property test over the resolver keeps the list honest.**
+The `reports` group is off by default like `attachments`: a `Limits` switch with a default of off, the policy schema and its
+switch list, the two resolver filters (workspace tools and passthrough), the grant warning for a switch the workspace has
+off, the admin form's switch list, the stdio group list and its config (`AB_REPORTS`, `reports:`), plus the harness's
+opt-in list and the `tools/list` budgets. Forgetting one leaves the group on or unreachable; the resolver property test
+(`never offered unless workspace and grant both allow it`) and the stdio tests catch the first two.
+*Applied in:* P6-07.
 
 **L-280 — An opt-in read tool needs a gate in the access resolver, not only a missing name in a list.**
 The resolver offers every read tool when a workspace names none, so a tool that returns content people may not want

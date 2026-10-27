@@ -32,7 +32,7 @@
 | `collaboration` | on | `get_conversations`, `list_attachments` |
 | `history` | on | `get_asset_history`, `list_recent_changes` |
 | `attachments` | **off** (workspace limit `attachmentDownload`, which a grant can only turn off; `AB_ATTACHMENT_DOWNLOAD` in stdio) | `get_attachment` |
-| `reports` | off (enable per workspace) | `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage`, `work_item_quality` |
+| `reports` | **off** (workspace limit `reports`, which a grant can only turn off; `AB_REPORTS` in stdio) | `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage`, `work_item_quality` |
 | `writes` | **off** | `add_comment`, `update_status`, `log_effort`, `assign_owners`, `move_to_sprint`, `create_work_item`, `update_fields`, `close_asset`, `reopen_asset` |
 
 Default: 20 read tools (costs are worst cases with a cold metadata cache, verified by the cost tests). Everything: 26 read + 9 write = 35.
@@ -69,14 +69,18 @@ Default: 20 read tools (costs are worst cases with a cold metadata cache, verifi
 | `get_attachment` | attachments | 12 | Opt-in, off by default (D-08): the text of one attachment of an asset in scope (`asset`, `attachment`, `max_characters`), within the size and content-type allowlists, inside the untrusted-data envelope; never rendered or executed (THREAT_MODEL A8). Not paged: text is cut at `max_characters` (default 20,000; P6-20 adds ranged reads). |
 | `get_asset_history` | history | 14 | What changed on one asset in a bounded window (`time_range`, last 30 days when omitted, at most the workspace maximum), from the authoritative `rest-1.v1/Hist` versions: one row per changed field (`changedAt` UTC, `changedBy`, `field`, `from`, `to`, `version`), newest first, diffed against the version before the window. `fields` (at most 10 plain attribute paths, validated by the query compiler; paths reaching project-bound assets are refused) or a default set (name, status, owners, estimates, sprint, team, priority, state). Not paged: `limit` caps the rows, `truncated` says more exist. The activity stream is never read (D-89). Args: `asset`, `time_range`, `fields`, `limit`, `format`. Output: `items[]`, `asset`, `window`, `versions { total, inWindow }`. |
 | `list_recent_changes` | history | 24 | Work items (Story, Defect, Task, Test) changed inside a bounded `time_range` (last 7 days when omitted) in an Agility project, a team or the whole workspace, newest change first, with `changedAt` and `changedBy`; sorting by change date costs about a second. Paged (a cursor per type). Says which items changed; `get_asset_history` says what changed. Args: `project`, `team`, `asset_type`, `time_range`, `include_closed`, `limit`, `cursor`, `format`. |
-| `sprint_health` | reports | 12 | Progress vs time, scope change, blocked or unowned or unestimated items, defects opened during the sprint; honest `partial`. |
-| `standup_summary` | reports | 10 | What moved, finished, got blocked or was created for a team since a point in time. |
-| `release_readiness` | reports | 12 | For a release, schedule or epic: open defects by priority, failing or missing tests, items not done. |
-| `defect_triage` | reports | 8 | New or untriaged defects with missing fields, age and likely duplicates (by name similarity). |
-| `work_item_quality` | reports | 10 | Check backlog items against the versioned quality rubric: description, acceptance criteria, estimate, tests, owner, parent. |
+| `sprint_health` | reports | 54 | *(built, P6-07)* `get_sprint` plus the sprint's open items: share done against share of time elapsed (a status `on_track` / `at_risk` / `off_track` only for a current sprint with a known share), scope added after the start, unestimated items, open defects, open items without an owner or unchanged for 3 days. Honest `partial`. |
+| `standup_summary` | reports | 48 | *(built, P6-07)* For a member (default `me`), optionally within a team or project and a `time_range` (last 24 hours): items finished, items changed, items in progress (two `search_work_items` reads). Blockers are not reported (no blocked flag is read) and the result says so. |
+| `release_readiness` | reports | 20 | *(built, P6-07)* For an epic (release or initiative): open items, open defects, unestimated open items and sub-epics short of done, from `get_portfolio_tree`. Verdict `ready` only when everything was read and nothing is open, `not_ready` when open work was seen, otherwise `unknown`. Tests are not read. |
+| `defect_triage` | reports | 24 | *(built, P6-07)* Open defects of a project, team or sprint (first page, at most 100): no owner, no sprint, unchanged for 14 days, and likely duplicates by name similarity. Priority and severity are not read yet (P6-30). |
+| `work_item_quality` | reports | 28 | *(built, P6-07)* One backlog item or defect scored with the versioned rubric (`agility-bridge://rubrics/backlog-item-quality`, cited by version): mechanical checks with the evidence per criterion, `null` for what could not be assessed, a score range and a level only when the range stays in one. Dependencies are not read. |
 
 Reports skip any section whose underlying tool the caller was not granted, with a note (L-037), and are offered as
-MCP Tasks to clients that support them (Phase 8).
+MCP Tasks to clients that support them (Phase 8). The `reports` group is absent from `tools/list` and refused by name
+unless the workspace limit `reports` is on and the grant keeps it on (stdio: `AB_REPORTS=on`, or `reports: true` in the
+workspace). A report's declared cost is the sum of its sections' costs (L-302); a section that is skipped, failed, out of
+budget or cut is named in `sections` and in the notes, and what it would have contributed is absent, never zero (L-033).
+Calls to the siblings use the same context, scope and budget: a composite never widens what the caller may read.
 
 ### Attachments (opt-in)
 

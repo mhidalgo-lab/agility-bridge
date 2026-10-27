@@ -239,6 +239,56 @@ describe('tools/list contract', () => {
           },
           "name": "get_portfolio_tree",
         },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Sprint health",
+          },
+          "name": "sprint_health",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Standup summary",
+          },
+          "name": "standup_summary",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Release readiness",
+          },
+          "name": "release_readiness",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Defect triage",
+          },
+          "name": "defect_triage",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Work item quality",
+          },
+          "name": "work_item_quality",
+        },
       ]
     `,
     );
@@ -248,7 +298,9 @@ describe('tools/list contract', () => {
   it.each(CORE_TOOLS.map((t) => [t.name, t] as const))(
     '%s follows the naming and description conventions',
     (_n, tool) => {
-      expect(tool.name).toMatch(/^(?:list|search|get|query|describe)_[a-z0-9_]+$|^whoami$/);
+      expect(tool.name).toMatch(
+        /^(?:list|search|get|query|describe)_[a-z0-9_]+$|^(?:whoami|sprint_health|standup_summary|release_readiness|defect_triage|work_item_quality)$/,
+      );
       expect(tool.description.length).toBeLessThanOrEqual(450);
       expect(tool.description).not.toMatch(/^(?:This tool|Use this|A tool)/i);
       expect(tool.description).toMatch(/Paged: pass nextCursor back as cursor\.|Not paged\./);

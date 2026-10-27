@@ -38,6 +38,7 @@ export const STDIO_GROUPS = [
   'collaboration',
   'attachments',
   'portfolio',
+  'reports',
 ] as const;
 
 const SETUP_HINT =
@@ -48,7 +49,7 @@ export function selectTools(config: LoadedConfig): ToolDefinition[] {
   const registry = new ToolRegistry();
   for (const tool of CORE_TOOLS) registry.register(tool);
   if (config.kind === 'setup')
-    return registry.select({ groups: STDIO_GROUPS.filter((g) => g !== 'attachments') });
+    return registry.select({ groups: STDIO_GROUPS.filter((g) => g !== 'attachments' && g !== 'reports') });
   const valid = registry.list().map((t) => t.name);
   const unknown = (config.tools ?? []).filter((t) => !valid.includes(t));
   if (unknown.length > 0) {
@@ -57,7 +58,10 @@ export function selectTools(config: LoadedConfig): ToolDefinition[] {
     );
   }
   const groups = STDIO_GROUPS.filter(
-    (g) => (g !== 'query' || config.genericQuery) && (g !== 'attachments' || config.attachmentDownload),
+    (g) =>
+      (g !== 'query' || config.genericQuery) &&
+      (g !== 'attachments' || config.attachmentDownload) &&
+      (g !== 'reports' || config.reports),
   );
   return registry.select({
     groups,
@@ -103,6 +107,7 @@ export function contextFactory(
       maxResponseBytes: config.maxResponseBytes,
       memberEmails: config.memberEmails,
       attachmentDownload: config.attachmentDownload,
+      reports: config.reports,
       attachmentMaxBytes: config.attachmentMaxBytes,
       attachmentTypes: config.attachmentTypes,
     },

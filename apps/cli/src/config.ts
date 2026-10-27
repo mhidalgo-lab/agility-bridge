@@ -35,6 +35,8 @@ export interface StdioConfig {
   readonly memberEmails: boolean;
   /** `get_attachment` (D-08): off by default. */
   readonly attachmentDownload: boolean;
+  /** The composite reports group (P6-07, D-101): off by default. */
+  readonly reports: boolean;
   readonly attachmentMaxBytes: number;
   readonly attachmentTypes: readonly string[];
   readonly maxRows: number;
@@ -65,6 +67,7 @@ const KNOWN_ENV = new Set([
   'AB_GENERIC_QUERY',
   'AB_MEMBER_EMAILS',
   'AB_ATTACHMENT_DOWNLOAD',
+  'AB_REPORTS',
   'AB_ATTACHMENT_MAX_BYTES',
   'AB_ATTACHMENT_TYPES',
   'AB_LIMITS_MAX_LIMIT',
@@ -146,6 +149,7 @@ const ENV_MODE_ONLY = [
   'AB_GENERIC_QUERY',
   'AB_MEMBER_EMAILS',
   'AB_ATTACHMENT_DOWNLOAD',
+  'AB_REPORTS',
   'AB_ATTACHMENT_MAX_BYTES',
   'AB_ATTACHMENT_TYPES',
   'AB_LIMITS_MAX_LIMIT',
@@ -328,6 +332,7 @@ const workspaceSchema = z.strictObject({
     })
     .optional(),
   generic_query: z.boolean().optional(),
+  reports: z.boolean().optional(),
   member_emails: z.boolean().optional(),
   attachments: z
     .strictObject({
@@ -468,6 +473,7 @@ function fromYaml(env: Readonly<Record<string, string | undefined>>, options: Lo
     },
     genericQuery: resolved.generic_query ?? true,
     memberEmails: resolved.member_emails ?? false,
+    reports: resolved.reports ?? false,
     attachmentDownload: resolved.attachments?.download ?? false,
     attachmentMaxBytes: resolved.attachments?.max_bytes ?? DEFAULTS.attachmentMaxBytes,
     attachmentTypes: attachmentTypes(`workspaces.${id}.attachments.types`, resolved.attachments?.types),
@@ -531,6 +537,7 @@ export function loadConfig(
     },
     genericQuery: bool('AB_GENERIC_QUERY', env['AB_GENERIC_QUERY'], true),
     memberEmails: bool('AB_MEMBER_EMAILS', env['AB_MEMBER_EMAILS'], false),
+    reports: bool('AB_REPORTS', env['AB_REPORTS'], false),
     attachmentDownload: bool('AB_ATTACHMENT_DOWNLOAD', env['AB_ATTACHMENT_DOWNLOAD'], false),
     attachmentMaxBytes: int(
       'AB_ATTACHMENT_MAX_BYTES',

@@ -2,7 +2,7 @@
 
 # Tool reference
 
-21 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
+26 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
 later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a cold metadata cache.
 
 | Tool | Group | Cost | Title |
@@ -28,6 +28,11 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 | [`get_attachment`](#get_attachment) | attachments | 12 | Get the text of an attachment |
 | [`list_portfolio_items`](#list_portfolio_items) | portfolio | 12 | List portfolio items |
 | [`get_portfolio_tree`](#get_portfolio_tree) | portfolio | 20 | Get a portfolio tree |
+| [`sprint_health`](#sprint_health) | reports | 54 | Sprint health |
+| [`standup_summary`](#standup_summary) | reports | 48 | Standup summary |
+| [`release_readiness`](#release_readiness) | reports | 20 | Release readiness |
+| [`defect_triage`](#defect_triage) | reports | 24 | Defect triage |
+| [`work_item_quality`](#work_item_quality) | reports | 28 | Work item quality |
 
 ## `whoami`
 
@@ -408,3 +413,81 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 | `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
 
 `structuredContent`: `root`, `nodes`, `backlogItems`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
+
+## `sprint_health`
+
+**Sprint health** · group `reports` · read · cost 54 Agility requests at most
+
+Report a sprint’s health in one call: share done against share of time elapsed (a status only for a current sprint), scope change since the start, unestimated items, open defects, open items without an owner or unchanged for 3 days. Sections not granted or not read are named, never counted as zero. Not paged. A cold call can make up to 54 Agility requests.
+
+Annotations: read-only true, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `sprint` | string |  | `"current"` | Sprint name, Timebox:<id>, or current, previous or next. |
+| `team` | string |  |  | Team name or Team:<id>. |
+| `project` | string |  |  | Agility project name or Scope:<id>. |
+
+`structuredContent`: `sections`, `partial`, `notes`, `sprint`, `pace` (open: more fields may be added).
+
+## `standup_summary`
+
+**Standup summary** · group `reports` · read · cost 48 Agility requests at most
+
+Summarise a member’s work for a standup: items changed or finished in a time_range (last 24 hours unless given, UTC) and items in progress, optionally within a team or Agility project. Blockers are not reported. Sections not granted or not read are named, never shown as empty. Not paged. At most 50 items per section. A cold call can make up to 48 Agility requests.
+
+Annotations: read-only true, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `member` | string |  | `"me"` | The owner: me, a username, a name or Member:<id>. |
+| `team` | string |  |  | Team name or Team:<id>. |
+| `project` | string |  |  | Agility project name or Scope:<id>. |
+| `time_range` | string |  | `"last 24 hours"` | Window (UTC, bounded by the workspace), e.g. "last 2 days", "yesterday". |
+
+`structuredContent`: `sections`, `partial`, `notes`, `window` (open: more fields may be added).
+
+## `release_readiness`
+
+**Release readiness** · group `reports` · read · cost 20 Agility requests at most
+
+Judge whether an epic (a release or initiative) is finished: open backlog items, open defects, unestimated open items and the sub-epics still short of done, from its portfolio tree. Verdict ready only when everything was read and nothing is open; not_ready when open work was seen; otherwise unknown. Not paged. A cold call can make up to 20 Agility requests.
+
+Annotations: read-only true, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `asset` | string | yes |  | Epic number (E-01234) or OID token (Epic:1234). |
+| `depth` | integer (≥ 1, ≤ 4) |  | `2` | Levels of sub-epics below the epic to read. |
+
+`structuredContent`: `sections`, `partial`, `notes`, `verdict`, `epic` (open: more fields may be added).
+
+## `defect_triage`
+
+**Defect triage** · group `reports` · read · cost 24 Agility requests at most
+
+Triage the open defects of an Agility project, team or sprint: those with no owner, no sprint or no change for 14 days, and likely duplicates by name similarity. Priority and severity are not read. Reads the first page only (at most 100 defects) and says when more exist. Not paged. A cold call can make up to 24 Agility requests.
+
+Annotations: read-only true, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `project` | string |  |  | Agility project name or Scope:<id>. |
+| `team` | string |  |  | Team name or Team:<id>. |
+| `sprint` | string |  |  | Sprint name, Timebox:<id>, or current, previous or next. |
+
+`structuredContent`: `sections`, `partial`, `notes`, `counts` (open: more fields may be added).
+
+## `work_item_quality`
+
+**Work item quality** · group `reports` · read · cost 28 Agility requests at most
+
+Score one backlog item or defect against the versioned quality rubric (resource backlog-item-quality): title, stated value, acceptance criteria, size, open questions, readiness. Checks are mechanical; a criterion that cannot be assessed is null and the score becomes a range. Dependencies are not read. Not paged. A cold call can make up to 28 Agility requests.
+
+Annotations: read-only true, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `asset` | string | yes |  | Number (B-01234, D-00012) or OID token (Story:1234). |
+
+`structuredContent`: `sections`, `partial`, `notes`, `rubric`, `criteria` (open: more fields may be added).

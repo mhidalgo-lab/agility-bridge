@@ -252,7 +252,7 @@ export function buildMcpServer({
         ...(def.outputSchema ? { outputSchema: withCachedJsonSchema(def.outputSchema) } : {}),
       },
       async (input: unknown): Promise<CallToolResult> => {
-        const ctx = freezeContext(contextFor());
+        const ctx = freezeContext({ ...contextFor(), grantedTools: tools.map((t) => t.name) });
         const logger = ctx.logger.child({ requestId: ctx.requestId, tool: def.name });
         const started = ctx.clock.now();
         const observe = (status: 'ok' | 'error', errorCode: string | null, out?: ToolOutput): void => {
