@@ -3,8 +3,10 @@
 //
 //   ANTHROPIC_API_KEY=... pnpm eval:llm --yes [--model claude-sonnet-5-5] [--out eval-report.md] [--limit N]
 //
-// It spends money, so it never runs in CI or `pnpm test`: it refuses without ANTHROPIC_API_KEY and without `--yes`.
-// Invented fixtures only; the key is read from the environment, never from an argument, and never printed.
+// It spends money, so it never runs in CI or `pnpm test`: it refuses without a key and without `--yes`. The key
+// (`ANTHROPIC_API_KEY`, or `ANTHROPIC_AUTH_TOKEN` for a bearer token) and an optional `ANTHROPIC_BASE_URL` (a local
+// router or gateway) are read from the environment, never from an argument, and never printed.
+// Invented fixtures only.
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { listedTools } from './evals/catalogue.ts';
@@ -24,7 +26,8 @@ import { readBaseline } from './evals/run-router.ts';
 import { validateDataset } from './evals/score.ts';
 
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
-const API_URL = 'https://api.anthropic.com/v1/messages';
+const DEFAULT_BASE_URL = 'https://api.anthropic.com';
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 const API_VERSION = '2023-06-01';
 const MAX_TOKENS = 4096;
 const RETRIES = 3;
@@ -56,19 +59,79 @@ export function parseArgs(argv: readonly string[]): Options {
   return { model, out, limit, yes };
 }
 
+type Env = Readonly<Record<string, string | undefined>>;
+
+/** How the Messages API is reached: `x-api-key`, a bearer token, or both, as the official SDK sends them. */
+export interface Credentials {
+  readonly apiKey?: string | undefined;
+  readonly authToken?: string | undefined;
+}
+
+export interface Endpoint {
+  /** The Messages API URL. */
+  readonly url: string;
+  /** The host of a custom base URL, for the report; undefined for the Anthropic API. Never the path or query. */
+  readonly customHost: string | undefined;
+}
+
+/**
+ * The endpoint from `ANTHROPIC_BASE_URL` (the name the official SDK and Claude Code use), with `/v1/messages` appended.
+ * HTTPS only, except plain HTTP to a loopback router; no credentials in the URL. Throws with a reason otherwise.
+ */
+export function resolveEndpoint(env: Env): Endpoint {
+  const raw = env['ANTHROPIC_BASE_URL']?.trim();
+  if (!raw) return { url: `${DEFAULT_BASE_URL}/v1/messages`, customHost: undefined };
+  let base: URL;
+  try {
+    base = new URL(raw);
+  } catch {
+    throw new Error('ANTHROPIC_BASE_URL is not a valid URL.');
+  }
+  if (base.username || base.password)
+    throw new Error(
+      'ANTHROPIC_BASE_URL must not carry credentials: set ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN.',
+    );
+  if (base.search || base.hash) throw new Error('ANTHROPIC_BASE_URL must not have a query or fragment.');
+  const loopback = LOOPBACK_HOSTS.has(base.hostname);
+  if (base.protocol !== 'https:' && !(base.protocol === 'http:' && loopback))
+    throw new Error('ANTHROPIC_BASE_URL must use https (plain http only to localhost, 127.0.0.1 or [::1]).');
+  const custom = `${base.origin}${base.pathname.replace(/\/+$/, '')}`;
+  if (custom === DEFAULT_BASE_URL) return { url: `${DEFAULT_BASE_URL}/v1/messages`, customHost: undefined };
+  return { url: `${custom}/v1/messages`, customHost: base.host };
+}
+
+/** The key or token from the environment; empty values count as unset. */
+export function credentialsFrom(env: Env): Credentials {
+  return {
+    apiKey: env['ANTHROPIC_API_KEY'] || undefined,
+    authToken: env['ANTHROPIC_AUTH_TOKEN'] || undefined,
+  };
+}
+
 /** Why the run must not start, or undefined. Pure, so a test covers the refusals. */
-export function refusal(
-  env: Readonly<Record<string, string | undefined>>,
-  options: Options,
-): string | undefined {
-  if (!env['ANTHROPIC_API_KEY'])
-    return 'ANTHROPIC_API_KEY is not set. The LLM eval calls a paid API and needs an explicit key.';
+export function refusal(env: Env, options: Options): string | undefined {
+  const { apiKey, authToken } = credentialsFrom(env);
+  if (!apiKey && !authToken)
+    return 'Neither ANTHROPIC_API_KEY nor ANTHROPIC_AUTH_TOKEN is set. The LLM eval calls a paid API and needs an explicit key.';
+  try {
+    resolveEndpoint(env);
+  } catch (e) {
+    return (e as Error).message;
+  }
   if (!options.yes) return 'Refusing to spend money without --yes (see docs/dev/evals.md).';
   return undefined;
 }
 
 /** The Messages API over fetch (D-108: no SDK dependency for a script that runs a few times a release). */
-export function anthropicModel(apiKey: string, modelId: string, fetchImpl: typeof fetch = fetch): Model {
+export function anthropicModel(
+  credentials: Credentials,
+  modelId: string,
+  fetchImpl: typeof fetch = fetch,
+  url: string = `${DEFAULT_BASE_URL}/v1/messages`,
+): Model {
+  const auth: Record<string, string> = {};
+  if (credentials.apiKey) auth['x-api-key'] = credentials.apiKey;
+  if (credentials.authToken) auth['authorization'] = `Bearer ${credentials.authToken}`;
   return async (request: ModelRequest) => {
     const tools = request.tools.map((t, i) =>
       i === request.tools.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t,
@@ -81,11 +144,11 @@ export function anthropicModel(apiKey: string, modelId: string, fetchImpl: typeo
       messages: request.messages,
     });
     for (let attempt = 0; ; attempt++) {
-      const res = await fetchImpl(API_URL, {
+      const res = await fetchImpl(url, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'x-api-key': apiKey,
+          ...auth,
           'anthropic-version': API_VERSION,
         },
         body,
@@ -99,7 +162,7 @@ export function anthropicModel(apiKey: string, modelId: string, fetchImpl: typeo
       }
       const retryable = res.status === 429 || res.status >= 500;
       if (!retryable || attempt >= RETRIES)
-        throw new Error(`Anthropic API ${res.status}: ${(await res.text()).slice(0, 300)}`);
+        throw new Error(`Messages API ${res.status}: ${(await res.text()).slice(0, 300)}`);
       await new Promise((r) => setTimeout(r, 2000 * 2 ** attempt));
     }
   };
@@ -121,15 +184,17 @@ async function main(): Promise<void> {
   const toolsJson = JSON.stringify(
     full.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })),
   );
+  const endpoint = resolveEndpoint(process.env);
   console.error(
-    `Model ${options.model}: ${questions.length} tool-choice calls and ${HOSTILE_SCENARIOS.length} hostile-result calls, ` +
+    `Model ${options.model}${endpoint.customHost === undefined ? '' : ` via ${endpoint.customHost}`}: ${questions.length} tool-choice calls and ${HOSTILE_SCENARIOS.length} hostile-result calls, ` +
       `each sending ~${Math.round(toolsJson.length / 4)} tokens of tools/list.`,
   );
-  const model = anthropicModel(process.env['ANTHROPIC_API_KEY'] as string, options.model);
+  const model = anthropicModel(credentialsFrom(process.env), options.model, fetch, endpoint.url);
   const choice = await runToolChoice(model, questions, catalogues);
   const hostile = await runHostile(model, HOSTILE_SCENARIOS, full);
   const report: EvalReport = {
     model: options.model,
+    endpointHost: endpoint.customHost,
     date: new Date().toISOString().slice(0, 10),
     toolsListSha256: createHash('sha256').update(toolsJson).digest('hex'),
     toolCount: full.length,

@@ -6,7 +6,7 @@ import { buildMcpServer, CORE_TOOLS } from '../../packages/core/src/index.ts';
 import { OPT_IN_GROUPS as HARNESS_OPT_IN } from '../../packages/core/test/harness/index.ts';
 import { makeContext } from '../../packages/core/test/helpers/context.ts';
 import { rpc } from '../../packages/core/test/helpers/mcp.ts';
-import { anthropicModel, DEFAULT_MODEL, parseArgs, refusal } from '../eval-llm.ts';
+import { anthropicModel, DEFAULT_MODEL, parseArgs, refusal, resolveEndpoint } from '../eval-llm.ts';
 import { listedTools, OPT_IN_GROUPS } from '../evals/catalogue.ts';
 import { loadDataset } from '../evals/dataset.ts';
 import {
@@ -243,6 +243,21 @@ describe('LLM eval scoring (stubbed model)', () => {
     expect(report).toContain('**1/2**');
     expect(report).toContain('**FOLLOWED**');
     expect(report).toContain('| Q1 | a / b | whoami | list_projects |');
+    expect(report).toContain('- Endpoint: Anthropic API');
+  });
+
+  it('the report says when a custom base URL was used, by host only', () => {
+    const report = formatReport({
+      model: 'claude-test',
+      endpointHost: 'localhost:4000',
+      date: '2026-01-01',
+      toolsListSha256: 'abc',
+      toolCount: 26,
+      choice: [],
+      hostile: [],
+      routerBaseline: { top1: 0.6, top3: 0.8 },
+    });
+    expect(report).toContain('custom base URL (host `localhost:4000`), not the Anthropic API');
   });
 });
 
@@ -254,6 +269,36 @@ describe('the CLI is guarded', () => {
     expect(refusal({ ANTHROPIC_API_KEY: '' }, opts(['--yes']))).toMatch(/ANTHROPIC_API_KEY/);
     expect(refusal({ ANTHROPIC_API_KEY: 'sk-test' }, opts())).toMatch(/--yes/);
     expect(refusal({ ANTHROPIC_API_KEY: 'sk-test' }, opts(['--yes']))).toBeUndefined();
+    expect(refusal({ ANTHROPIC_AUTH_TOKEN: 'tok' }, opts(['--yes']))).toBeUndefined();
+    expect(
+      refusal({ ANTHROPIC_API_KEY: 'sk-test', ANTHROPIC_BASE_URL: 'http://router.example' }, opts(['--yes'])),
+    ).toMatch(/https/);
+  });
+
+  it('reads a custom base URL from the environment: https, or plain http to loopback only, no credentials', () => {
+    expect(resolveEndpoint({})).toEqual({
+      url: 'https://api.anthropic.com/v1/messages',
+      customHost: undefined,
+    });
+    expect(resolveEndpoint({ ANTHROPIC_BASE_URL: 'https://api.anthropic.com/' }).customHost).toBeUndefined();
+    expect(resolveEndpoint({ ANTHROPIC_BASE_URL: 'http://localhost:4000' })).toEqual({
+      url: 'http://localhost:4000/v1/messages',
+      customHost: 'localhost:4000',
+    });
+    expect(resolveEndpoint({ ANTHROPIC_BASE_URL: 'http://127.0.0.1:8080/anthropic/' }).url).toBe(
+      'http://127.0.0.1:8080/anthropic/v1/messages',
+    );
+    expect(resolveEndpoint({ ANTHROPIC_BASE_URL: 'http://[::1]:4000' }).customHost).toBe('[::1]:4000');
+    expect(resolveEndpoint({ ANTHROPIC_BASE_URL: 'https://gateway.example/llm' }).url).toBe(
+      'https://gateway.example/llm/v1/messages',
+    );
+    expect(() => resolveEndpoint({ ANTHROPIC_BASE_URL: 'http://gateway.example' })).toThrow(/https/);
+    expect(() => resolveEndpoint({ ANTHROPIC_BASE_URL: 'http://localhost.evil.example' })).toThrow(/https/);
+    expect(() => resolveEndpoint({ ANTHROPIC_BASE_URL: 'https://u:p@gateway.example' })).toThrow(
+      /credentials/,
+    );
+    expect(() => resolveEndpoint({ ANTHROPIC_BASE_URL: 'https://gateway.example/?key=x' })).toThrow(/query/);
+    expect(() => resolveEndpoint({ ANTHROPIC_BASE_URL: 'not a url' })).toThrow(/valid URL/);
   });
 
   it('takes no secret as an argument and validates its options', () => {
@@ -268,9 +313,11 @@ describe('the CLI is guarded', () => {
 
   it('sends the tools with a cache breakpoint, retries a 429 and does not leak the key in errors', async () => {
     const bodies: unknown[] = [];
+    const headers: Record<string, string>[] = [];
     let n = 0;
     const fetchStub = (async (_url: string, init: RequestInit) => {
       bodies.push(JSON.parse(init.body as string));
+      headers.push(init.headers as Record<string, string>);
       n++;
       if (n === 1) return new Response('slow down', { status: 429 });
       return Response.json({
@@ -281,7 +328,7 @@ describe('the CLI is guarded', () => {
         stop_reason: 'end_turn',
       });
     }) as unknown as typeof fetch;
-    const model = anthropicModel('sk-test-key', 'claude-test', fetchStub);
+    const model = anthropicModel({ apiKey: 'sk-test-key' }, 'claude-test', fetchStub);
     const turn = await model({
       system: 's',
       tools: [
@@ -297,11 +344,30 @@ describe('the CLI is guarded', () => {
     expect(sent.tools[1]?.['cache_control']).toEqual({ type: 'ephemeral' });
     expect(sent.tools[0]?.['cache_control']).toBeUndefined();
     expect(n).toBe(2);
+    expect(headers[0]?.['x-api-key']).toBe('sk-test-key');
+    expect(headers[0]?.['authorization']).toBeUndefined();
 
     const failing = (async () => new Response('bad request', { status: 400 })) as unknown as typeof fetch;
     await expect(
-      anthropicModel('sk-secret-value', 'm', failing)({ system: '', tools: [], messages: [] }),
+      anthropicModel({ apiKey: 'sk-secret-value' }, 'm', failing)({ system: '', tools: [], messages: [] }),
     ).rejects.toThrow(/400/);
+  });
+
+  it('sends a bearer token and posts to the custom URL it is given', async () => {
+    const calls: Array<{ url: string; headers: Record<string, string> }> = [];
+    const fetchStub = (async (url: string, init: RequestInit) => {
+      calls.push({ url, headers: init.headers as Record<string, string> });
+      return Response.json({ content: [], stop_reason: 'end_turn' });
+    }) as unknown as typeof fetch;
+    await anthropicModel(
+      { authToken: 'router-token' },
+      'm',
+      fetchStub,
+      'http://localhost:4000/v1/messages',
+    )({ system: '', tools: [], messages: [] });
+    expect(calls[0]?.url).toBe('http://localhost:4000/v1/messages');
+    expect(calls[0]?.headers['authorization']).toBe('Bearer router-token');
+    expect(calls[0]?.headers['x-api-key']).toBeUndefined();
   });
 });
 

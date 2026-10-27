@@ -79,7 +79,7 @@ It spends money (about 80 requests, each with the ~10 K-token `tools/list`; the 
 the list is read from cache after the first call) and never runs in CI or `pnpm test`.
 
 ```sh
-export ANTHROPIC_API_KEY=...            # an explicit key; the script refuses without it
+export ANTHROPIC_API_KEY=...            # an explicit key (or ANTHROPIC_AUTH_TOKEN); the script refuses without one
 pnpm eval:llm --yes                     # default model claude-sonnet-5-5, report in ./eval-report.md
 pnpm eval:llm --yes --model claude-opus-5-5 --out eval-report-opus.md
 pnpm eval:llm --yes --limit 10          # a cheap smoke test of the harness
@@ -89,6 +89,23 @@ Run the default model and the strongest model: a weaker model exposes descriptio
 users with the best clients get. The report (`eval-report*.md`, git-ignored) lists the model, the date, the SHA-256 of the
 `tools/list` JSON, tool-choice accuracy next to the router baseline, every hostile scenario with the tool calls made, and
 every tool-choice miss.
+
+**Through a router or gateway.** Set `ANTHROPIC_BASE_URL` (the name the official SDK and Claude Code use) and the script
+posts to `<base URL>/v1/messages` instead of the Anthropic API:
+
+```sh
+export ANTHROPIC_BASE_URL=http://localhost:4000   # a local router; https for anything else
+read -rs ANTHROPIC_AUTH_TOKEN && export ANTHROPIC_AUTH_TOKEN   # or ANTHROPIC_API_KEY, whichever the router expects
+pnpm eval:llm --yes --out eval-report-sonnet.md
+```
+
+- The URL is read from the environment only. It must be `https`, or plain `http` to `localhost`, `127.0.0.1` or `[::1]`;
+  credentials, a query or a fragment in it are refused.
+- `ANTHROPIC_API_KEY` is sent as `x-api-key` and `ANTHROPIC_AUTH_TOKEN` as `Authorization: Bearer …`; one of them must be
+  set, and both are sent when both are set.
+- The report states the endpoint: `Anthropic API`, or `custom base URL (host …)` with the host only. A router may
+  rewrite the model, drop the `cache_control` breakpoint (the run then costs more) or alter requests, so a report made
+  through one is evidence about that route; for the release report, say which endpoint was used.
 
 **Reading it.**
 
