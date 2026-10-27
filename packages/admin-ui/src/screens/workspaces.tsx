@@ -46,6 +46,7 @@ import {
   AssetTypeFields,
   assetTypesFrom,
   assetTypeValues,
+  compositeNotes,
   confirmed,
   confirmPage,
   enabledState,
@@ -62,6 +63,7 @@ import {
   limitValues,
   load,
   loadFailed,
+  Notes,
   paged,
   problemOf,
   RowAction,
@@ -503,11 +505,12 @@ export function registerWorkspaces(ui: Hono, kit: UiKit): void {
       if (!isId(id)) return errorPage(404, undefined, principal);
       const ws = await loadWorkspace(c, principal, id);
       if ('status' in ws) return loadFailed(c, ws, principal);
-      const [instance, grants, users, creds] = await Promise.all([
+      const [instance, grants, users, creds, tools] = await Promise.all([
         load(kit, c, principal, adminPath`/instances/${ws.instanceId}`, (b) => one(b, parseInstance)),
         load(kit, c, principal, '/grants', (b) => rows(b, parseGrant), { workspaceId: id }),
         load(kit, c, principal, '/users', (b) => rows(b, parseUser)),
         credentialsOf(c, principal, ws.instanceId),
+        load(kit, c, principal, '/tools', (b) => rows(b, parseTool)),
       ]);
       const emails = new Map<string, User>((users.ok ? users.value : []).map((u) => [u.id, u]));
       const t = now();
@@ -566,6 +569,7 @@ export function registerWorkspaces(ui: Hono, kit: UiKit): void {
                 ['Created', <When at={ws.createdAt} />],
               ]}
             />
+            <Notes title="Notes" items={compositeNotes(ws.enabledTools, tools.ok ? tools.value : [])} />
             <div class="actions">
               <LinkButton href={`${self}/edit`}>Edit</LinkButton>
             </div>

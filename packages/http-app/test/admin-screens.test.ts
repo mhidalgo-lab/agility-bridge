@@ -1384,6 +1384,7 @@ describe('the tool catalogue endpoint', () => {
         name: WRITE_TOOL,
         kind: 'write',
         group: 'work',
+        siblings: [],
       });
       expect(tools.length).toBe(TOOLS.size);
     }
@@ -1391,5 +1392,66 @@ describe('the tool catalogue endpoint', () => {
     expect(denied.status).toBe(403);
     expect(await denied.text()).not.toContain(WRITE_TOOL);
     expect((await s.send('GET', '/api/admin/v1/tools')).status).toBe(401);
+  });
+});
+
+describe('composite grants (P6-11)', () => {
+  const REPORT = 'sprint_health';
+
+  it('lists the sibling tools of a composite in the tool catalogue and nothing for the others', async () => {
+    const e = await env();
+    const tools = (await (await e.s.api('GET', '/tools', e.owner)).json()) as Array<{
+      name: string;
+      siblings: string[];
+    }>;
+    expect(tools.find((t) => t.name === REPORT)?.siblings).toEqual(['get_sprint', 'search_work_items']);
+    expect(tools.find((t) => t.name === 'whoami')?.siblings).toEqual([]);
+  });
+
+  it('warns on the workspace page when a composite is enabled without its siblings, and only then', async () => {
+    const e = await env();
+    const { s, admin } = e;
+    const ws = `/admin/workspaces/${e.ids.workspaceA}`;
+    const patch = (enabledTools: string[] | null) =>
+      s.api('PATCH', `/workspaces/${e.ids.workspaceA}`, e.owner, { enabledTools });
+    expect((await patch(['whoami', REPORT, 'get_sprint'])).status).toBe(200);
+    const partial = await (await page(s, ws, admin)).text();
+    expect(partial).toContain('sprint_health is granted without search_work_items');
+    expect(partial).not.toContain('without get_sprint');
+    expect((await patch(['whoami', REPORT, 'get_sprint', 'search_work_items'])).status).toBe(200);
+    expect(await (await page(s, ws, admin)).text()).not.toContain('is granted without');
+    expect((await patch(['whoami'])).status).toBe(200);
+    expect(await (await page(s, ws, admin)).text()).not.toContain('is granted without');
+    expect((await patch(null)).status).toBe(200);
+    expect(await (await page(s, ws, admin)).text()).not.toContain('is granted without');
+  });
+
+  it('warns on the grant page from what the grant can really call: its list inside the workspace list', async () => {
+    const e = await env();
+    const { s, admin } = e;
+    const made = await s.api('POST', '/grants', e.owner, {
+      workspaceId: e.ids.workspaceA,
+      userId: e.ids.alice,
+      credentialId: e.ids.aliceCredential,
+      tools: ['whoami', REPORT, 'get_sprint', 'search_work_items'],
+    });
+    const id = ((await made.json()) as { record: { id: string } }).record.id;
+    const detail = `/admin/grants/${id}`;
+    expect(await (await page(s, detail, admin)).text()).not.toContain('is granted without');
+    // The workspace stops enabling one sibling: the grant's list is intersected with it.
+    await s.api('PATCH', `/workspaces/${e.ids.workspaceA}`, e.owner, {
+      enabledTools: ['whoami', REPORT, 'get_sprint'],
+    });
+    const html = await (await page(s, detail, admin)).text();
+    expect(html).toContain('sprint_health is granted without search_work_items');
+  });
+
+  it('shows the warning to owners and admins only: members and strangers get no page', async () => {
+    const e = await env();
+    await e.s.api('PATCH', `/workspaces/${e.ids.workspaceA}`, e.owner, { enabledTools: ['whoami', REPORT] });
+    for (const who of [e.alice, undefined]) {
+      const res = await page(e.s, `/admin/workspaces/${e.ids.workspaceA}`, who);
+      expect(await res.text()).not.toContain('sprint_health');
+    }
   });
 });

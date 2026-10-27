@@ -262,3 +262,31 @@
 - **Recommendation:** (a) now with the rule stated in the result; (b) when an owner asks, as a follow-up of the reports'
   first live use. The figures are always returned beside the status.
 - **Owner:** *(open; built as (a))*
+
+### D-111 — A composite granted without its siblings is a warning, not a refusal *(P6-11)*
+- **Context:** a report whose siblings are not granted skips those sections and says so (L-300). An operator may do this
+  on purpose (a standup that reads only searches); it may also be an oversight.
+- **Options:** (a) advisory warnings in `whoami` and on the workspace and grant pages; (b) refuse to save a list that has a
+  composite without its siblings; (c) grant the siblings implicitly.
+- **Recommendation:** (a): (b) blocks legitimate narrow grants, (c) widens access behind the operator's back (L-037, T3).
+  The warning names the missing tools so the fix is one tick.
+- **Owner:** *(open; built as (a))*
+
+### D-112 — The sibling table lives beside the reports, not on `ToolDefinition` *(P6-11)*
+- **Context:** the metadata is needed by `whoami` (inside the tool catalogue's own import graph), the admin API and the
+  tests; a field on every definition would put a new optional property in the contract of all 26 tools.
+- **Options:** (a) one table `COMPOSITE_SIBLINGS` in `tools/reports/siblings.ts`, tied to each report's sections by a test;
+  (b) an optional `siblings` field on `ToolDefinition`; (c) derive it at run time from the sections that ran.
+- **Recommendation:** (a): no cycle (`whoami` cannot import `CORE_TOOLS`), one place to edit, and the test fails when a
+  report's sections and the table disagree. (b) is easy to move to later.
+- **Owner:** *(open; built as (a))*
+
+### D-113 — The every-tool cost test uses one shared world; the deepest cases stay beside each tool *(P6-11)*
+- **Context:** each tool's test file has its own synthetic world and its deepest worst case (four-level trees, every page).
+  The all-tools test needs one fixture per tool without importing 8 test files.
+- **Options:** (a) `test/tools/worst-case.ts` with one entry per tool over the reports world (plus comments, attachments
+  and history), failing for a missing entry, for a call that errors and for one that makes no request; (b) move all worlds
+  into shared helpers; (c) a registry the per-file tests fill.
+- **Recommendation:** (a) now: it makes a missing fixture a failing test with minimal churn; (b) is a refactor of 3,800
+  lines for no new coverage. No tool's declared cost was wrong.
+- **Owner:** *(open; built as (a))*

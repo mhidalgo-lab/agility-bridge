@@ -16,7 +16,7 @@ import {
   type TokenListItem,
   type ToolInfo,
 } from '@agility-bridge/auth';
-import type { Clock, Logger } from '@agility-bridge/core';
+import { type Clock, COMPOSITE_SIBLINGS, type Logger } from '@agility-bridge/core';
 import type { AccessToken, AuditKind, AuditStatus, Credential, Storage } from '@agility-bridge/storage';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
@@ -1795,7 +1795,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       path: '/tools',
       tag: 'tools',
       summary:
-        'The tool catalogue: name, kind and group of every tool (owner, admin); what workspaces and grants choose from',
+        'The tool catalogue: name, kind, group and (for a composite) the sibling tools it reads, of every tool (owner, admin); what workspaces and grants choose from',
       out: z.array(ToolOut),
     },
     async (c) => {
@@ -1803,7 +1803,13 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       if (actor.kind === 'user' && actor.role === 'member')
         throw new AdminError('forbidden', 'This needs an owner or an admin.');
       return [...options.tools.entries()]
-        .map(([name, info]) => ({ name, kind: info.kind, group: info.group }))
+        .map(([name, info]) => ({
+          name,
+          kind: info.kind,
+          group: info.group,
+          // The tools a composite reads: the panel warns when it is granted without them (P6-11).
+          siblings: [...(COMPOSITE_SIBLINGS[name] ?? [])],
+        }))
         .sort((a, b) => a.name.localeCompare(b.name));
     },
   );

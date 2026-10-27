@@ -179,7 +179,14 @@ Annotations are derived from `kind` by the registry, never written by hand. Non-
 - Each tool declares `cost`: the worst-case number of Agility requests in one call, including retries, paging and
   resolution (L-114). The registry hides a tool whose cost exceeds the deployment's per-call budget (`select({ maxCost })`, L-115; see
   [core contracts](core.md)).
-- A cost test forces the worst case for every tool and asserts requests ≤ declared cost.
+- One test (`packages/core/test/tools/cost.test.ts`) walks `CORE_TOOLS` and measures each tool's worst-case call on a cold
+  cache against its declared cost (L-313). **A new tool needs an entry in `test/tools/worst-case.ts`** (arguments of its most
+  expensive call over the shared world, composites measured with their siblings), or the test fails; a fixture whose call
+  errors or makes no request fails too. The deepest cases (four-level trees, every page) stay in the tool's own test file.
+- A composite names the tools it reads in `COMPOSITE_SIBLINGS` (`tools/reports/siblings.ts`); a test ties the table to the
+  sections it runs. `whoami` (`warnings`, a note) and the admin panel (workspace and grant pages, from `GET /tools`
+  `siblings`) warn when a composite is granted without some of them (L-314). A composite never costs less than a sibling,
+  so a per-call budget never hides a sibling and keeps the composite.
 - Descriptions state the cost when it can reach 8 or more requests, and what happens when the budget runs out.
 
 ## Untrusted data

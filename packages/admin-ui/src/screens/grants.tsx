@@ -45,6 +45,7 @@ import {
   AssetTypeFields,
   assetTypesFrom,
   assetTypeValues,
+  compositeNotes,
   confirmed,
   confirmPage,
   FormError,
@@ -285,8 +286,16 @@ function formFieldOf(apiField: string | undefined): string | undefined {
 }
 
 /** What a saved grant does not do the way it reads (the API's warnings, recomputed from what is stored). */
-export function grantNotes(g: Grant, ws: Workspace): string[] {
+export function grantNotes(g: Grant, ws: Workspace, tools: readonly Tool[] = []): string[] {
   const notes: string[] = [];
+  // What the grant can really call: its own list inside the workspace's (null = inherit / every read tool).
+  const effective =
+    g.tools === null
+      ? ws.enabledTools
+      : ws.enabledTools === null
+        ? g.tools
+        : g.tools.filter((t) => ws.enabledTools?.includes(t));
+  notes.push(...compositeNotes(effective, tools));
   const outside = (g.tools ?? []).filter((t) =>
     ws.enabledTools === null ? false : !ws.enabledTools.includes(t),
   );
@@ -576,10 +585,11 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
       const g = await loadGrant(c, principal, id);
       if ('status' in g) return loadFailed(c, g, principal);
       const ws = await loadWorkspace(c, principal, g.workspaceId);
-      const [tokens, users, creds] = await Promise.all([
+      const [tokens, users, creds, tools] = await Promise.all([
         load(kit, c, principal, adminPath`/grants/${id}/tokens`, (b) => rows(b, parseToken)),
         usersOf(c, principal),
         'status' in ws ? Promise.resolve([] as Credential[]) : credentialsOf(c, principal, ws.instanceId),
+        catalogue(c, principal),
       ]);
       const person = users.find((u) => u.id === g.userId);
       const credential = creds.find((k) => k.id === g.credentialId);
@@ -646,7 +656,7 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
                 ['Created', <When at={g.createdAt} />],
               ]}
             />
-            {'status' in ws ? null : <Notes title="Notes" items={grantNotes(g, ws)} />}
+            {'status' in ws ? null : <Notes title="Notes" items={grantNotes(g, ws, tools)} />}
             <div class="actions">
               <LinkButton href={`${self}/edit`}>Edit</LinkButton>
             </div>

@@ -10,6 +10,10 @@ export interface CostMeasurement {
   readonly declared: number;
   readonly requests: number;
   readonly withinCost: boolean;
+  /** The call ended in an error result: a worst-case fixture that errors early under-measures. */
+  readonly isError: boolean;
+  /** The first text block of the result, to explain a failed fixture. */
+  readonly text: string;
 }
 
 /** Runs one call with a budget far above the declared cost and counts the requests that reached the fake. */
@@ -18,13 +22,22 @@ export async function measureCost(
   fake: FakeAgility,
   ctx: (overrides: Partial<ToolContext>) => ToolContext,
   args: Record<string, unknown> = {},
+  /** The sibling tools a composite reads: registered with it, as the host does for a caller granted them. */
+  siblings: readonly ToolDefinition[] = [],
 ): Promise<CostMeasurement> {
   const before = fake.requests;
   const context = ctx({ fetch: fake.fetch, budget: createBudget(Math.max(1_000, tool.cost * 10)) });
-  await rpc(() => buildMcpServer({ tools: [tool], ctx: context }), 'tools/call', {
+  const result = await rpc(() => buildMcpServer({ tools: [tool, ...siblings], ctx: context }), 'tools/call', {
     name: tool.name,
     arguments: args,
   });
   const requests = fake.requests - before;
-  return { tool: tool.name, declared: tool.cost, requests, withinCost: requests <= tool.cost };
+  return {
+    tool: tool.name,
+    declared: tool.cost,
+    requests,
+    withinCost: requests <= tool.cost,
+    isError: result['isError'] === true,
+    text: ((result['content'] as Array<{ text?: string }> | undefined)?.[0]?.text ?? '').slice(0, 300),
+  };
 }

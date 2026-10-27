@@ -10,6 +10,7 @@ import {
   type ToolDefinition,
 } from '../../src/index.ts';
 import { CORE_TOOLS } from '../../src/tools/index.ts';
+import { COMPOSITE_SIBLINGS } from '../../src/tools/reports/siblings.ts';
 import snapshotJson from '../fixtures/agility/meta-snapshot.json' with { type: 'json' };
 import {
   FakeAgility,
@@ -211,14 +212,8 @@ export const toolByName = (name: string): ToolDefinition => {
   return t;
 };
 
-/** What a report needs, by report name (the siblings its sections read through). */
-export const SIBLINGS: Readonly<Record<string, readonly string[]>> = {
-  sprint_health: ['get_sprint', 'search_work_items'],
-  standup_summary: ['search_work_items'],
-  release_readiness: ['get_portfolio_tree'],
-  defect_triage: ['search_work_items'],
-  work_item_quality: ['get_work_item'],
-};
+/** What a report needs, by report name (the siblings its sections read through): the product's own table. */
+export const SIBLINGS: Readonly<Record<string, readonly string[]>> = COMPOSITE_SIBLINGS;
 
 export function rig(
   options: WorldOptions & {

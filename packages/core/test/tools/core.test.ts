@@ -11,6 +11,7 @@ import {
 import { describeAssetType, listAssetTypes } from '../../src/tools/core/asset-types.ts';
 import { listProjects } from '../../src/tools/core/list-projects.ts';
 import { whoami } from '../../src/tools/core/whoami.ts';
+import { CORE_TOOLS } from '../../src/tools/index.ts';
 import snapshotJson from '../fixtures/agility/meta-snapshot.json' with { type: 'json' };
 import {
   FakeAgility,
@@ -218,5 +219,35 @@ describe('untrusted text and costs', () => {
     const { ctx, fake } = setup();
     const m = await measureCost(tool, fake, (o) => ctx(o), args);
     expect(m.requests, `${m.tool}: ${m.requests} > ${m.declared}`).toBeLessThanOrEqual(m.declared);
+  });
+});
+
+describe('whoami composite warnings (P6-11)', () => {
+  const asServer = (tools: ToolDefinition[], ctx: ToolContext) =>
+    rpc(() => buildMcpServer({ tools, ctx }), 'tools/call', { name: 'whoami', arguments: {} });
+  const by = (n: string) => CORE_TOOLS.find((t) => t.name === n) as ToolDefinition;
+
+  it('names a granted composite whose sibling tools are not granted, in the note and the structured result', async () => {
+    const { ctx } = setup();
+    const r = await asServer([whoami, by('sprint_health')], ctx());
+    expect(r['isError'], text(r)).toBeUndefined();
+    const warnings = (r['structuredContent'] as { warnings?: Array<{ tool: string; missing: string[] }> })
+      .warnings;
+    expect(warnings?.map((w) => [w.tool, w.missing])).toEqual([
+      ['sprint_health', ['get_sprint', 'search_work_items']],
+    ]);
+    expect(text(r)).toContain('sprint_health is granted without get_sprint, search_work_items');
+  });
+
+  it('says nothing when the siblings are granted or no composite is', async () => {
+    const { ctx } = setup();
+    for (const tools of [
+      [whoami],
+      [whoami, by('sprint_health'), by('get_sprint'), by('search_work_items')],
+    ]) {
+      const r = await asServer(tools, ctx());
+      expect(r['structuredContent']).not.toHaveProperty('warnings');
+      expect(text(r)).not.toContain('is granted without');
+    }
   });
 });

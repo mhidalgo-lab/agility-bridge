@@ -104,7 +104,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 
 | Method | Path | What | Body | Response |
 |---|---|---|---|---|
-| `GET` | `/tools` | The tool catalogue: name, kind and group of every tool (owner, admin); what workspaces and grants choose from | — | 200 Tool[] |
+| `GET` | `/tools` | The tool catalogue: name, kind, group and (for a composite) the sibling tools it reads, of every tool (owner, admin); what workspaces and grants choose from | — | 200 Tool[] |
 
 ## users
 

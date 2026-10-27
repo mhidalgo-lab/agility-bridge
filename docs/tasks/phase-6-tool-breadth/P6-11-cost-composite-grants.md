@@ -2,7 +2,7 @@
 id: P6-11
 title: Cost accounting and composite grants
 phase: 6
-status: in-progress
+status: review
 priority: medium
 depends_on: [P6-07]
 adr: ["0010"]
@@ -30,13 +30,13 @@ when a composite is granted without the sibling tools it reads.
   negative tests for the panel.
 
 ## Acceptance criteria
-- [ ] A single test iterates `CORE_TOOLS` and fails for a tool with no worst-case fixture or a measured cold cost above its
+- [x] A single test iterates `CORE_TOOLS` and fails for a tool with no worst-case fixture or a measured cold cost above its
   declared cost.
-- [ ] `select({ maxCost })` is tested over the real catalogue: no listed tool costs more than the budget, composites included.
-- [ ] `COMPOSITE_SIBLINGS` is the single source: every report is covered by a test that its sections run exactly those tools.
-- [ ] `whoami` shows the warning (structured and note) for a composite granted without a sibling, nothing otherwise.
-- [ ] The workspace and grant pages show the warning; names are escaped; a workspace on "all tools" and a complete list show none.
-- [ ] `docs/dev/tool-conventions.md`, generated references, a changeset.
+- [x] `select({ maxCost })` is tested over the real catalogue: no listed tool costs more than the budget, composites included.
+- [x] `COMPOSITE_SIBLINGS` is the single source: every report is covered by a test that its sections run exactly those tools.
+- [x] `whoami` shows the warning (structured and note) for a composite granted without a sibling, nothing otherwise.
+- [x] The workspace and grant pages show the warning; names are escaped; a workspace on "all tools" and a complete list show none.
+- [x] `docs/dev/tool-conventions.md`, generated references, a changeset.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.
