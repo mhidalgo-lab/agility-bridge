@@ -36,6 +36,8 @@ interface Node {
   estimate: number;
   doneEstimate: number;
   estimated: boolean;
+  /** Items read below this epic (itself included) that have no estimate. */
+  unestimated: number;
   incomplete: boolean;
 }
 
@@ -50,6 +52,8 @@ const num = (v: unknown): number | undefined => {
   return v === null || v === undefined || !Number.isFinite(n) ? undefined : n;
 };
 const round1 = (n: number) => Math.round(n * 10) / 10;
+/** The most epics one item query names (the compiler's limit for a server-built `in` list). */
+const MAX_EPICS_IN_ITEM_QUERY = 2_000;
 const budgetOut = (e: unknown) => e instanceof AbError && e.code === ErrorCode.BudgetExhausted;
 
 export const getPortfolioTree: ToolDefinition = defineTool({
@@ -138,6 +142,7 @@ export const getPortfolioTree: ToolDefinition = defineTool({
         estimate: 0,
         doneEstimate: 0,
         estimated: false,
+        unestimated: 0,
         incomplete: false,
       });
       return true;
@@ -150,12 +155,13 @@ export const getPortfolioTree: ToolDefinition = defineTool({
     add(rootRow, 0);
 
     let frontier: string[] = [target.oid];
+    let inFrontier = new Set(frontier);
     let levelResult = firstLevel;
     let depthReached = 0;
     for (let level = 1; level <= depth; level++) {
       if (level > 1) {
         try {
-          [levelResult] = await runBatch(ctx, [await childrenOf(frontier)]);
+          [levelResult] = await runBatch(ctx, [await childrenOf(frontier.slice(0, MAX_EPICS_IN_ITEM_QUERY))]);
         } catch (e) {
           if (!budgetOut(e)) throw e;
           cut = true;
@@ -170,7 +176,7 @@ export const getPortfolioTree: ToolDefinition = defineTool({
       const next: string[] = [];
       for (const row of levelResult.rows) {
         const parent = oidsOf(row['Super'])[0];
-        if (parent === undefined || !frontier.includes(parent)) continue; // an upstream that ignored the filter
+        if (parent === undefined || !inFrontier.has(parent)) continue; // an upstream that ignored the filter
         if (add(row, level, parent)) next.push(oidsOf(row['_oid'])[0] ?? '');
       }
       if (levelResult.more) {
@@ -181,12 +187,14 @@ export const getPortfolioTree: ToolDefinition = defineTool({
       }
       depthReached = level;
       frontier = next;
+      inFrontier = new Set(frontier);
       if (frontier.length === 0) break;
     }
 
     // Everything below the last level read, and the backlog items, in one request.
     const itemTypes: string[] = [];
     const skipped: string[] = [];
+    await md.prefetch(ITEM_TYPES); // one round of loads instead of one round trip per type
     for (const type of ITEM_TYPES) {
       const meta = await md.findAssetType(type);
       if (meta === undefined || !meta.attributes.has('Super')) continue;
@@ -213,7 +221,16 @@ export const getPortfolioTree: ToolDefinition = defineTool({
       ].filter((f) => meta.attributes.has(f.split('.')[0] as string));
     };
     const deeper = depthReached === depth && frontier.length > 0;
-    const epicOids = [...nodes.keys()];
+    // The server-built `in` list is bounded by the compiler (2,000 values): a bigger tree is cut here, said so, and
+    // marked incomplete rather than failing the call.
+    const allOids = [...nodes.keys()];
+    const epicOids = allOids.slice(0, MAX_EPICS_IN_ITEM_QUERY);
+    if (allOids.length > epicOids.length) {
+      cut = true;
+      notes.push(
+        `The tree has ${allOids.length} epics; backlog items are read for the first ${epicOids.length} only, so the roll-ups are incomplete. Get a sub-epic for exact numbers.`,
+      );
+    }
     const pageSize = ctx.limits.maxRows;
     const items: ItemRow[] = [];
     let itemsCut = false;
@@ -228,7 +245,14 @@ export const getPortfolioTree: ToolDefinition = defineTool({
               {
                 assetType: EPIC,
                 fields: ['Super'],
-                filters: [{ field: 'Super', op: 'in', value: frontier, trusted: true }],
+                filters: [
+                  {
+                    field: 'Super',
+                    op: 'in',
+                    value: frontier.slice(0, MAX_EPICS_IN_ITEM_QUERY),
+                    trusted: true,
+                  },
+                ],
                 limit: maxItems,
                 includeClosed: true,
               },
@@ -319,6 +343,7 @@ export const getPortfolioTree: ToolDefinition = defineTool({
         at.items++;
         if (done) at.doneItems++;
         if (open) at.openDefects++;
+        if (estimate === undefined) at.unestimated++;
         if (estimate !== undefined) {
           at.estimated = true;
           at.estimate += estimate;
@@ -339,7 +364,10 @@ export const getPortfolioTree: ToolDefinition = defineTool({
     // Pre-order, children in the order Agility returned them.
     const kids = new Map<string, Node[]>();
     for (const n of nodes.values()) {
-      if (n.parent !== undefined) kids.set(n.parent, [...(kids.get(n.parent) ?? []), n]);
+      if (n.parent === undefined) continue;
+      const siblings = kids.get(n.parent);
+      if (siblings === undefined) kids.set(n.parent, [n]);
+      else siblings.push(n);
     }
     const ordered: Node[] = [];
     const walk = (n: Node) => {
@@ -349,7 +377,9 @@ export const getPortfolioTree: ToolDefinition = defineTool({
     const rootNode = nodes.get(target.oid) as Node;
     walk(rootNode);
     const treeRows = ordered.map((n) => {
-      const basis = n.estimated && n.estimate > 0 ? 'estimate' : 'count';
+      // By estimate only when every item read has one: items without an estimate would add nothing to either side and
+      // the percentage would read as complete while they are open (L-033).
+      const basis = n.estimated && n.estimate > 0 && n.unestimated === 0 ? 'estimate' : 'count';
       const percent =
         basis === 'estimate'
           ? round1((n.doneEstimate / n.estimate) * 100)
@@ -363,6 +393,7 @@ export const getPortfolioTree: ToolDefinition = defineTool({
         doneItemCount: n.doneItems,
         openDefectCount: n.openDefects,
         ...(n.estimated ? { estimate: n.estimate, doneEstimate: n.doneEstimate } : {}),
+        ...(n.estimated && n.unestimated > 0 ? { unestimatedItemCount: n.unestimated } : {}),
         ...(percent === undefined ? {} : { donePercent: percent, donePercentBasis: basis }),
         ...(n.incomplete ? { incomplete: true } : {}),
       };
@@ -399,7 +430,9 @@ export const getPortfolioTree: ToolDefinition = defineTool({
         ...notes,
         ...(partial
           ? []
-          : ['Done = closed or in a completed status; the percentage uses estimates when items have them.']),
+          : [
+              'Done = closed or in a completed status; the percentage uses estimates when every item has one, otherwise item counts.',
+            ]),
       ],
       blocks: [
         {
@@ -421,6 +454,7 @@ export const getPortfolioTree: ToolDefinition = defineTool({
             'openDefectCount',
             'estimate',
             'doneEstimate',
+            'unestimatedItemCount',
             'donePercent',
             'donePercentBasis',
             'incomplete',

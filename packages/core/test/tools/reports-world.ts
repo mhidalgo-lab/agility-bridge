@@ -32,6 +32,12 @@ export interface WorldOptions {
   readonly poisoned?: boolean;
   /** No open work at all: every item of the epic and the sprint is done. */
   readonly allDone?: boolean;
+  /** This many extra stories under Epic 2: all done, none estimated unless `estimated` is set (P6-13). */
+  readonly extraStories?: number;
+  /** Give the extra stories this estimate (undefined: none). */
+  readonly extraEstimate?: number;
+  /** The extra stories are open, not done. */
+  readonly extraOpen?: boolean;
 }
 
 export function world(options: WorldOptions = {}): NonNullable<FakeAgilityOptions['assets']> {
@@ -133,6 +139,17 @@ export function world(options: WorldOptions = {}): NonNullable<FakeAgilityOption
     epic(2, 'Checkout', { Super: 'Epic:1', 'Super.Number': 'E-00001', 'Super.Name': 'Release 5' }),
     epic(3, 'Empty epic'),
   ];
+  for (let i = 0; i < (options.extraStories ?? 0); i++) {
+    stories.push(
+      story(2000 + i, options.extraOpen === true ? 1 : 3, options.extraEstimate, {
+        Super: 'Epic:2',
+        'Super.Name': 'Checkout',
+        ...(options.extraOpen === true
+          ? { AssetState: 64, Status: 'StoryStatus:1', 'Status.Name': 'Not started' }
+          : {}),
+      }),
+    );
+  }
   const workItems = [...stories, ...defects, ...tasks];
   return {
     Story: stories,

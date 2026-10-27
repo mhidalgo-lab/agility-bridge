@@ -2,7 +2,7 @@
 id: P6-11
 title: Cost accounting and composite grants
 phase: 6
-status: review
+status: done
 priority: medium
 depends_on: [P6-07]
 adr: ["0010"]

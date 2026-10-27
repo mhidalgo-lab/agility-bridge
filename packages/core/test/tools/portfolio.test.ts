@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildMcpServer,
   createBudget,
+  DEFAULT_LIMITS,
   MetadataService,
   type ToolContext,
   type ToolDefinition,
@@ -225,6 +226,47 @@ describe('list_portfolio_items', () => {
   });
 });
 
+describe('get_portfolio_tree: a tree wider than the trusted list limit (P6-13)', () => {
+  it('cuts the item read at 2,000 epics and says so, instead of failing', async () => {
+    const base = world();
+    const level = (from: number, parent: number | 1) =>
+      Array.from({ length: 700 }, (_, i) => ({
+        _oid: `Epic:${from + i}`,
+        AssetType: 'Epic',
+        Number: `E-${String(from + i).padStart(5, '0')}`,
+        Name: `Wide ${from + i}`,
+        AssetState: 64,
+        ...inScope,
+        'Category.Name': 'Feature',
+        Category: 'EpicCategory:1',
+        Status: 'EpicStatus:1',
+        'Status.Name': 'In Progress',
+        Super: `Epic:${parent}`,
+        'Super.Number': `E-${String(parent).padStart(5, '0')}`,
+        'Super.Name': 'Parent',
+      }));
+    // Three levels of 700 under the root: 2,100 epics, more than one trusted `in` list may hold.
+    const wide = [...level(10_000, 1), ...level(11_000, 10_000), ...level(12_000, 11_000)];
+    const epics = [...(base['Epic'] as Rows), ...wide];
+    const fake = new FakeAgility({
+      meta: SNAPSHOT,
+      assets: { ...base, Epic: epics, Workitem: [...(base['Workitem'] as Rows), ...wide] },
+    });
+    const ctx = makeContext({
+      fetch: fake.fetch,
+      metadata: new MetadataService(),
+      budget: createBudget(100),
+      projects: { allowed: ['Scope:1001'], includeChildren: true },
+      clock: { now: () => NOW },
+      limits: { ...DEFAULT_LIMITS, maxRows: 3_000 },
+    });
+    const r = await call(getPortfolioTree, ctx, { asset: 'E-00001', depth: 3, max_items: 1_000 });
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect(tree(r)['partial']).toBe(true);
+    expect(text(r)).toContain('first 2000 only');
+  });
+});
+
 describe('get_portfolio_tree', () => {
   it('rolls up three levels, excluding dead assets and counting closed items as done', async () => {
     const { ctx } = setup();
@@ -253,14 +295,19 @@ describe('get_portfolio_tree', () => {
       openDefectCount: 1,
       estimate: 11,
       doneEstimate: 7,
-      donePercent: 63.6,
+      // One of its five items has no estimate: the percentage is by count, not by the estimates that exist (P6-13).
+      unestimatedItemCount: 1,
+      donePercent: 60,
+      donePercentBasis: 'count',
     });
     expect(byNumber(out.nodes, 'E-00001')).toMatchObject({
       itemCount: 6,
       doneItemCount: 3,
       openDefectCount: 1,
       estimate: 12,
-      donePercent: 58.3,
+      unestimatedItemCount: 1,
+      donePercent: 50,
+      donePercentBasis: 'count',
     });
     expect(byNumber(out.nodes, 'E-00004')).toMatchObject({ parent: { oid: 'Epic:2' }, state: 'active' });
     expect(byNumber(out.nodes, 'E-00003')).toMatchObject({ itemCount: 0, depth: 1, state: 'closed' });

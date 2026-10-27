@@ -2,7 +2,7 @@
 id: P6-08
 title: MCP prompts (workflows)
 phase: 6
-status: review
+status: done
 priority: medium
 depends_on: [P6-07]
 adr: ["0015"]

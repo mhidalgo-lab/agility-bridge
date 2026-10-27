@@ -280,6 +280,10 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
 
       list_portfolio_items: { limit: 3 },
       get_portfolio_tree: { asset: epic, depth: 2 },
+      // The reports are called with only themselves granted here (their sections are skipped and named); the full
+      // sibling reads are in reports.live.test.ts. They still need valid arguments.
+      release_readiness: { asset: epic },
+      work_item_quality: { asset: defect },
     };
     for (const tool of CORE_TOOLS) {
       // The guard allows no attachment content request, and the download is off by default: `get_attachment` is
@@ -295,8 +299,13 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
       const code = (result['_meta'] as Record<string, { code?: string }> | undefined)?.[
         'agility-bridge/error'
       ]?.code;
+      // `get_sprint` without an argument means the current sprint; a tenant with several running sprints answers a clean
+      // ambiguity (its own live suite reads sprints by OID), which is not an Agility error.
+      if (tool.name === 'get_sprint' && code === 'AB_AMBIGUOUS') continue;
       expect(code, tool.name).toBeUndefined();
-      expect(result['isError'], `${tool.name} returned an error`).toBeUndefined();
+      // Only the code (the first characters of an error text) is printed: the rest can hold Agility names.
+      const first = (result['content'] as Array<{ text?: string }> | undefined)?.[0]?.text ?? '';
+      expect(result['isError'], `${tool.name} returned an error: ${first.slice(0, 16)}`).toBeUndefined();
       expect(fresh.budget.used, tool.name).toBeLessThanOrEqual(tool.cost);
     }
   });

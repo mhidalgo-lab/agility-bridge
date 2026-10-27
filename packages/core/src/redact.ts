@@ -6,13 +6,18 @@
 export const REDACTED = '[REDACTED]';
 
 /** Value patterns: each match is replaced; the replacer keeps a short, non-secret prefix for debugging. */
-const VALUE_PATTERNS: ReadonlyArray<[RegExp, (match: string, ...groups: string[]) => string]> = [
+type Guard = readonly string[];
+const VALUE_PATTERNS: ReadonlyArray<[RegExp, (match: string, ...groups: string[]) => string, Guard]> = [
   // agility-bridge device, admin and setup tokens (ARCHITECTURE §4): ab_live_ / ab_test_ / ab_admin_ / ab_setup_ + random.
-  [/\bab_(live|test|admin|setup)_[A-Za-z0-9_-]{8,}/g, (_m, kind) => `ab_${kind}_${REDACTED}`],
+  [/\bab_(live|test|admin|setup)_[A-Za-z0-9_-]{8,}/g, (_m, kind) => `ab_${kind}_${REDACTED}`, ['ab_']],
   // Admin session and sign-in cookies (P4-02, P4-01): `__Host-ab_session=<user>.<secret>`, `ab_login=<binding>`.
-  [/((?:__Host-)?ab_(?:session|login))(\s*=\s*)[^\s;,"]+/g, (_m, name, sep) => `${name}${sep}${REDACTED}`],
+  [
+    /((?:__Host-)?ab_(?:session|login))(\s*=\s*)[^\s;,"]+/g,
+    (_m, name, sep) => `${name}${sep}${REDACTED}`,
+    ['ab_'],
+  ],
   // Bearer credentials in headers or messages (Agility access tokens travel this way).
-  [/\b(Bearer)\s+[A-Za-z0-9._~+/=:-]{8,}/gi, (_m, scheme) => `${scheme} ${REDACTED}`],
+  [/\b(Bearer)\s+[A-Za-z0-9._~+/=:-]{8,}/gi, (_m, scheme) => `${scheme} ${REDACTED}`, ['bearer']],
   // Authorization headers with any scheme (Basic, Token, Digest, custom): the scheme stays, the credential goes. A
   // quoted (JSON) value is cut at its closing quote; a header line to its end, because Digest-style parameters hold
   // quotes and commas.
@@ -20,6 +25,7 @@ const VALUE_PATTERNS: ReadonlyArray<[RegExp, (match: string, ...groups: string[]
     /\b((?:proxy-)?authorization"?\s*[:=]\s*)(?:(")([A-Za-z][A-Za-z0-9-]*\s+)?(?:\\.|[^"\\\r\n])+|([A-Za-z][A-Za-z0-9-]*\s+)?[^\r\n]+)/gi,
     (_m, name, quote, quotedScheme, scheme) =>
       quote ? `${name}"${quotedScheme ?? ''}${REDACTED}` : `${name}${scheme ?? ''}${REDACTED}`,
+    ['authorization'],
   ],
   // key/value assignments: x-api-key: v, apiKey=v, AB_MASTER_KEY=v, AB_AGILITY_TOKEN=v, DB_PASSWORD=v,
   // client_secret=v, access_token=v. A name prefix is allowed; only its last 40 characters are matched (bounded).
@@ -27,35 +33,53 @@ const VALUE_PATTERNS: ReadonlyArray<[RegExp, (match: string, ...groups: string[]
   [
     /([A-Za-z0-9_.-]{0,40}?(?:api[_-]?key|(?:master|access|private)[_-]?key|passw(?:or)?d|secret|token|credentials?|cookie|csrf|verifier|(?:authorization|auth)[_-]?code|nonce|setup[_-]?code))("?\s*[:=]\s*"?)([^\s",;}&]+)/gi,
     (_m, name, sep) => `${name}${sep}${REDACTED}`,
+    // Every alternative of the name contains one of these: text without any of them cannot match (a cheap, linear
+    // pre-check, so a long hex or base64 body does not pay the lazy prefix retries at every character).
+    [
+      'api',
+      'key',
+      'passw',
+      'secret',
+      'token',
+      'credential',
+      'cookie',
+      'csrf',
+      'verifier',
+      'auth',
+      'nonce',
+      'setup',
+    ],
   ],
   // The OAuth authorization code in a callback URL's query string (`?code=…`, `&code=…`), single use but still a grant.
-  [/([?&]code=)[^\s&#"']+/g, (_m, name) => `${name}${REDACTED}`],
+  [/([?&]code=)[^\s&#"']+/g, (_m, name) => `${name}${REDACTED}`, ['code=']],
 ];
 
 /** Secret shapes that show up in free text (log lines, error messages, URLs) beyond the value patterns above. */
-const FREE_TEXT_PATTERNS: ReadonlyArray<[RegExp, string]> = [
+const FREE_TEXT_PATTERNS: ReadonlyArray<[RegExp, string, Guard]> = [
   // JSON web tokens, also one cut short at the end of the text.
   [
     /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.(?:[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*|[A-Za-z0-9_-]*$)/g,
     '[REDACTED_JWT]',
+    ['eyj'],
   ],
   // AWS access key ids; GitHub, Slack, Stripe and OpenAI-style tokens.
-  [/\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g, '[REDACTED_AWS_KEY]'],
-  [/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g, '[REDACTED_TOKEN]'],
-  [/\bxox[abprs]-[A-Za-z0-9-]{10,}/g, '[REDACTED_TOKEN]'],
-  [/\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]{10,}/g, '[REDACTED_TOKEN]'],
-  [/\bsk-[A-Za-z0-9_-]{20,}/g, '[REDACTED_TOKEN]'],
+  [/\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g, '[REDACTED_AWS_KEY]', ['akia', 'asia']],
+  [/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g, '[REDACTED_TOKEN]', ['gh']],
+  [/\bxox[abprs]-[A-Za-z0-9-]{10,}/g, '[REDACTED_TOKEN]', ['xox']],
+  [/\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]{10,}/g, '[REDACTED_TOKEN]', ['sk_', 'pk_', 'rk_']],
+  [/\bsk-[A-Za-z0-9_-]{20,}/g, '[REDACTED_TOKEN]', ['sk-']],
   // agility-bridge master keys: v<N>: + 32 bytes in base64 (ADR-0007).
-  [/\bv[0-9]{1,3}:[A-Za-z0-9+/]{43}=/g, '[REDACTED_MASTER_KEY]'],
+  [/\bv[0-9]{1,3}:[A-Za-z0-9+/]{43}=/g, '[REDACTED_MASTER_KEY]', [':']],
   // Credentials in URLs: scheme://user:password@host.
-  [/([a-z][a-z0-9+.-]{0,31}:\/\/)[^\s/:@]+:[^\s/@]+@/gi, '$1[REDACTED]@'],
+  [/([a-z][a-z0-9+.-]{0,31}:\/\/)[^\s/:@]+:[^\s/@]+@/gi, '$1[REDACTED]@', ['://']],
   // OAuth authorization codes, access tokens and refresh tokens (P5-01): `<user id>:<grant id, 16>:<secret, 32>`. The two
   // ids are not secret and stay, so a log line can still be matched to a device.
-  [/\b([A-Za-z0-9_-]{1,64}:[A-Za-z0-9_-]{16}:)[A-Za-z0-9_-]{32}(?![A-Za-z0-9_-])/g, '$1[REDACTED]'],
+  [/\b([A-Za-z0-9_-]{1,64}:[A-Za-z0-9_-]{16}:)[A-Za-z0-9_-]{32}(?![A-Za-z0-9_-])/g, '$1[REDACTED]', [':']],
   // PEM private key bodies.
   [
     /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g,
     '[REDACTED_PRIVATE_KEY]',
+    ['-----begin'],
   ],
 ];
 
@@ -70,8 +94,14 @@ export function isSecretKeyName(key: string): boolean {
 /** Redact secrets inside a string. Idempotent. */
 export function redact(input: string): string {
   let out = input;
-  for (const [re, replace] of VALUE_PATTERNS) out = out.replace(re, replace as (m: string) => string);
-  for (const [re, replacement] of FREE_TEXT_PATTERNS) out = out.replace(re, replacement);
+  // Each pattern runs only when one of its guard literals is in the (lowercased) text; the guards are necessary
+  // conditions, so skipping never lets a secret through. Replacements keep the shape, so the text is lowered once.
+  const lower = input.toLowerCase();
+  const may = (guard: Guard): boolean => guard.some((g) => lower.includes(g));
+  for (const [re, replace, guard] of VALUE_PATTERNS)
+    if (may(guard)) out = out.replace(re, replace as (m: string) => string);
+  for (const [re, replacement, guard] of FREE_TEXT_PATTERNS)
+    if (may(guard)) out = out.replace(re, replacement);
   return out;
 }
 

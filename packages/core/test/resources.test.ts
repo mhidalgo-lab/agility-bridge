@@ -172,14 +172,23 @@ describe('availability follows the allowed tools', () => {
   it('offers exactly the resources whose tools are allowed', async () => {
     const { build } = setup();
     expect((await list(build([tool('list_projects')]))).map((r) => r.uri)).toEqual([URI.projects]);
-    // The per-type template lists types through list_asset_types, so it needs both tools.
-    expect(await list(build([tool('describe_asset_type')]))).toEqual([]);
-    await expect(read(build([tool('describe_asset_type')]), URI.story)).rejects.toThrow();
+    // The per-type template is offered with describe_asset_type, which reads it; listing needs no other tool.
+    const typesOnly = await list(build([tool('describe_asset_type')]));
+    expect(typesOnly.length).toBeGreaterThan(3);
+    expect(typesOnly.every((r) => r.uri.startsWith(`${URI.types}/`))).toBe(true);
+    await expect(read(build([tool('list_projects')]), URI.story)).rejects.toThrow();
     const noQuery = (await list(build(CORE_TOOLS.filter((t) => t.name !== 'query_assets')))).map(
       (r) => r.uri,
     );
     expect(noQuery).not.toContain(URI.filters);
     expect(noQuery).toContain(URI.types);
+  });
+
+  it('resources/list makes no Agility request: no cold metadata sweep on connect (P6-13)', async () => {
+    const { build, fake } = setup();
+    const listed = await list(build(CORE_TOOLS));
+    expect(listed.length).toBeGreaterThan(5);
+    expect(fake.requests).toBe(0);
   });
 
   it('availableEntries is the one rule', () => {

@@ -11,6 +11,7 @@ import { OTHER_ASSET_RECIPES } from './recipes/other-assets.ts';
 import { QUALITY_RECIPE_RESOURCES } from './recipes/quality.ts';
 import { BACKLOG_ITEM_QUALITY_RUBRIC } from './rubric.ts';
 import type { ToolOutput } from './tool.ts';
+import { DEFAULT_READABLE_TYPES, typeAllowed } from './tools/core/asset-types.ts';
 
 export const RESOURCE_SCHEME = 'agility-bridge://';
 
@@ -215,17 +216,14 @@ export const RESOURCE_MANIFEST: readonly ResourceDefinition[] = Object.freeze([
       'Attributes, operations, statuses and field tiers of one asset type (the output of describe_asset_type).',
     mimeType: 'text/plain',
     source: 'tool',
-    uses: ['describe_asset_type', 'list_asset_types'],
+    uses: ['describe_asset_type'],
     read: viaTool('describe_asset_type', (v) => ({ asset_type: v['asset_type'] ?? '' })),
-    list: async (reader) => {
-      const out = await reader.run('list_asset_types', {});
-      const items = ((out.structured ?? {}) as { items?: Array<{ assetType?: unknown }> }).items ?? [];
-      return items.flatMap((i) =>
-        typeof i.assetType === 'string' && TYPE_NAME_RE.test(i.assetType)
-          ? [{ uri: `${RESOURCE_SCHEME}instance/asset-types/${i.assetType}`, name: i.assetType }]
-          : [],
-      );
-    },
+    // No upstream call: listing must not trigger a cold metadata sweep (one request per type). The names are the
+    // workspace's allowed types; a type the instance does not have fails cleanly when it is read.
+    list: async (reader) =>
+      (reader.ctx.assetTypes.allow ?? DEFAULT_READABLE_TYPES)
+        .filter((t) => TYPE_NAME_RE.test(t) && typeAllowed(reader.ctx, t))
+        .map((t) => ({ uri: `${RESOURCE_SCHEME}instance/asset-types/${t}`, name: t })),
   },
   {
     id: 'workspace_projects',

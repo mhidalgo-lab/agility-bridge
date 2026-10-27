@@ -63,11 +63,15 @@ export function scoreRouter(questions: readonly Question[]): RouterScore {
   const wrongFirst: Miss[] = [];
   const byCategory: Record<string, { total: number; top1: number }> = {};
   for (const q of questions) {
-    const ranked = routers[q.catalogue].rank(q.question).map((r) => r.name);
+    const scored = routers[q.catalogue].rank(q.question);
+    const ranked = scored.map((r) => r.name);
     const first = ranked[0] as string;
     const top = ranked.slice(0, 3);
-    const hit1 = q.expect.includes(first);
-    const hit3 = top.some((n) => q.expect.includes(n));
+    // A question that shares no word with any tool ranks everything at zero, and the alphabetical order would hand
+    // a free hit to whichever tool sorts first: no score is no answer (P6-13).
+    const ranks = (scored[0]?.score ?? 0) > 0;
+    const hit1 = ranks && q.expect.includes(first);
+    const hit3 = ranks && top.some((n) => q.expect.includes(n));
     if (hit1) top1++;
     else wrongFirst.push({ id: q.id, question: q.question, expect: q.expect, top3: top });
     if (hit3) top3++;

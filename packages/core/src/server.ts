@@ -11,6 +11,7 @@ import {
   AbError,
   ERROR_META_KEY,
   ErrorCode,
+  isAbError,
   type ToolErrorOptions,
   toProtocolError,
   toToolErrorResult,
@@ -55,6 +56,23 @@ const MAX_AUDIT_NUMBERS = 50;
 const MAX_AUDIT_QUERIES = 10;
 const MAX_QUERY_CHARS = 2_000;
 
+/** The download facts of a result's `_meta` or of a failed call's `AbError.audit`, bounded; undefined when malformed. */
+export function downloadFacts(value: unknown): NonNullable<ToolCallEvent['download']> | undefined {
+  const d = value as Record<string, unknown> | null | undefined;
+  if (d === null || d === undefined || typeof d !== 'object') return undefined;
+  return typeof d['asset'] === 'string' &&
+    typeof d['attachment'] === 'string' &&
+    typeof d['bytes'] === 'number' &&
+    typeof d['contentType'] === 'string'
+    ? {
+        asset: d['asset'].slice(0, 64),
+        attachment: d['attachment'].slice(0, 64),
+        bytes: d['bytes'],
+        contentType: d['contentType'].slice(0, 100),
+      }
+    : undefined;
+}
+
 /** The audit facts of a tool result: asset numbers from its rows and the masked queries from its `_meta`. */
 export function auditFacts(out: ToolOutput | undefined): {
   assetNumbers: string[];
@@ -90,20 +108,7 @@ export function auditFacts(out: ToolOutput | undefined): {
     const text = typeof q === 'string' ? q : JSON.stringify(q);
     return text.length > MAX_QUERY_CHARS ? `${text.slice(0, MAX_QUERY_CHARS)}…` : text;
   });
-  const d = out?.meta?.['agility-bridge/download'] as Record<string, unknown> | undefined;
-  const download =
-    d !== undefined &&
-    typeof d['asset'] === 'string' &&
-    typeof d['attachment'] === 'string' &&
-    typeof d['bytes'] === 'number' &&
-    typeof d['contentType'] === 'string'
-      ? {
-          asset: d['asset'].slice(0, 64),
-          attachment: d['attachment'].slice(0, 64),
-          bytes: d['bytes'],
-          contentType: d['contentType'].slice(0, 100),
-        }
-      : undefined;
+  const download = downloadFacts(out?.meta?.['agility-bridge/download']);
   return { assetNumbers: [...numbers], queries, ...(download === undefined ? {} : { download }) };
 }
 
@@ -267,7 +272,12 @@ export function buildMcpServer({
         const ctx = freezeContext({ ...contextFor(), grantedTools: tools.map((t) => t.name) });
         const logger = ctx.logger.child({ requestId: ctx.requestId, tool: def.name });
         const started = ctx.clock.now();
-        const observe = (status: 'ok' | 'error', errorCode: string | null, out?: ToolOutput): void => {
+        const observe = (
+          status: 'ok' | 'error',
+          errorCode: string | null,
+          out?: ToolOutput,
+          failedDownload?: ToolCallEvent['download'],
+        ): void => {
           try {
             if (onToolCall === undefined) return;
             onToolCall({
@@ -277,6 +287,7 @@ export function buildMcpServer({
               durationMs: Math.max(0, ctx.clock.now() - started),
               requestsUsed: ctx.budget.used,
               ...auditFacts(out),
+              ...(failedDownload === undefined ? {} : { download: failedDownload }),
             });
           } catch {
             // An observer never changes a tool result.
@@ -295,7 +306,7 @@ export function buildMcpServer({
           );
           const code = (result._meta?.[ERROR_META_KEY] as { code?: string } | undefined)?.code ?? null;
           logger.warn('tool error', { ms: ctx.clock.now() - started, code, error });
-          observe('error', code);
+          observe('error', code, undefined, isAbError(error) ? downloadFacts(error.audit) : undefined);
           return result;
         }
       },

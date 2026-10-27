@@ -27,9 +27,9 @@ How to use it:
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
-| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315, L-317 – L-320 |
+| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315, L-317 – L-320, L-324 – L-326, L-328 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
-| [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282 |
+| [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282, L-323 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280, L-304, L-316 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271 |
@@ -38,9 +38,9 @@ How to use it:
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237 |
-| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
-| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312 |
+| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327 |
+| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297 |
@@ -1994,6 +1994,78 @@ descriptions; one-line shared argument texts) and less from descriptions. Trimmi
 the words people use ("comments", "files attached", "who is on", "which one is current") are what it matches. Descriptions
 were rewritten to keep those words and the baseline rose (75 % top-1, 87 % top-3). Measure both after every trim.
 *Applied in:* P6-12, `server.ts` (`openSchema`), `scripts/evals/baseline.json`, L-155, L-124.
+
+**L-321 — Read a response body at once; never hold an unread stream across a second request.**
+`answers every OAuth denial with the one 401` failed now and then on the workerd host with "Body is unusable: Body has
+already been read". The test made a reference request, then a second one, and only then read the first body; a
+`dispatchFetch` response is a live stream on a connection, and under load it was disturbed before the test read it
+(Miniflare documents that a body must be consumed immediately). The test now reads the body and header of each response
+before the next request, and the worker host buffers every response in `call` and `adminApi`, so no test can hold a live
+stream. Retrying the test would only have hidden it.
+*Applied in:* P6-13, `packages/http-app/test/oauth/suite.ts` (`expectDenied`), `apps/worker/test/oauth.test.ts` (`buffered`), L-121.
+
+**L-322 — A property test is CPU-bound: size it to the property and give the project a timeout that fits the CI machine.**
+Two seeded property tests ran at 60 % of the 5 s default timeout on an idle machine and failed under a parallel run. Seeds
+are fixed, so the run time is deterministic and only the machine varies. The formatter property does not depend on the
+size of its input (100 runs of up to 30 rows replace 200 runs of 60 rows of 400 characters), and `core` and `auth` now set
+`testTimeout: 20_000` like the other projects.
+*Applied in:* P6-13, `packages/core/test/harness.test.ts`, `packages/auth/test/resolve.property.test.ts`, the vitest configs.
+
+**L-323 — A limit named for a date applies to every tool that reads at that date.**
+`maxAsOfAgeDays` ("the furthest point into the past") was enforced by the query compiler for `as_of` and by `get_sprint`, and
+forgotten by `get_asset_history`, whose window was only bounded in length. When a limit is added to the context, search for
+every tool that takes a date or a window, not only the one it was written for; the review found this one, a test now pins it.
+*Applied in:* P6-13, `tools/history/asset-history.ts`, `test/tools/history.test.ts`, L-060.
+
+**L-324 — A string the uploader controls does not go in an error message; it goes in the enveloped details.**
+`get_attachment` echoed the declared content type in its refusal. The tool error renders `message` as plain text and wraps only
+`details` in the untrusted-data envelope, so an uploader could put an instruction in the `ContentType` of a file. Messages are
+ours (and numbers); anything Agility supplied is a detail. The test uploads a hostile type and checks that every occurrence
+sits inside the envelope.
+*Applied in:* P6-13, `tools/collaboration/attachments.ts`, L-038, ADR-0015.
+
+**L-325 — Do not repeat a free-text blob in `structuredContent`.**
+The enveloped text block carried the attachment text and `structuredContent.content` repeated it with only cleaning, so a
+client that forwards structured content loses the envelope, and the result is twice the size (a risk on the Workers response
+cap). Structured output for a text tool carries metadata only; the text is in the enveloped block.
+*Applied in:* P6-13, `tools/collaboration/attachments.ts`, D-117.
+
+**L-326 — A regular expression over Agility text must be linear; `a[\s\S]*b[\s\S]*c` is not.**
+`given[\s\S]*when[\s\S]*then` backtracks cubically on text with no `then`: 33 ms at 2 KB, 5 s at 11 KB, and anyone who can edit a
+description controls the input. Search in order with three anchored searches (each linear), and add a hostile-input timing
+test whenever a pattern reads a description, a comment or an attachment. The same review measured the redaction pass at 77 ms on
+a 100 KB hex body; each pattern now runs only when a literal it needs is in the text (L-327 is about the same idea for cost).
+*Applied in:* P6-13, `tools/reports/quality.ts` (`hasGivenWhenThen`), `redact.ts` (guards), L-117.
+
+**L-327 — A listing method builds from what it already knows; it never triggers a sweep.**
+`resources/list` called `list_asset_types`, which loads the metadata of about 20 types (21 requests, about 1.9 MB parsed) on a
+cold isolate, for every client that lists resources on connect. The names come from the workspace's allowed types now and a
+type the instance lacks fails cleanly when read. A test asserts zero upstream requests for `resources/list`. Related: independent
+metadata loads go out together (`prefetch`), counted by the same budget.
+*Applied in:* P6-13, `resources.ts`, `metadata/service.ts`, `test/resources.test.ts`, L-113.
+
+**L-328 — A completeness flag follows what was counted, not what was listed; a percentage needs every term.**
+`release_readiness` called a tree incomplete because the tree listed only 100 of 150 backlog items, so a finished release of a
+realistic size could never be `ready`. The roll-ups had counted all 150. Likewise a percentage by estimate over items of which
+only some had estimates read 100 % beside eight open items. Completeness comes from the roll-up's own flag; the percentage is by
+estimate only when every item read has one, and the row says how many have none. A test with 120 done stories and one with a
+mixed epic pin both.
+*Applied in:* P6-13, `tools/reports/release-readiness.ts`, `tools/portfolio/get-tree.ts`, L-033, D-81.
+
+**L-329 — A hand-kept list of groups drifts from the registry: test it against the registry.**
+The stdio server kept its own list of served groups (`STDIO_GROUPS`), which missed `history` after P6-05, so stdio users lacked
+two tools and the prompt and resources that need them, while the catalogue said they were on by default. A test now compares
+the list with the groups of the catalogue and expects the history tools in the default stdio set.
+*Applied in:* P6-13, `apps/cli/src/stdio.ts`, `apps/cli/test/attachments.test.ts`, L-153.
+
+**L-330 — Close a review with a pass over the reviewers' own claims.**
+Three reviewers produced about 45 findings; most held, some needed a smaller fix than proposed or were already covered (a
+status-less closed item, partial from hidden rows, the staleness of a newest-first page). Reproducing each finding with a failing
+test first kept the fixes small and showed which claims were hypotheses (the OAuth flake was one: the cause was a hypothesis until
+the late read was removed and the test stayed green), and one reviewer fix (read `AssetState` at every burndown point) passed every
+fake and made the real tenant time out, which only the live pass showed: a fix to a query that runs 60 times needs a live run. The
+review document records every verdict, including the dropped ones.
+*Applied in:* P6-13, `docs/reviews/phase-6-review.md`, L-004.
 
 ---
 

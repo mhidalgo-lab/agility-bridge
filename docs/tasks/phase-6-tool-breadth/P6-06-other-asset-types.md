@@ -2,7 +2,7 @@
 id: P6-06
 title: Requests, issues, goals, themes and retrospectives through the generic tools
 phase: 6
-status: review
+status: done
 priority: medium
 depends_on: [P2-17]
 adr: ["0012"]

@@ -3,11 +3,11 @@
 // sections named and never counted as zero, budget exhaustion, partial upstream failures, scope on every row,
 // poisoned text, cold costs.
 import { describe, expect, it } from 'vitest';
-import { createBudget } from '../../src/index.ts';
+import { createBudget, DEFAULT_LIMITS } from '../../src/index.ts';
 import { BACKLOG_ITEM_QUALITY_RUBRIC } from '../../src/rubric.ts';
 import { CORE_TOOLS } from '../../src/tools/index.ts';
 import { defectTriage, nameSimilarity } from '../../src/tools/reports/defect-triage.ts';
-import { assess, type Facts, summarise } from '../../src/tools/reports/quality.ts';
+import { assess, type Facts, hasGivenWhenThen, summarise } from '../../src/tools/reports/quality.ts';
 import { readinessVerdict } from '../../src/tools/reports/release-readiness.ts';
 import { paceStatus } from '../../src/tools/reports/sprint-health.ts';
 import { findLeaks } from '../harness/index.ts';
@@ -39,6 +39,17 @@ describe('the catalogue: reports are in their own opt-in group', () => {
         expect(tool.cost).toBeGreaterThanOrEqual(toolByName(sibling).cost);
     }
     expect(CORE_TOOLS.filter((t) => t.group === 'reports')).toHaveLength(5);
+  });
+});
+
+describe('sprint_health notes from the sibling (P6-13)', () => {
+  it('forwards them as untrusted data: none stands outside the envelope as our own text', async () => {
+    const { call } = rig();
+    const r = await call('sprint_health', ARGS['sprint_health'] as Record<string, unknown>);
+    const out = text(r);
+    expect(out).toContain('Sprint note:');
+    const outside = out.replace(/<untrusted-data[\s\S]*?<\/untrusted-data[^>]*>/g, '');
+    expect(outside).not.toContain('Sprint note:');
   });
 });
 
@@ -244,6 +255,28 @@ describe('release_readiness', () => {
     expect(s(r).counts).toMatchObject({ open: 0, openDefects: 0, lowerBound: false });
   });
 
+  it('says ready for a finished epic with more items than the listing cap (P6-13)', async () => {
+    // The tree lists at most 100 backlog items for the report but counted all 126: the counts are complete.
+    const { call } = rig({ allDone: true, extraStories: 120 });
+    const r = await call('release_readiness', { asset: 'E-00001' });
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect(s(r).verdict).toBe('ready');
+    expect(s(r).counts).toMatchObject({ open: 0, lowerBound: false });
+    expect(s(r).counts.items).toBeGreaterThan(120);
+    expect(text(r)).not.toContain('counts are lower bounds');
+  });
+
+  it('does not report a percentage by estimate while open items have none (P6-13)', async () => {
+    // Estimated items are partly done; eight more are open and unestimated: the estimate alone would hide them.
+    const { call } = rig({ extraStories: 8, extraOpen: true });
+    const r = await call('release_readiness', { asset: 'E-00001' });
+    expect(r['isError'], text(r)).toBeUndefined();
+    const epic = s(r).epic as Record<string, unknown>;
+    expect(epic['donePercentBasis']).toBe('count');
+    expect(epic['unestimatedItemCount']).toBeGreaterThanOrEqual(8);
+    expect(epic['donePercent']).toBeLessThan(50);
+  });
+
   it('says unknown, not ready, for an epic with no backlog items and for an incomplete read', async () => {
     const { call } = rig({ allDone: true });
     const empty = await call('release_readiness', { asset: 'E-00003' });
@@ -286,6 +319,17 @@ describe('release_readiness', () => {
     expect(r['isError']).toBe(true);
     expect(text(r)).toContain('AB_AUTH_FORBIDDEN');
     expect(queried(denied.bodies, 'Epic')).toBe(0);
+  });
+});
+
+describe('defect_triage, when more defects exist than one page (P6-13)', () => {
+  it('reads the oldest change first so the stale ones are in the page, and says so', async () => {
+    const { call } = rig();
+    const r = await call('defect_triage', {}, { ctx: { limits: { ...DEFAULT_LIMITS, maxRows: 2 } } });
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect(s(r).counts).toMatchObject({ openRead: 2, stale: 1, lowerBound: true });
+    expect(s(r).flagged.map((f: { number?: string }) => f.number)).toContain('D-01102');
+    expect(text(r)).toContain('oldest change first');
   });
 });
 
@@ -485,6 +529,49 @@ describe('the rubric checks', () => {
       ),
     );
     expect(low.level).toBe('not ready');
+  });
+});
+
+describe('the rubric checks on hostile text (P6-13)', () => {
+  const criterion = (id: string) => {
+    const c = BACKLOG_ITEM_QUALITY_RUBRIC.criteria.find((x) => x.id === id);
+    if (c === undefined) throw new Error(id);
+    return c;
+  };
+  const base: Facts = {
+    name: 'Sign in with a saved password',
+    description: '',
+    acceptance: undefined,
+    hasAcceptanceField: false,
+    estimate: 3,
+    hasEstimateField: true,
+    hasEpic: true,
+    hasProject: true,
+    hasOwnerOrTeam: true,
+    hasPriority: true,
+  };
+
+  it('finds given, when, then in order without backtracking on text that has no then', () => {
+    const hostile = 'given when '.repeat(400); // 4.4 KB, no "then": cubic with a `given.*when.*then` regexp
+    const t0 = performance.now();
+    assess(criterion('acceptance_criteria'), { ...base, acceptance: hostile });
+    expect(performance.now() - t0).toBeLessThan(50);
+    expect(hasGivenWhenThen('Given a when b then c')).toBe(true);
+    expect(hasGivenWhenThen('then when given')).toBe(false);
+    expect(hasGivenWhenThen('given then when')).toBe(false);
+  });
+
+  it('scores only the text after "acceptance criteria" when there is no acceptance field', () => {
+    const prose =
+      'It should be quick. It shows a lot. It returns many things. Please read the acceptance criteria';
+    const withPhrase = assess(criterion('acceptance_criteria'), { ...base, description: prose });
+    expect(withPhrase.score).toBe(0); // nothing follows the phrase
+    const real = assess(criterion('acceptance_criteria'), {
+      ...base,
+      description:
+        'Intro.\nAcceptance criteria:\n- It shows an error when wrong\n- It locks after five tries\n- It returns the user',
+    });
+    expect(real.score).toBe(2);
   });
 });
 

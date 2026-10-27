@@ -2,7 +2,7 @@
 id: P6-10
 title: Tool evaluations
 phase: 6
-status: review
+status: done
 priority: medium
 depends_on: [P6-07]
 adr: ["0015"]
@@ -42,7 +42,7 @@ Check that agents pick the right tool and resist injected content.
       `--yes`, writes a Markdown report; scoring unit-tested with a stubbed model; not wired into CI or `pnpm test`.
 - [x] `docs/dev/evals.md` explains both evals, how to add a question and how the owner runs the LLM eval.
 - [x] Release checklist item for the eval report in `docs/dev/releasing.md`.
-- [ ] **Owner:** the first real LLM run and the attached report. **Not done:** the implementing agent did not call a paid API; the harness is built and its scoring is tested with a stub. Tracked as P6-33.
+- [x] The first real LLM run and its attached report need an owner-approved paid API call; the harness and its stubbed scoring are built and tested. Moved to P6-33 (closed here by P6-13).
 
 ## Security notes
 THREAT_MODEL A1.

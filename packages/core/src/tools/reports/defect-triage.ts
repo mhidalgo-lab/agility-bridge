@@ -42,8 +42,11 @@ const words = (name: string): Set<string> =>
 
 /** Jaccard similarity of two names' word sets; 0 when either has fewer than three words (too little to compare). */
 export function nameSimilarity(a: string, b: string): number {
-  const x = words(a);
-  const y = words(b);
+  return setSimilarity(words(a), words(b));
+}
+
+/** The same on word sets built once per name: a pair loop must not tokenise each name once per pair. */
+function setSimilarity(x: ReadonlySet<string>, y: ReadonlySet<string>): number {
   if (x.size < 3 || y.size < 3) return 0;
   let shared = 0;
   for (const w of x) if (y.has(w)) shared++;
@@ -76,7 +79,9 @@ export const defectTriage: ToolDefinition = defineTool({
       ...(input.team === undefined ? {} : { team: input.team }),
       ...(input.sprint === undefined ? {} : { sprint: input.sprint }),
       include_closed: false,
-      sort_by: 'recently_changed',
+      // Oldest change first: the stale defects and the old twins of newer ones are what triage looks for, and
+      // they are the ones a newest-first page would cut.
+      sort_by: 'oldest_changed',
       limit: Math.min(100, ctx.limits.maxRows),
     });
     const runs = [run];
@@ -105,7 +110,9 @@ export const defectTriage: ToolDefinition = defineTool({
       const noDate = rows.filter((r) => !Number.isFinite(changedMs(r))).length;
       if (noDate > 0) notes.push(`${noDate} defects have no change date and are not checked for staleness.`);
       if (more)
-        notes.push('More open defects exist than the first page: counts and duplicates cover the page only.');
+        notes.push(
+          'More open defects exist than the first page, read oldest change first: counts and duplicates cover the page only and lean towards stale defects.',
+        );
       if (run.data?.['hiddenOutsideScope'] === true)
         notes.push('Some defects were left out because they are outside the workspace.');
       notes.push(
@@ -138,11 +145,12 @@ export const defectTriage: ToolDefinition = defineTool({
           ...(strOf(v.row['name']) === undefined ? {} : { name: v.row['name'] }),
         }));
       const found: Record<string, unknown>[] = [];
+      const wordSets = rows.map((r) => words(strOf(r['name']) ?? ''));
       for (let i = 0; i < rows.length && found.length < PAIR_CAP; i++) {
         for (let j = i + 1; j < rows.length && found.length < PAIR_CAP; j++) {
           const a = rows[i] as Record<string, unknown>;
           const b = rows[j] as Record<string, unknown>;
-          const s = nameSimilarity(strOf(a['name']) ?? '', strOf(b['name']) ?? '');
+          const s = setSimilarity(wordSets[i] as Set<string>, wordSets[j] as Set<string>);
           if (s >= DUPLICATE_SIMILARITY)
             found.push({
               first: strOf(a['number']) ?? a['oid'],
@@ -165,7 +173,7 @@ export const defectTriage: ToolDefinition = defineTool({
           : [{ title: 'Defects to triage', source: 'flagged defects', rows: flagged }]),
         ...(pairs.length === 0 ? [] : [{ title: 'Likely duplicates', source: 'defect pairs', rows: pairs }]),
       ],
-      partial: incomplete(runs) || more,
+      partial: incomplete(runs) || more || run.data?.['hiddenOutsideScope'] === true,
       structured: {
         sections: sectionInfos(runs),
         ...(counts === undefined ? {} : { counts, flagged, likelyDuplicates: pairs }),

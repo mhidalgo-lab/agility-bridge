@@ -177,6 +177,23 @@ const asofCalls = (calls: readonly FakeCall[]) =>
       (Array.isArray(c.body) ? c.body : [c.body]).some((b) => (b as { asof?: string }).asof !== undefined),
   );
 
+describe('a closed item with no status category (P6-13)', () => {
+  it('counts as done now, and the burndown says that earlier points cannot know it', async () => {
+    // A closed story without a status: only its AssetState says it is done. History points do not read the state.
+    const closed = () => item(30, 'Story', 42, undefined, 4, { AssetState: 128 });
+    const hist = (p: (n: number, plain: string) => string) =>
+      snapshots(p).map((snap) => ({ ...snap, rows: [...snap.rows, closed()] }));
+    const { ctx } = setup(world(false, undefined, hist));
+    const r = await call(ctx(), { sprint: 'Sprint 42' });
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect(s(r)['totals']).toMatchObject({ done: 9 });
+    expect(text(r)).toContain('1 closed item has no status category');
+    // Without such an item there is no note.
+    const plain = await call(setup().ctx(), { sprint: 'Sprint 42' });
+    expect(text(plain)).not.toContain('no status category');
+  });
+});
+
 describe('a running sprint', () => {
   it('reports totals by status category, committed vs done, scope change and the burndown', async () => {
     const { ctx } = setup();
@@ -436,6 +453,19 @@ describe('authorization', () => {
     expect(r['isError'], text(r)).toBeUndefined();
     expect(JSON.stringify(r)).not.toContain('Scope:2000');
     expect(JSON.stringify(r)).not.toContain('B-00009');
+  });
+
+  it('is partial when rows outside the workspace were left out of the totals (P6-13)', async () => {
+    const foreign = () => ({ ...item(9, 'Story', 41, 2, 1), Scope: 'Scope:2000' });
+    const hist = (p: (n: number, plain: string) => string) =>
+      snapshots(p).map((snap) => ({ ...snap, rows: [...snap.rows, foreign()] }));
+    // With every filter ignored the upstream answers rows of other projects; the recheck drops them.
+    const { ctx } = setup({ ...world(false, undefined, hist), filters: 'ignore-filters' });
+    const r = await call(ctx(), { sprint: 'Timebox:41', burndown: false });
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect(JSON.stringify(r)).not.toContain('B-00009');
+    expect(text(r)).toContain('left out');
+    expect(s(r)['partial']).toBe(true);
   });
 
   it('is refused, with no upstream request, when neither backlog items nor defects are allowed', async () => {

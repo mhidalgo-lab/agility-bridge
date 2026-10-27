@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildMcpServer,
   createBudget,
+  DEFAULT_LIMITS,
   MetadataService,
   type ToolContext,
   type ToolDefinition,
@@ -270,6 +271,45 @@ describe('get_asset_history', () => {
     expect(r['isError'], text(r)).toBeUndefined();
     expect(s(r).items).toEqual([]);
     expect(text(r)).toContain('returned no history versions');
+  });
+
+  it('refuses a window older than maxAsOfAgeDays, like as_of, before any request', async () => {
+    const { ctx, hist, fake } = setup({}, {});
+    const c = ctx({ limits: { ...DEFAULT_LIMITS, maxAsOfAgeDays: 30 } });
+    const r = await call(getAssetHistory, c, { asset: 'B-01001', time_range: '2026-01-01 to 2026-03-01' });
+    expect(r['isError']).toBe(true);
+    expect(text(r)).toContain('maxAsOfAgeDays');
+    expect(hist).toHaveLength(0);
+    expect(fake.requests).toBe(0);
+    // A window of exactly the limit ('last 365 days' with the default 365) is allowed; one day more is not.
+    // The clock moves between calls (a real one does): the window and the limit must be judged at one instant.
+    let tick = NOW;
+    const edge = ctx({ limits: { ...DEFAULT_LIMITS, maxAsOfAgeDays: 365 }, clock: { now: () => tick++ } });
+    expect(
+      (await call(getAssetHistory, edge, { asset: 'B-01001', time_range: 'last 365 days' }))['isError'],
+    ).toBeUndefined();
+    expect(
+      (await call(getAssetHistory, edge, { asset: 'B-01001', time_range: 'last 366 days' }))['isError'],
+    ).toBe(true);
+    // A window that starts inside the limit still works.
+    const ok = await call(getAssetHistory, c, { asset: 'B-01001', time_range: 'last 14 days' });
+    expect(ok['isError'], text(ok)).toBeUndefined();
+  });
+
+  it('does not follow Scope: an earlier project of the asset may be outside the workspace', async () => {
+    const { ctx, hist } = setup();
+    for (const fields of [['Scope'], ['Scope.Name']]) {
+      const r = await call(getAssetHistory, ctx(), { asset: 'B-01001', fields });
+      expect(r['isError']).toBe(true);
+      expect(text(r)).toContain('Scope');
+    }
+    expect(hist).toHaveLength(0);
+  });
+
+  it('does not read a reordered multi-valued relation as a change', () => {
+    expect(historyValue([{ _oid: 'Member:2' }, { _oid: 'Member:1' }])).toEqual(
+      historyValue([{ _oid: 'Member:1' }, { _oid: 'Member:2' }]),
+    );
   });
 
   it('turns relation values into OID tokens', () => {

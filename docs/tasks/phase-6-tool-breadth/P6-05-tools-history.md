@@ -2,7 +2,7 @@
 id: P6-05
 title: History and activity tools
 phase: 6
-status: review
+status: done
 priority: medium
 depends_on: [P2-17]
 adr: ["0011"]

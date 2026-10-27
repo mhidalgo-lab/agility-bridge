@@ -5,6 +5,29 @@
 > The owner authorised the whole phase as a batch (2026-10-27): decisions marked *built as …* are implemented at their
 > recommendation; say so if you want the alternative.
 
+## Owner steps
+
+Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.md)); none needs a code change first.
+
+1. **The OAuth client runs** ([P6-14](../tasks/phase-6-tool-breadth/P6-14-oauth-client-matrix-rest.md)) against the real deployment:
+   Claude mobile, Claude Desktop connectors, VS Code, JetBrains, Copilot CLI and MCP Inspector (Cursor and Windsurf when a subscription
+   exists), plus the Phase 5 follow-ups (disconnect and reconnect, a refresh of claude.ai, a real phone). The release gate needs
+   them; record version and date in the [client matrix](../reference/client-compatibility.md#oauth-runs-p5-06).
+2. **The first LLM eval run** ([P6-33](../tasks/phase-6-tool-breadth/P6-33-first-llm-eval-run.md)) before the release: it calls a paid
+   API (`ANTHROPIC_API_KEY`, `pnpm eval:llm --yes`), with the default model and the strongest one (D-110). Attach the report; tune
+   descriptions only from it (P6-34).
+3. **The v0.6 release**: merge the Version Packages PR when 1 and 2 are done (the owner merges it; the release run publishes to npm
+   and pushes the image).
+4. **The writable sandbox** ([P6-19](../tasks/phase-6-tool-breadth/P6-19-verify-attachment-download.md),
+   [P6-21](../tasks/phase-6-tool-breadth/P6-21-history-sandbox-verification.md),
+   [P6-25](../tasks/phase-6-tool-breadth/P6-25-verify-regression-recipes-sandbox.md),
+   [P6-27](../tasks/phase-6-tool-breadth/P6-27-verify-requests-on-sandbox.md)) is still the unblocker for the attachment download, the
+   activity stream, the regression recipes and the requests: nothing in Phase 6 can verify them on the read-only tenant.
+5. **The open decisions below, D-80 to D-122.** Every one is built at its recommendation (the owner authorised the phase as a batch);
+   say so for any you want the other way. D-117 to D-122 come from the review: attachment text only in the enveloped block (D-117),
+   a roll-up percentage by estimate only when every item has one (D-118), defect triage reading the oldest change first (D-119),
+   no `Scope` in history (D-120), `resources/list` with no upstream call (D-121) and stdio serving the `history` group (D-122).
+
 ## Open decisions
 
 ### D-89 — The activity stream is not read by the history tools *(P6-05)*
@@ -384,3 +407,56 @@
 - **Recommendation:** (b), built. (c) would not change what clients accept (Cursor's cap is about the number of tools; the
   byte budget is ours).
 - **Owner:** *(open; built as (b))*
+
+### D-117 — `get_attachment` returns its text only in the enveloped block, not in `structuredContent` *(P6-13)*
+- **Context:** the text block carried the attachment text inside the untrusted-data envelope, and `structuredContent.content` repeated
+  it (up to 100,000 characters) with cleaning and redaction only. A client that forwards or prefers structured content loses the
+  envelope, and the result was twice as large, which matters on the 512 KiB Worker cap.
+- **Options:** (a) structured carries metadata only (`attachment { oid, name?, contentType, bytes, characters }`, `asset`, `truncated`);
+  (b) keep the text and add an `untrusted: true` marker; (c) keep as it was.
+- **Recommendation:** (a), built. The model reads the enveloped block; code that needs the bytes is not an MCP client's job.
+- **Owner:** *(open; built as (a))*
+
+### D-118 — A roll-up percentage is by estimate only when every item read has one *(P6-13, changes D-81)*
+- **Context:** with some items estimated and others not, the percentage by estimate ignored the unestimated ones: an epic with two
+  estimated (done) and eight unestimated (open) items read 100 % done.
+- **Options:** (a) by estimate only when no item read lacks one, else by item count, and show `unestimatedItemCount`; (b) keep the
+  estimate basis and only add the count; (c) always by count.
+- **Recommendation:** (a), built: the number never hides open work, and the count of unestimated items is in the row. (c) throws away
+  the estimates where they are complete.
+- **Owner:** *(open; built as (a))*
+
+### D-119 — `defect_triage` reads the oldest change first *(P6-13)*
+- **Context:** the report read the 100 most recently changed open defects, so the stale ones it exists to find were the ones cut
+  when there were more than 100, and the stale count was biased low.
+- **Options:** (a) read oldest change first (a new `sort_by: oldest_changed` on `search_work_items`, about 20 bytes in `tools/list`)
+  and say so when more exist; (b) two sections, the oldest 50 and the newest 50 (two requests); (c) keep newest first and add a note.
+- **Recommendation:** (a), built. (b) is the better answer for a large backlog and is part of P6-30 (priority and severity triage).
+- **Owner:** *(open; built as (a))*
+
+### D-120 — `get_asset_history` does not follow `Scope`, and reads the history of an asset that has since moved into scope *(P6-13)*
+- **Context:** an asset moved from a project outside the workspace into one inside it carries its earlier `Scope` in `Hist`, so
+  following `Scope` would show an out-of-scope project's OID, and name or status history from before the move is readable.
+- **Options:** (a) refuse `Scope` and `Scope.*`; accept that other attributes of an asset that is in scope now are readable for their
+  whole history (the asset is in scope, as are its comments); (b) also refuse any window that starts before the asset was last
+  moved (needs the move date, not available); (c) leave as it was.
+- **Recommendation:** (a), built, and stated in THREAT_MODEL A4. A grant that must not see pre-move history can set `maxAsOfAgeDays`.
+- **Owner:** *(open; built as (a))*
+
+### D-121 — `resources/list` makes no upstream request *(P6-13)*
+- **Context:** the per-type resource list called `list_asset_types`: 21 requests and about 1.9 MB of metadata parsed on a cold isolate,
+  for every client that lists resources on connect (about 15 ms of Worker CPU, over the Free limit), with a failure answered as an
+  empty list.
+- **Options:** (a) list the workspace's allowed type names (the default readable types when no list is set), no upstream call; a type
+  the instance does not have fails cleanly when read; (b) list only types already in the metadata cache; (c) keep it live.
+- **Recommendation:** (a), built. The resource then needs only `describe_asset_type`.
+- **Owner:** *(open; built as (a))*
+
+### D-122 — The stdio server serves the `history` group by default *(P6-13)*
+- **Context:** `STDIO_GROUPS` lacked `history`, so stdio users had no `get_asset_history` or `list_recent_changes`, although the
+  catalogue lists the group as on by default and the HTTP and Worker hosts serve it. Nothing says it was a decision (compare D-82).
+- **Options:** (a) serve it (a read-only group, 2 tools, 20 tools in the default catalogue); (b) leave it out until P6-21 has verified
+  `Hist` on a sandbox; (c) make it opt-in.
+- **Recommendation:** (a), built; `Hist` was verified read-only on the tenant (P6-05). A test compares the list with the registry.
+- **Owner:** *(open; built as (a))*
+

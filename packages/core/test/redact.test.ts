@@ -80,6 +80,20 @@ describe('redact', () => {
   });
 });
 
+describe('redaction of large plain text (P6-13)', () => {
+  it('skips patterns whose literals are absent: a 100 KB hex body costs little, and secrets are still found', () => {
+    const hex = 'deadbeef0123456789abcdef'.repeat(4_200);
+    const t = performance.now();
+    for (let i = 0; i < 3; i++) redact(hex);
+    // Was about 75 ms per call before the guards; the bound is loose so a loaded machine does not flake.
+    expect(performance.now() - t).toBeLessThan(120);
+    expect(redact(`${hex.slice(0, 500)} api_key=hunter2hunter2 ${hex.slice(0, 500)}`)).toContain(
+      `api_key=${REDACTED}`,
+    );
+    expect(redact('Authorization: Basic abc123def')).toContain(REDACTED);
+  });
+});
+
 describe('redactValue and Secret', () => {
   it('blanks secret-named keys at any depth and keeps Secret values hidden', () => {
     const note = `1.${fake(24)}=`;

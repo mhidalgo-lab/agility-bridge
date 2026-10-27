@@ -157,7 +157,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 | `status_category` | `not_started` \| `in_progress` \| `completed` |  |  | Rollup category of the status. |
 | `contains` | string |  |  | Only items whose name contains this text. |
 | `include_closed` | boolean |  | `false` | Include closed items. |
-| `sort_by` | `id` \| `name` \| `recently_changed` |  | `"id"` | recently_changed costs about a second per call. |
+| `sort_by` | `id` \| `name` \| `recently_changed` \| `oldest_changed` |  | `"id"` | Changed sorts cost about a second per call. |
 | `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows; the workspace page size when omitted. |
 | `cursor` | string |  |  | nextCursor of the previous call, same arguments. |
 | `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
@@ -371,7 +371,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 | `attachment` | string | yes |  | Attachment id (Attachment:1234) from list_attachments. |
 | `max_characters` | integer (≥ 1, ≤ 100000) |  |  | Most characters of text to return; the rest is cut and the note says so. |
 
-`structuredContent`: `attachment`, `content`, `truncated` (open: more fields may be added).
+`structuredContent`: `attachment`, `truncated` (open: more fields may be added).
 
 ## `list_portfolio_items`
 

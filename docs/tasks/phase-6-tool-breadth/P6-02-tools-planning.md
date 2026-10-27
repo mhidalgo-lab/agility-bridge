@@ -2,7 +2,7 @@
 id: P6-02
 title: Planning tools (get_sprint)
 phase: 6
-status: review
+status: done
 priority: high
 depends_on: [P2-17]
 adr: ["0011", "0012", "0015"]

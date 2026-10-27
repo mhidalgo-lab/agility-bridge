@@ -3,7 +3,7 @@
 // derived from what the sections returned; a figure that cannot be computed is absent, never zero (L-033).
 import { z } from 'zod';
 import { capBudget } from '../../context.ts';
-import { shapeOutput, untrusted } from '../../output/result.ts';
+import { type Line, shapeOutput, untrusted } from '../../output/result.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import { currentSprintArg, projectArg, teamArg } from '../common.ts';
 import { getSprint } from '../planning/sprint.ts';
@@ -91,9 +91,11 @@ export const sprintHealth: ToolDefinition = defineTool({
     });
     const runs: SectionRun[] = [sprintRun, workRun];
     rethrowIfNothingRead(runs);
-    const notes: string[] = sectionNotes(runs, TITLES);
+    const notes: Line[] = sectionNotes(runs, TITLES);
+    // The sibling's notes were already flattened to text; a note that carries an Agility name would otherwise reach the
+    // model outside the envelope. They are forwarded as untrusted data, never as our own text (P6-13).
     for (const n of Array.isArray(sprintData?.['notes']) ? (sprintData['notes'] as unknown[]) : [])
-      if (typeof n === 'string') notes.push(n);
+      if (typeof n === 'string') notes.push(['Sprint note: ', untrusted(n)]);
 
     // Pace.
     const timing = strOf(sprint?.['timing']);
@@ -241,7 +243,11 @@ export const sprintHealth: ToolDefinition = defineTool({
           ? []
           : [{ title: 'Open items without an owner', source: 'unowned items', rows: unownedRows }]),
       ],
-      partial: incomplete(runs) || sprintData?.['partial'] === true || more,
+      partial:
+        incomplete(runs) ||
+        sprintData?.['partial'] === true ||
+        more ||
+        workRun.data?.['hiddenOutsideScope'] === true,
       structured: {
         sections: sectionInfos(runs),
         ...(sprint === undefined ? {} : { sprint }),

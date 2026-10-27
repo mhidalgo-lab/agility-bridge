@@ -116,10 +116,10 @@ describe.skipIf(!target)('get_sprint against the live tenant (read-only)', () =>
       expect(sprint['timing']).toBe(timing);
       expect(typeof sprint['beginDate']).toBe('string');
       const totals = out['totals'] as Record<string, number>;
-      expect(Number.isInteger(totals['items'])).toBe(true);
+      expect(Number.isInteger(totals['itemCount'])).toBe(true);
       // The categories add up to the items counted, and nothing is null.
-      const categories = out['byStatusCategory'] as Array<{ items: number }>;
-      expect(categories.reduce((n, c) => n + c.items, 0)).toBe(totals['items']);
+      const categories = out['byStatusCategory'] as Array<{ itemCount: number }>;
+      expect(categories.reduce((n, c) => n + c.itemCount, 0)).toBe(totals['itemCount']);
       expect(JSON.stringify(out)).not.toContain(':null');
       // History is bounded: at most 15 points, ordered, never after now, and the last point reconciles with the totals.
       const points = (out['burndown'] as Array<{ at: string; remaining?: number }> | undefined) ?? [];
@@ -132,7 +132,7 @@ describe.skipIf(!target)('get_sprint against the live tenant (read-only)', () =>
       expect(Array.isArray(out['notes'])).toBe(true);
       const meta = r['_meta'] as Record<string, Record<string, unknown>> | undefined;
       report[timing] = {
-        items: level(totals['items'] as number),
+        items: level(totals['itemCount'] as number),
         categories: categories.length,
         burndownPoints: points.length,
         committed: out['committed'] !== undefined,

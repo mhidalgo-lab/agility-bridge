@@ -181,6 +181,7 @@ export const getSprint: ToolDefinition = defineTool({
 
     // Status categories come from the instance's lists (never hard-coded names, L-142).
     const statusInfo = new Map<string, { name: string; category?: StatusCategory }>();
+    await md.prefetch(types);
     for (const type of types) {
       for (const s of await md.statuses(type))
         statusInfo.set(s.oid, {
@@ -188,11 +189,19 @@ export const getSprint: ToolDefinition = defineTool({
           ...(s.category === undefined ? {} : { category: s.category }),
         });
     }
+    // Closed items whose status has no category count as completed (their state says so). History points cannot read
+    // the state: selecting it on every `asof` query made the real tenant time out (live, P6-13), so those items are
+    // open there and the series says so in a note rather than claiming a consistency it does not have.
+    let closedWithoutCategory = 0;
     const classify = (row: Row): Category => {
       const status = oidsOf(row['Status'])[0];
       const category = status === undefined ? undefined : statusInfo.get(status)?.category;
       if (category !== undefined) return category;
-      return Number(row['AssetState']) === 128 ? 'completed' : 'unknown';
+      if (Number(row['AssetState']) === 128) {
+        closedWithoutCategory++;
+        return 'completed';
+      }
+      return 'unknown';
     };
     const toItem = (row: Row): Item => {
       const estimate = num(row['Estimate']);
@@ -393,6 +402,10 @@ export const getSprint: ToolDefinition = defineTool({
       }
       if (timing === 'current')
         notes.push('The last burndown point is now; earlier points are daily from the begin date (UTC).');
+      if (closedWithoutCategory > 0)
+        notes.push(
+          `${closedWithoutCategory} closed item${closedWithoutCategory === 1 ? ' has' : 's have'} no status category: counted as done in the totals and the last point, but as remaining at earlier points (history cannot read an item's state).`,
+        );
     }
     const carryOver = timing === 'past' && basis === 'end_of_sprint' ? open : undefined;
     notes.push(
@@ -403,10 +416,12 @@ export const getSprint: ToolDefinition = defineTool({
       notes.push(
         `The item list shows the first ${ITEM_LIST_CAP} of ${current.length} items; totals cover all of them.`,
       );
-    if (hidden > 0)
+    if (hidden > 0) {
+      partial = true; // the totals leave those items out: not complete (the same rule as get_portfolio_tree)
       notes.push(
         'Some items were left out because they are outside the workspace or of a type this workspace does not allow.',
       );
+    }
 
     const itemRows = [...current]
       .sort(

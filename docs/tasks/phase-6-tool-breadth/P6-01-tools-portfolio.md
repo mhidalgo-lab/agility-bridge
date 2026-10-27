@@ -2,7 +2,7 @@
 id: P6-01
 title: Portfolio tools (epics and portfolio items)
 phase: 6
-status: review
+status: done
 priority: high
 depends_on: [P2-17]
 adr: ["0015"]

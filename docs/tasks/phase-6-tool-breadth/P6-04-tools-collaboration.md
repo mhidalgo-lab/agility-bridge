@@ -2,7 +2,7 @@
 id: P6-04
 title: Collaboration tools (conversations, links, attachments)
 phase: 6
-status: review
+status: done
 priority: medium
 depends_on: [P2-17]
 adr: ["0015"]

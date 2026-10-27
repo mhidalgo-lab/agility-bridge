@@ -285,6 +285,14 @@ export class InstanceMetadata {
     return meta;
   }
 
+  /**
+   * Load several asset types at once (a cold call otherwise pays one round trip after another). The loads are
+   * counted by the request budget as usual; an unknown type is simply not cached (the later `assetType` names it).
+   */
+  async prefetch(names: Iterable<string>): Promise<void> {
+    await Promise.all([...new Set(names)].map((n) => this.findAssetType(n)));
+  }
+
   /** The asset type, or undefined when the instance has no such type. */
   async findAssetType(name: string): Promise<AssetTypeMeta | undefined> {
     if (!ASSET_TYPE_NAME_RE.test(name)) return undefined;

@@ -44,6 +44,19 @@ afterEach(async () => {
   await Promise.all(running.splice(0).map((mf) => mf.dispose()));
 });
 
+/**
+ * A response whose body is already read. A `dispatchFetch` response holds a live stream on the workerd connection;
+ * a test that left it unread across a second request could find it "already read" under load (P6-13, L-321).
+ */
+async function buffered(res: Response): Promise<Response> {
+  const nullBody = [101, 204, 205, 304].includes(res.status);
+  return new Response(nullBody ? null : await res.arrayBuffer(), {
+    status: res.status,
+    statusText: res.statusText,
+    headers: res.headers,
+  });
+}
+
 async function workerHost(shape?: RefreshHostShape): Promise<OAuthHost> {
   const key = generateMasterKey(1);
   const adminToken = generateAdminToken();
@@ -134,11 +147,13 @@ async function workerHost(shape?: RefreshHostShape): Promise<OAuthHost> {
     origin: ORIGIN,
     documents,
     call: async (url, init) =>
-      (await mf.dispatchFetch(url, {
-        ...init,
-        // The SDK passes `Headers` objects (client authentication): flatten them, spreading one loses every header.
-        headers: { 'cf-connecting-ip': '203.0.113.9', ...Object.fromEntries(new Headers(init?.headers)) },
-      } as never)) as unknown as Response,
+      buffered(
+        await mf.dispatchFetch(url, {
+          ...init,
+          // The SDK passes `Headers` objects (client authentication): flatten them, spreading one loses every header.
+          headers: { 'cf-connecting-ip': '203.0.113.9', ...Object.fromEntries(new Headers(init?.headers)) },
+        } as never),
+      ),
     storage,
     ids: {
       alice: alice.id,
@@ -153,15 +168,17 @@ async function workerHost(shape?: RefreshHostShape): Promise<OAuthHost> {
     },
     agilityRequests: () => agility.requests(),
     adminApi: async (method, path, body) =>
-      (await mf.dispatchFetch(`${ORIGIN}/api/admin/v1${path}`, {
-        method,
-        headers: {
-          authorization: `Bearer ${adminToken}`,
-          'cf-connecting-ip': '203.0.113.9',
-          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-        },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      } as never)) as unknown as Response,
+      buffered(
+        await mf.dispatchFetch(`${ORIGIN}/api/admin/v1${path}`, {
+          method,
+          headers: {
+            authorization: `Bearer ${adminToken}`,
+            'cf-connecting-ip': '203.0.113.9',
+            ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+          },
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        } as never),
+      ),
     address: (ip) => ({ 'cf-connecting-ip': ip }),
     // The Worker's console is not captured here; the redaction corpus and the Node suites cover the log lines.
     logs: () => [],
