@@ -177,6 +177,24 @@ const asofCalls = (calls: readonly FakeCall[]) =>
       (Array.isArray(c.body) ? c.body : [c.body]).some((b) => (b as { asof?: string }).asof !== undefined),
   );
 
+describe('a closed item with no status category (P6-13)', () => {
+  it('is classified the same way at every burndown point as in the totals', async () => {
+    // A closed story without a status: only its AssetState says it is done. It is selected at every point.
+    const closed = () => item(30, 'Story', 42, undefined, 4, { AssetState: 128 });
+    const hist = (p: (n: number, plain: string) => string) =>
+      snapshots(p).map((snap) => ({ ...snap, rows: [...snap.rows, closed()] }));
+    const base = await call(setup().ctx(), { sprint: 'Sprint 42' });
+    const { ctx } = setup(world(false, undefined, hist));
+    const r = await call(ctx(), { sprint: 'Sprint 42' });
+    expect(r['isError'], text(r)).toBeUndefined();
+    const remaining = (o: Record<string, unknown>) =>
+      (s(o)['burndown'] as Array<{ remaining?: number }>).map((x) => x.remaining);
+    // Done work is never remaining, at any point: the series does not change by adding a finished item.
+    expect(remaining(r)).toEqual(remaining(base));
+    expect(s(r)['totals']).toMatchObject({ done: 9 });
+  });
+});
+
 describe('a running sprint', () => {
   it('reports totals by status category, committed vs done, scope change and the burndown', async () => {
     const { ctx } = setup();
@@ -436,6 +454,19 @@ describe('authorization', () => {
     expect(r['isError'], text(r)).toBeUndefined();
     expect(JSON.stringify(r)).not.toContain('Scope:2000');
     expect(JSON.stringify(r)).not.toContain('B-00009');
+  });
+
+  it('is partial when rows outside the workspace were left out of the totals (P6-13)', async () => {
+    const foreign = () => ({ ...item(9, 'Story', 41, 2, 1), Scope: 'Scope:2000' });
+    const hist = (p: (n: number, plain: string) => string) =>
+      snapshots(p).map((snap) => ({ ...snap, rows: [...snap.rows, foreign()] }));
+    // With every filter ignored the upstream answers rows of other projects; the recheck drops them.
+    const { ctx } = setup({ ...world(false, undefined, hist), filters: 'ignore-filters' });
+    const r = await call(ctx(), { sprint: 'Timebox:41', burndown: false });
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect(JSON.stringify(r)).not.toContain('B-00009');
+    expect(text(r)).toContain('left out');
+    expect(s(r)['partial']).toBe(true);
   });
 
   it('is refused, with no upstream request, when neither backlog items nor defects are allowed', async () => {

@@ -84,6 +84,8 @@ export const standupSummary: ToolDefinition = defineTool({
       ...(strOf(r['changedAt']) === undefined ? {} : { changedAt: r['changedAt'] }),
       ...(strOf(r['name']) === undefined ? {} : { name: r['name'] }),
     });
+    // Set where a list is known to be incomplete (not read back from note text, which a rewording would break).
+    let listPartial = false;
     let changed: ReturnType<typeof brief>[] | undefined;
     let finished: ReturnType<typeof brief>[] | undefined;
     if (changedRun.info.status === 'ok') {
@@ -95,23 +97,31 @@ export const standupSummary: ToolDefinition = defineTool({
       const more = typeof changedRun.data?.['nextCursor'] === 'string';
       const last = rows.at(-1);
       const lastT = Date.parse(strOf(last?.['changedAt']) ?? '');
-      if (more && Number.isFinite(lastT) && lastT >= since)
+      // An unreadable change date on the last row cannot show the page reached the window's start: not complete.
+      if (more && (!Number.isFinite(lastT) || lastT >= since)) {
+        listPartial = true;
         notes.push('More items changed in the window than the first page: the list is not complete.');
+      }
       if (rows.some((r) => !Number.isFinite(Date.parse(strOf(r['changedAt']) ?? ''))))
         notes.push('Some items have no change date and are left out of the window.');
       changed = inWindow.filter((r) => r['state'] !== 'closed').map(brief);
       finished = inWindow.filter((r) => r['state'] === 'closed').map(brief);
-      if (changedRun.data?.['hiddenOutsideScope'] === true)
+      if (changedRun.data?.['hiddenOutsideScope'] === true) {
+        listPartial = true;
         notes.push('Some items were left out because they are outside the workspace.');
+      }
     }
     let inProgress: ReturnType<typeof brief>[] | undefined;
     if (progressRun.info.status === 'ok') {
       inProgress = arr(progressRun.data?.['items']).map(brief);
-      if (typeof progressRun.data?.['nextCursor'] === 'string')
+      if (typeof progressRun.data?.['nextCursor'] === 'string') {
+        listPartial = true;
         notes.push('More items are in progress than the first page: the list is not complete.');
+      }
+      if (progressRun.data?.['hiddenOutsideScope'] === true) listPartial = true;
     }
     notes.push(
-      'Blockers are not reported: no blocked flag is read. Items created in the window are not told apart from changed ones.',
+      'Blockers are not reported: no blocked flag is read. Items created in the window are not told apart from changed ones, and a closed item counts as finished when it changed in the window, not necessarily when it was closed.',
     );
     const count = (l: unknown[] | undefined) => (l === undefined ? 'not read' : String(l.length));
     const { output } = shapeOutput(ctx, {
@@ -124,7 +134,7 @@ export const standupSummary: ToolDefinition = defineTool({
           ? []
           : [{ title: 'In progress', source: 'in-progress items', rows: inProgress }]),
       ],
-      partial: incomplete(runs) || notes.some((n) => n.includes('not complete')),
+      partial: incomplete(runs) || listPartial,
       structured: {
         sections: sectionInfos(runs),
         window: { ...window },

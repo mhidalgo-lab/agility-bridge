@@ -1,14 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 // P6-04: the stdio server offers `get_attachment` only when AB_ATTACHMENT_DOWNLOAD is on (D-08, THREAT_MODEL A8), and
 // the context it builds carries the same switch, so a handler reached any other way refuses too.
+
+import { CORE_TOOLS } from '@agility-bridge/core';
 import { describe, expect, it } from 'vitest';
 import { loadConfig, type StdioConfig } from '../src/config.ts';
-import { contextFactory, selectTools } from '../src/stdio.ts';
+import { contextFactory, STDIO_GROUPS, selectTools } from '../src/stdio.ts';
 
 const URL = 'https://agility.example.com/SyntheticInstance';
 const base = { AB_AGILITY_URL: URL, AB_AGILITY_TOKEN: 'FAKE-token' };
 const config = (env: Record<string, string> = {}) => loadConfig({ ...base, ...env }) as StdioConfig;
 const names = (c: StdioConfig) => selectTools(c).map((t) => t.name);
+
+describe('stdio serves every tool group the catalogue has (P6-13)', () => {
+  it('has no group in the core catalogue that STDIO_GROUPS leaves out, and offers the history tools by default', () => {
+    const groups = new Set(CORE_TOOLS.map((t) => t.group));
+    for (const g of groups) expect(STDIO_GROUPS as readonly string[], `group ${g}`).toContain(g);
+    expect(names(config())).toEqual(expect.arrayContaining(['get_asset_history', 'list_recent_changes']));
+  });
+});
 
 describe('stdio composite reports (P6-07, D-101)', () => {
   const REPORTS = [

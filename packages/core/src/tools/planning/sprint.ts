@@ -181,6 +181,7 @@ export const getSprint: ToolDefinition = defineTool({
 
     // Status categories come from the instance's lists (never hard-coded names, L-142).
     const statusInfo = new Map<string, { name: string; category?: StatusCategory }>();
+    await md.prefetch(types);
     for (const type of types) {
       for (const s of await md.statuses(type))
         statusInfo.set(s.oid, {
@@ -206,7 +207,9 @@ export const getSprint: ToolDefinition = defineTool({
 
     const itemMeta = await md.assetType('PrimaryWorkitem');
     const has = (a: string) => itemMeta.attributes.has(a.split('.')[0] as string);
-    const light = ['AssetType', 'Status', 'Estimate'].filter(has);
+    // AssetState too: a closed item with no status category must be classified the same way at every point of the
+    // burndown as in the current totals (otherwise the last point steps down by items that were never reclassified).
+    const light = ['AssetType', 'Status', 'Estimate', 'AssetState'].filter(has);
     const rich = ['AssetType', 'Number', 'Name', 'Status', 'Status.Name', 'Estimate', 'AssetState'].filter(
       has,
     );
@@ -403,10 +406,12 @@ export const getSprint: ToolDefinition = defineTool({
       notes.push(
         `The item list shows the first ${ITEM_LIST_CAP} of ${current.length} items; totals cover all of them.`,
       );
-    if (hidden > 0)
+    if (hidden > 0) {
+      partial = true; // the totals leave those items out: not complete (the same rule as get_portfolio_tree)
       notes.push(
         'Some items were left out because they are outside the workspace or of a type this workspace does not allow.',
       );
+    }
 
     const itemRows = [...current]
       .sort(

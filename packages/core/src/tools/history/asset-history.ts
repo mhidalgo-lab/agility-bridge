@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { agilityClient } from '../../agility/client.ts';
 import { capBudget, type ToolContext } from '../../context.ts';
+import { AbError, ErrorCode } from '../../errors.ts';
 import { resolveAsset } from '../../identity/resolve.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { assetState, shapeList, untrusted } from '../../output/result.ts';
@@ -56,7 +57,11 @@ interface Change {
 /** One attribute value of a Hist row as a plain, comparable value (relations become OID tokens). */
 export function historyValue(raw: unknown): Json {
   if (raw === null || raw === undefined) return null;
-  if (Array.isArray(raw)) return raw.map(historyValue);
+  // Multi-valued relations come back in no fixed order: sort them so a reordering is not read as a change.
+  if (Array.isArray(raw)) {
+    const items = raw.map(historyValue);
+    return items.every((x) => typeof x === 'string') ? [...(items as string[])].sort() : items;
+  }
   if (typeof raw === 'object') {
     const o = raw as Record<string, unknown>;
     const ref = o['idref'] ?? o['_oid'];
@@ -79,11 +84,16 @@ function display(field: string, assetType: string, v: Json): Json {
 }
 
 /** The versions of a Hist answer that belong to `oid`, oldest first (L-122: nothing else is trusted). */
-function versions(data: unknown, oid: string, keys: ReadonlyMap<string, string>, atKey: string): Version[] {
+function versions(
+  data: unknown,
+  oid: string,
+  keys: ReadonlyMap<string, string>,
+  atKey: string,
+): { list: Version[]; cut: number } {
   const assets = (data as { Assets?: unknown } | null)?.Assets;
-  if (!Array.isArray(assets)) return [];
+  if (!Array.isArray(assets)) return { list: [], cut: 0 };
   const out: Version[] = [];
-  for (const a of assets.slice(0, MAX_VERSIONS)) {
+  for (const a of assets) {
     if (a === null || typeof a !== 'object') continue;
     const row = a as { id?: unknown; Attributes?: Record<string, { value?: unknown } | undefined> };
     const id = typeof row.id === 'string' ? row.id : '';
@@ -102,7 +112,10 @@ function versions(data: unknown, oid: string, keys: ReadonlyMap<string, string>,
       by: typeof by === 'string' && by !== '' ? cleanText(by).slice(0, 200) : undefined,
     });
   }
-  return out.sort((x, y) => x.moment - y.moment);
+  out.sort((x, y) => x.moment - y.moment);
+  // Hist order is not guaranteed: sort first, then keep the most recent versions (the oldest ones go).
+  const cut = Math.max(0, out.length - MAX_VERSIONS);
+  return { list: cut === 0 ? out : out.slice(cut), cut };
 }
 
 export const getAssetHistory: ToolDefinition = defineTool({
@@ -150,9 +163,20 @@ export const getAssetHistory: ToolDefinition = defineTool({
       if (requested.length > most) throw limitError('maxFields', most, 'fields', requested.length);
       for (const f of requested) {
         if (/[@[\]]/.test(f)) throw invalid('History follows plain attributes, not aggregations or filters.');
+        // The asset's own project is checked against its current state; an earlier project could be outside the
+        // workspace, so its history is not offered (THREAT_MODEL A4).
+        if (/^Scope(\.|$)/i.test(f))
+          throw invalid(
+            'History does not follow Scope: the asset may have lived in a project outside this workspace.',
+            'Ask for the current project with query_assets.',
+          );
       }
     }
     const since = Date.parse(window.since);
+    // maxAsOfAgeDays is the furthest point into the past a grant can read, here as for as_of (L-060, THREAT_MODEL A4).
+    const ageDays = (ctx.clock.now() - since) / 86_400_000;
+    if (ageDays > ctx.limits.maxAsOfAgeDays)
+      throw limitError('maxAsOfAgeDays', ctx.limits.maxAsOfAgeDays, 'days', Math.ceil(ageDays));
     const until = Date.parse(window.until);
 
     const md = metadataFor(ctx);
@@ -192,15 +216,28 @@ export const getAssetHistory: ToolDefinition = defineTool({
       ...new Set([...keys.values(), atKey, ...(has('ChangedBy') ? ['ChangedBy.Name'] : [])]),
     ];
 
-    const res = await agilityClient(ctx).hist<unknown>(
-      target.assetType,
-      target.oid.split(':')[1] as string,
-      selection,
-    );
-    const all = versions(res.data, target.oid, keys, atKey);
-    const rawCount = (res.data as { Assets?: unknown[] } | null)?.Assets?.length ?? 0;
-    if (rawCount > MAX_VERSIONS)
-      notes.push(`Only the first ${MAX_VERSIONS} versions of this asset were read; later ones are missing.`);
+    const res = await agilityClient(ctx)
+      .hist<unknown>(target.assetType, target.oid.split(':')[1] as string, selection)
+      .catch((error: unknown) => {
+        // Hist answers every version in one body and cannot be narrowed by date: say what can be done instead.
+        if (error instanceof AbError && error.code === ErrorCode.LimitResponseTooLarge)
+          throw new AbError(
+            ErrorCode.LimitResponseTooLarge,
+            `This asset has more versions than fit in one response (${Math.round(ctx.limits.maxResponseBytes / 1024)} KiB).`,
+            {
+              hint: 'Follow fewer attributes with fields (each one is read for every version), or use list_recent_changes for a window across assets.',
+              details: { maxResponseBytes: ctx.limits.maxResponseBytes },
+              localDetails: true,
+              cause: error,
+            },
+          );
+        throw error;
+      });
+    const { list: all, cut } = versions(res.data, target.oid, keys, atKey);
+    if (cut > 0)
+      notes.push(
+        `Only the most recent ${MAX_VERSIONS} versions of this asset were read; ${cut} older ones are missing, so the oldest rows may lack their "from".`,
+      );
     if (all.length === 0) notes.push('Agility returned no history versions for this asset.');
 
     const changes: Change[] = [];

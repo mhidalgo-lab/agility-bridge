@@ -57,6 +57,8 @@ const MINIMAL: Record<string, Record<string, string>> = {
 /** Other valid argument sets that change which tools the text names. */
 const VARIANTS: Record<string, Array<Record<string, string>>> = {
   draft_release_notes: [{ asset: 'E-00007' }],
+  // Without an asset the prompt searches for the items to review: it names search_work_items (P6-13).
+  review_backlog_item_quality: [{ sprint: 'current' }],
 };
 
 describe('the prompt manifest', () => {
@@ -170,6 +172,9 @@ describe('arguments are caller input', () => {
     ['standup', { project: 'x`y' }],
     ['standup', { member: 'a'.repeat(201) }],
     ['standup', { member: ' padded ' }],
+    // Format characters: a right-to-left override and a zero-width space hide text from a reader (P6-13).
+    ['standup', { member: 'ann\u202Edeen' }],
+    ['standup', { team: 'blue\u200Bteam' }],
     ['explain_asset', {}],
     ['explain_asset', { asset: 'B-01234; drop' }],
     ['explain_asset', { asset: 'not an asset' }],

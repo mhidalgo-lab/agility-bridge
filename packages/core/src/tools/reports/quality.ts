@@ -62,7 +62,18 @@ export interface CriterionResult {
 
 const ROLE = /\bas (?:an?|the)\b/i;
 const WHY = /\bso that\b|\bin order to\b|\bbecause\b/i;
-const GWT = /\bgiven\b[\s\S]*\bwhen\b[\s\S]*\bthen\b/i;
+/**
+ * Given ... when ... then, in that order. Three anchored searches, each linear: a single `given[\s\S]*when[\s\S]*then`
+ * regexp backtracks cubically on hostile text (Agility text is untrusted, and a description is editable by anyone).
+ */
+export function hasGivenWhenThen(text: string): boolean {
+  const g = /\bgiven\b/i.exec(text);
+  if (g === null) return false;
+  const afterGiven = text.slice(g.index + g[0].length);
+  const w = /\bwhen\b/i.exec(afterGiven);
+  if (w === null) return false;
+  return /\bthen\b/i.test(afterGiven.slice(w.index + w[0].length));
+}
 const MODAL = /\b(?:should|must|shall|can|cannot|displays?|shows?|is shown|returns?|redirects?)\b/i;
 const OPEN = /\b(?:tbd|tbc|todo|fixme|to be (?:decided|defined|determined|confirmed))\b|\?\?+/gi;
 
@@ -100,7 +111,11 @@ export function assess(c: RubricCriterion, f: Facts): CriterionResult {
       return result(c, 0, 'no who, why or parent epic found');
     }
     case 'acceptance_criteria': {
-      const text = f.acceptance ?? (/acceptance criteria/i.test(f.description) ? f.description : '');
+      // Without an acceptance field, only the text after the words "acceptance criteria" in the description counts:
+      // prose that merely mentions the phrase must not score as the criteria themselves.
+      const phrase = /acceptance criteria/i.exec(f.description);
+      const text =
+        f.acceptance ?? (phrase === null ? '' : f.description.slice(phrase.index + phrase[0].length));
       if (text.trim() === '')
         return result(
           c,
@@ -108,7 +123,7 @@ export function assess(c: RubricCriterion, f: Facts): CriterionResult {
           f.hasAcceptanceField ? 'the acceptance field is empty' : 'none found in the description',
         );
       const lines = acceptanceLines(text);
-      const testable = GWT.test(text) || MODAL.test(text);
+      const testable = hasGivenWhenThen(text) || MODAL.test(text);
       return lines.length >= 3 && testable
         ? result(c, 2, `${lines.length} criteria with testable wording`)
         : result(c, 1, `${lines.length} criteria${testable ? '' : ', no testable wording'}`);

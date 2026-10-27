@@ -45,7 +45,20 @@ export interface AbErrorOptions {
    * through the untrusted-data envelope (ADR-0015).
    */
   localDetails?: boolean;
+  /**
+   * Audit facts for a failed call (identifiers and sizes, never content or Agility text), recorded by the observer
+   * next to the error code. Not shown to the agent.
+   */
+  audit?: AuditDownload;
   cause?: unknown;
+}
+
+/** A downloaded (or refused) attachment as the audit records it: ids, size and type, never content (THREAT_MODEL A8). */
+export interface AuditDownload {
+  readonly asset: string;
+  readonly attachment: string;
+  readonly bytes: number;
+  readonly contentType: string;
 }
 
 /** An expected, agent-actionable failure. `message` and `hint` must be safe to show to the client. */
@@ -54,6 +67,8 @@ export class AbError extends Error {
   readonly hint: string | undefined;
   readonly details: Record<string, unknown> | undefined;
   readonly localDetails: boolean;
+  /** Set by the code that knew the ids when the failure came after the request (see `AbErrorOptions.audit`). */
+  audit: AuditDownload | undefined;
 
   constructor(code: ErrorCode, message: string, options: AbErrorOptions = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
@@ -62,6 +77,7 @@ export class AbError extends Error {
     this.hint = options.hint;
     this.details = options.details;
     this.localDetails = options.localDetails === true;
+    this.audit = options.audit;
   }
 }
 

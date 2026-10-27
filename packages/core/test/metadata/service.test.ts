@@ -4,6 +4,7 @@ import {
   AbError,
   createBudget,
   DEFAULT_LIMITS,
+  type FetchLike,
   MetadataService,
   type MetadataServiceOptions,
   metadataDrift,
@@ -40,6 +41,27 @@ async function failure(p: Promise<unknown>): Promise<AbError> {
   }
   throw new Error('expected a failure');
 }
+
+describe('prefetch', () => {
+  it('starts every type load before any of them finishes, and counts each request', async () => {
+    const { fake, ctx } = setup();
+    let started = 0;
+    let concurrent = 0;
+    const slow: FetchLike = async (request) => {
+      started++;
+      concurrent = Math.max(concurrent, started);
+      await new Promise((r) => setTimeout(r, 15));
+      started--;
+      return fake.fetch(request);
+    };
+    const c = ctx({ fetch: slow });
+    await metadataFor(c).prefetch(['Story', 'Defect', 'Task', 'Story']);
+    expect(concurrent).toBeGreaterThanOrEqual(3);
+    expect(c.budget.used).toBe(3); // the duplicate name is loaded once
+    expect(await metadataFor(c).assetType('Task')).toMatchObject({ name: 'Task' });
+    expect(c.budget.used).toBe(3);
+  });
+});
 
 describe('parseAssetType', () => {
   it('parses the committed snapshot', () => {

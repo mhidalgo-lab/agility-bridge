@@ -28,7 +28,7 @@ import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { createNodeFetch } from './agility-fetch.ts';
 import { ConfigError, type LoadedConfig, type StdioConfig } from './config.ts';
 
-/** Groups served in Phase 1 (docs/reference/tool-catalogue.md); `query` follows AB_GENERIC_QUERY. */
+/** Groups the stdio server can serve (docs/reference/tool-catalogue.md); `query` follows AB_GENERIC_QUERY. */
 export const STDIO_GROUPS = [
   'core',
   'query',
@@ -38,6 +38,7 @@ export const STDIO_GROUPS = [
   'collaboration',
   'attachments',
   'portfolio',
+  'history',
   'reports',
 ] as const;
 

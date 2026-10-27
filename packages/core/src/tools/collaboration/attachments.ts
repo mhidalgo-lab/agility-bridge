@@ -209,7 +209,6 @@ export const getAttachment: ToolDefinition = defineTool({
   }),
   outputSchema: z.looseObject({
     attachment: z.looseObject({ oid: z.string(), contentType: z.string(), bytes: z.number() }),
-    content: z.string(),
     truncated: z.boolean().optional(),
   }),
   handler: async (input, outer) => {
@@ -247,35 +246,59 @@ export const getAttachment: ToolDefinition = defineTool({
         hint: 'Use an attachment id from list_attachments for this asset; it may also be outside the workspace.',
       });
     }
+    const asset = target.number ?? target.oid;
+    // A failure after this point still carries the asset and attachment id (and what is known of size and type) into
+    // the audit: an operator can tell which attachment was asked for, even when the body was refused (A8).
+    let known = { bytes: 0, contentType: mediaType(text(row['ContentType']) ?? '') || 'unknown' };
+    function fail(error: unknown): never {
+      if (error instanceof AbError && error.audit === undefined) {
+        error.audit = { asset, attachment: oid, ...known };
+      }
+      throw error;
+    }
     // 2. Metadata checks: type allowlist and declared size (a cheap early refusal; the stream is the authority).
     const declaredType = mediaType(text(row['ContentType']) ?? '');
     if (declaredType === '' || !allowed.includes(declaredType)) {
-      throw refuse(
-        declaredType === ''
-          ? 'The attachment has no content type, so it cannot be returned.'
-          : `The attachment type ${declaredType.slice(0, 80)} is not one this workspace returns.`,
-        `Allowed types: ${allowed.join(', ') || 'none'}. Nothing was fetched.`,
+      // The type is uploader-controlled text: it is not echoed in the message, only in the (enveloped) details.
+      fail(
+        new AbError(
+          ErrorCode.InputInvalid,
+          declaredType === ''
+            ? 'The attachment has no content type, so it cannot be returned.'
+            : 'The attachment has a content type that this workspace does not return.',
+          {
+            hint: `Allowed types: ${allowed.join(', ') || 'none'}. Nothing was fetched.`,
+            ...(declaredType === '' ? {} : { details: { contentType: declaredType.slice(0, 80) } }),
+          },
+        ),
       );
     }
     const declaredBytes = num(row['ContentLength']);
     if (declaredBytes !== undefined && declaredBytes > maxBytes) {
-      throw new AbError(
-        ErrorCode.LimitResponseTooLarge,
-        `The attachment is larger than ${Math.round(maxBytes / 1024)} KiB, the most this workspace returns.`,
-        { hint: 'Nothing was fetched. Open it in Agility.', details: { maxBytes }, localDetails: true },
+      known = { ...known, bytes: declaredBytes };
+      fail(
+        new AbError(
+          ErrorCode.LimitResponseTooLarge,
+          `The attachment is larger than ${Math.round(maxBytes / 1024)} KiB, the most this workspace returns.`,
+          { hint: 'Nothing was fetched. Open it in Agility.', details: { maxBytes }, localDetails: true },
+        ),
       );
     }
     // 3. The content: one request, type checked on the response, size counted on the stream.
-    const res = await agilityClient(ctx).attachmentContent(id, { maxBytes, allowedTypes: allowed });
+    const res = await agilityClient(ctx)
+      .attachmentContent(id, { maxBytes, allowedTypes: allowed })
+      .catch(fail);
     const { bytes, contentType } = res.data;
+    known = { bytes: bytes.byteLength, contentType };
     const content = decodeText(bytes);
     if (content === null) {
-      throw refuse(
-        'The attachment is not valid UTF-8 text.',
-        'Only text is returned; binary content is never shown.',
+      fail(
+        refuse(
+          'The attachment is not valid UTF-8 text.',
+          'Only text is returned; binary content is never shown.',
+        ),
       );
     }
-    const asset = target.number ?? target.oid;
     // Audited: HTTP writes an audit row from this meta; stdio logs it (stderr, structured).
     const download = { asset, attachment: oid, bytes: bytes.byteLength, contentType };
     ctx.logger.info('attachment downloaded', download);
@@ -311,7 +334,6 @@ export const getAttachment: ToolDefinition = defineTool({
       ...output,
       structured: {
         ...(output.structured as { attachment: { oid: string; contentType: string; bytes: number } }),
-        content: shown?.text ?? '',
         ...(shown?.cut === true ? { truncated: true } : {}),
       },
       meta: { ...output.meta, 'agility-bridge/download': download },

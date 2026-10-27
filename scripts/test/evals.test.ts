@@ -110,6 +110,16 @@ describe('lexical router baseline (CI gate)', () => {
     expect(router.rank('zzzz qqqq')[0]?.score).toBe(0);
   });
 
+  it('counts a question that shares no word with any tool as a miss, not a free hit (P6-13)', () => {
+    const tools = listedTools('default');
+    const alphabeticalFirst = [...tools].map((t) => t.name).sort()[0] as string;
+    const score = scoreRouter([
+      { id: 'Z1', category: 'x', question: 'zzzz qqqq', expect: [alphabeticalFirst], catalogue: 'default' },
+    ]);
+    expect(score.top1).toBe(0);
+    expect(score.top3).toBe(0);
+  });
+
   it('tokenizes asset numbers and stems plurals', () => {
     expect(tokenize('Open B-04821 and Story:1234')).toEqual(['open', 'number', 'number']);
     expect(stem('defects')).toBe('defect');

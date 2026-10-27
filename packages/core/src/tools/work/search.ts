@@ -46,6 +46,12 @@ const SORTS = {
       String(b.row['ChangeDateUTC'] ?? '').localeCompare(String(a.row['ChangeDateUTC'] ?? '')) ||
       idOf(a.row) - idOf(b.row),
   },
+  oldest_changed: {
+    fields: [{ field: 'ChangeDateUTC', direction: 'asc' as const }],
+    compare: (a: TypedRow, b: TypedRow) =>
+      String(a.row['ChangeDateUTC'] ?? '').localeCompare(String(b.row['ChangeDateUTC'] ?? '')) ||
+      idOf(a.row) - idOf(b.row),
+  },
 };
 
 /** Workspace types the caller may read, among the work-item types asked for. */
@@ -148,9 +154,9 @@ export const searchWorkItems: ToolDefinition = defineTool({
     contains: containsArg('items'),
     include_closed: includeClosedArg,
     sort_by: z
-      .enum(['id', 'name', 'recently_changed'])
+      .enum(['id', 'name', 'recently_changed', 'oldest_changed'])
       .default('id')
-      .describe('recently_changed costs about a second per call.'),
+      .describe('Changed sorts cost about a second per call.'),
     limit: limitArg,
     cursor: cursorArg,
     format: formatArg,
@@ -227,7 +233,7 @@ export const searchWorkItems: ToolDefinition = defineTool({
         'estimate',
         'toDoHours',
         // The sort key is shown when it is the sort: reports read it (P6-07).
-        ...(input.sort_by === 'recently_changed' ? ['changedAt'] : []),
+        ...(input.sort_by === 'recently_changed' || input.sort_by === 'oldest_changed' ? ['changedAt'] : []),
       ],
       hasMore: page.hasMore,
       // Per-type offsets after the rows actually shown, so a cut by the output caps skips nothing.

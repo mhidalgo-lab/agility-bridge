@@ -26,9 +26,9 @@ export const PROMPT_RULES: string = [
   '- Cite items by number (for example B-01234) so the reader can open them.',
 ].join('\n');
 
-// Characters a value may not contain: control characters (line breaks included), and the delimiters of the envelope
+// Characters a value may not contain: control and format characters (line breaks, bidi overrides, zero-width), and the delimiters of the envelope
 // and of code spans. Values still get JSON-quoted when they enter the text.
-const FORBIDDEN = /[\p{Cc}\p{Zl}\p{Zp}<>`]/u;
+const FORBIDDEN = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}<>`]/u;
 const REF = /^[A-Za-z][A-Za-z0-9]{0,19}[-:]\d{1,12}$/;
 
 const text = (max: number, what: string) =>
@@ -69,7 +69,7 @@ export const PROMPT_MANIFEST: readonly PromptDefinition[] = Object.freeze([
     title: 'Review backlog item quality',
     description:
       'Assess one backlog item, a sprint or a team’s backlog against the versioned quality rubric and propose concrete improvements.',
-    uses: ['work_item_quality', 'get_work_item'],
+    uses: ['work_item_quality', 'get_work_item', 'search_work_items'],
     arguments: z.object({
       asset: ref('asset').optional().describe('One item: number (B-01234) or OID token.'),
       sprint,
@@ -218,7 +218,7 @@ export const PROMPT_MANIFEST: readonly PromptDefinition[] = Object.freeze([
         `Suggest refinements for the top ${n} backlog items of ${given({ team: a['team'], project: a['project'] })}.`,
         '',
         steps(
-          `Call search_work_items for open stories not in a sprint, in backlog order, with limit ${n}.`,
+          `Call search_work_items for open stories (include_closed false) with a limit of 50; the tool cannot sort by backlog rank, so say so, and keep the first ${n} that show no sprint.`,
           'Call get_work_item for each to read the description and acceptance criteria.',
           'For each item suggest: a split when it is large or holds several outcomes; missing or vague acceptance criteria written as testable statements; questions the product owner must answer first.',
           'These are suggestions for a person to apply in Agility; make none of the changes yourself.',

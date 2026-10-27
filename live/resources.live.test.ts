@@ -73,4 +73,43 @@ describe.skipIf(!target)('MCP resources against the live tenant (read-only)', ()
     // The tool-backed resources (types, per-type, projects) carry instance strings, so each of them is enveloped.
     expect(enveloped).toBeGreaterThanOrEqual(2);
   });
+
+  it('lists the prompts and builds each one; resources/list makes no upstream request (P6-13)', {
+    timeout: 60_000,
+  }, async () => {
+    const metadata = new MetadataService();
+    let requests = 0;
+    const counting = (): ToolContext => {
+      const c = liveContext(metadata);
+      return {
+        ...c,
+        fetch: (request) => {
+          requests++;
+          return c.fetch(request);
+        },
+      };
+    };
+    const build = () => buildMcpServer({ tools: CORE_TOOLS, ctx: counting });
+    await rpc(build, 'resources/list');
+    expect(requests, 'resources/list made an upstream request').toBe(0);
+    const listed = (await rpc(build, 'prompts/list')) as { prompts: Array<{ name: string }> };
+    expect(listed.prompts.length).toBeGreaterThanOrEqual(6);
+    // Invented argument values only: a prompt builds text, it never reads the tenant.
+    const args: Record<string, Record<string, string>> = {
+      review_backlog_item_quality: { asset: 'B-01234' },
+      sprint_review: {},
+      standup: {},
+      triage_defects: { team: 'Team Example' },
+      draft_release_notes: { sprint: 'current' },
+      refine_backlog: { team: 'Team Example' },
+      explain_asset: { asset: 'B-01234' },
+    };
+    for (const p of listed.prompts) {
+      const r = (await rpc(build, 'prompts/get', { name: p.name, arguments: args[p.name] ?? {} })) as {
+        messages: Array<{ content: { text: string } }>;
+      };
+      expect(r.messages.length, p.name).toBeGreaterThan(0);
+    }
+    expect(requests, 'a prompt made an upstream request').toBe(0);
+  });
 });

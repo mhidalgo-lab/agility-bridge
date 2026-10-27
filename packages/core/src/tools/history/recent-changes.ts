@@ -7,6 +7,7 @@ import { capBudget, type ToolContext } from '../../context.ts';
 import { AbError, ErrorCode } from '../../errors.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { shapeList } from '../../output/result.ts';
+import { utcIso } from '../../output/text.ts';
 import type { FilterInput } from '../../query/compiler.ts';
 import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { invalid } from '../../query/limits.ts';
@@ -91,6 +92,7 @@ export const listRecentChanges: ToolDefinition = defineTool({
     const identity = new Map<string, string[]>();
     const changedField = new Map<string, string>();
     const queries = [];
+    await md.prefetch(perType.keys());
     for (const [type, common] of perType) {
       identity.set(type, await identityFor(type, ctx));
       const meta = await md.assetType(type);
@@ -118,11 +120,14 @@ export const listRecentChanges: ToolDefinition = defineTool({
       });
     }
     const compare = (a: TypedRow, b: TypedRow): number => {
-      const key = (r: TypedRow) => {
+      // As instants, not text: stamps with a different number of fractional digits do not sort by characters.
+      const key = (r: TypedRow): number => {
         const f = changedField.get(r.type) ?? 'ChangeDate';
-        return String(r.row[f] ?? '');
+        const iso = utcIso(String(r.row[f] ?? ''));
+        const t = iso === undefined ? Number.NaN : Date.parse(iso);
+        return Number.isNaN(t) ? 0 : t;
       };
-      return key(b).localeCompare(key(a)) || idOf(a.row) - idOf(b.row);
+      return key(b) - key(a) || idOf(a.row) - idOf(b.row);
     };
     const page = await multiPage(ctx, queries, limit, offsets, compare, (t) => identity.get(t) ?? []);
     const items = page.rows.map((r) => {

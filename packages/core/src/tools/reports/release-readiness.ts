@@ -77,7 +77,9 @@ export const releaseReadiness: ToolDefinition = defineTool({
     const items = numOf(root?.['itemCount']);
     const doneItems = numOf(root?.['doneItemCount']);
     const openDefects = numOf(root?.['openDefectCount']);
-    const treePartial = data?.['partial'] === true || root?.['incomplete'] === true;
+    // Completeness is the roll-ups' own: a tree that only listed fewer backlog items than it counted (max_items) has
+    // complete counts, so the verdict does not depend on the listing cap.
+    const treePartial = root?.['incomplete'] === true;
     const complete = run.info.status === 'ok' && !treePartial;
     const verdict = readinessVerdict({ items, doneItems, openDefects, complete });
     if (run.info.status === 'ok') {
@@ -149,7 +151,7 @@ export const releaseReadiness: ToolDefinition = defineTool({
           ? []
           : [{ title: 'Open backlog items', source: 'open items', rows: openRows }]),
       ],
-      partial: incomplete(runs) || treePartial,
+      partial: incomplete(runs) || treePartial || data?.['partial'] === true,
       structured: {
         sections: sectionInfos(runs),
         verdict,
