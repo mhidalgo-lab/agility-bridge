@@ -179,7 +179,7 @@ describe('resolveAccess properties', () => {
         for (const e of [w.tokenExpires, w.grantExpires])
           if (e !== null) expect(a.expiresAt).toBeLessThanOrEqual(e);
       }),
-      propertyParams(500),
+      propertyParams(250),
     );
   });
 

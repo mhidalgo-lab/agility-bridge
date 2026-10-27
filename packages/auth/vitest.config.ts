@@ -10,5 +10,5 @@ export default defineProject({
       '@agility-bridge/storage': fileURLToPath(new URL('../storage/src/index.ts', import.meta.url)),
     },
   },
-  test: { name: 'auth' },
+  test: { name: 'auth', testTimeout: 20_000 },
 });

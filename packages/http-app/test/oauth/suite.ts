@@ -245,12 +245,17 @@ export async function kvText(h: OAuthHost): Promise<string> {
 async function expectDenied(h: OAuthHost, slug: string, token: string, reason: string) {
   const requests = h.agilityRequests();
   const toolCalls = (await h.storage.audit.query({ kind: 'tool_call', limit: 1000 })).length;
+  // Read each response at once: a body left unread while a second request is made can be reported as already read
+  // on a busy machine (the workerd host), which made this test flaky (L-321).
   const reference = await mcp(h, slug, null, WHOAMI);
+  const referenceBody = await reference.text();
+  const referenceChallenge = reference.headers.get('www-authenticate');
   const denied = await mcp(h, slug, token, WHOAMI);
+  const deniedBody = await denied.text();
   expect(denied.status).toBe(401);
   // One body and one challenge for every denial (T19): not a hint of why.
-  expect(await denied.text()).toBe(await reference.text());
-  expect(denied.headers.get('www-authenticate')).toBe(reference.headers.get('www-authenticate'));
+  expect(deniedBody).toBe(referenceBody);
+  expect(denied.headers.get('www-authenticate')).toBe(referenceChallenge);
   expect(h.agilityRequests()).toBe(requests);
   expect((await h.storage.audit.query({ kind: 'tool_call', limit: 1000 })).length).toBe(toolCalls);
   const rows = await auditRows(

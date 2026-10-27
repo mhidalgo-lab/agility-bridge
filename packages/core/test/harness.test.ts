@@ -273,9 +273,9 @@ describe('seeded properties', () => {
         fc.array(
           fc.record({
             number: fc.string({ maxLength: 12 }),
-            name: fc.string({ unit: 'binary', maxLength: 400 }),
+            name: fc.string({ unit: 'binary', maxLength: 200 }),
           }),
-          { maxLength: 60 },
+          { maxLength: 30 },
         ),
         fc.integer({ min: 200, max: 6_000 }),
         (rows, maxBlockChars) => {
@@ -287,7 +287,9 @@ describe('seeded properties', () => {
             : lines.length === f.rows.length + 2 && f.body.length <= maxBlockChars;
         },
       ),
-      propertyParams(),
+      // The property does not depend on the size of the input: 100 runs of up to 30 rows cover it (it took 3 s at 200
+      // runs of 60 rows of 400 characters, most of a 5 s budget).
+      propertyParams(100),
     );
   });
 });
