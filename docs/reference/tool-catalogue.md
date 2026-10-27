@@ -116,7 +116,8 @@ attachment upload, membership or permission changes.
 
 ## Prompts (Phase 6)
 
-Registered only when every tool they use is allowed. Arguments use the tool vocabulary.
+Registered only when every tool they use is allowed (so the three on report tools need the opt-in `reports` group, D-105).
+Arguments use the tool vocabulary. Built in P6-08; the generated [prompt reference](prompts.md) is the current list.
 
 | Prompt | Purpose | Uses |
 |---|---|---|

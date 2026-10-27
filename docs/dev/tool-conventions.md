@@ -207,11 +207,15 @@ Resources (P6-09) and prompts (P6-08) are registered from one manifest, never fr
   `mimeType`, `source`, `uses` and `read`. A `read` that needs Agility calls `reader.run('<tool>', input)`: that runs the
   declared tool's handler with its schema, so budget, limits, cache, scope, envelope and audit are the tool's. A template
   URI (`{variable}`) also gives `list`, built from the same tool output the read uses, so every listed URI is readable.
-- **Add a prompt** (P6-08): a sibling `PROMPT_MANIFEST` of `ManifestEntry` extensions, filtered with the same
-  `availableEntries`; the prompt's `uses` are the tools it calls.
+- **Add a prompt** (P6-08): one entry in `PROMPT_MANIFEST` (`prompts.ts`), a sibling of the resource manifest filtered with the
+  same `availableEntries`: `id`, `uses` (the tools its text tells the model to call; a test checks the text names exactly
+  those), `title`, `description`, `arguments` (a zod object of string arguments named by the tool vocabulary, each described,
+  validated like a tool's; use `text()` and `ref()`) and `build`. Arguments enter the text only through `given()` / `q()`
+  (JSON-quoted) and never reach a query. Always end with `PROMPT_RULES` (untrusted data, read-only). A prompt calls no tool
+  itself, so it has no budget or audit row. A prompt on an opt-in group is absent without it (D-105).
 - Static text is our own; anything from Agility goes through the output shaper (the tool's, or `shapeOutput`) so it is
   enveloped. The poisoned-string probe and a "read every listed entry" test cover every entry; `pnpm docs:resources`
-  regenerates [the resource reference](../reference/resources.md).
+  regenerates [the resource reference](../reference/resources.md) and `pnpm docs:prompts` [the prompt reference](../reference/prompts.md).
 - Reads are audited as `tool_call` rows whose action is `resource:<id>`.
 
 ## Catalogue size and `tools/list` budget

@@ -27,7 +27,7 @@ How to use it:
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
-| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-313 – L-315 |
+| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280, L-304, L-316 |
@@ -393,6 +393,35 @@ type) is the call's error, so a missing sprint is a not-found and not an empty r
 change date and read it. The alternative, a second query in the report, would duplicate the scope and cost handling the
 sibling already does (L-037).
 *Applied in:* P6-07, `work/search.ts`.
+
+**L-305 — A prompt's arguments are caller input: validate like a tool's, quote on the way in, and let only tools build queries.**
+MCP prompt arguments are plain strings, so a prompt that interpolates them is the one place a value could carry a line
+break, an envelope delimiter or a code fence into the model's instructions. Each argument has the tool's length limit, a
+plain-text rule (no control characters, line separators, `<`, `>` or backticks, no padding) and a shape for asset
+references; values enter the text only as JSON-quoted strings that the model passes to a tool, which binds them
+(ADR-0012). The check is a schema, so `prompts/list` advertises it and the SDK refuses before the builder runs.
+*Applied in:* P6-08, `prompts.ts`, `test/prompts.test.ts`.
+
+**L-306 — A prompt's text must name exactly the tools in its `uses`: a test reads the text, not the list.**
+Availability is computed from `uses`, so a prompt that tells the model to call a tool it does not declare would be offered
+to a caller who cannot do what it asks, and one that declares a tool it never names is hidden for no reason. Prompts that
+branch on their arguments (a sprint or an epic) are read in every branch, because the branch that names the second tool is
+easy to forget.
+*Applied in:* P6-08, `test/prompts.test.ts`.
+
+**L-307 — A prompt on an opt-in group is invisible by default: decide the fallback, do not discover it.**
+Three of the seven prompts use report tools, and `reports` is off by default (D-101), so the default catalogue offers four
+prompts and the stand-up prompt is not among them. The manifest rule makes that automatic; whether a prompt should
+degrade to the base tools is a product decision (D-105), recorded and tested ("without the reports group only these
+remain") so a change is visible in review.
+*Applied in:* P6-08.
+
+**L-308 — A prompt cannot enforce what it asks: read-only is a request to the model, the server's gates are what hold.**
+A prompt does not touch Agility, spends no budget and passes no handler, so there is nothing to audit or deny in it. "Do
+not change anything" is text; the write gates (ADR-0013) are what keep a caller with write tools from being talked into
+a change by the data. The prompts say it anyway and say that tool output is untrusted data, and the reference page says
+what a prompt is and is not.
+*Applied in:* P6-08, D-106.
 
 **L-272 — A roll-up over rows you read is exact only when nothing cut the set: mark each aggregate `incomplete`, not the whole answer vaguely.**
 The portfolio tree sums estimates, done items and open defects from the backlog items it fetched. A depth limit, a per-level
