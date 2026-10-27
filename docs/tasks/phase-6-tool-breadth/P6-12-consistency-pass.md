@@ -2,7 +2,7 @@
 id: P6-12
 title: Consistency pass (arguments, outputs, paging, tool count)
 phase: 6
-status: in-progress
+status: review
 priority: medium
 depends_on: [P6-07, P6-08, P6-09]
 adr: ["0015"]
@@ -37,18 +37,18 @@ default `tools/list` has real headroom before the Phase 7 tools and more recipes
 5. Refresh the Phase 6 rows of the tool catalogue so they match what was built.
 
 ## Acceptance criteria
-- [ ] Every shared argument name has one type and one description, from one schema; a lint refuses a tool that spells one
+- [x] Every shared argument name has one type and one description, from one schema; a lint refuses a tool that spells one
   differently, with no exceptions.
-- [ ] Titles, the paging sentence, the cost sentence, the description opening and the shared output keys are linted over the
+- [x] Titles, the paging sentence, the cost sentence, the description opening and the shared output keys are linted over the
   whole catalogue, each with refused examples.
-- [ ] A behavioural test over every tool's worst case covers identity columns, declared shared keys, error codes for the
+- [x] A behavioural test over every tool's worst case covers identity columns, declared shared keys, error codes for the
   same mistake and one paging contract (cursor works, binds to its filters, keeps the first window).
-- [ ] Drift found in the review is fixed (listed in the changeset); any renamed released name has an alias in the
+- [x] Drift found in the review is fixed (listed in the changeset); any renamed released name has an alias in the
   deprecation registry, or the PR says there was none.
-- [ ] Default `tools/list` is at most about 36 KB and every-group at most 72 KB; both measured and recorded.
-- [ ] The router eval does not regress (baseline raised if it improved).
-- [ ] The tool count with every group and the nine Phase 7 tools is below 40, with the arithmetic recorded.
-- [ ] `docs/reference/tool-catalogue.md` Phase 6 rows match what was built; `docs/dev/tool-conventions.md` updated;
+- [x] Default `tools/list` is at most about 36 KB and every-group at most 72 KB; both measured and recorded.
+- [x] The router eval does not regress (baseline raised if it improved).
+- [x] The tool count with every group and the nine Phase 7 tools is below 40, with the arithmetic recorded.
+- [x] `docs/reference/tool-catalogue.md` Phase 6 rows match what was built; `docs/dev/tool-conventions.md` updated;
   generated references and the contract snapshot refreshed; a changeset.
 
 ## Security notes

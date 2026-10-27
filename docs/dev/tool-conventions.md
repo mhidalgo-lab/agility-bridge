@@ -25,14 +25,30 @@ released argument or output field is a breaking change (see [Deprecations](#depr
 - Start with the action and what is returned ("List open defects in an Agility project…"); never "This tool…" or
   "Use this…".
 - At most about **450 characters**; say the scope ("within the workspace's Agility projects"), paging ("Paged: pass
-  `nextCursor` back as `cursor`" or "Not paged: …"), side effects for writes ("Changes Agility. Needs approval."), and
-  the cost when a call can make 8 or more Agility requests.
+  `nextCursor` back as `cursor`" exactly when the tool takes `cursor`, otherwise "Not paged."), side effects for writes
+  ("Changes Agility. Needs approval."), and the cost when a call can reach 8 or more Agility requests, in one sentence:
+  "Cold call: up to N Agility requests." (N is the declared cost; below 8 the description says nothing about cost).
+- Open with an imperative verb ("Get …", "List …", "Summarise …"), never "What …", "The …" or a third-person verb.
+  Use the words a person would use ("comments", "files attached", "who is on", "which one is current"): the lexical
+  router eval (`pnpm eval:router`) matches them, and a trim that drops them lowers its score (L-320).
+- **Titles** are sentence case (proper names and acronyms such as Agility, UTC, OID keep their capitals), at most 40
+  characters, no final punctuation, and a `list_` / `get_` / `search_` / `describe_` / `query_` tool's title starts with
+  that verb ("List teams", "Get a sprint"); report titles are nouns ("Sprint health").
 - Default values in descriptions and server instructions are generated from the schema, never typed by hand (L-150).
 - Never put instructions about other content, secrets or examples with real data in descriptions.
 
 ## Arguments (input schema)
 
 Arguments are `snake_case`. Prompt arguments use the same names.
+
+**Shared names come from `packages/core/src/tools/common.ts` and nowhere else** (L-317): `assetArg`, `epicArg`,
+`workItemArg`, `assetTypeArg`, `projectArg`, `teamArg`, `sprintArg` / `currentSprintArg`, `memberArg` / `myMemberArg`,
+`statusArg`, `timeRangeArg(default)`, `workItemTypeArg(types)`, `includeClosedArg`, `minimalOutputArg`, `limitArg`,
+`cursorArg`, `containsArg(what)` and `formatArg`. A tool uses the schema instead of re-describing the concept; the
+description lint compares what `tools/list` advertises with `ARGUMENT_VOCABULARY` in the same file, and the type of every
+shared name is checked too. A different concept gets its own vocabulary entry (a work-item `asset_type` enum versus a free
+asset type name), never an exception. A tool with a natural default says so in the schema (`myMemberArg` defaults to `me`,
+`currentSprintArg` to `current`).
 
 | Concept | Name | Type | Notes |
 |---|---|---|---|
@@ -54,7 +70,7 @@ Arguments are `snake_case`. Prompt arguments use the same names.
 | Time window | `time_range` | string | e.g. `"last 14 days"`, `"2026-10-01 to 2026-10-15"` (UTC; L-061). |
 | Point in time | `as_of` | string | ISO 8601 UTC; bounded by the workspace's history limit. |
 | Include closed items | `include_closed` | boolean | Default `false`. |
-| Most rows | `limit` | integer | Rows of the main list. A cap on something else is `max_<things>`. |
+| Most rows | `limit` | integer | Rows of the main list. A cap on something else is `max_<things>` (an integer). |
 | Next page | `cursor` | string | The `nextCursor` of the previous call with the same filters. A tool takes `cursor` only if it returns `nextCursor`. |
 | Fewer fields per row | `minimal_output` | boolean | |
 | Output format | `format` | enum | `auto` \| `table` \| `csv` \| `json`. |
@@ -92,12 +108,19 @@ unknown`), not by `null`.
 | Effort | `estimate`, `detailEstimateHours`, `toDoHours`, `actualHours` | number (optional) | Omitted when not set; `estimate` keeps the instance's estimate unit, reported once in `_meta`. |
 | UI link | `url` | string | Built from the pinned instance origin (`assetdetail.v1`). |
 | More pages | `nextCursor` | string (optional) | Present only when more rows exist (the tool fetches `limit + 1`); pass back as `cursor`. |
+| Counts | `<thing>Count` | integer | `childCount`, `commentCount`, `itemCount`: never `items` (always the row array) or a bare `count` (D-115). |
 | Deliberately bounded list | `truncated` | boolean | Never `hasMore`, never together with `nextCursor`; the text says how to see the rest. |
 | Total matches | `total` | integer (optional) | Only when the tool actually computed it (e.g. an aggregate). Agility 26.0.3.2 returns no totals for lists (P0-06), so lists normally omit it and rely on `nextCursor`; never a guess or `-1` (L-144). |
 | Rows dropped for being outside scope | `hiddenOutsideScope` | boolean | On every list that rechecks scope after fetching (L-064). |
 | Not everything ran | `partial` + `notes` | boolean + string[] | Whenever paging, permissions, limits, budget or a failed section prevent a complete answer (L-033). |
-| Window actually read | `since`, `until` | string | Resolved bounds, not the expression typed. |
+| Window actually read | `window { since, until }` | object | Resolved UTC bounds, not the expression typed; a cursor keeps the first call's window. |
 | Write outcome | `applied`, `approval`, `plan` | | `approval`: `approved` \| `not_required` \| `dry_run`; see ADR-0013. |
+
+Rows start with the identity columns in one order, then the tool's own columns (L-043): `number`, `assetType`, `oid`,
+`state`, `project` (those a row has), then `name`, `status`, … A list that is ordered or grouped by something (sprint,
+change date) shows that column in the tool's own part, not before the identity. Every list output declares `partial` and
+`notes` (a list that never sets them still says they exist) and every key the table above names keeps its type; a result
+never returns a shared key its schema does not declare.
 
 Text output: a one-line summary, `Note:` lines, then the data block(s) in the requested `format`, each inside the
 untrusted-data envelope ([ADR-0015](../adr/0015-tool-output-contract.md)). Tools never format output themselves: they
@@ -108,6 +131,8 @@ described in [Output formats](../guide/output-formats.md).
 ## Paging
 
 - Every list takes `limit` (default 25, maximum the workspace limit) and either pages or says why it is bounded.
+- A tool that takes `cursor` validates it **before anything that can return early** (an empty list, a missing project), so a
+  forged or foreign cursor is always `AB_INPUT_INVALID` (L-318); a tool without `cursor` never returns `nextCursor`.
 - Agility paging is offset-based (`page {start, size}`); the tool always sends an explicit size (L-137) and a
   deterministic sort ending with `ID` as the unique tiebreaker (pages measured disjoint and repeatable, P0-06), and
   notes that concurrent edits can move items between pages. Offsets count **upstream positions**: a row the scope recheck drops still
@@ -127,6 +152,12 @@ described in [Output formats](../guide/output-formats.md).
 
 - Stable codes (`AB_*`, the final list below); result `isError: true`, text `CODE: message`, optional `Hint:` line;
   `_meta["agility-bridge/error"] = { code, requestId }`.
+- The same mistake gets the same code in every tool (the consistency test checks it): an unknown asset number, team,
+  project, member or sprint is `AB_NOT_FOUND` (a project outside the workspace too: not found or not visible are the same
+  answer, L-140); text that is not an asset number or OID token, a cursor that is not ours, a time range nobody understands
+  and an unknown asset type name are `AB_INPUT_INVALID`; several close sprint, team or project names are `AB_AMBIGUOUS`
+  with candidates. A value the input schema itself refuses (`limit: 0`, a value outside an enum) is rejected by the SDK
+  before the handler runs ([P6-37](../tasks/phase-6-tool-breadth/P6-37-consistency-schema-errors.md)).
 - Messages are actionable for the agent and never contain secrets, tokens or raw Agility bodies; names and candidates
   inside an error are enveloped.
 - Non-tool methods (prompts, resources) use JSON-RPC errors: `-32602` for invalid parameters, `-32603` with
@@ -220,13 +251,19 @@ Resources (P6-09) and prompts (P6-08) are registered from one manifest, never fr
 
 ## Catalogue size and `tools/list` budget
 
-- Default catalogue ≤ 25 tools (now 20); every group and all writes < 40 (now 35) (L-155, D-05).
-- Serialised `tools/list`: **≤ 40 KB for the default catalogue and ≤ 72 KB with every group** (P0-07 measured about
-  1.6 KB per tool with rich schemas). P1-13's size test enforces both; a tool that would break them is redesigned, not
-  exempted.
+- Default catalogue ≤ 25 tools (now 20); every group and all writes < 40 (now 26 read tools + the 9 planned Phase 7
+  write tools = 35) (L-155, D-05). The arithmetic is recorded in the [tool catalogue](../reference/tool-catalogue.md#counts-and-toolslist-size);
+  the contract test fails when the count of tools with every group plus nine reaches 40.
+- Serialised `tools/list`: **≤ 40 KB for the default catalogue and ≤ 72 KB with every group**, plus a tripwire for headroom:
+  the default catalogue stays at **≤ 36.5 KB** and no single tool above **4,000 bytes** (D-116). Measured after the P6-12
+  consistency pass: default 20 tools, **35,892 B** (was 39,179); every group 26 tools, **44,157 B** (was 47,946); the five
+  reports add 6,952 B and `get_attachment` 1,335 B. A tool that would break a limit is redesigned, not exempted.
 - The default catalogue is every group a workspace gets without switching one on; the opt-in groups (`attachments`,
-  `reports`, `writes`) count only against the every-group budget. With P6-01 the default catalogue is 20 tools and
-  about 39.2 KB of the 40 KB: the P6-12 consistency pass trims descriptions and schemas before more default tools land.
+  `reports`, `writes`) count only against the every-group budget.
+- Where the bytes go, in the order that paid off (L-320): structure first (the advertised output schema drops
+  `additionalProperties: {}` since open is the default; the nested filter inside `any_of` carries no descriptions; one
+  shared one-line description per shared argument), then description prose. Re-run `pnpm eval:router` after every trim and
+  raise `scripts/evals/baseline.json` (`pnpm eval:router --write-baseline`) when a rewrite improves it.
 - Tool schemas are converted to JSON Schema once per process and registered with `fromJsonSchema`; building the
   per-request server must stay under 2 ms for the default catalogue (P0-07: 0.7 ms for 25 tools).
 - No deferred-tool or tool-search mechanism while the catalogue stays under these limits (prior-art follow-up 1,
@@ -261,11 +298,24 @@ P1-13 builds these from the specifications here; each refused example is a test 
 |---|---|
 | "This tool lists…", "Use this to…", "A tool that…" | start with the action |
 | more than 450 characters | token budget |
-| a list tool without "Paged: pass `nextCursor` back as `cursor`" or "Not paged: …" | paging must be explicit |
+| "Paged: …" without a `cursor` argument, a `cursor` argument without it, or neither "Paged" nor "Not paged" | paging must be explicit and true |
 | a write tool without "Changes Agility. Needs approval." | side effects must be explicit |
-| a tool with `cost ≥ 8` that does not state it | cost must be explicit |
+| a tool with `cost ≥ 8` without "Cold call: up to N Agility requests", or a cheaper tool that mentions requests | one cost sentence |
+| a first word that is not an imperative verb ("What changed …", "The …", "Lists …") | start with the action |
 | a typed default ("default 25") | defaults come from the schema (L-150) |
 | instance-specific words (status names, custom fields, a customer's project) | `tools/list` is static per version (THREAT_MODEL A12) |
+
+**Title lint:** sentence case, at most 40 characters, no final punctuation, starts with the tool name's verb for verb
+tools. **Argument lint:** shared names carry the shared type and description from `tools/common.ts` (`ARGUMENT_VOCABULARY`);
+`format` is `auto | table | csv | json` defaulting to `auto`; `contains` is `containsArg(...)`; `max_*` is an integer;
+`sort_by` is an enum whose default is `id`. **Output lint:** keys at every depth are camelCase; `items` is an array,
+`partial` / `truncated` / `hiddenOutsideScope` booleans, `notes` an array of strings, `window` has `since` and `until`;
+`hasMore`, `next_cursor`, `warnings`, `count` and the like are refused; every list declares `partial` and `notes`.
+
+**Behavioural consistency test** (`packages/core/test/tools/consistency.test.ts`, P6-12): runs every tool's worst case and
+checks identity columns first, every returned shared key declared with its type, `partial` explaining itself in `notes`,
+`nextCursor` and `truncated` never together, one error code per mistake (list above), and one paging contract (the cursor
+of page one opens page two, keeps the first window, and is refused with other filters).
 
 **Schema lint:** `type` arrays and `nullable` are refused in input and output schemas; output schemas are open
 (`additionalProperties` not `false`); every list output has `nextCursor` or `truncated`, never both; scalar filter values
