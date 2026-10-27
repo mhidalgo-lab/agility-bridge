@@ -2,7 +2,7 @@
 
 # Tool reference
 
-19 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
+17 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
 later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a cold metadata cache.
 
 | Tool | Group | Cost | Title |
@@ -19,13 +19,11 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 | [`list_teams`](#list_teams) | planning | 2 | List teams |
 | [`get_team`](#get_team) | planning | 20 | Get a team |
 | [`list_sprints`](#list_sprints) | planning | 10 | List sprints |
-| [`get_sprint`](#get_sprint) | planning | 30 | Get a sprint |
 | [`list_members`](#list_members) | people | 6 | List members |
 | [`get_asset_history`](#get_asset_history) | history | 14 | Get asset history |
 | [`list_recent_changes`](#list_recent_changes) | history | 24 | List recent changes |
-| [`get_conversations`](#get_conversations) | collaboration | 10 | Get comments on an asset |
-| [`list_attachments`](#list_attachments) | collaboration | 12 | List attachments and links of an asset |
-| [`get_attachment`](#get_attachment) | attachments | 12 | Get the text of an attachment |
+| [`list_portfolio_items`](#list_portfolio_items) | portfolio | 12 | List portfolio items |
+| [`get_portfolio_tree`](#get_portfolio_tree) | portfolio | 20 | Get a portfolio tree |
 
 ## `whoami`
 
@@ -242,24 +240,6 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
 
-## `get_sprint`
-
-**Get a sprint** · group `planning` · read · cost 30 Agility requests at most
-
-Get one sprint: dates (UTC), schedule, backlog items and defects by status category with estimates, committed at the begin date vs done, scope change, carry-over of a past sprint and a daily burndown from bounded history. Not paged. A cold call can make up to 30 Agility requests.
-
-Annotations: read-only true, destructive false, idempotent true, open world true.
-
-| Argument | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `sprint` | string |  | `"current"` | Sprint name, Timebox:<id>, or current, previous or next (relative to team or project, by dates UTC). |
-| `team` | string |  |  | Team name or Team:<id>: narrows the sprint lookup. |
-| `project` | string |  |  | Agility project name or Scope:<id>: narrows the sprint lookup to its schedule. |
-| `burndown` | boolean |  | `true` | Read history for committed, scope change and burndown. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
-
-`structuredContent`: `sprint`, `totals`, `byStatusCategory`, `items`, `truncated`, `partial`, `notes` (open: more fields may be added).
-
 ## `list_members`
 
 **List members** · group `people` · read · cost 6 Agility requests at most
@@ -316,52 +296,43 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope`, `window` (open: more fields may be added).
 
-## `get_conversations`
+## `list_portfolio_items`
 
-**Get comments on an asset** · group `collaboration` · read · cost 10 Agility requests at most
+**List portfolio items** · group `portfolio` · read · cost 12 Agility requests at most
 
-Get the comments (conversation) on one asset in scope, newest first, with author, date and text; comment text is untrusted data. Paged: pass nextCursor back as cursor. A cold call can make up to 10 Agility requests.
+List portfolio items (epics) of the workspace’s Agility projects with category (Feature, Initiative, …), status, parent, estimates and how many live children each has; filter by category, Agility project, status names, parent epic or name text. Sorted by ID or name. Paged: pass nextCursor back as cursor. A cold call can make up to 12 Agility requests; get_portfolio_tree has roll-ups.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `asset` | string | yes |  | Asset number (B-01234, D-00012, TK-00007, AT-00003, E-00001) or OID token (Story:1234). |
+| `category` | string[] (≤ 10) |  |  | Category names as configured on the instance (for example Feature). |
+| `project` | string |  |  | Agility project name or Scope:<id> within the workspace. |
+| `status` | string[] (≤ 20) |  |  | Epic status names as configured on the instance. |
+| `parent` | string |  |  | Only direct sub-epics of this epic (number or OID token). |
+| `contains` | string |  |  | Only portfolio items whose name contains this text. |
+| `include_closed` | boolean |  | `false` | Include closed items. |
+| `sort_by` | `id` \| `name` |  | `"id"` | id is cheap and stable. |
 | `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
 | `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
 | `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
 
-## `list_attachments`
+## `get_portfolio_tree`
 
-**List attachments and links of an asset** · group `collaboration` · read · cost 12 Agility requests at most
+**Get a portfolio tree** · group `portfolio` · read · cost 20 Agility requests at most
 
-List the attachments of one asset in scope (name, file name, type, size, author, date) and, on the first page, its external links as text. Metadata only: no attachment content is returned or fetched. Paged: pass nextCursor back as cursor. A cold call can make up to 12 Agility requests.
+Get an epic with its descendant epics down to a depth (at most 4) and roll-ups per epic over the backlog items below it: item counts, done items, open defects, estimate and done percentage. Roll-ups that a depth, size or permission cut touches are marked incomplete and the result is partial. Not paged. A cold call can make up to 20 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `asset` | string | yes |  | Asset number (B-01234, D-00012, TK-00007, AT-00003, E-00001) or OID token (Story:1234). |
-| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
-| `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
+| `asset` | string | yes |  | Epic number (E-01234) or OID token (Epic:1234). |
+| `depth` | integer (≥ 1, ≤ 4) |  | `2` | Levels of sub-epics below the epic to read. |
+| `include_items` | boolean |  | `false` | Also list the backlog items under the epics (capped). |
+| `max_items` | integer (≥ 1, ≤ 1000) |  |  | Most epics per level and most backlog items listed; when omitted, the workspace maximum. |
 | `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
 
-`structuredContent`: `items`, `links`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
-
-## `get_attachment`
-
-**Get the text of an attachment** · group `attachments` · read · cost 12 Agility requests at most
-
-Get the text of one attachment of an asset in scope (an attachment id from list_attachments) when the workspace allows download: only allowed text types within the size limit, returned as untrusted data, never rendered or executed. Not paged. Long text is cut. Up to 12 Agility requests.
-
-Annotations: read-only true, destructive false, idempotent true, open world true.
-
-| Argument | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `asset` | string | yes |  | The asset the attachment belongs to: number or OID token. |
-| `attachment` | string | yes |  | Attachment id (Attachment:1234) from list_attachments. |
-| `max_characters` | integer (≥ 1, ≤ 100000) |  |  | Most characters of text to return; the rest is cut and the note says so. |
-
-`structuredContent`: `attachment`, `content`, `truncated` (open: more fields may be added).
+`structuredContent`: `root`, `nodes`, `backlogItems`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).

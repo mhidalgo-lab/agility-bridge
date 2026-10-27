@@ -37,6 +37,7 @@ export const STDIO_GROUPS = [
   'people',
   'collaboration',
   'attachments',
+  'portfolio',
 ] as const;
 
 const SETUP_HINT =

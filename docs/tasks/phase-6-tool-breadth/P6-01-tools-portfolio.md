@@ -2,7 +2,7 @@
 id: P6-01
 title: Portfolio tools (epics and portfolio items)
 phase: 6
-status: in-progress
+status: review
 priority: high
 depends_on: [P2-17]
 adr: ["0015"]
@@ -39,20 +39,20 @@ See the portfolio tree and its progress without hand-written queries.
   catalogue costs to the measured ones.
 
 ## Acceptance criteria
-- [ ] `list_portfolio_items`: category, status, project, parent and name filters; identity on every row (number,
+- [x] `list_portfolio_items`: category, status, project, parent and name filters; identity on every row (number,
       assetType, oid, state, project); paging with a cursor bound to the filters; denied `Epic` type refused.
-- [ ] `get_portfolio_tree`: synthetic fixture with three portfolio levels (Initiative, Feature, Feature) and backlog
+- [x] `get_portfolio_tree`: synthetic fixture with three portfolio levels (Initiative, Feature, Feature) and backlog
       items; roll-ups exclude dead assets and count closed items as done; open defects counted; done percentage basis
       stated; non-epic assets refused with no further requests.
-- [ ] `partial` is set and explained for a depth cut, a `max_items` cut and a denied item type; `incomplete` roll-ups
+- [x] `partial` is set and explained for a depth cut, a `max_items` cut and a denied item type; `incomplete` roll-ups
       are marked.
-- [ ] Negative authorization tests: an epic outside the workspace answers not found; children in other projects are
+- [x] Negative authorization tests: an epic outside the workspace answers not found; children in other projects are
       dropped and reported; a denied type makes no upstream call; an upstream that ignores filters leaks nothing.
-- [ ] Poisoned upstream text stays inside the envelope on every output path (probe test); declared costs hold on a cold
+- [x] Poisoned upstream text stays inside the envelope on every output path (probe test); declared costs hold on a cold
       cache (cost test); contract, naming and size lints pass.
-- [ ] Live (guarded suite, third-party tenant, shapes and coarse levels only): both tools run against the tenant and the
+- [x] Live (guarded suite, third-party tenant, shapes and coarse levels only): both tools run against the tenant and the
       result shapes are asserted; nothing from the tenant is printed or committed.
-- [ ] Catalogue, tool reference (generated), verification page and THREAT_MODEL (A4 row) updated; changeset added.
+- [x] Catalogue, tool reference (generated), verification page and THREAT_MODEL (A4 row) updated; changeset added.
 
 ## Security notes
 THREAT_MODEL A4.
