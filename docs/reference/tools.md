@@ -2,7 +2,7 @@
 
 # Tool reference
 
-19 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
+21 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
 later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a cold metadata cache.
 
 | Tool | Group | Cost | Title |
@@ -26,6 +26,8 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 | [`get_conversations`](#get_conversations) | collaboration | 10 | Get comments on an asset |
 | [`list_attachments`](#list_attachments) | collaboration | 12 | List attachments and links of an asset |
 | [`get_attachment`](#get_attachment) | attachments | 12 | Get the text of an attachment |
+| [`list_portfolio_items`](#list_portfolio_items) | portfolio | 12 | List portfolio items |
+| [`get_portfolio_tree`](#get_portfolio_tree) | portfolio | 20 | Get a portfolio tree |
 
 ## `whoami`
 
@@ -365,3 +367,44 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 | `max_characters` | integer (≥ 1, ≤ 100000) |  |  | Most characters of text to return; the rest is cut and the note says so. |
 
 `structuredContent`: `attachment`, `content`, `truncated` (open: more fields may be added).
+
+## `list_portfolio_items`
+
+**List portfolio items** · group `portfolio` · read · cost 12 Agility requests at most
+
+List portfolio items (epics) of the workspace’s Agility projects with category (Feature, Initiative, …), status, parent, estimates and how many live children each has; filter by category, Agility project, status names, parent epic or name text. Sorted by ID or name. Paged: pass nextCursor back as cursor. A cold call can make up to 12 Agility requests; get_portfolio_tree has roll-ups.
+
+Annotations: read-only true, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `category` | string[] (≤ 10) |  |  | Category names as configured on the instance (for example Feature). |
+| `project` | string |  |  | Agility project name or Scope:<id> within the workspace. |
+| `status` | string[] (≤ 20) |  |  | Epic status names as configured on the instance. |
+| `parent` | string |  |  | Only direct sub-epics of this epic (number or OID token). |
+| `contains` | string |  |  | Only portfolio items whose name contains this text. |
+| `include_closed` | boolean |  | `false` | Include closed items. |
+| `sort_by` | `id` \| `name` |  | `"id"` | id is cheap and stable. |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
+| `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+
+`structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
+
+## `get_portfolio_tree`
+
+**Get a portfolio tree** · group `portfolio` · read · cost 20 Agility requests at most
+
+Get an epic with its descendant epics down to a depth (at most 4) and roll-ups per epic over the backlog items below it: item counts, done items, open defects, estimate and done percentage. Roll-ups that a depth, size or permission cut touches are marked incomplete and the result is partial. Not paged. A cold call can make up to 20 Agility requests.
+
+Annotations: read-only true, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `asset` | string | yes |  | Epic number (E-01234) or OID token (Epic:1234). |
+| `depth` | integer (≥ 1, ≤ 4) |  | `2` | Levels of sub-epics below the epic to read. |
+| `include_items` | boolean |  | `false` | Also list the backlog items under the epics (capped). |
+| `max_items` | integer (≥ 1, ≤ 1000) |  |  | Most epics per level and most backlog items listed; when omitted, the workspace maximum. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+
+`structuredContent`: `root`, `nodes`, `backlogItems`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).

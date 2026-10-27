@@ -256,7 +256,7 @@ Status lives in each task file.
 
 | ID | Task | Priority | Depends on | Status |
 |---|---|---|---|---|
-| P6-01 | [Portfolio tools (epics and portfolio items)](tasks/phase-6-tool-breadth/P6-01-tools-portfolio.md) | high | P2-17 | todo |
+| P6-01 | [Portfolio tools (epics and portfolio items)](tasks/phase-6-tool-breadth/P6-01-tools-portfolio.md) | high | P2-17 | review |
 | P6-02 | [Planning tools (get_sprint)](tasks/phase-6-tool-breadth/P6-02-tools-planning.md) | high | P2-17 | review |
 | P6-03 | [Quality views (tests, regression assets, defects)](tasks/phase-6-tool-breadth/P6-03-tools-quality.md) | medium | P2-17 | todo |
 | P6-04 | [Collaboration tools (conversations, links, attachments)](tasks/phase-6-tool-breadth/P6-04-tools-collaboration.md) | medium | P2-17 | review |
@@ -270,6 +270,8 @@ Status lives in each task file.
 | P6-12 | [Consistency pass (arguments, outputs, paging, tool count)](tasks/phase-6-tool-breadth/P6-12-consistency-pass.md) | medium | P6-07, P6-08, P6-09 | todo |
 | P6-13 | [Phase 6 review and live verification](tasks/phase-6-tool-breadth/P6-13-phase-6-review.md) | high | P6-03, P6-04, P6-06, P6-10, P6-11, P6-12 | todo |
 | P6-14 | [OAuth client matrix for the remaining clients](tasks/phase-6-tool-breadth/P6-14-oauth-client-matrix-rest.md) | medium | P5-06 | todo |
+| P6-15 | [Server-side aggregate roll-ups for the portfolio tree](tasks/phase-6-tool-breadth/P6-15-portfolio-aggregate-rollups.md) | low | P6-01 | todo |
+| P6-16 | [Portfolio tree for very large epics (per-child roll-ups)](tasks/phase-6-tool-breadth/P6-16-portfolio-tree-large-epics.md) | low | P6-01 | todo |
 | P6-17 | [Sprint capacity, velocity and hour-based burndown](tasks/phase-6-tool-breadth/P6-17-sprint-capacity-velocity.md) | low | P6-02 | todo |
 | P6-18 | [Burndown for sprints with hundreds of items](tasks/phase-6-tool-breadth/P6-18-sprint-burndown-large-sprints.md) | medium | P6-02 | todo |
 | P6-19 | [Verify the attachment download on a writable sandbox](tasks/phase-6-tool-breadth/P6-19-verify-attachment-download.md) | medium | P6-04 | todo |

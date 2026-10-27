@@ -2,6 +2,9 @@
 
 > Open questions and owner steps from Phase 6. Answer inline (`**Owner:** …` with a date).
 
+> The owner authorised the whole phase as a batch (2026-10-27): decisions marked *built as …* are implemented at their
+> recommendation; say so if you want the alternative.
+
 ## Open decisions
 
 ### D-89 — The activity stream is not read by the history tools *(P6-05)*
@@ -131,3 +134,33 @@
 - **Recommendation:** (a): it is the instance's own definition and needs no configuration. Hour-based (task) burndown and
   velocity are follow-ups (P6-17).
 - **Owner:** pending (built as (a)).
+
+### D-80 — Portfolio roll-ups are computed from the rows read, not from server-side aggregates *(P6-01)*
+- **Context:** `get_portfolio_tree` rolls estimates, done items and open defects up a tree of epics. Agility can aggregate
+  one relation (`Subs.@Count`, `Rel.Attribute.@Sum`), but the compiler's aggregation form takes no per-status filter and
+  sums through the abstract `Workitem` type, which has no estimate: done percentage and open defects cannot be asked for
+  that way, and the downcast form (`Subs:Story.Estimate.@Sum`) is unverified on the live instance (L-148).
+- **Options:** (a) read the backlog items (stories and defects, `Super` in the tree's epics, up to three pages of the
+  workspace's row maximum per type) and compute the roll-ups here, marking every roll-up `incomplete` and the result
+  `partial` when a cap, the depth, the budget, a permission or hidden rows cut the set; (b) aggregate upstream (cheaper,
+  exact on any size), once verified live.
+- **Recommendation:** (a) now, because it is exact whenever it says nothing is cut and honest when it is not; follow up
+  with (b) in [P6-15](../tasks/phase-6-tool-breadth/P6-15-portfolio-aggregate-rollups.md) after a live check.
+- **Owner:** *(open; built as (a))*
+
+### D-81 — What "done" means in a roll-up, and how the percentage is taken *(P6-01)*
+- **Context:** Agility has no single "done" flag: an item is closed (`AssetState` 128) or has a status whose rollup
+  category is *Done*; teams use either. Estimates are optional.
+- **Options:** (a) done = closed **or** status category `completed`; percentage by estimate when any counted item has one,
+  otherwise by item count, with the basis stated on every epic (`donePercentBasis`); (b) closed only; (c) status
+  category only; (d) always by item count.
+- **Recommendation:** (a): it matches what people see on a board whichever convention the team follows, and the stated basis
+  stops a count-based number being read as effort. Dead assets (deleted, templates, broken down) are never counted.
+- **Owner:** *(open; built as (a))*
+
+### D-82 — The `portfolio` group is served by the stdio server by default *(P6-01)*
+- **Context:** the catalogue lists `portfolio` as on by default; the stdio server's group list stopped at `people` in
+  Phase 1, so a new group would exist only for HTTP workspaces that enable it.
+- **Options:** (a) add `portfolio` to the stdio groups; (b) leave stdio at five groups and let each later group opt in.
+- **Recommendation:** (a): same default as the catalogue; the catalogue stays within the 25-tool default target (15 now).
+- **Owner:** *(open; built as (a))*

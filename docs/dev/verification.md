@@ -43,6 +43,15 @@ What it checks (about 40 read requests, one at a time):
   the last point equals the totals' remaining estimate, no `null`, the envelope is present. Records coarse levels to the
   ignored `live/results/sprint.json`. Findings: sprint dates have no zone (L-276), sprints hold hundreds of items (L-279).
 
+- `live/portfolio.live.test.ts` (P6-01): the portfolio tools through the production client and guard. Passed 2026-10-27
+  (Agility 26.0.3.2, third-party tenant, read-only): `list_portfolio_items` returned live epics with identity, a category
+  (a value of `Epic.Category`) and the aggregated child count (`Subs` with the dead-asset bracket filter), a category filter
+  and a disjoint second page; `get_portfolio_tree` returned a two-level tree with consistent roll-ups (done and open-defect
+  counts never above the item count, percentages within 0 to 100, parents never below their children) and no `null`; a
+  story given as the asset was refused. Both tools stayed within their declared costs on a cold cache (also checked for
+  every catalogue tool in `client.live.test.ts`). Assertions are booleans with our own labels (L-274); coarse levels only
+  (epics: 100+, tree: 2 levels, items counted: fewer than 100).
+
 ## Tenant inventory (2026-10-21, Agility 26.0.3.2, hosted)
 
 Recorded by `live/inventory.live.test.ts` as size buckets and published here at a coarser level (the repository is

@@ -255,6 +255,13 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
       page: { start: 0, size: 1 },
     });
     const team = String(teams.data[0]?.[0]?.['_oid'] ?? 'Team:0');
+    const epics = await agilityClient(ctx).query<Rows>({
+      from: 'Epic',
+      select: ['Number'],
+      sort: ['ID'],
+      page: { start: 0, size: 1 },
+    });
+    const epic = String(epics.data[0]?.[0]?.['Number'] ?? 'E-00000');
     const argsFor: Record<string, Record<string, unknown>> = {
       describe_asset_type: { asset_type: 'Story' },
       query_assets: { asset_type: 'Defect', fields: ['Name', 'Status.Name', 'Description'], limit: 3 },
@@ -270,6 +277,9 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
       list_recent_changes: { time_range: 'last 7 days', limit: 3 },
       get_conversations: { asset: defect, limit: 3 },
       list_attachments: { asset: defect, limit: 3 },
+
+      list_portfolio_items: { limit: 3 },
+      get_portfolio_tree: { asset: epic, depth: 2 },
     };
     for (const tool of CORE_TOOLS) {
       // The guard allows no attachment content request, and the download is off by default: `get_attachment` is

@@ -27,9 +27,9 @@ How to use it:
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
-| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-288 – L-291 |
+| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-291 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
-| [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-282 |
+| [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271 |
@@ -40,7 +40,7 @@ How to use it:
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287 |
@@ -364,6 +364,22 @@ With no resource available the SDK registers none, and `resources/list` is "meth
 Clients and tests treat both as "nothing"; do not register a placeholder resource to make the list answer.
 *Applied in:* P6-09, `test/resources.test.ts`.
 
+**L-272 — A roll-up over rows you read is exact only when nothing cut the set: mark each aggregate `incomplete`, not the whole answer vaguely.**
+The portfolio tree sums estimates, done items and open defects from the backlog items it fetched. A depth limit, a per-level
+or per-page cap, a request budget that ran out, an item type the workspace does not allow and rows hidden for being outside
+the workspace each leave a hole, and a percentage over a hole reads as a fact. Every epic carries `incomplete` when anything
+that could touch it was cut (the epics above a depth cut, or every epic for a global cut), the result is `partial`, and a
+note names the cause. The percentage states its basis (`estimate` or `count`), because a count-based number read as effort
+is the same lie. Tests pin each cause separately.
+*Applied in:* P6-01.
+
+**L-275 — Structured output built from shaped blocks carries only the columns you listed: assert every field you promise.**
+`get_portfolio_tree` returns its nodes from the shaper's rows, and the shaper keeps the block's `columns`. A field the tool
+computed but did not list (`assetType`, `doneEstimate`, `parent`) vanished from `structuredContent`; the output-schema
+check caught `assetType`, but `parent` was missing until the live run, because no unit test asserted it. A test per
+promised output field, on the structured result and not on the row the tool built, is the cheap fix.
+*Applied in:* P6-01.
+
 ## E. The Agility API client
 
 **L-046 — Classify errors precisely.**
@@ -514,6 +530,14 @@ with a different, in-scope row. Before fetching content for an attachment id, th
 must match the request.
 *Why:* found by the hostile-upstream test (`ignore-filters`): the first in-scope row stood in for any attachment id.
 *Applied in:* P6-04 (`get_attachment`), L-064.
+
+**L-273 — A level-by-level walk takes its next frontier only from rows that passed the recheck and name the frontier as their parent.**
+The portfolio tree asks for the children of the epics found so far (`Super in <OIDs>`), one request per level. An upstream
+that ignores the filter returns rows from other parents and other projects; the scope recheck drops the foreign ones, and a
+row whose parent is not in the current frontier is dropped too, so it cannot graft a branch. The root is picked out by its
+OID from the answer, never taken as "the first row". A level that has more rows than the cap is reported, and the walk
+asks one more question below the last level (limit-capped) so a depth cut is known rather than guessed.
+*Applied in:* P6-01.
 
 ## G. Access model, tokens and isolation
 
@@ -1531,6 +1555,13 @@ stripping silently put Trojan Source characters into the repository (regex liter
 such characters from `String.fromCodePoint` constants (`packages/core/test/helpers/chars.ts`), and a review greps for
 raw invisible characters.
 *Applied in:* P1-05.
+
+**L-274 — Live assertions on tenant data are booleans with our own labels, so a failure cannot print the tenant.**
+`expect(row).toMatchObject({...})` and `expect(JSON.stringify(out)).not.toContain('null')` print the whole row or document
+when they fail, and CI logs are public. The portfolio live suite wraps every check in `ok(condition, label)` (a boolean and
+a label we wrote), checks nulls structurally instead of by text (a tenant name can contain "null"), and prints coarse levels
+only.
+*Applied in:* P6-01, `live/portfolio.live.test.ts`.
 
 ## R. CI, release and supply chain
 

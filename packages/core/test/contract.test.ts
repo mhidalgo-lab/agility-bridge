@@ -8,6 +8,7 @@ import snapshotJson from './fixtures/agility/meta-snapshot.json' with { type: 'j
 import {
   DEFAULT_CATALOGUE_MAX_BYTES,
   DEFAULT_CATALOGUE_MAX_TOOLS,
+  defaultCatalogue,
   FakeAgility,
   FULL_CATALOGUE_MAX_BYTES,
   makeContext,
@@ -17,7 +18,8 @@ import { rpc } from './helpers/mcp.ts';
 
 describe('tools/list contract', () => {
   it('stays within the default catalogue budgets', async () => {
-    const contract = await toolsListContract(CORE_TOOLS);
+    // Opt-in groups (attachments, reports, writes) count only against the full-catalogue budget below.
+    const contract = await toolsListContract(defaultCatalogue(CORE_TOOLS));
     expect(contract.count).toBeLessThanOrEqual(DEFAULT_CATALOGUE_MAX_TOOLS);
     expect(contract.bytes).toBeLessThanOrEqual(DEFAULT_CATALOGUE_MAX_BYTES);
   });
@@ -216,6 +218,26 @@ describe('tools/list contract', () => {
             "title": "Get the text of an attachment",
           },
           "name": "get_attachment",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "List portfolio items",
+          },
+          "name": "list_portfolio_items",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Get a portfolio tree",
+          },
+          "name": "get_portfolio_tree",
         },
       ]
     `,

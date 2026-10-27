@@ -13,7 +13,9 @@ export {
 export {
   DEFAULT_CATALOGUE_MAX_BYTES,
   DEFAULT_CATALOGUE_MAX_TOOLS,
+  defaultCatalogue,
   FULL_CATALOGUE_MAX_BYTES,
+  OPT_IN_GROUPS,
   type ToolsListContract,
   toolsListContract,
 } from './contract.ts';

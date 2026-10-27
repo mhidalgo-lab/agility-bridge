@@ -23,7 +23,7 @@ export function makeContext(
     workspace: {
       id: 'default',
       name: 'Default',
-      groups: ['core', 'query', 'work', 'planning', 'people'],
+      groups: ['core', 'query', 'work', 'planning', 'people', 'portfolio'],
       writes: { enabled: false, approval: 'unavailable' },
     },
     credential: { id: 'cred-1', kind: 'personal', token: new Secret('FAKE-token-1') },
