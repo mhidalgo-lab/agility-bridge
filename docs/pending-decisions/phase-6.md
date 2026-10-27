@@ -72,6 +72,7 @@
   the whole text up to the byte cap.
 - **Recommendation:** (a): bounded results by default, and the common case (a log excerpt, a small CSV, a note) fits.
 - **Built:** (a).
+- **Owner:** pending.
 
 ### D-92 — The quality rubric is defined in core now, ahead of `work_item_quality` *(P6-09)*
 - **Context:** the catalogue lists `agility-bridge://rubrics/backlog-item-quality` as "the versioned quality rubric (JSON)
