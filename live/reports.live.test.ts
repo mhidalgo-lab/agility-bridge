@@ -232,11 +232,19 @@ describe.skipIf(!target)('composite reports against the live tenant (read-only)'
       rubric.id === 'backlog-item-quality' && /^\d+\.\d+\.\d+$/.test(rubric.version),
       'the rubric is cited by version',
     );
-    const criteria = out['criteria'] as Array<{ id: string; score: number | null; evidence: string }>;
+    const criteria = out['criteria'] as Array<{
+      id: string;
+      score?: number;
+      assessed: boolean;
+      evidence: string;
+    }>;
     ok(criteria.length === 6, 'six criteria');
     ok(
-      criteria.every((c) => c.score === null || [0, 1, 2].includes(c.score)),
-      'scores are 0 to 2 or null',
+      criteria.every(
+        (c) =>
+          c.assessed === (c.score !== undefined) && (c.score === undefined || [0, 1, 2].includes(c.score)),
+      ),
+      'scores are 0 to 2, absent exactly when not assessed',
     );
     const min = out['scoreMin'] as number;
     const max = out['scoreMax'] as number;
@@ -246,7 +254,7 @@ describe.skipIf(!target)('composite reports against the live tenant (read-only)'
       'an exact score only without unassessed criteria',
     );
     process.stderr.write(
-      `live work_item_quality: ${summary(out)}; unassessed ${criteria.filter((c) => c.score === null).length}; level ${String(out['level'] ?? 'none')}; scores ${criteria.map((c) => c.score ?? '-').join('')}\n`,
+      `live work_item_quality: ${summary(out)}; unassessed ${criteria.filter((c) => !c.assessed).length}; level ${String(out['level'] ?? 'none')}; scores ${criteria.map((c) => c.score ?? '-').join('')}\n`,
     );
   });
 

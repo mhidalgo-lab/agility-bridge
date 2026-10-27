@@ -303,7 +303,8 @@ export const workItemQuality: ToolDefinition = defineTool({
                 oid: item['oid'],
               },
             }),
-        criteria: results,
+        // A null score is not shown by the shaper: `assessed: false` and no `score` mean not assessed.
+        criteria: results.map((r) => ({ ...r, assessed: r.score !== null })),
         ...(summary === undefined
           ? {}
           : {

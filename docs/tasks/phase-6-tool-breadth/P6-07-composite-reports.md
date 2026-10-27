@@ -2,7 +2,7 @@
 id: P6-07
 title: Composite reports
 phase: 6
-status: in-progress
+status: review
 priority: high
 depends_on: [P6-01, P6-02, P6-05]
 adr: ["0015"]
@@ -43,18 +43,18 @@ One-call reports that save agents many round trips and stay honest about gaps.
 - Declared worst-case costs are the sum of the sections' declared costs, tested cold (L-114).
 
 ## Acceptance criteria
-- [ ] Each report is tested with missing grants (section skipped with a note, sibling not called), empty data, budget
+- [x] Each report is tested with missing grants (section skipped with a note, sibling not called), empty data, budget
   exhaustion, partial upstream failures; no plausible zeros.
-- [ ] Reports are absent from `tools/list` and refused by name unless the workspace limit is on and the grant keeps it
+- [x] Reports are absent from `tools/list` and refused by name unless the workspace limit is on and the grant keeps it
   on; stdio needs `AB_REPORTS`.
-- [ ] Negative authorization: denial answers with no upstream call and no data; scope is enforced on every row (through
+- [x] Negative authorization: denial answers with no upstream call and no data; scope is enforced on every row (through
   the siblings); a section never reads with a tool the caller does not hold.
-- [ ] Poisoned-text probe passes on every report (titles, names, descriptions, statuses reach text and structured
+- [x] Poisoned-text probe passes on every report (titles, names, descriptions, statuses reach text and structured
   output only through the shaper).
-- [ ] Cold cost tests: each report's declared cost covers the requests it makes on a cold cache.
-- [ ] The rubric is the one in `packages/core/src/rubric.ts`; the resource lists `work_item_quality` in `uses`.
-- [ ] Live (guarded suite): shapes and levels only.
-- [ ] `tools/list` stays inside the budgets (default and every group); generated references, threat model, lessons,
+- [x] Cold cost tests: each report's declared cost covers the requests it makes on a cold cache.
+- [x] The rubric is the one in `packages/core/src/rubric.ts`; the resource lists `work_item_quality` in `uses`.
+- [x] Live (guarded suite): shapes and levels only.
+- [x] `tools/list` stays inside the budgets (default and every group); generated references, threat model, lessons,
   decisions and a changeset updated.
 
 ## Security notes

@@ -372,7 +372,13 @@ describe('work_item_quality', () => {
     const r = await call('work_item_quality', { asset: 'B-01004' });
     const out = s(r);
     const ready = out.criteria.find((c: { id: string }) => c.id === 'ready_to_start');
-    expect(ready.score === null || typeof ready.score === 'number').toBe(true);
+    // Priority is not set on the fake's rows, so one part is missing; an unassessed score would be absent and flagged.
+    expect(ready.assessed).toBe(ready.score !== undefined);
+    expect(
+      out.criteria.every(
+        (c: { assessed: boolean; score?: number }) => c.assessed === (c.score !== undefined),
+      ),
+    ).toBe(true);
     if (out.score === undefined) expect(out.scoreMax).toBeGreaterThan(out.scoreMin);
     else expect(out.scoreMax).toBe(out.scoreMin);
   });
