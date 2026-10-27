@@ -70,6 +70,10 @@ public): **absent**, **present** (fewer than 100) or **100+** (enough to test pa
 | Tests | 100+ | | Links | 100+ |
 | Epics | 100+ | | Epic categories | present |
 
+P6-06 (`live/other-assets.live.test.ts`, 2026-10-27) added the planning types through `query_assets` and `get_assets`
+with default tiers: goals, themes, retrospectives and issues are **present**; requests are **absent** (the type answers with
+an empty page), so the request recipe is verified on fixtures only (tracked in P6-27).
+
 Custom attributes exist on backlog items, defects and epics (none on tasks and tests); their names are not recorded.
 
 **Gaps for the writable sandbox:** requests, regression tests, plans and suites, and test sets (no live data here), plus

@@ -666,3 +666,14 @@ Checked 2026-10-23.
   <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/form-action>). The owner
   setup page therefore has a policy without `form-action` ([L-195](LESSONS-LEARNED.md), D-35). Chromium confirmed it in the P4-08 browser run
   (2026-10-23, the policy and the redirect behave as specified); Firefox and WebKit are *unverified* (D-44).
+
+### Issues, requests, goals, themes and retrospectives (P6-06)
+
+- **Product model.** The public example instance (26.2.6.29, public `meta.v1`, checked 2026-10-27 with
+  `pnpm metadata:drift`) defines `RequestStatus` with base `List` (no `RollupState`) and `Retrospective` with no `Number`;
+  `Issue` has a single `Owner` relation, `Request` a `Status` relation to `RequestStatus`, `Goal` neither. The committed
+  snapshot is hand-written and matches these product attributes. Source: https://www14.v1host.com/v1sdktesting/meta.v1
+- **Read-only tenant (26.0.3.2, 2026-10-27).** Issues, goals, themes and retrospectives each answer `query_assets` and
+  `get_assets` with default tiers (levels only; the tenant is a third party's). `Request` is a defined type with no
+  assets: the query returns an empty page, not an error. Writable-sandbox checks of requests: P6-27.
+

@@ -2,7 +2,7 @@
 
 # Resource reference
 
-7 resources. Reference material an agent reads on demand (`resources/read`). Each one is served through
+11 resources. Reference material an agent reads on demand (`resources/read`). Each one is served through
 the tool handlers named below, so a read has the same request budget, limits, metadata cache, scope rules, untrusted-data
 envelope and audit entry (action `resource:<id>`) as the tool call it stands for. A resource whose tools are not allowed for the
 workspace or grant does not exist: it is not listed and reading it fails. The plan: [tool catalogue](tool-catalogue.md#resources-phase-6).
@@ -16,6 +16,10 @@ workspace or grant does not exist: it is not listed and reading it fails. The pl
 | `agility-bridge://rubrics/backlog-item-quality` | Backlog item quality rubric | `get_work_item` | static | `application/json` |
 | `agility-bridge://recipes/tests-and-defects` | Recipe: tests and defects | `query_assets`, `describe_asset_type`, `list_asset_types` | static | `text/markdown` |
 | `agility-bridge://recipes/regression-assets` | Recipe: regression assets and test sets | `query_assets`, `describe_asset_type`, `list_asset_types` | static | `text/markdown` |
+| `agility-bridge://recipes/issues` | Recipe: issues | `query_assets`, `get_assets` | static | `text/markdown` |
+| `agility-bridge://recipes/requests` | Recipe: requests | `query_assets`, `get_assets` | static | `text/markdown` |
+| `agility-bridge://recipes/goals-and-themes` | Recipe: goals and themes | `query_assets`, `get_assets` | static | `text/markdown` |
+| `agility-bridge://recipes/retrospectives` | Recipe: retrospectives | `query_assets`, `get_assets` | static | `text/markdown` |
 
 ## `reference_filters`
 
@@ -72,3 +76,35 @@ Served through: [`query_assets`](tools.md#query_assets), [`describe_asset_type`]
 Worked query_assets calls for regression tests, test sets and the tests inside one; regression plans and suites follow the same pattern once list_asset_types shows them.
 
 Served through: [`query_assets`](tools.md#query_assets), [`describe_asset_type`](tools.md#describe_asset_type), [`list_asset_types`](tools.md#list_asset_types). Offered only when all of those tools are allowed for the workspace and grant.
+
+## `recipe_issues`
+
+`agility-bridge://recipes/issues`
+
+How to find and read Agility issues (impediments raised on a project) with query_assets and get_assets.
+
+Served through: [`query_assets`](tools.md#query_assets), [`get_assets`](tools.md#get_assets). Offered only when all of those tools are allowed for the workspace and grant.
+
+## `recipe_requests`
+
+`agility-bridge://recipes/requests`
+
+How to find and read Agility requests (ideas and asks to triage) with query_assets and get_assets.
+
+Served through: [`query_assets`](tools.md#query_assets), [`get_assets`](tools.md#get_assets). Offered only when all of those tools are allowed for the workspace and grant.
+
+## `recipe_goals_themes`
+
+`agility-bridge://recipes/goals-and-themes`
+
+How to read Agility goals and themes (planning groupings above backlog items) with query_assets and get_assets.
+
+Served through: [`query_assets`](tools.md#query_assets), [`get_assets`](tools.md#get_assets). Offered only when all of those tools are allowed for the workspace and grant.
+
+## `recipe_retrospectives`
+
+`agility-bridge://recipes/retrospectives`
+
+How to find and read Agility retrospectives (what a team learned in a sprint) with query_assets and get_assets.
+
+Served through: [`query_assets`](tools.md#query_assets), [`get_assets`](tools.md#get_assets). Offered only when all of those tools are allowed for the workspace and grant.

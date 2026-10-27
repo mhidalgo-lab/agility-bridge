@@ -184,6 +184,7 @@ export {
 } from './query/cursor.ts';
 export { invalid, limitError } from './query/limits.ts';
 export { parseInstant, parseTimeRange, type TimeWindow } from './query/time.ts';
+export { OTHER_ASSET_RECIPES } from './recipes/other-assets.ts';
 export {
   QUALITY_RECIPE_RESOURCES,
   QUALITY_RECIPES,
