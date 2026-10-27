@@ -46,6 +46,17 @@ The database is migrated by the Worker at its first request. `--dry-run` shows t
 Keep the secrets file like the master key of a self-hosted server: away from the data, backed up separately
 ([secrets](secrets.md)).
 
+## Turn on OAuth
+
+Add `--oauth on` to switch the OAuth server on for apps such as claude.ai and Claude Code (`--oauth off` switches it off).
+The value is written to the local config as `AB_OAUTH` and a later run without the flag keeps it. It needs a sign-in
+provider (`--sign-in`) and public HTTPS; the whole procedure, the registration settings and the checks are in the
+[OAuth operator guide](oauth-operator.md#cloudflare-worker).
+
+```sh
+pnpm cf:setup --name agility-bridge --domain mcp.example.com --secrets-file ~/.config/agility-bridge/prod.secrets --oauth on
+```
+
 ## Things that differ from a single server
 
 - **Revocations reach every isolate within the access-cache time.** Each isolate keeps resolved access for up to

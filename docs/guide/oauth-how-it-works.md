@@ -1,8 +1,25 @@
 # How OAuth sign-in and tokens work
 
 > For people who run `agility-bridge serve` or the Cloudflare Worker with `AB_OAUTH=on`, and for anyone who wonders why an
-> app asked them to connect again. Step by step for a phone: [connect a phone](oauth-phone.md). Developer details:
-> [OAuth server](../dev/oauth.md).
+> app asked them to connect again. Step by step: [claude.ai and a phone](oauth-phone.md), [IDEs and CLIs](oauth-ides.md).
+> Turning it on: [operator guide](oauth-operator.md). When it fails: [troubleshooting](oauth-troubleshooting.md). Developer
+> details: [OAuth server](../dev/oauth.md).
+
+## From "add a server" to "connected"
+
+1. **Discovery.** The app calls the workspace address (`/w/<slug>/mcp`) without a token and gets a `401` whose
+   `WWW-Authenticate` header names the **protected resource metadata** (`/.well-known/oauth-protected-resource/w/<slug>/mcp`).
+   That document names the authorization server, and the server's own metadata (`/.well-known/oauth-authorization-server`)
+   lists the endpoints. Both are public and the same for every workspace name, so they tell nobody which workspaces exist.
+2. **Registration.** The app identifies itself: either by a **client metadata document** (its client id is an `https` URL the
+   server fetches; claude.ai and Claude Code do this) or by **dynamic registration** at `/oauth/register`. Redirect
+   addresses must be `https` or loopback; private-use schemes such as `cursor://` are refused.
+3. **Sign-in and consent.** The browser opens `/oauth/authorize`. You sign in with the server's identity provider, see who is
+   asking, where the answer goes and which of your own accesses it would get, and choose Allow or Deny. The app name is never
+   verified, so only approve a connection you just started.
+4. **Tokens.** The app swaps the one-use code (with its PKCE proof) for the tokens below, bound to this one workspace.
+
+Each step has its own failure and its own audit row: [troubleshooting](oauth-troubleshooting.md).
 
 ## The short version
 
@@ -71,6 +88,8 @@ Nothing the bridge stores can be used as a token.
   log and the logs for token text after complete flows.
 
 ## For the operator
+
+Turning OAuth on and the registration settings are in the [operator guide](oauth-operator.md).
 
 | Setting | Default | Range |
 |---|---|---|
