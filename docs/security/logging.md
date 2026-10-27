@@ -42,6 +42,8 @@ carry `requestId`.
 | debug | `tool ok` | `tool`, `ms`, `requests` | [server.ts](../../packages/core/src/server.ts) |
 | warn | `tool error` | `tool`, `ms`, `code`, `error` (class, redacted message) | [server.ts](../../packages/core/src/server.ts) |
 | info | `attachment downloaded` | `asset` (number), `attachment` (id), `bytes`, `contentType`; never the content | [attachments.ts](../../packages/core/src/tools/collaboration/attachments.ts) |
+| debug | `resource ok` | `resource`, `ms`, `requests` | [server.ts](../../packages/core/src/server.ts) |
+| warn | `resource error` | `resource`, `ms`, `error` (class, redacted message) | [server.ts](../../packages/core/src/server.ts) |
 | debug | `agility request` | `endpoint`, `method`, `attempt`, `status`, `ms`, `bytes` (no body, no token) | [client.ts](../../packages/core/src/agility/client.ts) |
 | debug | `agility error body` | `status`, the first 500 characters of the error body (redacted by the logger) | [client.ts](../../packages/core/src/agility/client.ts) |
 | error | `access resolution failed` | `requestId`, `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
