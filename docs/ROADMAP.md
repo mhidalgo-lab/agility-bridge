@@ -257,7 +257,7 @@ Status lives in each task file.
 | ID | Task | Priority | Depends on | Status |
 |---|---|---|---|---|
 | P6-01 | [Portfolio tools (epics and portfolio items)](tasks/phase-6-tool-breadth/P6-01-tools-portfolio.md) | high | P2-17 | todo |
-| P6-02 | [Planning tools (sprints, schedules, capacity)](tasks/phase-6-tool-breadth/P6-02-tools-planning.md) | high | P2-17 | todo |
+| P6-02 | [Planning tools (get_sprint)](tasks/phase-6-tool-breadth/P6-02-tools-planning.md) | high | P2-17 | in-progress |
 | P6-03 | [Quality views (tests, regression assets, defects)](tasks/phase-6-tool-breadth/P6-03-tools-quality.md) | medium | P2-17 | todo |
 | P6-04 | [Collaboration tools (conversations, links, attachments)](tasks/phase-6-tool-breadth/P6-04-tools-collaboration.md) | medium | P2-17 | review |
 | P6-05 | [History and activity tools](tasks/phase-6-tool-breadth/P6-05-tools-history.md) | medium | P2-17 | review |
