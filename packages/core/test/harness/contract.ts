@@ -7,6 +7,12 @@ import { rpc } from '../helpers/mcp.ts';
 export const DEFAULT_CATALOGUE_MAX_TOOLS = 25;
 export const DEFAULT_CATALOGUE_MAX_BYTES = 40_000;
 export const FULL_CATALOGUE_MAX_BYTES = 72_000;
+/** Groups a workspace must switch on (docs/reference/tool-catalogue.md): not part of the default catalogue. */
+export const OPT_IN_GROUPS: readonly string[] = ['attachments', 'reports', 'writes'];
+
+/** The tools a workspace gets without switching on an opt-in group. */
+export const defaultCatalogue = (tools: readonly ToolDefinition[]): ToolDefinition[] =>
+  tools.filter((t) => !OPT_IN_GROUPS.includes(t.group));
 
 export interface ToolsListContract {
   readonly count: number;

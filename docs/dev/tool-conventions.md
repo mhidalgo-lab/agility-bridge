@@ -213,6 +213,9 @@ Resources (P6-09) and prompts (P6-08) are registered from one manifest, never fr
 - Serialised `tools/list`: **≤ 40 KB for the default catalogue and ≤ 72 KB with every group** (P0-07 measured about
   1.6 KB per tool with rich schemas). P1-13's size test enforces both; a tool that would break them is redesigned, not
   exempted.
+- The default catalogue is every group a workspace gets without switching one on; the opt-in groups (`attachments`,
+  `reports`, `writes`) count only against the every-group budget. With P6-01 the default catalogue is 20 tools and
+  about 39.2 KB of the 40 KB: the P6-12 consistency pass trims descriptions and schemas before more default tools land.
 - Tool schemas are converted to JSON Schema once per process and registered with `fromJsonSchema`; building the
   per-request server must stay under 2 ms for the default catalogue (P0-07: 0.7 ms for 25 tools).
 - No deferred-tool or tool-search mechanism while the catalogue stays under these limits (prior-art follow-up 1,
