@@ -111,6 +111,45 @@ describe('resolveAccess: what a valid grant gets', () => {
     );
   });
 
+  it('offers the attachment download only where the workspace turns it on and the grant keeps it on (D-08, A8)', () => {
+    // Off by default: never listed, never granted, even when both lists name it.
+    expect(allowed(records()).tools).not.toContain('get_attachment');
+    expect(allowed(records()).limits.attachmentDownload).toBe(false);
+    const named = records({
+      workspace: workspace({ enabledTools: ['whoami', 'get_attachment'] }),
+      grant: grant({ tools: ['whoami', 'get_attachment'] }),
+    });
+    expect(allowed(named).tools).toEqual(['whoami']);
+    // On in the workspace: offered, with the size limit.
+    const on = allowed(
+      records({ workspace: workspace({ limits: { attachmentDownload: true, attachmentMaxBytes: 4_096 } }) }),
+    );
+    expect(on.tools).toContain('get_attachment');
+    expect(on.limits).toMatchObject({ attachmentDownload: true, attachmentMaxBytes: 4_096 });
+    // A grant can only turn it off, never on; and it can only lower the size.
+    expect(
+      allowed(
+        records({
+          workspace: workspace({ limits: { attachmentDownload: true } }),
+          grant: grant({ limits: { attachmentDownload: false } }),
+        }),
+      ).tools,
+    ).not.toContain('get_attachment');
+    const grantOn = allowed(
+      records({ grant: grant({ limits: { attachmentDownload: true, attachmentMaxBytes: 2_048 } }) }),
+    );
+    expect(grantOn.tools).not.toContain('get_attachment');
+    expect(grantOn.warnings.join(' ')).toContain('attachmentDownload on, but the workspace has it off');
+    expect(
+      allowed(
+        records({
+          workspace: workspace({ limits: { attachmentDownload: true, attachmentMaxBytes: 4_096 } }),
+          grant: grant({ limits: { attachmentMaxBytes: 8_192 } }),
+        }),
+      ).limits.attachmentMaxBytes,
+    ).toBe(4_096);
+  });
+
   it('applies the deployment ceilings to what a workspace asks for', () => {
     const settings: AccessSettings = {
       ...SETTINGS,

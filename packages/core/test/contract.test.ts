@@ -177,6 +177,36 @@ describe('tools/list contract', () => {
           },
           "name": "list_recent_changes",
         },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Get comments on an asset",
+          },
+          "name": "get_conversations",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "List attachments and links of an asset",
+          },
+          "name": "list_attachments",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Get the text of an attachment",
+          },
+          "name": "get_attachment",
+        },
       ]
     `,
     );

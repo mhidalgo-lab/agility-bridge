@@ -42,6 +42,15 @@ export const limitsPolicySchema = z.strictObject({
   memberEmails: z.boolean().optional(),
   /** The generic `query_assets` / `get_assets` tools. */
   genericQuery: z.boolean().optional(),
+  /** `get_attachment`, the text content of one attachment (D-08): off unless the workspace turns it on. */
+  attachmentDownload: z.boolean().optional(),
+  /** Largest attachment `get_attachment` reads, in bytes. */
+  attachmentMaxBytes: z
+    .number()
+    .int()
+    .min(1_024)
+    .max(8 * 1024 * 1024)
+    .optional(),
 });
 export type LimitsPolicy = z.infer<typeof limitsPolicySchema>;
 
@@ -87,9 +96,10 @@ const NUMBER_LIMITS = [
   'maxResponseBytes',
   'maxAsOfAgeDays',
   'maxTimeRangeDays',
+  'attachmentMaxBytes',
   'callBudget',
 ] as const;
-const SWITCHES = ['memberEmails', 'genericQuery'] as const;
+const SWITCHES = ['memberEmails', 'genericQuery', 'attachmentDownload'] as const;
 
 /** What a deployment allows at most and uses by default (runtime presets, ADR-0010). */
 export interface DeploymentLimits {
@@ -111,7 +121,7 @@ export function effectiveLimits(
   grant: LimitsPolicy,
 ): { limits: EffectiveLimits; warnings: string[] } {
   const warnings: string[] = [];
-  const out: Record<string, number | boolean> = { ...deployment.defaults };
+  const out: Record<string, number | boolean | readonly string[]> = { ...deployment.defaults };
   for (const key of NUMBER_LIMITS) {
     let value = workspace[key] ?? deployment.defaults[key];
     const ceiling = deployment.ceilings[key];

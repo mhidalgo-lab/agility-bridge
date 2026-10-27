@@ -36,3 +36,39 @@
 - **Recommendation:** (a), with [P6-22](../tasks/phase-6-tool-breadth/P6-22-recent-changes-portfolio-items.md) adding epics
   once P6-01 settles how portfolio items are listed.
 - **Owner:** pending.
+
+### D-86 — Where the attachment download is switched on *(P6-04)*
+- **Context:** D-08 wants `get_attachment` off by default and enabled "per workspace and grant". The access resolver
+  lists every read tool of a workspace unless its tool list says otherwise, so an opt-in read tool needs a gate that
+  does not depend on someone remembering to leave it out of a list.
+- **Options:** (a) a workspace limit `attachmentDownload` (default off) that a grant can only turn off, like
+  `genericQuery`, plus `attachmentMaxBytes` that a grant can only lower; the resolver drops the `attachments` group when
+  it is off, and the handler refuses as well; stdio uses `AB_ATTACHMENT_DOWNLOAD` and friends; (b) a deployment-wide
+  switch only; (c) tool lists only (name the tool in the workspace and the grant).
+- **Recommendation:** (a): the same shape as every other switch (L-062: a grant can only tighten), visible in the admin
+  limits form, and a tool named in a list is still not served while the switch is off.
+- **Built:** (a). `AB_ATTACHMENT_DOWNLOAD` is not a deployment default for HTTP: the default is off and a workspace
+  turns it on.
+- **Owner:** pending.
+
+### D-87 — What counts as an attachment that may be returned *(P6-04)*
+- **Context:** the task allows text types, checked on the metadata and on the response. Agility may serve a different
+  type than it stored, an attachment may have no content type, and a deployment may want more types.
+- **Options:** (a) exact `type/subtype` allowlist (default `text/plain`, `text/markdown`, `text/csv`,
+  `application/json`; `AB_ATTACHMENT_TYPES` replaces it), types that run or render (`text/html`, `image/svg+xml`,
+  XML, JavaScript) refused even when listed, a missing content type refused, text must be valid UTF-8 without NUL;
+  (b) allow wildcards such as `text/*`; (c) sniff the bytes instead of trusting types.
+- **Recommendation:** (a): the allowlist is what an operator can reason about, wildcards would admit HTML, and sniffing
+  adds a parser to a path that fetches untrusted bytes.
+- **Built:** (a). Unverified until a sandbox run (P6-19): the exact endpoint spelling (`attachments.img`, from the
+  developer library) and whether Agility answers with the stored content type.
+- **Owner:** pending.
+
+### D-88 — How much text one call returns *(P6-04)*
+- **Context:** the download cap (1 MiB by default) bounds what the bridge reads, but a model's context should not take
+  a megabyte of text in one result, and the output shaper caps one value at 4,000 characters.
+- **Options:** (a) return up to `max_characters` (default 20,000, at most 100,000) in one enveloped text block, with a
+  note and `truncated` when cut; ranged reads later (P6-20); (b) page through the text with a cursor now; (c) return
+  the whole text up to the byte cap.
+- **Recommendation:** (a): bounded results by default, and the common case (a log excerpt, a small CSV, a note) fits.
+- **Built:** (a).

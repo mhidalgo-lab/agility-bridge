@@ -22,7 +22,7 @@ import {
 import { createMemoryStorage, type Storage } from '@agility-bridge/storage';
 import type { Client } from '@modelcontextprotocol/client';
 import snapshotJson from '../../../core/test/fixtures/agility/meta-snapshot.json' with { type: 'json' };
-import { FAKE_BASE_URL, FakeAgility } from '../../../core/test/harness/index.ts';
+import { FAKE_BASE_URL, FakeAgility, type FakeAgilityOptions } from '../../../core/test/harness/index.ts';
 import {
   AuditWriter,
   createHttpApp,
@@ -110,6 +110,8 @@ export async function world(
      * Tests move it with `vi.setSystemTime`; `now.t` cannot be assigned.
      */
     liveClock?: boolean;
+    /** Answers before the fake does (an attachment content endpoint, say); return undefined to fall through. */
+    agility?: FakeAgilityOptions['override'];
   } = {},
 ): Promise<World> {
   const now: { t: number } =
@@ -190,11 +192,11 @@ export async function world(
     meta: snapshotJson as unknown as Record<string, unknown>,
     assets: (options.assets ?? ASSETS) as never,
     filters: options.filters ?? 'evaluate',
-    override: (req) => {
+    override: (req, call) => {
       const token = req.headers.get('authorization')?.replace(/^Bearer /, '') ?? '';
       agilityTokens.push(token);
       if (options.validate?.reject?.(token) === true) return new Response('{}', { status: 401 });
-      return undefined;
+      return options.agility?.(req, call);
     },
   });
   const requests: RequestEvent[] = [];

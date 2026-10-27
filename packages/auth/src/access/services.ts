@@ -239,7 +239,9 @@ export function accessServices(options: AccessServicesOptions) {
           `limits.${key} (${value}) is above the workspace's (${base}); the workspace's applies.`,
         );
       }
-      if (value === true && base === false) warnings.push(`limits.${key} is off in the workspace.`);
+      // The attachment download is off unless the workspace says otherwise (D-08), so an unset value is off.
+      if (value === true && (base === false || (base === undefined && key === 'attachmentDownload')))
+        warnings.push(`limits.${key} is off in the workspace.`);
     }
     return warnings;
   }

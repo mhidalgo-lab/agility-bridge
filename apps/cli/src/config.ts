@@ -5,7 +5,13 @@
 import { execFileSync } from 'node:child_process';
 import { closeSync, fstatSync, openSync, readFileSync } from 'node:fs';
 import { IDENTITY_SECRET_NAMES, IDENTITY_SETTING_NAMES } from '@agility-bridge/auth';
-import { canonicalInstanceUrl, type LogLevel, Secret } from '@agility-bridge/core';
+import {
+  ACTIVE_ATTACHMENT_TYPES,
+  canonicalInstanceUrl,
+  DEFAULT_ATTACHMENT_TYPES,
+  type LogLevel,
+  Secret,
+} from '@agility-bridge/core';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 
@@ -27,6 +33,10 @@ export interface StdioConfig {
   readonly assetTypes: { readonly allow?: readonly string[]; readonly deny: readonly string[] };
   readonly genericQuery: boolean;
   readonly memberEmails: boolean;
+  /** `get_attachment` (D-08): off by default. */
+  readonly attachmentDownload: boolean;
+  readonly attachmentMaxBytes: number;
+  readonly attachmentTypes: readonly string[];
   readonly maxRows: number;
   readonly maxResponseBytes: number;
   readonly callBudget: number;
@@ -135,12 +145,16 @@ const ENV_MODE_ONLY = [
   'AB_ASSET_TYPES_DENY',
   'AB_GENERIC_QUERY',
   'AB_MEMBER_EMAILS',
+  'AB_ATTACHMENT_DOWNLOAD',
+  'AB_ATTACHMENT_MAX_BYTES',
+  'AB_ATTACHMENT_TYPES',
   'AB_LIMITS_MAX_LIMIT',
   'AB_LIMITS_MAX_RESPONSE_BYTES',
   'AB_CALL_BUDGET',
 ];
 
 export const DEFAULTS = Object.freeze({
+  attachmentMaxBytes: 1_048_576,
   maxRows: 100,
   /** Node default (ADR-0010); Workers Free uses 512 KiB. */
   maxResponseBytes: 8 * 1024 * 1024,
@@ -151,6 +165,21 @@ const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
 const SCOPE_OID = /^Scope:\d{1,12}$/;
 const TYPE_NAME = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 const TOOL_NAME = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
+const MEDIA_TYPE_LOOSE = /^[^\s,]{1,130}$/;
+const MEDIA_TYPE = /^[a-z0-9][a-z0-9!#$&^_.+-]{0,63}\/[a-z0-9][a-z0-9!#$&^_.+-]{0,63}$/;
+
+/** `AB_ATTACHMENT_TYPES`: exact `type/subtype` names, lower case; types that run or render are refused (A8). */
+function attachmentTypes(name: string, items: readonly string[] | undefined): string[] {
+  if (items === undefined) return [...DEFAULT_ATTACHMENT_TYPES];
+  const types = items.map((t) => t.trim().toLowerCase());
+  for (const t of types) {
+    if (!MEDIA_TYPE.test(t))
+      throw new ConfigError(`${name} has an invalid content type: "${t.slice(0, 40)}".`);
+    if (ACTIVE_ATTACHMENT_TYPES.includes(t))
+      throw new ConfigError(`${name}: ${t} runs or renders in a client and is never returned.`);
+  }
+  return [...new Set(types)];
+}
 
 function bool(name: string, value: string | undefined, fallback: boolean): boolean {
   if (value === undefined || value === '') return fallback;
@@ -300,6 +329,18 @@ const workspaceSchema = z.strictObject({
     .optional(),
   generic_query: z.boolean().optional(),
   member_emails: z.boolean().optional(),
+  attachments: z
+    .strictObject({
+      download: z.boolean().optional(),
+      max_bytes: z
+        .number()
+        .int()
+        .min(1_024)
+        .max(8 * 1024 * 1024)
+        .optional(),
+      types: z.array(z.string().min(3).max(130)).max(20).optional(),
+    })
+    .optional(),
   limits: z
     .strictObject({
       max_limit: z.number().int().min(1).max(1_000).optional(),
@@ -427,6 +468,9 @@ function fromYaml(env: Readonly<Record<string, string | undefined>>, options: Lo
     },
     genericQuery: resolved.generic_query ?? true,
     memberEmails: resolved.member_emails ?? false,
+    attachmentDownload: resolved.attachments?.download ?? false,
+    attachmentMaxBytes: resolved.attachments?.max_bytes ?? DEFAULTS.attachmentMaxBytes,
+    attachmentTypes: attachmentTypes(`workspaces.${id}.attachments.types`, resolved.attachments?.types),
     maxRows: resolved.limits?.max_limit ?? DEFAULTS.maxRows,
     maxResponseBytes: resolved.limits?.max_response_bytes ?? DEFAULTS.maxResponseBytes,
     callBudget: resolved.limits?.call_budget ?? DEFAULTS.callBudget,
@@ -487,6 +531,18 @@ export function loadConfig(
     },
     genericQuery: bool('AB_GENERIC_QUERY', env['AB_GENERIC_QUERY'], true),
     memberEmails: bool('AB_MEMBER_EMAILS', env['AB_MEMBER_EMAILS'], false),
+    attachmentDownload: bool('AB_ATTACHMENT_DOWNLOAD', env['AB_ATTACHMENT_DOWNLOAD'], false),
+    attachmentMaxBytes: int(
+      'AB_ATTACHMENT_MAX_BYTES',
+      env['AB_ATTACHMENT_MAX_BYTES'],
+      DEFAULTS.attachmentMaxBytes,
+      1_024,
+      8 * 1024 * 1024,
+    ),
+    attachmentTypes: attachmentTypes(
+      'AB_ATTACHMENT_TYPES',
+      list('AB_ATTACHMENT_TYPES', env['AB_ATTACHMENT_TYPES'], MEDIA_TYPE_LOOSE, 'content type'),
+    ),
     maxRows: int('AB_LIMITS_MAX_LIMIT', env['AB_LIMITS_MAX_LIMIT'], DEFAULTS.maxRows, 1, 1_000),
     maxResponseBytes: int(
       'AB_LIMITS_MAX_RESPONSE_BYTES',

@@ -25,7 +25,7 @@ For every request the server resolves, from scratch or from a cache of at most 6
 | Tools | the workspace's enabled tools (default: every read tool) **∩** the grant's tools (default: no narrowing) |
 | Agility projects | the workspace's projects **∩** the grant's projects (exact ids), and Agility still applies the member's own visibility |
 | Asset types | allow lists intersect (none = every type), deny lists add up |
-| Limits | the workspace's values (default: the server's), capped by the runtime, then **lowered** by the grant: numbers take the minimum, switches such as member emails or the generic query tools stay on only if both leave them on |
+| Limits | the workspace's values (default: the server's), capped by the runtime, then **lowered** by the grant: numbers take the minimum, switches such as member emails, the generic query tools or the attachment download (off unless the workspace turns it on) stay on only if both leave them on |
 | Credential | the grant's credential, or the workspace's default shared credential |
 
 Anything missing, disabled, revoked, expired, not yet validated or malformed **denies**. Tools a caller may not use are

@@ -42,6 +42,41 @@ describe('environment mode', () => {
     expect(String(c.kind === 'configured' ? c.token : '')).toBe('[REDACTED]');
   });
 
+  it('keeps the attachment download off by default, with the text types and a 1 MiB cap (D-08)', () => {
+    const c = loadConfig({ AB_AGILITY_URL: URL, AB_AGILITY_TOKEN: 'x' });
+    expect(c).toMatchObject({
+      attachmentDownload: false,
+      attachmentMaxBytes: 1_048_576,
+      attachmentTypes: ['text/plain', 'text/markdown', 'text/csv', 'application/json'],
+    });
+  });
+
+  it('reads the attachment settings and refuses types that run or render in a client', () => {
+    const base = { AB_AGILITY_URL: URL, AB_AGILITY_TOKEN: 'x' };
+    expect(
+      loadConfig({
+        ...base,
+        AB_ATTACHMENT_DOWNLOAD: 'on',
+        AB_ATTACHMENT_MAX_BYTES: '4096',
+        AB_ATTACHMENT_TYPES: 'text/plain, Text/Log',
+      }),
+    ).toMatchObject({
+      attachmentDownload: true,
+      attachmentMaxBytes: 4_096,
+      attachmentTypes: ['text/plain', 'text/log'],
+    });
+    for (const [env, message] of [
+      [{ AB_ATTACHMENT_TYPES: 'text/html' }, /runs or renders/],
+      [{ AB_ATTACHMENT_TYPES: 'image/svg+xml' }, /runs or renders/],
+      [{ AB_ATTACHMENT_TYPES: '*/*' }, /invalid content type/],
+      [{ AB_ATTACHMENT_TYPES: 'text' }, /invalid content type/],
+      [{ AB_ATTACHMENT_MAX_BYTES: '100000000' }, /from 1024 to 8388608/],
+      [{ AB_ATTACHMENT_DOWNLOAD: 'maybe' }, /on or off/],
+    ] as const) {
+      expect(() => loadConfig({ ...base, ...env })).toThrow(message);
+    }
+  });
+
   it('starts unconfigured (setup mode) with nothing set', () => {
     expect(loadConfig({})).toEqual({ kind: 'setup', logLevel: 'info' });
   });
@@ -74,6 +109,7 @@ workspaces:
     include_child_projects: false
     asset_types: { allow: [Story, Defect, Task] }
     generic_query: false
+    attachments: { download: true, max_bytes: 2048, types: [text/plain] }
     limits: { max_limit: 40, call_budget: 200 }
   other:
     instance: { url: ${URL}, token: "\${keychain:agility/ann}" }
@@ -92,6 +128,9 @@ workspaces:
       includeChildProjects: false,
       assetTypes: { allow: ['Story', 'Defect', 'Task'], deny: [] },
       genericQuery: false,
+      attachmentDownload: true,
+      attachmentMaxBytes: 2_048,
+      attachmentTypes: ['text/plain'],
       maxRows: 40,
       callBudget: 200,
       logLevel: 'warn',
@@ -132,6 +171,7 @@ workspaces:
       /not valid YAML|alias/i,
     ],
     ['an env-mode variable next to AB_CONFIG', { AB_AGILITY_TOKEN: 'x' }, YAML, /must not be/],
+    ['an attachment variable next to AB_CONFIG', { AB_ATTACHMENT_DOWNLOAD: 'on' }, YAML, /must not be/],
   ])('refuses %s', (_name, env, text, message) => {
     expect(() => loadConfig({ AB_CONFIG: '/cfg.yaml', ...env }, { files: files(text) })).toThrow(message);
   });

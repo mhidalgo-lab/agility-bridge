@@ -3,6 +3,11 @@
 import { z } from 'zod';
 import { oidsOf } from '../identity/scope.ts';
 
+export const assetArg: z.ZodString = z
+  .string()
+  .min(1)
+  .max(64)
+  .describe('Asset number (B-01234, D-00012, TK-00007, AT-00003, E-00001) or OID token (Story:1234).');
 export const limitArg: z.ZodOptional<z.ZodNumber> = z
   .number()
   .int()

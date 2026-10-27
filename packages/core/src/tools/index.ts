@@ -2,6 +2,8 @@
 // The tool catalogue (docs/reference/tool-catalogue.md). Tool tasks add their definitions here; the contract, probe and
 // cost tests in test/ run over every entry.
 import type { ToolDefinition } from '../tool.ts';
+import { getAttachment, listAttachments } from './collaboration/attachments.ts';
+import { getConversations } from './collaboration/conversations.ts';
 import { describeAssetType, listAssetTypes } from './core/asset-types.ts';
 import { listProjects } from './core/list-projects.ts';
 import { whoami } from './core/whoami.ts';
@@ -32,4 +34,7 @@ export const CORE_TOOLS: readonly ToolDefinition[] = Object.freeze([
   listMembers,
   getAssetHistory,
   listRecentChanges,
+  getConversations,
+  listAttachments,
+  getAttachment,
 ] as ToolDefinition[]);
