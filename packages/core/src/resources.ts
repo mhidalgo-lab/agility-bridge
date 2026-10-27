@@ -7,8 +7,8 @@ import { AbError, ErrorCode } from './errors.ts';
 import { assertManifest, type ManifestEntry } from './manifest.ts';
 import { shapeOutput } from './output/result.ts';
 import { FILTER_OPS } from './query/compiler.ts';
-import { QUALITY_RECIPE_RESOURCES } from './recipes/quality.ts';
 import { OTHER_ASSET_RECIPES } from './recipes/other-assets.ts';
+import { QUALITY_RECIPE_RESOURCES } from './recipes/quality.ts';
 import { BACKLOG_ITEM_QUALITY_RUBRIC } from './rubric.ts';
 import type { ToolOutput } from './tool.ts';
 

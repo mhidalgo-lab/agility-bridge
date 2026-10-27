@@ -256,9 +256,9 @@ Status lives in each task file.
 
 | ID | Task | Priority | Depends on | Status |
 |---|---|---|---|---|
-| P6-01 | [Portfolio tools (epics and portfolio items)](tasks/phase-6-tool-breadth/P6-01-tools-portfolio.md) | high | P2-17 | todo |
+| P6-01 | [Portfolio tools (epics and portfolio items)](tasks/phase-6-tool-breadth/P6-01-tools-portfolio.md) | high | P2-17 | review |
 | P6-02 | [Planning tools (get_sprint)](tasks/phase-6-tool-breadth/P6-02-tools-planning.md) | high | P2-17 | review |
-| P6-03 | [Quality views (tests, regression assets, defects)](tasks/phase-6-tool-breadth/P6-03-tools-quality.md) | medium | P2-17 | todo |
+| P6-03 | [Quality views (tests, regression assets, defects)](tasks/phase-6-tool-breadth/P6-03-tools-quality.md) | medium | P2-17, P6-09 | review |
 | P6-04 | [Collaboration tools (conversations, links, attachments)](tasks/phase-6-tool-breadth/P6-04-tools-collaboration.md) | medium | P2-17 | review |
 | P6-05 | [History and activity tools](tasks/phase-6-tool-breadth/P6-05-tools-history.md) | medium | P2-17 | review |
 | P6-06 | [Requests, issues, goals, themes and retrospectives through the generic tools](tasks/phase-6-tool-breadth/P6-06-other-asset-types.md) | medium | P2-17 | review |
@@ -270,12 +270,16 @@ Status lives in each task file.
 | P6-12 | [Consistency pass (arguments, outputs, paging, tool count)](tasks/phase-6-tool-breadth/P6-12-consistency-pass.md) | medium | P6-07, P6-08, P6-09 | todo |
 | P6-13 | [Phase 6 review and live verification](tasks/phase-6-tool-breadth/P6-13-phase-6-review.md) | high | P6-03, P6-04, P6-06, P6-10, P6-11, P6-12 | todo |
 | P6-14 | [OAuth client matrix for the remaining clients](tasks/phase-6-tool-breadth/P6-14-oauth-client-matrix-rest.md) | medium | P5-06 | todo |
+| P6-15 | [Server-side aggregate roll-ups for the portfolio tree](tasks/phase-6-tool-breadth/P6-15-portfolio-aggregate-rollups.md) | low | P6-01 | todo |
+| P6-16 | [Portfolio tree for very large epics (per-child roll-ups)](tasks/phase-6-tool-breadth/P6-16-portfolio-tree-large-epics.md) | low | P6-01 | todo |
 | P6-17 | [Sprint capacity, velocity and hour-based burndown](tasks/phase-6-tool-breadth/P6-17-sprint-capacity-velocity.md) | low | P6-02 | todo |
 | P6-18 | [Burndown for sprints with hundreds of items](tasks/phase-6-tool-breadth/P6-18-sprint-burndown-large-sprints.md) | medium | P6-02 | todo |
 | P6-19 | [Verify the attachment download on a writable sandbox](tasks/phase-6-tool-breadth/P6-19-verify-attachment-download.md) | medium | P6-04 | todo |
 | P6-20 | [Ranged reads of long attachment text](tasks/phase-6-tool-breadth/P6-20-attachment-ranged-reads.md) | low | P6-04 | todo |
 | P6-21 | [Verify history against known edits on the writable sandbox](tasks/phase-6-tool-breadth/P6-21-history-sandbox-verification.md) | medium | P6-05, P7-07 | todo |
 | P6-22 | [Portfolio items in list_recent_changes](tasks/phase-6-tool-breadth/P6-22-recent-changes-portfolio-items.md) | low | P6-05, P6-01 | todo |
+| P6-25 | [Verify the regression and test-set recipes on the writable sandbox](tasks/phase-6-tool-breadth/P6-25-verify-regression-recipes-sandbox.md) | low | P6-03, P7-07 | todo |
+| P6-26 | [Revisit a typed quality tool after the tool evals](tasks/phase-6-tool-breadth/P6-26-quality-typed-tool-revisit.md) | low | P6-03, P6-10 | todo |
 | P6-27 | [Verify requests and empty asset types on a writable sandbox](tasks/phase-6-tool-breadth/P6-27-verify-requests-on-sandbox.md) | low | P6-06 | todo |
 | P6-28 | [Decide on typed tools for issues and requests from usage and evals](tasks/phase-6-tool-breadth/P6-28-typed-tools-for-other-types.md) | low | P6-06, P6-10 | todo |
 
