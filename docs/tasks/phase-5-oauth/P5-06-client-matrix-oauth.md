@@ -2,7 +2,7 @@
 id: P5-06
 title: Real-client compatibility matrix (OAuth)
 phase: 5
-status: review
+status: done
 priority: high
 depends_on: [P5-02, P5-03, P5-04, P5-05]
 adr: ["0016"]
