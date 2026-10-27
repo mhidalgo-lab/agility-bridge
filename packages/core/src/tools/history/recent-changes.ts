@@ -14,6 +14,7 @@ import { invalid } from '../../query/limits.ts';
 import { parseTimeRange } from '../../query/time.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import {
+  changedItemTypeArg,
   cursorArg,
   formatArg,
   includeClosedArg,
@@ -22,21 +23,23 @@ import {
   projectArg,
   teamArg,
   timeRangeArg,
-  workItemTypeArg,
 } from '../common.ts';
+import { EPIC, epicFields, epicRow } from '../portfolio/epics.ts';
 import { identityFor, WORK_ITEM_TYPES, workItem, workItemFields } from '../work/items.ts';
 import { idOf, multiPage, offsetsAfter, type TypedRow } from '../work/multi.ts';
 import { readableWorkTypes, workFilters } from '../work/search.ts';
 
 const NAME = 'list_recent_changes';
 const COST = 24;
+/** Work-item types plus epics (portfolio items, D-91): epics keep their own row and field set. */
+const CHANGE_TYPES = [...WORK_ITEM_TYPES, EPIC] as const;
 const DEFAULT_WINDOW = 'last 7 days';
 
 export const listRecentChanges: ToolDefinition = defineTool({
   name: NAME,
   title: 'List recent changes',
   description:
-    'List work items (backlog items, defects, tasks, tests) changed inside a bounded time_range in an Agility project, a team or the whole workspace, newest first, with who changed them; get_asset_history shows what changed. Sorts by change date, about a second per call. Paged: pass nextCursor back as cursor. Cold call: up to 24 Agility requests.',
+    'List work items (backlog items, defects, tasks, tests) and epics changed inside a bounded time_range in an Agility project, a team or the whole workspace, newest first, with who changed them; get_asset_history shows what changed. Sorts by change date, about a second per call. Paged: pass nextCursor back as cursor. Cold call: up to 24 Agility requests.',
   kind: 'read',
   group: 'history',
   // Capped at run time: metadata for the types, name resolution, the project tree, one page of one batched request.
@@ -44,7 +47,7 @@ export const listRecentChanges: ToolDefinition = defineTool({
   inputSchema: z.object({
     project: projectArg,
     team: teamArg,
-    asset_type: workItemTypeArg(WORK_ITEM_TYPES),
+    asset_type: changedItemTypeArg(CHANGE_TYPES),
     time_range: timeRangeArg(DEFAULT_WINDOW),
     include_closed: includeClosedArg,
     limit: limitArg,
@@ -52,10 +55,15 @@ export const listRecentChanges: ToolDefinition = defineTool({
     format: formatArg,
   }),
   outputSchema: listOutput(z.looseObject({ assetType: z.string(), oid: z.string() })).and(
-    z.looseObject({ window: z.looseObject({ since: z.string(), until: z.string() }) }),
+    z.looseObject({
+      window: z.looseObject({ since: z.string(), until: z.string() }),
+    }),
   ),
   handler: async (input, outer) => {
-    const ctx: ToolContext = { ...outer, budget: capBudget(outer.budget, COST) };
+    const ctx: ToolContext = {
+      ...outer,
+      budget: capBudget(outer.budget, COST),
+    };
     // The window and the page size are validated before any request (L-060).
     const window = parseTimeRange(
       input.time_range ?? DEFAULT_WINDOW,
@@ -65,10 +73,7 @@ export const listRecentChanges: ToolDefinition = defineTool({
     const limit = input.limit ?? ctx.limits.defaultRows;
     if (limit > ctx.limits.maxRows)
       throw invalid(`limit is at most ${ctx.limits.maxRows} in this workspace.`);
-    const types = readableWorkTypes(
-      ctx,
-      input.asset_type === undefined ? WORK_ITEM_TYPES : [input.asset_type],
-    );
+    const types = readableWorkTypes(ctx, input.asset_type === undefined ? CHANGE_TYPES : [input.asset_type]);
     if (types.length === 0) {
       throw new AbError(
         ErrorCode.AuthForbidden,
@@ -79,6 +84,15 @@ export const listRecentChanges: ToolDefinition = defineTool({
       project: input.project,
       team: input.team,
     });
+    // Not every instance gives epics a team: leave them out of a team view instead of failing the whole call.
+    if (
+      input.team !== undefined &&
+      perType.has(EPIC) &&
+      !(await metadataFor(ctx).assetType(EPIC)).attributes.has('Team')
+    ) {
+      perType.delete(EPIC);
+      notes.push('Epics have no team on this instance, so they were left out of the team view.');
+    }
     const binding = await cursorBinding(ctx, NAME, {
       types,
       resolved,
@@ -109,7 +123,7 @@ export const listRecentChanges: ToolDefinition = defineTool({
           assetType: type,
           fields: [
             ...new Set([
-              ...(await workItemFields(ctx, type)),
+              ...(type === EPIC ? await epicFields(ctx) : await workItemFields(ctx, type)),
               ...(meta.attributes.has('ChangedBy') ? ['ChangedBy.Name'] : []),
             ]),
           ],
@@ -133,17 +147,17 @@ export const listRecentChanges: ToolDefinition = defineTool({
     const items = page.rows.map((r) => {
       const by = r.row['ChangedBy.Name'];
       return {
-        ...workItem(r.type, r.row),
+        ...(r.type === EPIC ? epicRow(r.row) : workItem(r.type, r.row)),
         ...(typeof by === 'string' && by !== '' ? { changedBy: by } : {}),
       };
     });
     const out = shapeList(ctx, {
-      summary: `${items.length} work item${items.length === 1 ? '' : 's'} changed between ${window.since} and ${window.until} (${types.join(', ')}), newest change first.`,
+      summary: `${items.length} item${items.length === 1 ? '' : 's'} changed between ${window.since} and ${window.until} (${types.join(', ')}), newest change first.`,
       notes: [
         ...notes,
         'The time shown is the item’s latest change; use get_asset_history for what changed on one item.',
       ],
-      source: 'recently changed work items',
+      source: 'recently changed work items and epics',
       rows: items,
       columns: [
         'number',
@@ -152,6 +166,7 @@ export const listRecentChanges: ToolDefinition = defineTool({
         'state',
         'project',
         'name',
+        'category',
         'status',
         'owners',
         'sprint',
@@ -159,7 +174,11 @@ export const listRecentChanges: ToolDefinition = defineTool({
         'changedBy',
       ],
       hasMore: page.hasMore,
-      cursorFor: (shown) => encodeCursor(binding, { offset: 0, offsets: offsetsAfter(offsets, page, shown) }),
+      cursorFor: (shown) =>
+        encodeCursor(binding, {
+          offset: 0,
+          offsets: offsetsAfter(offsets, page, shown),
+        }),
       hiddenOutsideScope: page.hidden > 0,
       caps: { maxRows: Math.max(limit, 1) },
       ...(input.format === undefined ? {} : { format: input.format }),
@@ -168,7 +187,9 @@ export const listRecentChanges: ToolDefinition = defineTool({
     return {
       ...out,
       structured: {
-        ...(out.structured as { items: Array<{ assetType: string; oid: string }> }),
+        ...(out.structured as {
+          items: Array<{ assetType: string; oid: string }>;
+        }),
         window: { ...window },
       },
     };

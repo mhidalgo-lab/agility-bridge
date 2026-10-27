@@ -2,7 +2,7 @@
 id: P6-22
 title: Portfolio items in list_recent_changes
 phase: 6
-status: todo
+status: review
 priority: low
 depends_on: [P6-05, P6-01]
 adr: ["0011"]
@@ -22,9 +22,9 @@ covers the portfolio level too.
 - Keep one request for all types and per-type cursors.
 
 ## Acceptance criteria
-- [ ] Epics appear in `list_recent_changes` for a project and a team (where epics have one), newest change first.
-- [ ] Contract, cost, negative-authorization and untrusted-text tests cover the new types; the cost stays declared.
-- [ ] `pnpm docs:tools` refreshed.
+- [x] Epics appear in `list_recent_changes` for a project and a team (where epics have one), newest change first.
+- [x] Contract, cost, negative-authorization and untrusted-text tests cover the new types; the cost stays declared.
+- [x] `pnpm docs:tools` refreshed.
 
 ## Security notes
 Portfolio items use their own scope strategy (checked by the compiler); no new route.
@@ -34,6 +34,12 @@ Portfolio items use their own scope strategy (checked by the compiler); no new r
 
 ## Docs to update
 - docs/reference/tools.md (generated), docs/reference/tool-catalogue.md
+
+## Notes
+- Built per D-91 (b), owner decision 2026-10-27: `asset_type` accepts `Epic`; epics use the same `Scope` tree and
+  `Team` filters as the work-item types (as `list_portfolio_items`), their own field set (`epicFields`) and row
+  (`epicRow`, with `category`). When an instance's Epic has no `Team`, epics are left out of a team view with a note.
+- **Live verification of epics in recent changes is pending**: the owner runs `pnpm test:live`.
 
 ## Out of scope
 - Portfolio listing tools themselves (P6-01).

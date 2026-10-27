@@ -112,12 +112,30 @@ function world(): NonNullable<FakeAgilityOptions['assets']> {
     ChangeDateUTC: '2026-10-20T12:00:00.000Z',
     'ChangedBy.Name': 'Ann Example',
   };
+  const epic = (id: number, changed: string, extra: Attrs = {}) => ({
+    _oid: `Epic:${id}`,
+    AssetType: 'Epic',
+    Number: `E-0${id}`,
+    Name: `Epic ${id}`,
+    AssetState: 64,
+    ...inScope,
+    ChangeDateUTC: changed,
+    'ChangedBy.Name': 'Cy Example',
+    'Category.Name': 'Feature',
+    ...extra,
+  });
+  const epics = [
+    epic(1201, '2026-10-20T13:00:00.000Z', { Team: 'Team:5', 'Team.Name': 'Blue' }),
+    epic(1202, '2026-09-01T10:00:00.000Z'),
+    { ...epic(2201, '2026-10-20T14:00:00.000Z'), Scope: 'Scope:2000', 'Scope.Name': 'Outside' },
+  ];
   return {
     Story: stories,
     Defect: [defect],
     Task: [],
     Test: [],
-    Workitem: [...stories, defect],
+    Epic: epics,
+    Workitem: [...stories, defect, ...epics],
     Scope: [
       { _oid: 'Scope:1001', Name: 'Mobile App', AssetState: 64, ChildrenMeAndDown: ['Scope:1001'] },
       { _oid: 'Scope:2000', Name: 'Outside', AssetState: 64, ChildrenMeAndDown: ['Scope:2000'] },
@@ -324,16 +342,41 @@ describe('list_recent_changes', () => {
     const { ctx } = setup();
     const r = await call(listRecentChanges, ctx(), { time_range: 'last 7 days' });
     expect(r['isError'], text(r)).toBeUndefined();
-    expect(s(r).items.map((i) => i['number'])).toEqual(['D-01101', 'B-01001', 'B-01002']);
-    expect(s(r).items[0]).toMatchObject({ changedAt: '2026-10-20T12:00:00.000Z', changedBy: 'Ann Example' });
+    expect(s(r).items.map((i) => i['number'])).toEqual(['E-01201', 'D-01101', 'B-01001', 'B-01002']);
+    expect(s(r).items[0]).toMatchObject({
+      assetType: 'Epic',
+      category: 'Feature',
+      changedAt: '2026-10-20T13:00:00.000Z',
+      changedBy: 'Cy Example',
+    });
+    expect(s(r).items[1]).toMatchObject({ changedAt: '2026-10-20T12:00:00.000Z', changedBy: 'Ann Example' });
     expect(s(r)).toMatchObject({ window: { until: '2026-10-21T12:00:00.000Z' } });
     expect(JSON.stringify(r)).not.toContain('Story 2001');
+    expect(JSON.stringify(r)).not.toContain('Epic 2201');
+  });
+
+  it('lists epics alone, and in a team view when epics have a team', async () => {
+    const { ctx } = setup();
+    const epics = await call(listRecentChanges, ctx(), { asset_type: 'Epic', time_range: 'last 90 days' });
+    expect(s(epics).items.map((i) => i['number'])).toEqual(['E-01201', 'E-01202']);
+    const team = await call(listRecentChanges, ctx(), { team: 'Blue' });
+    expect(s(team).items.map((i) => i['number'])).toEqual(['E-01201', 'B-01001']);
+  });
+
+  it('refuses epics with no request when Epic is not allowed', async () => {
+    const { ctx, fake } = setup({}, { assetTypes: { deny: ['Epic'] } });
+    const r = await call(listRecentChanges, ctx(), { asset_type: 'Epic' });
+    expect(text(r)).toContain('AB_AUTH_FORBIDDEN');
+    expect(fake.requests).toBe(0);
+    // The other types still work and no epic is returned.
+    const rest = await call(listRecentChanges, ctx(), {});
+    expect(s(rest).items.map((i) => i['assetType'])).not.toContain('Epic');
   });
 
   it('filters by team and by type, and widens nothing', async () => {
     const { ctx } = setup();
     const team = await call(listRecentChanges, ctx(), { team: 'Blue' });
-    expect(s(team).items.map((i) => i['number'])).toEqual(['B-01001']);
+    expect(s(team).items.map((i) => i['number'])).toEqual(['E-01201', 'B-01001']);
     const defects = await call(listRecentChanges, ctx(), {
       asset_type: 'Defect',
       time_range: 'last 90 days',
@@ -361,7 +404,7 @@ describe('list_recent_changes', () => {
     const { ctx } = setup();
     const seen: string[] = [];
     let cursor: string | undefined;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 8; i++) {
       const r = await call(listRecentChanges, ctx(), {
         limit: 1,
         time_range: 'last 90 days',
@@ -371,8 +414,10 @@ describe('list_recent_changes', () => {
       cursor = s(r)['nextCursor'] as string | undefined;
       if (cursor === undefined) break;
     }
-    expect(new Set(seen)).toEqual(new Set(['D-01101', 'B-01001', 'B-01002', 'B-01003']));
-    expect(seen).toHaveLength(4);
+    expect(new Set(seen)).toEqual(
+      new Set(['E-01201', 'E-01202', 'D-01101', 'B-01001', 'B-01002', 'B-01003']),
+    );
+    expect(seen).toHaveLength(6);
   });
 
   it.each([
