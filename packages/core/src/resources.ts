@@ -245,7 +245,7 @@ export const RESOURCE_MANIFEST: readonly ResourceDefinition[] = Object.freeze([
       'The versioned rubric (JSON) for judging backlog items: criteria, weights, scale and levels. work_item_quality uses the same rubric.',
     mimeType: 'application/json',
     source: 'static',
-    uses: ['get_work_item'],
+    uses: ['get_work_item', 'work_item_quality'],
     read: async () => ({ text: JSON.stringify(BACKLOG_ITEM_QUALITY_RUBRIC, null, 2) }),
   },
   // Quality recipes (P6-03): a separate block, kept in recipes/quality.ts.

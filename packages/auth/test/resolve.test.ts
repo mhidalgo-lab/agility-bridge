@@ -150,6 +150,30 @@ describe('resolveAccess: what a valid grant gets', () => {
     ).toBe(4_096);
   });
 
+  it('offers the composite reports only where the workspace turns them on and the grant keeps them on (D-101)', () => {
+    expect(allowed(records()).tools).not.toContain('sprint_health');
+    expect(allowed(records()).limits.reports).toBe(false);
+    const named = records({
+      workspace: workspace({ enabledTools: ['whoami', 'sprint_health'] }),
+      grant: grant({ tools: ['whoami', 'sprint_health'] }),
+    });
+    expect(allowed(named).tools).toEqual(['whoami']);
+    expect(allowed(records({ workspace: workspace({ limits: { reports: true } }) })).tools).toContain(
+      'sprint_health',
+    );
+    expect(
+      allowed(
+        records({
+          workspace: workspace({ limits: { reports: true } }),
+          grant: grant({ limits: { reports: false } }),
+        }),
+      ).tools,
+    ).not.toContain('sprint_health');
+    const grantOn = allowed(records({ grant: grant({ limits: { reports: true } }) }));
+    expect(grantOn.tools).not.toContain('sprint_health');
+    expect(grantOn.warnings.join(' ')).toContain('reports on, but the workspace has it off');
+  });
+
   it('applies the deployment ceilings to what a workspace asks for', () => {
     const settings: AccessSettings = {
       ...SETTINGS,

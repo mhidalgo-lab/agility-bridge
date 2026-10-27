@@ -222,3 +222,43 @@
 - **Built:** (a).
 - **Owner:** _open_.
 
+### D-101 — The `reports` group is opt-in, gated like `attachments` *(P6-07)*
+- **Context:** the catalogue lists `reports` as off by default, "enable per workspace". Composites read several siblings and
+  spend the most requests of any tool (up to 54).
+- **Options:** (a) a workspace limit `reports` (off by default; a grant can only turn it off) plus `AB_REPORTS` /
+  `reports:` for stdio, exactly like the attachment download; (b) a normal group that a workspace names in its tool list;
+  (c) on by default.
+- **Recommendation:** (a): one mechanism for opt-in groups, impossible to get through an "all tools" list, visible in the
+  admin form. The default catalogue stays at 20 tools and 39.2 KB.
+- **Owner:** *(open; built as (a))*
+
+### D-102 — The quality rubric resource is offered with the report that applies it *(P6-07)*
+- **Context:** D-92 asked P6-07 to add `work_item_quality` to the rubric resource's `uses`; a resource is available only when
+  every tool in `uses` is allowed, so the rubric disappears from callers that have `get_work_item` but not the report group.
+- **Options:** (a) add it (the rubric follows the opt-in group); (b) keep `get_work_item` only and let the rubric stay
+  visible by default; (c) two resources.
+- **Recommendation:** (a): D-92's intent (one rubric for resource, tool and prompt) and the resource's text ("work_item_quality
+  uses the same rubric") assume the tool exists. The prompt of P6-08 still reads the rubric through its own entry.
+- **Owner:** *(open; built as (a))*
+
+### D-103 — Rubric checks are mechanical, unassessable criteria are `null`, and dependencies and priority limits are stated *(P6-07)*
+- **Context:** the rubric is judgement (clear title, stated value, testable criteria). A server cannot judge; it can count
+  words, find phrases and see which fields are set.
+- **Options:** (a) mechanical heuristics with the evidence shown per criterion, `null` where nothing was read (no estimate
+  field, empty description, priority unreadable), a score range and a level only when the range stays in one level, and a
+  note that dependencies are not read; (b) score everything, treating missing as 0; (c) return only the facts and let the agent
+  score.
+- **Recommendation:** (a): honest and repeatable (L-033); the rubric `version` is cited so scores stay comparable. The
+  thresholds (a title of at least four words, an estimate above 8 is large, three testable criteria) are a starting point
+  for the owner to tune together with the rubric.
+- **Owner:** *(open; built as (a))*
+
+### D-104 — Report thresholds: pace bands, staleness and duplicate similarity *(P6-07)*
+- **Context:** `sprint_health` needs a status, `defect_triage` a "stale" and a "likely duplicate".
+- **Options:** (a) pace = done share minus elapsed share: at least -10 points on track, down to -25 at risk, below off
+  track (only for a current sprint with a known share done); open items unchanged for 3 days are stale in a sprint and 14
+  days for a defect; two defect names with at least 60 % word overlap (three words or more each) are a likely duplicate;
+  (b) configurable per workspace; (c) no status at all, only the figures.
+- **Recommendation:** (a) now with the rule stated in the result; (b) when an owner asks, as a follow-up of the reports'
+  first live use. The figures are always returned beside the status.
+- **Owner:** *(open; built as (a))*

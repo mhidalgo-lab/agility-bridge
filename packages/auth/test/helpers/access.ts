@@ -14,6 +14,7 @@ export const TOOLS: ReadonlyMap<string, ToolInfo> = new Map<string, ToolInfo>([
   ['search_work_items', { kind: 'read', group: 'work' }],
   ['list_teams', { kind: 'read', group: 'planning' }],
   ['get_attachment', { kind: 'read', group: 'attachments' }],
+  ['sprint_health', { kind: 'read', group: 'reports' }],
   ['add_comment', { kind: 'write', group: 'collaboration' }],
   ['close_asset', { kind: 'destructive', group: 'work' }],
 ]);

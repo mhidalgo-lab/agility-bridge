@@ -17,6 +17,11 @@ import { getPortfolioTree } from './portfolio/get-tree.ts';
 import { listPortfolioItems } from './portfolio/list-items.ts';
 import { getAssets } from './query/get-assets.ts';
 import { queryAssets } from './query/query-assets.ts';
+import { defectTriage } from './reports/defect-triage.ts';
+import { workItemQuality } from './reports/quality.ts';
+import { releaseReadiness } from './reports/release-readiness.ts';
+import { sprintHealth } from './reports/sprint-health.ts';
+import { standupSummary } from './reports/standup.ts';
 import { getWorkItem } from './work/get-item.ts';
 import { listMyWork } from './work/my-work.ts';
 import { searchWorkItems } from './work/search.ts';
@@ -44,4 +49,9 @@ export const CORE_TOOLS: readonly ToolDefinition[] = Object.freeze([
 
   listPortfolioItems,
   getPortfolioTree,
+  sprintHealth,
+  standupSummary,
+  releaseReadiness,
+  defectTriage,
+  workItemQuality,
 ] as ToolDefinition[]);

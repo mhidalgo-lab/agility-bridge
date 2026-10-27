@@ -10,6 +10,40 @@ const base = { AB_AGILITY_URL: URL, AB_AGILITY_TOKEN: 'FAKE-token' };
 const config = (env: Record<string, string> = {}) => loadConfig({ ...base, ...env }) as StdioConfig;
 const names = (c: StdioConfig) => selectTools(c).map((t) => t.name);
 
+describe('stdio composite reports (P6-07, D-101)', () => {
+  const REPORTS = [
+    'sprint_health',
+    'standup_summary',
+    'release_readiness',
+    'defect_triage',
+    'work_item_quality',
+  ];
+
+  it('offers no report by default and all five with AB_REPORTS=on', () => {
+    for (const r of REPORTS) expect(names(config())).not.toContain(r);
+    for (const r of REPORTS) expect(names(config({ AB_REPORTS: 'on' }))).toContain(r);
+    expect(names(config({ AB_REPORTS: 'off' }))).not.toContain('sprint_health');
+  });
+
+  it('does not offer them in setup mode, and an allowlist naming one cannot bring it back', () => {
+    expect(selectTools(loadConfig({})).map((t) => t.name)).not.toContain('sprint_health');
+    expect(names(config({ AB_TOOLS: 'whoami,sprint_health' }))).toEqual(['whoami']);
+  });
+
+  it('puts the switch into every call context', () => {
+    for (const on of [false, true]) {
+      const c = config(on ? { AB_REPORTS: 'on' } : {});
+      const ctx = contextFactory(
+        c,
+        { fetch: () => Promise.reject(new Error('no')), logger: undefined as never },
+        selectTools(c),
+      )();
+      expect(ctx.limits.reports).toBe(on);
+      expect(ctx.workspace.groups.includes('reports')).toBe(on);
+    }
+  });
+});
+
 describe('stdio attachment download', () => {
   it('offers the collaboration tools, but not get_attachment, by default', () => {
     expect(names(config())).toEqual(expect.arrayContaining(['get_conversations', 'list_attachments']));

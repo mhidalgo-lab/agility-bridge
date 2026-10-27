@@ -420,6 +420,7 @@ export const LIMIT_SWITCHES = [
   ['memberEmails', 'Member emails in output'],
   ['genericQuery', 'The generic query tools (query_assets, get_assets)'],
   ['attachmentDownload', 'Attachment text download (get_attachment; off by default)'],
+  ['reports', 'Composite reports (sprint_health, standup_summary, …; off by default)'],
 ] as const;
 
 /** Form values for stored limits (`limit_<name>`). */

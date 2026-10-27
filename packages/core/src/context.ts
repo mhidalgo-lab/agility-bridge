@@ -69,6 +69,8 @@ export interface Limits {
   readonly memberEmails: boolean;
   /** Offer `get_attachment`, the text content of one attachment (D-08, THREAT_MODEL A8). Off by default. */
   readonly attachmentDownload: boolean;
+  /** Offer the composite reports (P6-07, D-101, THREAT_MODEL T3). Off by default. */
+  readonly reports: boolean;
   /** Largest attachment `get_attachment` reads, counted on the stream (never the declared length). */
   readonly attachmentMaxBytes: number;
   /** Content types `get_attachment` may return, as `type/subtype` in lower case (checked on metadata and response). */
@@ -109,6 +111,7 @@ export const DEFAULT_LIMITS: Limits = Object.freeze({
   maxTimeRangeDays: 366,
   memberEmails: false,
   attachmentDownload: false,
+  reports: false,
   attachmentMaxBytes: 1_048_576,
   attachmentTypes: DEFAULT_ATTACHMENT_TYPES,
 });
@@ -213,6 +216,11 @@ export interface ToolContext {
   readonly breaker: Breaker;
   /** Pinned at configuration time with the instance; never chosen by a request (L-055). */
   readonly fetch: FetchLike;
+  /**
+   * Names of the tools this caller may call, set by `buildMcpServer` from the tools it registered. A composite report
+   * reads a section only through a tool listed here (L-037); absent means none (fail closed).
+   */
+  readonly grantedTools?: readonly string[];
   /** The host's metadata service (P1-03); tools use `metadataFor(ctx)`. */
   readonly metadata?: MetadataService;
   readonly logger: Logger;

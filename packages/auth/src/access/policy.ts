@@ -44,6 +44,8 @@ export const limitsPolicySchema = z.strictObject({
   genericQuery: z.boolean().optional(),
   /** `get_attachment`, the text content of one attachment (D-08): off unless the workspace turns it on. */
   attachmentDownload: z.boolean().optional(),
+  /** The composite reports (`sprint_health`, …): off unless the workspace turns them on (D-101). */
+  reports: z.boolean().optional(),
   /** Largest attachment `get_attachment` reads, in bytes. */
   attachmentMaxBytes: z
     .number()
@@ -99,7 +101,7 @@ const NUMBER_LIMITS = [
   'attachmentMaxBytes',
   'callBudget',
 ] as const;
-const SWITCHES = ['memberEmails', 'genericQuery', 'attachmentDownload'] as const;
+const SWITCHES = ['memberEmails', 'genericQuery', 'attachmentDownload', 'reports'] as const;
 
 /** What a deployment allows at most and uses by default (runtime presets, ADR-0010). */
 export interface DeploymentLimits {

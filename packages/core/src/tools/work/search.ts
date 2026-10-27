@@ -230,6 +230,8 @@ export const searchWorkItems: ToolDefinition = defineTool({
         'sprint',
         'estimate',
         'toDoHours',
+        // The sort key is shown when it is the sort: reports read it (P6-07).
+        ...(input.sort_by === 'recently_changed' ? ['changedAt'] : []),
       ],
       hasMore: page.hasMore,
       // Per-type offsets after the rows actually shown, so a cut by the output caps skips nothing.

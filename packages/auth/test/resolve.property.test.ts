@@ -49,6 +49,7 @@ const limits = fc.record(
     memberEmails: fc.boolean(),
     genericQuery: fc.boolean(),
     attachmentDownload: fc.boolean(),
+    reports: fc.boolean(),
   },
   { requiredKeys: [] },
 );
@@ -162,7 +163,7 @@ describe('resolveAccess properties', () => {
           if (g !== undefined) expect(a.limits[key]).toBeLessThanOrEqual(g);
         }
         expect(a.limits.defaultRows).toBeLessThanOrEqual(a.limits.maxRows);
-        for (const key of ['memberEmails', 'genericQuery', 'attachmentDownload'] as const) {
+        for (const key of ['memberEmails', 'genericQuery', 'attachmentDownload', 'reports'] as const) {
           if (a.limits[key]) {
             expect(w.wsLimits[key] ?? SETTINGS.limits.defaults[key]).toBe(true);
             expect(w.grantLimits[key]).not.toBe(false);
@@ -172,6 +173,8 @@ describe('resolveAccess properties', () => {
         // The attachment download is never offered unless workspace and grant both allow it (D-08).
         if (!a.limits.attachmentDownload)
           for (const t of a.tools) expect(TOOLS.get(t)?.group).not.toBe('attachments');
+        // The reports are never offered unless workspace and grant both allow them (D-101).
+        if (!a.limits.reports) for (const t of a.tools) expect(TOOLS.get(t)?.group).not.toBe('reports');
         // Expiry: no later than the token or the grant.
         for (const e of [w.tokenExpires, w.grantExpires])
           if (e !== null) expect(a.expiresAt).toBeLessThanOrEqual(e);
