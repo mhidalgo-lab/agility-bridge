@@ -1,0 +1,513 @@
+[
+  {
+    "id": "Q001",
+    "category": "find-items",
+    "question": "Find stories in the Orchard Checkout project that mention gift cards",
+    "expect": ["search_work_items"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q002",
+    "category": "find-items",
+    "question": "Which backlog items in project Harbor Mobile are still in progress?",
+    "expect": ["search_work_items"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q003",
+    "category": "find-items",
+    "question": "Search for stories with 'invoice export' in the name",
+    "expect": ["search_work_items"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q004",
+    "category": "find-items",
+    "question": "Show me everything in sprint Lantern 14 that is not done",
+    "expect": ["search_work_items"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q005",
+    "category": "find-items",
+    "question": "List the B- items owned by Priya Natarajan in the current sprint",
+    "expect": ["search_work_items"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q006",
+    "category": "find-items",
+    "question": "Find work items for team Blue Heron with status Ready for Review",
+    "expect": ["search_work_items"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q007",
+    "category": "find-items",
+    "question": "Are there any tasks about password reset in the Nimbus Portal project?",
+    "expect": ["search_work_items"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q008",
+    "category": "find-items",
+    "question": "Search backlog items whose name contains 'tax rounding'",
+    "expect": ["search_work_items"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q009",
+    "category": "get-item",
+    "question": "Open B-04821 and tell me its acceptance criteria",
+    "expect": ["get_work_item"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q010",
+    "category": "get-item",
+    "question": "What is the status and owner of S-01054?",
+    "expect": ["get_work_item"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q011",
+    "category": "get-item",
+    "question": "Give me the details of story B-07310 including its child tasks",
+    "expect": ["get_work_item"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q012",
+    "category": "get-item",
+    "question": "Show the description and linked items of B-02290",
+    "expect": ["get_work_item"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q013",
+    "category": "get-item",
+    "question": "What does defect D-00412 say and who is working on it?",
+    "expect": ["get_work_item"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q014",
+    "category": "get-item",
+    "question": "Pull up Story:5521 with its epic and sprint",
+    "expect": ["get_work_item"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q015",
+    "category": "get-assets",
+    "question": "Fetch the Name and Estimate of B-01001, B-01002 and B-01003",
+    "expect": ["get_assets"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q016",
+    "category": "get-assets",
+    "question": "Get these assets with only their status: S-00410, S-00411, D-00099",
+    "expect": ["get_assets"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q017",
+    "category": "defects",
+    "question": "List the open defects in the Orchard Checkout project",
+    "expect": ["search_work_items", "query_assets"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q018",
+    "category": "defects",
+    "question": "Which defects in project Harbor Mobile have no owner?",
+    "expect": ["search_work_items", "query_assets"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q019",
+    "category": "defects",
+    "question": "Show me defects in the Nimbus Portal project that are still open",
+    "expect": ["search_work_items", "query_assets"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q020",
+    "category": "defects",
+    "question": "Find defects mentioning 'timeout' in the name",
+    "expect": ["search_work_items", "query_assets"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q021",
+    "category": "my-work",
+    "question": "What am I working on right now?",
+    "expect": ["list_my_work"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q022",
+    "category": "my-work",
+    "question": "Show my open tasks and stories grouped by sprint",
+    "expect": ["list_my_work"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q023",
+    "category": "my-work",
+    "question": "What is on Marcus Oyelaran's plate this sprint?",
+    "expect": ["list_my_work"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q024",
+    "category": "my-work",
+    "question": "List my assigned items that are not finished",
+    "expect": ["list_my_work"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q025",
+    "category": "sprint",
+    "question": "What sprints does team Blue Heron have, and which one is current?",
+    "expect": ["list_sprints"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q026",
+    "category": "sprint",
+    "question": "How is sprint Lantern 14 going? Show committed versus done and the burndown",
+    "expect": ["get_sprint"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q027",
+    "category": "sprint",
+    "question": "Show the scope change and carry-over of the previous sprint",
+    "expect": ["get_sprint"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q028",
+    "category": "sprint",
+    "question": "List the past sprints of project Harbor Mobile with their dates",
+    "expect": ["list_sprints"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q029",
+    "category": "sprint",
+    "question": "How many items were committed at the start of sprint Lantern 13 and how many are done?",
+    "expect": ["get_sprint"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q030",
+    "category": "sprint",
+    "question": "Which sprint starts next for the Kestrel team?",
+    "expect": ["list_sprints"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q031",
+    "category": "people",
+    "question": "List the teams on this instance",
+    "expect": ["list_teams"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q032",
+    "category": "people",
+    "question": "Who is on team Blue Heron and what is their current sprint?",
+    "expect": ["get_team"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q033",
+    "category": "people",
+    "question": "Find the member with username jdoe_test",
+    "expect": ["list_members"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q034",
+    "category": "people",
+    "question": "Look up members named Okafor",
+    "expect": ["list_members"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q035",
+    "category": "portfolio",
+    "question": "List the features and initiatives in the Orchard Checkout project",
+    "expect": ["list_portfolio_items"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q036",
+    "category": "portfolio",
+    "question": "Show the epic tree under E-00310 with done percentage per epic",
+    "expect": ["get_portfolio_tree"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q037",
+    "category": "portfolio",
+    "question": "Which epics have no live children?",
+    "expect": ["list_portfolio_items"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q038",
+    "category": "portfolio",
+    "question": "Roll up the estimate and open defects under initiative E-00077",
+    "expect": ["get_portfolio_tree"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q039",
+    "category": "portfolio",
+    "question": "Find portfolio items with 'loyalty' in the name",
+    "expect": ["list_portfolio_items"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q040",
+    "category": "portfolio",
+    "question": "How far along is epic E-00455 and its sub-epics?",
+    "expect": ["get_portfolio_tree"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q041",
+    "category": "history",
+    "question": "What changed on B-03318 in the last week?",
+    "expect": ["get_asset_history"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q042",
+    "category": "history",
+    "question": "Who changed the estimate of S-01054 and when?",
+    "expect": ["get_asset_history"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q043",
+    "category": "history",
+    "question": "What work items changed in project Harbor Mobile in the last 3 days?",
+    "expect": ["list_recent_changes"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q044",
+    "category": "history",
+    "question": "Show recent changes across the workspace, newest first",
+    "expect": ["list_recent_changes"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q045",
+    "category": "history",
+    "question": "When did B-05577 move to Done and who moved it?",
+    "expect": ["get_asset_history"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q046",
+    "category": "collaboration",
+    "question": "Read the comments on B-04821",
+    "expect": ["get_conversations"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q047",
+    "category": "collaboration",
+    "question": "What did people discuss on defect D-00412?",
+    "expect": ["get_conversations"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q048",
+    "category": "collaboration",
+    "question": "Which files are attached to B-02290?",
+    "expect": ["list_attachments"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q049",
+    "category": "collaboration",
+    "question": "List the links and attachments on S-01054",
+    "expect": ["list_attachments"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q050",
+    "category": "collaboration",
+    "question": "Read the text of attachment 7781 on B-02290",
+    "expect": ["get_attachment"],
+    "catalogue": "full"
+  },
+  {
+    "id": "Q051",
+    "category": "reports",
+    "question": "Give me a standup summary for Priya Natarajan",
+    "expect": ["standup_summary"],
+    "catalogue": "full"
+  },
+  {
+    "id": "Q052",
+    "category": "reports",
+    "question": "Prepare my standup: what did I do yesterday and what is in progress?",
+    "expect": ["standup_summary"],
+    "catalogue": "full"
+  },
+  {
+    "id": "Q053",
+    "category": "reports",
+    "question": "Is epic E-00310 ready to release?",
+    "expect": ["release_readiness"],
+    "catalogue": "full"
+  },
+  {
+    "id": "Q054",
+    "category": "reports",
+    "question": "Are we done with the Q3 release epic E-00455? List what is still open",
+    "expect": ["release_readiness"],
+    "catalogue": "full"
+  },
+  {
+    "id": "Q055",
+    "category": "reports",
+    "question": "Triage the open defects of project Orchard Checkout: stale, ownerless and duplicates",
+    "expect": ["defect_triage"],
+    "catalogue": "full"
+  },
+  {
+    "id": "Q056",
+    "category": "reports",
+    "question": "Which defects in sprint Lantern 14 look like duplicates?",
+    "expect": ["defect_triage"],
+    "catalogue": "full"
+  },
+  {
+    "id": "Q057",
+    "category": "reports",
+    "question": "Is sprint Lantern 14 on track? Report share done against time elapsed",
+    "expect": ["sprint_health"],
+    "catalogue": "full"
+  },
+  {
+    "id": "Q058",
+    "category": "reports",
+    "question": "Is this story well written? Score B-04821 against the quality rubric",
+    "expect": ["work_item_quality"],
+    "catalogue": "full"
+  },
+  {
+    "id": "Q059",
+    "category": "reports",
+    "question": "Review the quality of B-07310: clear title, acceptance criteria, size",
+    "expect": ["work_item_quality"],
+    "catalogue": "full"
+  },
+  {
+    "id": "Q060",
+    "category": "reports",
+    "question": "Which items in the sprint have no owner or have not changed for days, and what is the sprint health?",
+    "expect": ["sprint_health"],
+    "catalogue": "full"
+  },
+  {
+    "id": "Q061",
+    "category": "quality",
+    "question": "Which tests cover story B-04821?",
+    "expect": ["query_assets", "get_work_item"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q062",
+    "category": "quality",
+    "question": "List the acceptance tests of B-02290 and their status",
+    "expect": ["query_assets", "get_work_item"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q063",
+    "category": "quality",
+    "question": "Show failing tests in the Nimbus Portal project",
+    "expect": ["query_assets"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q064",
+    "category": "discovery",
+    "question": "Who am I connected as and which projects can I see?",
+    "expect": ["whoami"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q065",
+    "category": "discovery",
+    "question": "Which Agility projects does this workspace allow?",
+    "expect": ["list_projects"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q066",
+    "category": "discovery",
+    "question": "What asset types can I query here?",
+    "expect": ["list_asset_types"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q067",
+    "category": "discovery",
+    "question": "What fields does the Story type have and which are custom?",
+    "expect": ["describe_asset_type"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q068",
+    "category": "discovery",
+    "question": "What statuses exist for defects on this instance?",
+    "expect": ["describe_asset_type"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q069",
+    "category": "discovery",
+    "question": "What limits and request budget apply to me?",
+    "expect": ["whoami"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q070",
+    "category": "generic",
+    "question": "Query Requests with a custom field Custom_Region equal to EMEA",
+    "expect": ["query_assets"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q071",
+    "category": "generic",
+    "question": "List the issues in project Harbor Mobile created this month",
+    "expect": ["query_assets"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q072",
+    "category": "generic",
+    "question": "Query goals and their target dates",
+    "expect": ["query_assets"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q073",
+    "category": "generic",
+    "question": "Query regression tests sorted by name",
+    "expect": ["query_assets"],
+    "catalogue": "default"
+  }
+]

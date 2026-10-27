@@ -19,6 +19,8 @@
     "changeset": "changeset",
     "prepare": "lefthook install || true",
     "tasks": "node scripts/tasks.ts",
+    "eval:router": "node --conditions=source scripts/evals/run-router.ts",
+    "eval:llm": "node --conditions=source scripts/eval-llm.ts",
     "test:live": "vitest run --config vitest.live.config.ts",
     "metadata:drift": "node scripts/metadata-drift.ts",
     "storage:fixture": "node --conditions=source scripts/storage-fixture.ts",

@@ -32,6 +32,14 @@ with it.
    (`release.ts image-tags`, never backwards; never `latest` from `release/*`, never either for a prerelease). It
    attests build provenance and the SBOM to the registry (`push-to-registry`).
 
+## Before a release that changes tools (owner)
+
+A release whose `tools/list` changed (a tool added, removed or re-described) carries an **LLM tool-evaluation report**
+([Tool evaluations](evals.md), P6-10, L-124): run `pnpm eval:llm --yes` with the default model and with the strongest one
+before approving the Version Packages PR, attach the reports to the release notes, and record the tool-choice accuracy.
+Any hostile-result scenario the model followed blocks the release. The run spends money and never happens in CI. A
+release that did not touch the tools can reuse the last report if the `tools/list` SHA-256 in it is unchanged.
+
 ## One-time set-up (owner)
 
 | Setting | Value | Why |

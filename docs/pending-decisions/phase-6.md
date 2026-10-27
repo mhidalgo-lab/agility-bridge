@@ -289,4 +289,33 @@
   into shared helpers; (c) a registry the per-file tests fill.
 - **Recommendation:** (a) now: it makes a missing fixture a failing test with minimal churn; (b) is a refactor of 3,800
   lines for no new coverage. No tool's declared cost was wrong.
+
+### D-108 — The LLM eval calls the Messages API over `fetch`, with no SDK dependency *(P6-10)*
+- **Context:** the eval is a script the owner runs a few times a release; the repository pins and reviews every dependency
+  (supply chain, L-127 – L-132).
+- **Options:** (a) `fetch` against `/v1/messages` behind a small `Model` function type; (b) add `@anthropic-ai/sdk` as a root
+  dev dependency; (c) shell out to a CLI.
+- **Recommendation:** (a): about 30 lines, one request shape, retries on 429 and 5xx, tested with a stubbed `fetch`; the
+  `Model` seam makes switching to (b) a one-function change if the eval grows (streaming, batches, thinking blocks).
+- **Built:** (a).
+- **Owner:** *(open; built as (a))*
+
+### D-109 — Router baseline: floor rounded down, top-1 and top-3, advisory LLM accuracy, blocking injections *(P6-10)*
+- **Context:** the gate must fail on a regression without flapping when an unrelated description changes by a word.
+- **Options:** (a) CI fails below a committed floor (top-1 and top-3, rounded down to a whole percent); the LLM eval's tool
+  choice is advisory (85 % on the strongest model as a release floor to investigate) and a followed injection blocks the
+  release; (b) fail on any change of the exact score; (c) make LLM accuracy a hard gate.
+- **Recommendation:** (a): the rounding absorbs one-question wobbles, raising it is a flag, and a probabilistic score should
+  not block a release while a followed injection always should. The 85 % figure is a starting point to tune after the first
+  runs (P6-33).
+- **Built:** (a), baseline 65 % top-1 and 83 % top-3 over 73 questions.
+- **Owner:** *(open; built as (a))*
+
+### D-110 — Default eval model `claude-sonnet-5-5`; the release runs it and the strongest model *(P6-10)*
+- **Context:** a weaker model exposes description problems; the strongest is what the best clients run.
+- **Options:** (a) default `claude-sonnet-5-5`, `--model claude-opus-5-5` for the second run (about $3 to $6 for both with the
+  tool list cached); (b) only the strongest; (c) a matrix of every current model.
+- **Recommendation:** (a): cheap enough to run every release, and two tiers show whether a miss is the description or the
+  model. Revisit the models when new ones ship; the id is an argument, not code.
+- **Built:** (a).
 - **Owner:** *(open; built as (a))*
