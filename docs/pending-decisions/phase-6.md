@@ -23,8 +23,8 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
    [P6-25](../tasks/phase-6-tool-breadth/P6-25-verify-regression-recipes-sandbox.md),
    [P6-27](../tasks/phase-6-tool-breadth/P6-27-verify-requests-on-sandbox.md)) is still the unblocker for the attachment download, the
    activity stream, the regression recipes and the requests: nothing in Phase 6 can verify them on the read-only tenant.
-5. **The open decisions below, D-80 to D-122.** Every one is built at its recommendation (the owner authorised the phase as a batch);
-   say so for any you want the other way. D-117 to D-122 come from the review: attachment text only in the enveloped block (D-117),
+5. **The open decisions below, D-80 to D-122.** **Decided 2026-10-27:** every one as recommended except D-91, where the owner
+   chose (b) (epics in `list_recent_changes` now, P6-22 brought forward). D-117 to D-122 come from the review: attachment text only in the enveloped block (D-117),
    a roll-up percentage by estimate only when every item has one (D-118), defect triage reading the oldest change first (D-119),
    no `Scope` in history (D-120), `resources/list` with no upstream call (D-121) and stdio serving the `history` group (D-122).
 
@@ -39,7 +39,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   writable sandbox; (c) read it now, unverified.
 - **Recommendation:** (a), built. (b) is task [P6-21](../tasks/phase-6-tool-breadth/P6-21-history-sandbox-verification.md),
   after the sandbox exists.
-- **Owner:** pending.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-90 — `get_asset_history` is not paged; its window and row cap are the bound *(P6-05)*
 - **Context:** `rest-1.v1/Hist/<type>/<id>` answers every version of the asset in one response; it cannot be narrowed by
@@ -51,7 +51,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   whole `Hist` request, so it costs the same again for each page); (c) refuse assets with more than N versions.
 - **Recommendation:** (a). A person asks about a window, not for page 7 of a version list; a window and a field list
   narrow the answer, and (b) adds a request per page for no new information.
-- **Owner:** pending.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-91 — `list_recent_changes` covers the four work-item types, not portfolio items *(P6-05)*
 - **Context:** the tool queries Story, Defect, Task and Test through the same filters and merge as `search_work_items`
@@ -61,7 +61,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Options:** (a) four work-item types now; portfolio items later; (b) add `Epic` now.
 - **Recommendation:** (a), with [P6-22](../tasks/phase-6-tool-breadth/P6-22-recent-changes-portfolio-items.md) adding epics
   once P6-01 settles how portfolio items are listed.
-- **Owner:** pending.
+- **Owner (2026-10-27):** Decided: (b), add epics now (deviates from the recommendation); [P6-22](../tasks/phase-6-tool-breadth/P6-22-recent-changes-portfolio-items.md) is brought forward.
 
 ### D-86 — Where the attachment download is switched on *(P6-04)*
 - **Context:** D-08 wants `get_attachment` off by default and enabled "per workspace and grant". The access resolver
@@ -75,7 +75,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   limits form, and a tool named in a list is still not served while the switch is off.
 - **Built:** (a). `AB_ATTACHMENT_DOWNLOAD` is not a deployment default for HTTP: the default is off and a workspace
   turns it on.
-- **Owner:** pending.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-87 — What counts as an attachment that may be returned *(P6-04)*
 - **Context:** the task allows text types, checked on the metadata and on the response. Agility may serve a different
@@ -88,7 +88,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   adds a parser to a path that fetches untrusted bytes.
 - **Built:** (a). Unverified until a sandbox run (P6-19): the exact endpoint spelling (`attachments.img`, from the
   developer library) and whether Agility answers with the stored content type.
-- **Owner:** pending.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-88 — How much text one call returns *(P6-04)*
 - **Context:** the download cap (1 MiB by default) bounds what the bridge reads, but a model's context should not take
@@ -98,7 +98,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   the whole text up to the byte cap.
 - **Recommendation:** (a): bounded results by default, and the common case (a log excerpt, a small CSV, a note) fits.
 - **Built:** (a).
-- **Owner:** pending.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-92 — The quality rubric is defined in core now, ahead of `work_item_quality` *(P6-09)*
 - **Context:** the catalogue lists `agility-bridge://rubrics/backlog-item-quality` as "the versioned quality rubric (JSON)
@@ -109,7 +109,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   first release. The criteria and weights are a starting point for the owner to tune; any change bumps `version`.
 - **Built:** (a). The rubric resource is offered when `get_work_item` is allowed; P6-07 should add `work_item_quality` to its
   `uses` when it lands.
-- **Owner:** _open_.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-93 — Static resources are offered only with the tool they describe *(P6-09)*
 - **Context:** the filter vocabulary and the rubric need no Agility call. They could always be offered.
@@ -118,7 +118,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Recommendation:** (a): a workspace without the generic query tool is not shown how to use it, and one rule (all `uses`
   allowed) covers every entry, which prompts reuse (L-290).
 - **Built:** (a).
-- **Owner:** _open_.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-94 — Resource reads are audited as `tool_call` rows *(P6-09)*
 - **Context:** reads must be audited like tool calls (same limits, cache and audit), but a new audit `kind` needs a schema and
@@ -127,7 +127,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   queries, no content); (b) a new `resource_read` kind.
 - **Recommendation:** (a) now; (b) if the owner wants to filter resource reads apart from tool calls in the audit view.
 - **Built:** (a).
-- **Owner:** _open_.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-83 — `get_sprint` reports no capacity *(P6-02)*
 - **Context:** the task asked for schedules and capacity "where the instance exposes them". The Agility schema the metadata
@@ -137,7 +137,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   when the instance has one, unverified; (c) estimate capacity from members and sprint length.
 - **Recommendation:** (a): (b) cannot be tested against anything real yet and (c) is a plausible number with no source
   (L-033). P6-17 picks it up once an instance with capacity data is available.
-- **Owner:** pending (built as (a)).
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-84 — The burndown is read with `asof` queries, not `Hist` *(P6-02)*
 - **Context:** ADR-0011 names `rest-1.v1/Hist` the history authority for what changed on one asset. A sprint burndown needs
@@ -147,7 +147,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   per request, bounded by `maxAsOfAgeDays`; (b) `Hist` per item (hundreds of requests); (c) only the begin and now.
 - **Recommendation:** (a). Points that cannot be read in full are left out and named. `get_asset_history` (P6-05) keeps
   `Hist` as the authority for one asset.
-- **Owner:** pending (built as (a)).
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-85 — Burndown counts estimate of items not in a `completed` status category *(P6-02)*
 - **Context:** "done" needs a rule that works on any instance. The status lists carry a rollup category per status
@@ -156,7 +156,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Options:** (a) the rollup category (as built); (b) `AssetState` closed only; (c) a configurable list of status names.
 - **Recommendation:** (a): it is the instance's own definition and needs no configuration. Hour-based (task) burndown and
   velocity are follow-ups (P6-17).
-- **Owner:** pending (built as (a)).
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-80 — Portfolio roll-ups are computed from the rows read, not from server-side aggregates *(P6-01)*
 - **Context:** `get_portfolio_tree` rolls estimates, done items and open defects up a tree of epics. Agility can aggregate
@@ -169,7 +169,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   exact on any size), once verified live.
 - **Recommendation:** (a) now, because it is exact whenever it says nothing is cut and honest when it is not; follow up
   with (b) in [P6-15](../tasks/phase-6-tool-breadth/P6-15-portfolio-aggregate-rollups.md) after a live check.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-81 — What "done" means in a roll-up, and how the percentage is taken *(P6-01)*
 - **Context:** Agility has no single "done" flag: an item is closed (`AssetState` 128) or has a status whose rollup
@@ -179,14 +179,14 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   category only; (d) always by item count.
 - **Recommendation:** (a): it matches what people see on a board whichever convention the team follows, and the stated basis
   stops a count-based number being read as effort. Dead assets (deleted, templates, broken down) are never counted.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-82 — The `portfolio` group is served by the stdio server by default *(P6-01)*
 - **Context:** the catalogue lists `portfolio` as on by default; the stdio server's group list stopped at `people` in
   Phase 1, so a new group would exist only for HTTP workspaces that enable it.
 - **Options:** (a) add `portfolio` to the stdio groups; (b) leave stdio at five groups and let each later group opt in.
 - **Recommendation:** (a): same default as the catalogue; the catalogue stays within the 25-tool default target (15 now).
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-95 — No typed tool for quality views; recipes only *(P6-03)*
 - **Context:** the task asked whether a typed tool such as "test status for a backlog item" pays off under the tool budget
@@ -197,7 +197,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   generic tool. Revisit (b) if the tool evals (P6-10) show agents failing the recipe, or the owner wants a status roll-up
   per backlog item ([P6-26](../tasks/phase-6-tool-breadth/P6-26-quality-typed-tool-revisit.md)).
 - **Built:** (a).
-- **Owner:** _open_.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-96 — Two recipe resources, served through the generic query and metadata tools *(P6-03)*
 - **Context:** recipes are manifest entries that prompts (P6-08) can point at. One resource for everything would be long and
@@ -208,7 +208,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Recommendation:** (a): the optional-type warning stays with the optional types, and neither resource is lost when
   `search_work_items` is off (L-295).
 - **Built:** (a).
-- **Owner:** _open_.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-97 — Regression plans and suites have prose, not validated examples *(P6-03)*
 - **Context:** the committed metadata snapshot has `RegressionTest` and `TestSet` but not `RegressionPlan` or
@@ -218,6 +218,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   ([P6-25](../tasks/phase-6-tool-breadth/P6-25-verify-regression-recipes-sandbox.md)); (b) invent examples from Agility
   documentation, unverified; (c) extend the synthetic snapshot by hand.
 - **Recommendation:** (a).
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-98 — Issues, requests, goals, themes and retrospectives get no typed tools *(P6-06)*
 - **Context:** the five types are read through `query_assets` and `get_assets`; L-155 caps the tool count. The read-only
@@ -226,7 +227,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   per type later, driven by the P6-10 evals and real use.
 - **Recommendation:** (a) now, (c) when evals or usage show an agent failing with the generic route (follow-up P6-28).
 - **Built:** (a).
-- **Owner:** _open_.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-99 — Four recipe resources, grouped by what is read together *(P6-06)*
 - **Context:** five types, and the manifest lists every resource to every client, so the list should stay short.
@@ -234,7 +235,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   (b) one recipe per type; (c) one recipe for all five.
 - **Recommendation:** (a): each recipe stays short enough to read in one go, and the list grows by four rather than five.
 - **Built:** (a). Each recipe is offered only when `query_assets` and `get_assets` are both allowed.
-- **Owner:** _open_.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-100 — The single-owner fallback is in the computed default tier, not in per-type overrides *(P6-06)*
 - **Context:** issues have `Owner`, not `Owners`, so the default tier had no owner column for them. `tierOverrides` could
@@ -243,7 +244,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   `Issue`; (c) leave issues without an owner by default.
 - **Recommendation:** (a): it follows the metadata (L-050) and needs no list of type names; an override still replaces it.
 - **Built:** (a).
-- **Owner:** _open_.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-101 — The `reports` group is opt-in, gated like `attachments` *(P6-07)*
 - **Context:** the catalogue lists `reports` as off by default, "enable per workspace". Composites read several siblings and
@@ -253,7 +254,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   (c) on by default.
 - **Recommendation:** (a): one mechanism for opt-in groups, impossible to get through an "all tools" list, visible in the
   admin form. The default catalogue stays at 20 tools and 39.2 KB.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-102 — The quality rubric resource is offered with the report that applies it *(P6-07)*
 - **Context:** D-92 asked P6-07 to add `work_item_quality` to the rubric resource's `uses`; a resource is available only when
@@ -262,7 +263,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   visible by default; (c) two resources.
 - **Recommendation:** (a): D-92's intent (one rubric for resource, tool and prompt) and the resource's text ("work_item_quality
   uses the same rubric") assume the tool exists. The prompt of P6-08 still reads the rubric through its own entry.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-103 — Rubric checks are mechanical, unassessable criteria are `null`, and dependencies and priority limits are stated *(P6-07)*
 - **Context:** the rubric is judgement (clear title, stated value, testable criteria). A server cannot judge; it can count
@@ -274,7 +275,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Recommendation:** (a): honest and repeatable (L-033); the rubric `version` is cited so scores stay comparable. The
   thresholds (a title of at least four words, an estimate above 8 is large, three testable criteria) are a starting point
   for the owner to tune together with the rubric.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-104 — Report thresholds: pace bands, staleness and duplicate similarity *(P6-07)*
 - **Context:** `sprint_health` needs a status, `defect_triage` a "stale" and a "likely duplicate".
@@ -284,7 +285,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   (b) configurable per workspace; (c) no status at all, only the figures.
 - **Recommendation:** (a) now with the rule stated in the result; (b) when an owner asks, as a follow-up of the reports'
   first live use. The figures are always returned beside the status.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-111 — A composite granted without its siblings is a warning, not a refusal *(P6-11)*
 - **Context:** a report whose siblings are not granted skips those sections and says so (L-300). An operator may do this
@@ -293,7 +294,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   composite without its siblings; (c) grant the siblings implicitly.
 - **Recommendation:** (a): (b) blocks legitimate narrow grants, (c) widens access behind the operator's back (L-037, T3).
   The warning names the missing tools so the fix is one tick.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-112 — The sibling table lives beside the reports, not on `ToolDefinition` *(P6-11)*
 - **Context:** the metadata is needed by `whoami` (inside the tool catalogue's own import graph), the admin API and the
@@ -302,7 +303,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   (b) an optional `siblings` field on `ToolDefinition`; (c) derive it at run time from the sections that ran.
 - **Recommendation:** (a): no cycle (`whoami` cannot import `CORE_TOOLS`), one place to edit, and the test fails when a
   report's sections and the table disagree. (b) is easy to move to later.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-113 — The every-tool cost test uses one shared world; the deepest cases stay beside each tool *(P6-11)*
 - **Context:** each tool's test file has its own synthetic world and its deepest worst case (four-level trees, every page).
@@ -312,6 +313,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   into shared helpers; (c) a registry the per-file tests fill.
 - **Recommendation:** (a) now: it makes a missing fixture a failing test with minimal churn; (b) is a refactor of 3,800
   lines for no new coverage. No tool's declared cost was wrong.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-108 — The LLM eval calls the Messages API over `fetch`, with no SDK dependency *(P6-10)*
 - **Context:** the eval is a script the owner runs a few times a release; the repository pins and reviews every dependency
@@ -321,7 +323,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Recommendation:** (a): about 30 lines, one request shape, retries on 429 and 5xx, tested with a stubbed `fetch`; the
   `Model` seam makes switching to (b) a one-function change if the eval grows (streaming, batches, thinking blocks).
 - **Built:** (a).
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-109 — Router baseline: floor rounded down, top-1 and top-3, advisory LLM accuracy, blocking injections *(P6-10)*
 - **Context:** the gate must fail on a regression without flapping when an unrelated description changes by a word.
@@ -332,7 +334,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   not block a release while a followed injection always should. The 85 % figure is a starting point to tune after the first
   runs (P6-33).
 - **Built:** (a), baseline 65 % top-1 and 83 % top-3 over 73 questions.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-110 — Default eval model `claude-sonnet-5-5`; the release runs it and the strongest model *(P6-10)*
 - **Context:** a weaker model exposes description problems; the strongest is what the best clients run.
@@ -341,6 +343,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Recommendation:** (a): cheap enough to run every release, and two tiers show whether a miss is the description or the
   model. Revisit the models when new ones ship; the id is an argument, not code.
 - **Built:** (a).
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-105 — Prompts on report tools exist only when `reports` is on; no fallback to base tools *(P6-08)*
 - **Context:** `review_backlog_item_quality`, `standup` and `triage_defects` use `work_item_quality`, `standup_summary` and
@@ -351,7 +354,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Recommendation:** (a): the catalogue table's contract, one rule everywhere (L-153), and a stand-up prompt that quietly
   composes its own report from search calls would give a different answer than the tool. (b) as follow-up
   [P6-31](../tasks/phase-6-tool-breadth/P6-31-prompt-fallbacks-without-reports.md) when an owner asks.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-106 — Prompt arguments are strings with a plain-text rule; prompts are not audited or logged *(P6-08)*
 - **Context:** MCP prompt arguments are strings. A prompt does no work against Agility, so there is no request, budget or
@@ -361,7 +364,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   free text and rely on the model.
 - **Recommendation:** (a). (b) is cheap to add if an owner wants to know who asked for which workflow (the host's request
   log already shows `prompts/get`); (c) was refused by L-305.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-107 — Prompts guide a workflow; they do not read Agility to fill the message *(P6-08)*
 - **Context:** a prompt could run its tools at `prompts/get` and embed the result (a ready stand-up note) or only tell the
@@ -371,7 +374,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   prompts get a request budget, audit and error handling of their own, and a client may cache them).
 - **Recommendation:** (a). It keeps the untrusted-data path to one place (the tools) and prompts free of upstream failure
   modes; (b) can be added per prompt later without changing the argument contract.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-114 — One schema and one description per shared argument; the lint has no exceptions list *(P6-12)*
 - **Context:** the review of all 26 tools found `member` described as "The owner: …" on two tools and "Owner: …" on a third,
@@ -383,7 +386,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   (tools could not drift, but the source would no longer say what is advertised); (c) review by hand.
 - **Recommendation:** (a), built. A legitimately different concept gets its own vocabulary entry (`epicArg`,
   `workItemArg`, the work-item `asset_type` enum), never an exception.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-115 — Counts are `<thing>Count`; `get_sprint` renamed its numeric `items` fields without an alias *(P6-12)*
 - **Context:** `get_sprint` used `items` for a number (`totals.items`, `byStatusCategory[].items`, `committed.items`,
@@ -394,7 +397,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Recommendation:** (a), built: `get_sprint` is new in this unreleased version (its changeset is still pending), before
   1.0 renames need only a changelog entry, and `sprint_health` is the only reader and moved with it. (c) would be the rule
   once an output field has shipped.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-116 — The default `tools/list` has a 36.5 KB target in a test, below the 40 KB cap *(P6-12)*
 - **Context:** the default catalogue was 39,179 of 40,000 bytes; the pass brought it to 35,892 (every group: 47,946 to
@@ -406,7 +409,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   so a change that crosses it must say why; (c) lower the hard cap.
 - **Recommendation:** (b), built. (c) would not change what clients accept (Cursor's cap is about the number of tools; the
   byte budget is ours).
-- **Owner:** *(open; built as (b))*
+- **Owner (2026-10-27):** Decided: as recommended, (b).
 
 ### D-117 — `get_attachment` returns its text only in the enveloped block, not in `structuredContent` *(P6-13)*
 - **Context:** the text block carried the attachment text inside the untrusted-data envelope, and `structuredContent.content` repeated
@@ -415,7 +418,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Options:** (a) structured carries metadata only (`attachment { oid, name?, contentType, bytes, characters }`, `asset`, `truncated`);
   (b) keep the text and add an `untrusted: true` marker; (c) keep as it was.
 - **Recommendation:** (a), built. The model reads the enveloped block; code that needs the bytes is not an MCP client's job.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-118 — A roll-up percentage is by estimate only when every item read has one *(P6-13, changes D-81)*
 - **Context:** with some items estimated and others not, the percentage by estimate ignored the unestimated ones: an epic with two
@@ -424,7 +427,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   estimate basis and only add the count; (c) always by count.
 - **Recommendation:** (a), built: the number never hides open work, and the count of unestimated items is in the row. (c) throws away
   the estimates where they are complete.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-119 — `defect_triage` reads the oldest change first *(P6-13)*
 - **Context:** the report read the 100 most recently changed open defects, so the stale ones it exists to find were the ones cut
@@ -432,7 +435,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Options:** (a) read oldest change first (a new `sort_by: oldest_changed` on `search_work_items`, about 20 bytes in `tools/list`)
   and say so when more exist; (b) two sections, the oldest 50 and the newest 50 (two requests); (c) keep newest first and add a note.
 - **Recommendation:** (a), built. (b) is the better answer for a large backlog and is part of P6-30 (priority and severity triage).
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-120 — `get_asset_history` does not follow `Scope`, and reads the history of an asset that has since moved into scope *(P6-13)*
 - **Context:** an asset moved from a project outside the workspace into one inside it carries its earlier `Scope` in `Hist`, so
@@ -441,7 +444,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   whole history (the asset is in scope, as are its comments); (b) also refuse any window that starts before the asset was last
   moved (needs the move date, not available); (c) leave as it was.
 - **Recommendation:** (a), built, and stated in THREAT_MODEL A4. A grant that must not see pre-move history can set `maxAsOfAgeDays`.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-121 — `resources/list` makes no upstream request *(P6-13)*
 - **Context:** the per-type resource list called `list_asset_types`: 21 requests and about 1.9 MB of metadata parsed on a cold isolate,
@@ -450,7 +453,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Options:** (a) list the workspace's allowed type names (the default readable types when no list is set), no upstream call; a type
   the instance does not have fails cleanly when read; (b) list only types already in the metadata cache; (c) keep it live.
 - **Recommendation:** (a), built. The resource then needs only `describe_asset_type`.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-122 — The stdio server serves the `history` group by default *(P6-13)*
 - **Context:** `STDIO_GROUPS` lacked `history`, so stdio users had no `get_asset_history` or `list_recent_changes`, although the
@@ -458,5 +461,5 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Options:** (a) serve it (a read-only group, 2 tools, 20 tools in the default catalogue); (b) leave it out until P6-21 has verified
   `Hist` on a sandbox; (c) make it opt-in.
 - **Recommendation:** (a), built; `Hist` was verified read-only on the tenant (P6-05). A test compares the list with the registry.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
