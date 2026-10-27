@@ -19,6 +19,7 @@ export {
 export { CredentialLimiters, Semaphore } from './agility/limiter.ts';
 export { parseXml, type XmlElement } from './agility/xml.ts';
 export {
+  ACTIVE_ATTACHMENT_TYPES,
   type ApprovalChannel,
   type AssetTypeScope,
   type Breaker,
@@ -28,6 +29,7 @@ export {
   capBudget,
   closedBreaker,
   createBudget,
+  DEFAULT_ATTACHMENT_TYPES,
   DEFAULT_LIMITS,
   type FetchLike,
   freezeContext,

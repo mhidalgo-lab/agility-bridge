@@ -75,7 +75,8 @@ limits. Creating one is two steps: choose the instance (it cannot change later),
   projects are suggested. Nothing outside them is ever readable through the workspace.
 - **Tools**: "every read tool" (including ones added later) or a list. Write tools are never part of "all".
 - **Asset types** and **limits** (rows, fields, response size, time range, request budget per tool call, member emails,
-  generic query tools): a blank field means the server default; grants can only narrow them.
+  generic query tools, and the attachment download with its size cap, both off or small by default: the download is the
+  opt-in `get_attachment` tool, [off unless a workspace turns it on](../reference/tool-catalogue.md#attachments-opt-in)): a blank field means the server default; grants can only narrow them.
 - **Owner settings**: *Allow writes* and *Credential source* (pass-through). Owners only, with a recent sign-in. Admins do
   not see them and do not see write tools. When a workspace already enables write tools, an admin's edit leaves that list
   as it is and says why.

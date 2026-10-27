@@ -27,6 +27,12 @@ export interface AgilityClientOptions {
   readonly backoffBaseMs?: number;
 }
 
+/** What `attachmentContent` returns: the bytes (within the cap) and the response's `type/subtype`. */
+export interface AttachmentContent {
+  readonly bytes: Uint8Array;
+  readonly contentType: string;
+}
+
 /** A `query.v1` query; its shape is built and validated by the query compiler (P1-04), never by callers. */
 export type QueryBody = Readonly<Record<string, unknown>>;
 
@@ -36,7 +42,8 @@ type Endpoint =
   | 'meta.v1'
   | 'rest-1.v1/Data'
   | 'rest-1.v1/Hist'
-  | 'api/asset';
+  | 'api/asset'
+  | 'attachments.img';
 
 interface Call {
   readonly endpoint: Endpoint;
@@ -45,7 +52,9 @@ interface Call {
   readonly params?: URLSearchParams;
   readonly body?: string;
   readonly contentType?: string;
-  readonly expect: 'json' | 'xml';
+  readonly expect: 'json' | 'xml' | 'binary';
+  /** For `binary`: the stream cap and the content types the response may have (P6-04). */
+  readonly binary?: { readonly maxBytes: number; readonly allowedTypes: readonly string[] };
   /** Writes are never retried (L-047, ADR-0013). */
   readonly write: boolean;
   /** For the budget message: "before <what>". */
@@ -188,6 +197,27 @@ function agilityErrorDetails(body: string): Record<string, unknown> | undefined 
   }
 }
 
+/** `type/subtype` in lower case, without parameters (`text/plain; charset=utf-8` is `text/plain`). */
+export function mediaType(contentType: string): string {
+  return (contentType.split(';')[0] ?? '').trim().toLowerCase();
+}
+
+const typeRefused = (): AbError =>
+  new AbError(ErrorCode.InputInvalid, 'Agility answered with a content type this workspace does not allow.', {
+    hint: 'Only the text types the deployment allows (AB_ATTACHMENT_TYPES) are returned; nothing was read.',
+  });
+
+const tooBig = (maxBytes: number): AbError =>
+  new AbError(
+    ErrorCode.LimitResponseTooLarge,
+    `The attachment is larger than ${Math.round(maxBytes / 1024)} KiB, the most this workspace returns.`,
+    {
+      hint: 'Nothing was returned. Open the attachment in Agility, or ask an administrator to raise the attachment size limit.',
+      details: { maxBytes },
+      localDetails: true,
+    },
+  );
+
 function looksLikeHtml(contentType: string, text: string): boolean {
   return /\bhtml\b/i.test(contentType) || /^\s*<(?:!doctype\s+html|html)\b/i.test(text);
 }
@@ -327,6 +357,29 @@ export class AgilityClient {
     }) as Promise<AgilityResponse<T>>;
   }
 
+  /**
+   * `GET attachments.img/<id>`: the content of one attachment (P6-04, THREAT_MODEL A8). The response is refused before
+   * its body is read unless its content type is in `allowedTypes`, and the body is cut off as soon as it passes
+   * `maxBytes` (counted on the stream, never from `Content-Length`). One request; the caller verified scope first.
+   */
+  attachmentContent(
+    id: number | string,
+    options: { readonly maxBytes: number; readonly allowedTypes: readonly string[] },
+  ): Promise<AgilityResponse<AttachmentContent>> {
+    return this.#send({
+      endpoint: 'attachments.img',
+      method: 'GET',
+      segments: ['attachments.img', assetId(id)],
+      expect: 'binary',
+      binary: {
+        maxBytes: Math.min(options.maxBytes, this.#ctx.limits.maxResponseBytes),
+        allowedTypes: options.allowedTypes,
+      },
+      write: false,
+      what: 'the attachment download',
+    }) as Promise<AgilityResponse<AttachmentContent>>;
+  }
+
   async #send(call: Call): Promise<AgilityResponse<unknown>> {
     const { budget, breaker, limiter } = this.#ctx;
     const attempts = call.write ? 1 : this.#maxAttempts;
@@ -364,7 +417,12 @@ export class AgilityClient {
     const timeoutMs = limits.requestTimeoutMs;
     const headers: Record<string, string> = {
       authorization: `Bearer ${credential.token.reveal()}`,
-      accept: call.expect === 'json' ? 'application/json' : 'application/xml, text/xml',
+      accept:
+        call.expect === 'json'
+          ? 'application/json'
+          : call.expect === 'binary'
+            ? (call.binary?.allowedTypes.join(', ') ?? '*/*')
+            : 'application/xml, text/xml',
       'user-agent': `agility-bridge/${VERSION}`,
     };
     if (call.contentType !== undefined) headers['content-type'] = call.contentType;
@@ -481,7 +539,56 @@ export class AgilityClient {
     }
   }
 
+  async #binary(
+    binary: NonNullable<Call['binary']>,
+    res: Response,
+    log: (bytes?: number) => void,
+  ): Promise<Attempt> {
+    const contentType = res.headers.get('content-type') ?? '';
+    const type = mediaType(contentType);
+    if (/\bhtml\b/i.test(type)) {
+      await res.body?.cancel().catch(() => {});
+      log();
+      return { ok: false, retryable: false, error: wrongInstance('an HTML page, often a login page') };
+    }
+    if (!binary.allowedTypes.includes(type)) {
+      await res.body?.cancel().catch(() => {});
+      log();
+      return { ok: false, retryable: false, error: typeRefused() };
+    }
+    const declared = Number(res.headers.get('content-length'));
+    if (Number.isFinite(declared) && declared > binary.maxBytes) {
+      await res.body?.cancel().catch(() => {});
+      log();
+      return { ok: false, retryable: false, error: tooBig(binary.maxBytes) };
+    }
+    // The stream is the authority: a lying or missing Content-Length changes nothing.
+    const reader = res.body?.getReader();
+    const chunks: Uint8Array[] = [];
+    let bytes = 0;
+    while (reader !== undefined) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > binary.maxBytes) {
+        await reader.cancel().catch(() => {});
+        log(bytes);
+        return { ok: false, retryable: false, error: tooBig(binary.maxBytes) };
+      }
+      chunks.push(value);
+    }
+    log(bytes);
+    const all = new Uint8Array(bytes);
+    let offset = 0;
+    for (const c of chunks) {
+      all.set(c, offset);
+      offset += c.byteLength;
+    }
+    return { ok: true, response: { status: res.status, data: { bytes: all, contentType: type }, bytes } };
+  }
+
   async #success(call: Call, res: Response, log: (bytes?: number) => void): Promise<Attempt> {
+    if (call.expect === 'binary' && call.binary !== undefined) return this.#binary(call.binary, res, log);
     const contentType = res.headers.get('content-type') ?? '';
     const { text, bytes } = await readCapped(res, this.#ctx.limits.maxResponseBytes);
     log(bytes);

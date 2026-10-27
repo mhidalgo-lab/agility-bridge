@@ -412,12 +412,14 @@ export const LIMIT_NUMBERS = [
   ['maxResponseBytes', 'Largest response (bytes)', 65_536, 67_108_864],
   ['maxAsOfAgeDays', 'Furthest AsOf into the past (days)', 0, 3_650],
   ['maxTimeRangeDays', 'Longest time range (days)', 1, 3_660],
+  ['attachmentMaxBytes', 'Largest attachment text returned (bytes)', 1_024, 8_388_608],
   ['callBudget', 'Agility requests per tool call', 1, 10_000],
 ] as const;
 
 export const LIMIT_SWITCHES = [
   ['memberEmails', 'Member emails in output'],
   ['genericQuery', 'The generic query tools (query_assets, get_assets)'],
+  ['attachmentDownload', 'Attachment text download (get_attachment; off by default)'],
 ] as const;
 
 /** Form values for stored limits (`limit_<name>`). */

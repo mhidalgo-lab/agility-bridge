@@ -33,6 +33,11 @@ What it checks (about 40 read requests, one at a time):
   relation targets and bases; a failure names only product attributes), paging by `ID` with `limit + 1`, and the output shaper on real rows (envelope present,
   `structuredContent` rows equal to the rows shown, no `null`). Assertions are on counts and shapes only.
 
+- `live/collaboration.live.test.ts` (P6-04): `get_conversations` and `list_attachments` on real assets (counts and shapes
+  only), the product attributes they read, and `get_attachment` up to its metadata checks (scope, ID and parent match,
+  every content type refused, so no content request is made). **Gap:** the guard allows no `attachments.img` request, so
+  the download itself is verified on fixtures only (tracked in P6-19).
+
 ## Tenant inventory (2026-10-21, Agility 26.0.3.2, hosted)
 
 Recorded by `live/inventory.live.test.ts` as size buckets and published here at a coarser level (the repository is

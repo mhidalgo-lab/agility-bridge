@@ -235,6 +235,7 @@ export function resolveAccess(
     if (info === undefined) continue;
     if (gp.tools !== null && !gp.tools.includes(name)) continue;
     if (!limits.genericQuery && info.group === 'query') continue;
+    if (!limits.attachmentDownload && info.group === 'attachments') continue;
     if (info.kind !== 'read') {
       // Both lists must name a write tool explicitly: "all tools" never includes one.
       const explicit = ws.enabledTools?.includes(name) === true && gp.tools?.includes(name) === true;
@@ -312,7 +313,12 @@ export function resolvePassthroughAccess(
   const candidates = ws.enabledTools ?? [...known.keys()];
   const tools = candidates.filter((name) => {
     const info = known.get(name);
-    return info !== undefined && info.kind === 'read' && (limits.genericQuery || info.group !== 'query');
+    return (
+      info !== undefined &&
+      info.kind === 'read' &&
+      (limits.genericQuery || info.group !== 'query') &&
+      (limits.attachmentDownload || info.group !== 'attachments')
+    );
   });
   if (tools.length === 0) return deny('no_tools');
   const id = fingerprint.slice(0, 32);

@@ -28,9 +28,9 @@ How to use it:
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
 | [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171 |
-| [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167 |
-| [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172 |
-| [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239 |
+| [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
+| [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-282 |
+| [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267 |
@@ -43,7 +43,7 @@ How to use it:
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241 |
-| [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-284 – L-287 |
+| [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-283, L-284 – L-287 |
 | [Top 20](#top-20) | the lessons that save the most time |
 
 ---
@@ -416,6 +416,13 @@ compared with the public example instance (`pnpm metadata:drift`, weekly workflo
 attributes only.
 *Applied in:* P1-03, [RESEARCH §1.6](RESEARCH.md#16-asset-model).
 
+**L-281 — Bound downloaded bytes on the stream and check the type twice: on the metadata and on the response.**
+Never act on a declared length or a stored content type alone: read at most the cap and stop, refuse a response whose
+type is not on the allowlist before reading its body, treat an HTML answer as the wrong instance, and refuse a missing
+type, binary content (NUL, invalid UTF-8) and types that run or render (HTML, SVG, XML, JavaScript) even when listed.
+*Why:* length and type headers are chosen by whoever serves or uploaded the file.
+*Applied in:* P6-04 (`AgilityClient.attachmentContent`), D-87.
+
 ## F. Query safety and limits
 
 **L-057 — Never build upstream queries from strings.**
@@ -475,6 +482,13 @@ against what a fresh call could ask for (`maxTimeRangeDays`, offset range, a "no
 catches accidental edits and cursors from another request. A list whose filters depend on the time keeps the first
 page's "now", or a sprint that ends mid-paging is skipped.
 *Applied in:* P1-18, `query/cursor.ts`, `tools/planning/sprints.ts`.
+
+**L-282 — A lookup by id that precedes a side effect on that id must check the row it got is the row it asked for.**
+The scope recheck passes any row inside the workspace, so an upstream that ignores a filter can answer an id lookup
+with a different, in-scope row. Before fetching content for an attachment id, the row's own id and its parent asset
+must match the request.
+*Why:* found by the hostile-upstream test (`ignore-filters`): the first in-scope row stood in for any attachment id.
+*Applied in:* P6-04 (`get_attachment`), L-064.
 
 ## G. Access model, tokens and isolation
 
@@ -542,6 +556,13 @@ changed (a storage compare-and-swap would close the last milliseconds, P4-37). A
 compares lengths is no cap: read at most the cap and cancel (and do not await the cancel of a `clone()`, whose promise waits
 for the other branch).
 *Applied in:* P4-09.
+
+**L-280 — An opt-in read tool needs a gate in the access resolver, not only a missing name in a list.**
+The resolver offers every read tool when a workspace names none, so a tool that returns content people may not want
+flowing (an attachment's text) is dropped by group unless the workspace turns a switch on and the grant keeps it on;
+the handler checks the same switch, so a tool reached any other way refuses.
+*Why:* "off by default" that depends on every operator leaving a name out of a list is on by default.
+*Applied in:* P6-04 (`attachmentDownload`, group `attachments`), D-86.
 
 ## H. Storage, migrations and secrets
 
@@ -1672,6 +1693,13 @@ related type on a cold cache: `get_asset_history` needed 13 requests (the resolv
 each related type, the project tree, one `Hist`). Measure the cold
 cost with the default field set (the cost test does), declare it, and say it in the description.
 *Applied in:* P6-05, [tool conventions](dev/tool-conventions.md).
+
+**L-283 — Select optional product attributes from metadata, and expect the size to be unknown.**
+`ID` is a relation and cannot be sorted on (newest first needs a date attribute the type really has), and `ContentLength`
+does not exist on `Attachment` in 26.0.3.2, so a declared size may be missing: the stream cap is the authority and a
+list says nothing about size rather than guessing. The live guard allows no attachment content request, so a live
+check stops at the metadata and scope steps and the download is verified on fixtures; record that gap.
+*Applied in:* P6-04 (`list_attachments`, live collaboration suite).
 
 ---
 

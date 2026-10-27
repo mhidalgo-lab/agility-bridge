@@ -34,10 +34,24 @@ export interface Block {
   readonly richText?: readonly string[];
 }
 
+/** Free text from Agility shown as one block (an attachment's content): cleaned, redacted, cut and enveloped. */
+export interface TextBlock {
+  readonly title?: string;
+  readonly source: string;
+  readonly text: string;
+  /** Most characters shown (at most `MAX_TEXT_BLOCK_CHARS`); the rest is cut and `cut` says so. */
+  readonly maxChars: number;
+}
+
+/** The most characters one text block shows. */
+export const MAX_TEXT_BLOCK_CHARS = 100_000;
+
 export interface OutputSpec {
   readonly summary: Line;
   readonly notes?: readonly Line[];
   readonly blocks?: readonly Block[];
+  /** Text blocks, shown after the data blocks. */
+  readonly texts?: readonly TextBlock[];
   readonly format?: OutputFormat;
   readonly caps?: Partial<OutputCaps>;
   readonly partial?: boolean;
@@ -50,6 +64,8 @@ export interface OutputSpec {
 export interface ShapedOutput {
   readonly output: ToolOutput;
   readonly blocks: readonly FormattedRows[];
+  /** The text blocks as shown (`text` is what the caller sees; `cut` when the cap shortened it). */
+  readonly texts: readonly { readonly text: string; readonly cut: boolean }[];
 }
 
 const LINE_VALUE_CHARS = 300;
@@ -135,6 +151,14 @@ export function shapeOutput(ctx: ToolContext, spec: OutputSpec): ShapedOutput {
     lines.push(f.rows.length === 0 && f.droppedRows === 0 ? f.body : envelope(f.body, id, block.source));
   }
 
+  const shownTexts: Array<{ text: string; cut: boolean }> = [];
+  for (const block of spec.texts ?? []) {
+    const shown = safeText(block.text, Math.min(Math.max(1, block.maxChars), MAX_TEXT_BLOCK_CHARS));
+    shownTexts.push(shown);
+    if (block.title !== undefined) lines.push(`${block.title}:`);
+    lines.push(envelope(shown.text === '' ? '(empty)' : shown.text, id, block.source));
+  }
+
   const structuredExtra =
     spec.structured === undefined
       ? {}
@@ -153,7 +177,7 @@ export function shapeOutput(ctx: ToolContext, spec: OutputSpec): ShapedOutput {
       ...spec.meta,
     },
   };
-  return { output: { text: lines.join('\n'), structured, meta }, blocks: formatted };
+  return { output: { text: lines.join('\n'), structured, meta }, blocks: formatted, texts: shownTexts };
 }
 
 function shapeStructured(value: Readonly<Record<string, unknown>>): Record<string, unknown> {
@@ -184,6 +208,8 @@ export interface ListSpec {
   readonly format?: OutputFormat;
   readonly caps?: Partial<OutputCaps>;
   readonly meta?: Readonly<Record<string, unknown>>;
+  /** Further blocks after the list (a second, bounded list such as links); their shown rows go to `structured[key]`. */
+  readonly extraBlocks?: readonly (Block & { readonly key: string })[];
 }
 
 /**
@@ -224,7 +250,8 @@ export function shapeList(ctx: ToolContext, spec: ListSpec): ToolOutput {
     notes.push("Some rows outside the workspace's Agility projects were hidden.");
   const total =
     spec.total !== undefined && Number.isInteger(spec.total) && spec.total >= 0 ? spec.total : undefined;
-  const { output } = shapeOutput(ctx, {
+  const extra = spec.extraBlocks ?? [];
+  const { output, blocks } = shapeOutput(ctx, {
     summary: spec.summary,
     notes,
     blocks: [
@@ -234,9 +261,10 @@ export function shapeList(ctx: ToolContext, spec: ListSpec): ToolOutput {
         columns: probe.columns,
         ...(spec.title === undefined ? {} : { title: spec.title }),
       },
+      ...extra.map(({ key: _key, ...block }) => block),
     ],
     ...(spec.format === undefined ? {} : { format: probe.format }),
-    caps: { ...spec.caps, maxRows: Math.max(1, probe.rows.length) },
+    caps: { ...spec.caps, maxRows: Math.max(1, probe.rows.length, ...extra.map((b) => b.rows.length)) },
     partial,
     ...(spec.meta === undefined ? {} : { meta: spec.meta }),
   });
@@ -246,6 +274,7 @@ export function shapeList(ctx: ToolContext, spec: ListSpec): ToolOutput {
     ...(truncated ? { truncated: true } : {}),
     ...(total === undefined ? {} : { total }),
     ...(spec.hiddenOutsideScope === true ? { hiddenOutsideScope: true } : {}),
+    ...Object.fromEntries(extra.map((block, i) => [block.key, blocks[i + 1]?.rows ?? []])),
     ...(output.structured as Record<string, unknown>),
   };
   return { ...output, structured };

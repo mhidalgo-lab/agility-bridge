@@ -2,7 +2,7 @@
 id: P6-04
 title: Collaboration tools (conversations, links, attachments)
 phase: 6
-status: in-progress
+status: review
 priority: medium
 depends_on: [P2-17]
 adr: ["0015"]
@@ -42,17 +42,17 @@ Read the discussion around a work item safely, and, where a workspace opts in, t
     row in HTTP deployments, a structured stderr log line in stdio. Text must be valid UTF-8 without NUL bytes.
 
 ## Acceptance criteria
-- [ ] Poisoned comments, attachment names and attachment content stay inside the envelope.
-- [ ] With download off (the default), `get_attachment` is absent from `tools/list` and no attachment content is fetched.
-- [ ] Disallowed content type, oversize stream (declared length lying), attachment of an out-of-scope asset and a
+- [x] Poisoned comments, attachment names and attachment content stay inside the envelope.
+- [x] With download off (the default), `get_attachment` is absent from `tools/list` and no attachment content is fetched.
+- [x] Disallowed content type, oversize stream (declared length lying), attachment of an out-of-scope asset and a
       disabled grant are refused before content is returned, with no upstream content request on denial (negative tests).
-- [ ] Each download writes an audit entry (HTTP audit row; stdio log line) with asset number, attachment id, size and
+- [x] Each download writes an audit entry (HTTP audit row; stdio log line) with asset number, attachment id, size and
       content type, and never the content.
-- [ ] `get_conversations` and `list_attachments` page without skipping or repeating, answer an out-of-scope asset like a
+- [x] `get_conversations` and `list_attachments` page without skipping or repeating, answer an out-of-scope asset like a
       missing one, and drop rows outside the workspace even when the upstream ignores the filters.
-- [ ] The workspace and grant switches, the admin limits form, the stdio settings and the generated references agree;
+- [x] The workspace and grant switches, the admin limits form, the stdio settings and the generated references agree;
       THREAT_MODEL A8 is updated.
-- [ ] Live: conversations and attachment metadata verified on the read-only tenant (shapes and counts only); the
+- [x] Live: conversations and attachment metadata verified on the read-only tenant (shapes and counts only); the
       download itself is verified on fixtures only, because the live guard does not allow `attachments.img`.
 
 ## Security notes

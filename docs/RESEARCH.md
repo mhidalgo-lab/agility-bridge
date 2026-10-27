@@ -171,6 +171,14 @@ except `group`, and adds `op` (POST only). *docs*
   `Link` and `Attachment` have `Asset` → `BaseAsset`; `Actual` has `Scope`, `Team`, `Timebox`. The attributes needed to
   create them stay **unverified** until the writable sandbox (P7-07).
 - **Attachments**: create an `Attachment` asset, then upload the content; documented size limit 4 MB. *docs*
+  *live (P6-04, 2026-10-27, Agility 26.0.3.2, metadata and `query.v1` only):* `Attachment` has `Name`, `Filename`,
+  `ContentType`, `Asset` (→ `BaseAsset`), `Description` (long text), `CreateDate`, `CreateDateUTC` and `CreatedBy` (→
+  `Member`) and **no `ContentLength`**, so the size is unknown until the content is read; `ID` cannot be sorted on
+  (a relation), so newest-first uses `CreateDateUTC`. `Expression` has `Author`, `AuthoredAt`, `Content`, `BelongsTo`
+  and `Mentions`; comments of a work item are the `Expression` rows that mention it. The content endpoint
+  (`attachments.img/<id>`, as in the developer library's utility endpoints page; `attachment.img` appears in SDK
+  examples) and its `Content-Type` behaviour are **unverified**: the read-only tenant's guard allows no such request
+  (P6-19).
 - **Idempotency**: no idempotency keys; each `rest-1.v1` POST is atomic for one asset. *docs / inferred*
 
 ### 1.6 Asset model

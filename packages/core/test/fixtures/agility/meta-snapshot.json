@@ -6034,6 +6034,58 @@
     "IsMultivalue": false,
     "IsCanned": true,
     "IsCustom": false
+   },
+   "Attachment.Description": {
+    "_type": "AttributeDefinition",
+    "Name": "Description",
+    "Token": "Attachment.Description",
+    "DisplayName": "Description",
+    "AttributeType": "LongText",
+    "IsReadOnly": false,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": true,
+    "IsCustom": false
+   },
+   "Attachment.CreateDate": {
+    "_type": "AttributeDefinition",
+    "Name": "CreateDate",
+    "Token": "Attachment.CreateDate",
+    "DisplayName": "CreateDate",
+    "AttributeType": "Date",
+    "IsReadOnly": true,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": true,
+    "IsCustom": false
+   },
+   "Attachment.CreateDateUTC": {
+    "_type": "AttributeDefinition",
+    "Name": "CreateDateUTC",
+    "Token": "Attachment.CreateDateUTC",
+    "DisplayName": "CreateDateUTC",
+    "AttributeType": "Date",
+    "IsReadOnly": true,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": true,
+    "IsCustom": false
+   },
+   "Attachment.CreatedBy": {
+    "_type": "AttributeDefinition",
+    "Name": "CreatedBy",
+    "Token": "Attachment.CreatedBy",
+    "DisplayName": "CreatedBy",
+    "AttributeType": "Relation",
+    "IsReadOnly": false,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": true,
+    "IsCustom": false,
+    "RelatedAsset": {
+     "nameref": "Member",
+     "href": "/SyntheticInstance/meta.v1/Member"
+    }
    }
   },
   "Operations": {}

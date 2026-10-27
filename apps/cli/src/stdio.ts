@@ -29,7 +29,15 @@ import { createNodeFetch } from './agility-fetch.ts';
 import { ConfigError, type LoadedConfig, type StdioConfig } from './config.ts';
 
 /** Groups served in Phase 1 (docs/reference/tool-catalogue.md); `query` follows AB_GENERIC_QUERY. */
-export const STDIO_GROUPS = ['core', 'query', 'work', 'planning', 'people'] as const;
+export const STDIO_GROUPS = [
+  'core',
+  'query',
+  'work',
+  'planning',
+  'people',
+  'collaboration',
+  'attachments',
+] as const;
 
 const SETUP_HINT =
   'Set AB_AGILITY_URL (the address you open Agility at) and AB_AGILITY_TOKEN (an access token from the Agility Applications page) in the env block of your MCP client, then restart the server. See docs/guide/configuration.md.';
@@ -38,7 +46,8 @@ const SETUP_HINT =
 export function selectTools(config: LoadedConfig): ToolDefinition[] {
   const registry = new ToolRegistry();
   for (const tool of CORE_TOOLS) registry.register(tool);
-  if (config.kind === 'setup') return registry.select({ groups: STDIO_GROUPS });
+  if (config.kind === 'setup')
+    return registry.select({ groups: STDIO_GROUPS.filter((g) => g !== 'attachments') });
   const valid = registry.list().map((t) => t.name);
   const unknown = (config.tools ?? []).filter((t) => !valid.includes(t));
   if (unknown.length > 0) {
@@ -46,7 +55,9 @@ export function selectTools(config: LoadedConfig): ToolDefinition[] {
       `Unknown tool${unknown.length === 1 ? '' : 's'} in AB_TOOLS: ${unknown.join(', ')}. Valid tools: ${valid.join(', ')}.`,
     );
   }
-  const groups = STDIO_GROUPS.filter((g) => g !== 'query' || config.genericQuery);
+  const groups = STDIO_GROUPS.filter(
+    (g) => (g !== 'query' || config.genericQuery) && (g !== 'attachments' || config.attachmentDownload),
+  );
   return registry.select({
     groups,
     maxCost: config.callBudget,
@@ -90,6 +101,9 @@ export function contextFactory(
       maxRows: config.maxRows,
       maxResponseBytes: config.maxResponseBytes,
       memberEmails: config.memberEmails,
+      attachmentDownload: config.attachmentDownload,
+      attachmentMaxBytes: config.attachmentMaxBytes,
+      attachmentTypes: config.attachmentTypes,
     },
     budget: createBudget(config.callBudget),
     limiter: limiters.for(instanceId, 'stdio'),

@@ -36,6 +36,9 @@ The smallest working configuration:
 | `AB_ASSET_TYPES_ALLOW` / `AB_ASSET_TYPES_DENY` | all / none | Asset types the tools may read (`Story,Defect,Task`). A global type such as `Member` is readable through `query_assets` only when the allow list names it. |
 | `AB_GENERIC_QUERY` | `on` | `off` removes `query_assets` and `get_assets`. |
 | `AB_MEMBER_EMAILS` | `off` | `on` includes member emails in results. |
+| `AB_ATTACHMENT_DOWNLOAD` | `off` | `on` offers `get_attachment`: the text of one attachment of an asset in scope (own group, [THREAT_MODEL](../THREAT_MODEL.md) A8). Each download is logged to stderr (asset number, attachment id, size, type). |
+| `AB_ATTACHMENT_MAX_BYTES` | `1048576` | Largest attachment read, counted on the stream (1024–8388608; never above the largest Agility response). |
+| `AB_ATTACHMENT_TYPES` | `text/plain,text/markdown,text/csv,application/json` | Content types `get_attachment` returns, exact `type/subtype`; checked on the stored type and on the response. HTML, SVG, XML and JavaScript are refused even when listed. |
 | `AB_LIMITS_MAX_LIMIT` | `100` | Most rows one call may ask for (1–1000). |
 | `AB_LIMITS_MAX_RESPONSE_BYTES` | `8388608` | Largest Agility response read (bytes). |
 | `AB_CALL_BUDGET` | `1000` | Agility requests one tool call may make; tools that need more are not offered. |
@@ -69,6 +72,7 @@ workspaces:
     asset_types: { allow: [Story, Defect, Task, Test] }
     generic_query: true
     member_emails: false
+    attachments: { download: false, max_bytes: 1048576, types: [text/plain, text/csv] }
     limits: { max_limit: 100, call_budget: 1000 }
 ```
 

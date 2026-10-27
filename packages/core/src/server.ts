@@ -24,6 +24,13 @@ export interface ToolCallEvent {
   readonly assetNumbers: readonly string[];
   /** The compiled Agility queries with every bound value masked (at most 10, each at most 2,000 characters). */
   readonly queries: readonly string[];
+  /** A downloaded attachment: asset number, attachment id, size and content type (never content; THREAT_MODEL A8). */
+  readonly download?: {
+    readonly asset: string;
+    readonly attachment: string;
+    readonly bytes: number;
+    readonly contentType: string;
+  };
 }
 
 const ASSET_NUMBER = /^[A-Za-z]{1,4}-\d{1,12}$/;
@@ -32,7 +39,11 @@ const MAX_AUDIT_QUERIES = 10;
 const MAX_QUERY_CHARS = 2_000;
 
 /** The audit facts of a tool result: asset numbers from its rows and the masked queries from its `_meta`. */
-export function auditFacts(out: ToolOutput | undefined): { assetNumbers: string[]; queries: string[] } {
+export function auditFacts(out: ToolOutput | undefined): {
+  assetNumbers: string[];
+  queries: string[];
+  download?: NonNullable<ToolCallEvent['download']>;
+} {
   const numbers = new Set<string>();
   const walk = (value: unknown, depth: number): void => {
     if (numbers.size >= MAX_AUDIT_NUMBERS || depth > 5 || value === null || typeof value !== 'object') return;
@@ -62,7 +73,21 @@ export function auditFacts(out: ToolOutput | undefined): { assetNumbers: string[
     const text = typeof q === 'string' ? q : JSON.stringify(q);
     return text.length > MAX_QUERY_CHARS ? `${text.slice(0, MAX_QUERY_CHARS)}…` : text;
   });
-  return { assetNumbers: [...numbers], queries };
+  const d = out?.meta?.['agility-bridge/download'] as Record<string, unknown> | undefined;
+  const download =
+    d !== undefined &&
+    typeof d['asset'] === 'string' &&
+    typeof d['attachment'] === 'string' &&
+    typeof d['bytes'] === 'number' &&
+    typeof d['contentType'] === 'string'
+      ? {
+          asset: d['asset'].slice(0, 64),
+          attachment: d['attachment'].slice(0, 64),
+          bytes: d['bytes'],
+          contentType: d['contentType'].slice(0, 100),
+        }
+      : undefined;
+  return { assetNumbers: [...numbers], queries, ...(download === undefined ? {} : { download }) };
 }
 
 export interface BuildServerOptions {

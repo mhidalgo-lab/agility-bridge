@@ -268,8 +268,13 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
       list_members: { limit: 3 },
       get_asset_history: { asset: defect, time_range: 'last 90 days', limit: 5 },
       list_recent_changes: { time_range: 'last 7 days', limit: 3 },
+      get_conversations: { asset: defect, limit: 3 },
+      list_attachments: { asset: defect, limit: 3 },
     };
     for (const tool of CORE_TOOLS) {
+      // The guard allows no attachment content request, and the download is off by default: `get_attachment` is
+      // verified on fixtures, and up to its metadata checks in collaboration.live.test.ts (P6-04).
+      if (tool.name === 'get_attachment') continue;
       const fresh: ToolContext = { ...ctx, metadata: new MetadataService(), budget: createBudget(60) };
       const args = argsFor[tool.name] ?? {};
       const result = await rpc(() => buildMcpServer({ tools: [tool], ctx: fresh }), 'tools/call', {

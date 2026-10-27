@@ -31,7 +31,7 @@
 | `portfolio` | on | `list_portfolio_items`, `get_portfolio_tree` |
 | `collaboration` | on | `get_conversations`, `list_attachments` |
 | `history` | on | `get_asset_history`, `list_recent_changes` |
-| `attachments` | off (enable per workspace; `AB_ATTACHMENT_DOWNLOAD`) | `get_attachment` |
+| `attachments` | **off** (workspace limit `attachmentDownload`, which a grant can only turn off; `AB_ATTACHMENT_DOWNLOAD` in stdio) | `get_attachment` |
 | `reports` | off (enable per workspace) | `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage`, `work_item_quality` |
 | `writes` | **off** | `add_comment`, `update_status`, `log_effort`, `assign_owners`, `move_to_sprint`, `create_work_item`, `update_fields`, `close_asset`, `reopen_asset` |
 
@@ -64,9 +64,9 @@ Default: 20 read tools (costs are worst cases with a cold metadata cache, verifi
 | `get_sprint` | planning | 6 | Sprint summary: dates, committed vs done estimates, items by status category, carry-over, burndown points (bounded history). |
 | `list_portfolio_items` | portfolio | 3 | Portfolio items (epics by category such as Feature or Initiative) with status and progress. Paged. |
 | `get_portfolio_tree` | portfolio | 8 | An epic with its descendants (sub-epics, backlog items) and roll-ups (estimate, done %, open defects); depth-bounded. |
-| `get_conversations` | collaboration | 3 | Comments on an asset, newest first. Paged. |
-| `list_attachments` | collaboration | 2 | Attachment metadata (name, size, type, author, date) for an asset; content download is not offered by default (THREAT_MODEL A8). |
-| `get_attachment` | attachments | 3 | Opt-in, off by default (D-08): the text content of one attachment of an asset in scope, within the size and content-type allowlists, inside the untrusted-data envelope; never rendered or executed (THREAT_MODEL A8). |
+| `get_conversations` | collaboration | 10 | Comments on one asset in scope, newest first, with author, date and text (rich text as text; `asset`, `limit`, `cursor`, `format`). Paged. |
+| `list_attachments` | collaboration | 12 | Attachment metadata (name, file name, type, author, date; size where the instance has it) for one asset in scope, and on the first page its external links as text (never fetched). Paged. No content is returned or fetched. |
+| `get_attachment` | attachments | 12 | Opt-in, off by default (D-08): the text of one attachment of an asset in scope (`asset`, `attachment`, `max_characters`), within the size and content-type allowlists, inside the untrusted-data envelope; never rendered or executed (THREAT_MODEL A8). Not paged: text is cut at `max_characters` (default 20,000; P6-20 adds ranged reads). |
 | `get_asset_history` | history | 14 | What changed on one asset in a bounded window (`time_range`, last 30 days when omitted, at most the workspace maximum), from the authoritative `rest-1.v1/Hist` versions: one row per changed field (`changedAt` UTC, `changedBy`, `field`, `from`, `to`, `version`), newest first, diffed against the version before the window. `fields` (at most 10 plain attribute paths, validated by the query compiler; paths reaching project-bound assets are refused) or a default set (name, status, owners, estimates, sprint, team, priority, state). Not paged: `limit` caps the rows, `truncated` says more exist. The activity stream is never read (D-89). Args: `asset`, `time_range`, `fields`, `limit`, `format`. Output: `items[]`, `asset`, `window`, `versions { total, inWindow }`. |
 | `list_recent_changes` | history | 24 | Work items (Story, Defect, Task, Test) changed inside a bounded `time_range` (last 7 days when omitted) in an Agility project, a team or the whole workspace, newest change first, with `changedAt` and `changedBy`; sorting by change date costs about a second. Paged (a cursor per type). Says which items changed; `get_asset_history` says what changed. Args: `project`, `team`, `asset_type`, `time_range`, `include_closed`, `limit`, `cursor`, `format`. |
 | `sprint_health` | reports | 12 | Progress vs time, scope change, blocked or unowned or unestimated items, defects opened during the sprint; honest `partial`. |
@@ -77,6 +77,17 @@ Default: 20 read tools (costs are worst cases with a cold metadata cache, verifi
 
 Reports skip any section whose underlying tool the caller was not granted, with a note (L-037), and are offered as
 MCP Tasks to clients that support them (Phase 8).
+
+### Attachments (opt-in)
+
+`get_attachment` is absent from `tools/list` and refused by name unless the workspace limit `attachmentDownload` is on and
+the grant keeps it on (a grant can only turn it off, and only lower `attachmentMaxBytes`; stdio: `AB_ATTACHMENT_DOWNLOAD`,
+`AB_ATTACHMENT_MAX_BYTES`, `AB_ATTACHMENT_TYPES`). Checks, in order: the asset is in scope (resolver, project predicate,
+row recheck); the attachment row is the one asked for and belongs to that asset; its stored content type is on the
+allowlist (default `text/plain`, `text/markdown`, `text/csv`, `application/json`; HTML, SVG, XML and JavaScript never);
+then one content request whose response type is checked again and whose body is cut at the size cap on the stream; the
+text must be valid UTF-8 without NUL. The call spends from the budget and is audited (asset number, attachment id,
+size, type). See [THREAT_MODEL](../THREAT_MODEL.md) A8 and D-86 … D-88.
 
 ## Write tools (Phase 7, opt-in)
 

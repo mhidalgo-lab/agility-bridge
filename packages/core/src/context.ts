@@ -67,7 +67,33 @@ export interface Limits {
   readonly maxTimeRangeDays: number;
   /** Include member emails in output (D-06, off by default). */
   readonly memberEmails: boolean;
+  /** Offer `get_attachment`, the text content of one attachment (D-08, THREAT_MODEL A8). Off by default. */
+  readonly attachmentDownload: boolean;
+  /** Largest attachment `get_attachment` reads, counted on the stream (never the declared length). */
+  readonly attachmentMaxBytes: number;
+  /** Content types `get_attachment` may return, as `type/subtype` in lower case (checked on metadata and response). */
+  readonly attachmentTypes: readonly string[];
 }
+
+/** Default text types of `get_attachment` (D-08). */
+export const DEFAULT_ATTACHMENT_TYPES: readonly string[] = Object.freeze([
+  'text/plain',
+  'text/markdown',
+  'text/csv',
+  'application/json',
+]);
+
+/** Types that run or render in a client; refused even when a deployment lists them (THREAT_MODEL A8). */
+export const ACTIVE_ATTACHMENT_TYPES: readonly string[] = Object.freeze([
+  'text/html',
+  'application/xhtml+xml',
+  'image/svg+xml',
+  'text/javascript',
+  'application/javascript',
+  'application/x-javascript',
+  'text/xml',
+  'application/xml',
+]);
 
 /** D-07 starting limits; 512 KiB is the Workers Free response cap (ADR-0010), raised by hosts that allow more. */
 export const DEFAULT_LIMITS: Limits = Object.freeze({
@@ -82,6 +108,9 @@ export const DEFAULT_LIMITS: Limits = Object.freeze({
   maxAsOfAgeDays: 365,
   maxTimeRangeDays: 366,
   memberEmails: false,
+  attachmentDownload: false,
+  attachmentMaxBytes: 1_048_576,
+  attachmentTypes: DEFAULT_ATTACHMENT_TYPES,
 });
 
 /** Per-request budget of Agility requests (ADR-0010). Every attempt, retries included, spends from it. */

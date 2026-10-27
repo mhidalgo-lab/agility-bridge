@@ -172,7 +172,10 @@ export class AuditWriter {
       durationMs: Math.max(0, Math.round(e.durationMs)),
       agilityRequests: e.requestsUsed,
       errorCode: e.errorCode,
-      details: { credential: e.access.credential.kind },
+      details: {
+        credential: e.access.credential.kind,
+        ...(e.download === undefined ? {} : { download: { ...e.download } }),
+      },
     });
   }
 
