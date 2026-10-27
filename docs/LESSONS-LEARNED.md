@@ -27,7 +27,7 @@ How to use it:
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
-| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171 |
+| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-288 – L-291 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-282 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280 |
@@ -338,6 +338,31 @@ links re-joined the tail at each close, so 16 KB of crafted markup produced 8 MB
 converting it, cap depth-dependent output, and keep at most one open span that must be re-read; test with nesting, not
 only with length.
 *Applied in:* P1-16, `output/text.ts`.
+
+**L-288 — A listed template entry is built from the output its read uses, and the fixture must be able to read it.**
+`resources/list` for `instance/asset-types/{asset_type}` comes from the `list_asset_types` output, and the read runs
+`describe_asset_type`, so the two cannot disagree on case or spelling. The test reads every listed URI; it found that the
+committed metadata snapshot has no status list for `Request`, so a listed `Request` was not readable. Offline fixtures
+keep to the types they can describe, and a failed read of a listed entry is a finding, not a flake.
+*Applied in:* P6-09, `test/resources.test.ts`.
+
+**L-289 — Extra surfaces reach Agility only through the tool handlers.**
+A resource reader gets the per-request context and `run(tool, input)`, which runs only the tools the manifest entry
+declares and that are allowed, with the tool's own schema applied. A new surface then adds no upstream path of its own:
+budget, limits, cache, scope, envelope and audit are the tool's. Resource reads are audited as `tool_call` rows with the
+action `resource:<id>`.
+*Applied in:* P6-09, `server.ts`, `resources.ts`.
+
+**L-290 — A static reference belongs to the tool it describes.**
+The filter vocabulary and the quality rubric need no upstream call, but they name tools; offering them to a workspace that
+cannot use those tools is noise and a small information leak about the deployment. Each entry therefore declares `uses`
+and the vocabulary is generated from the code's own list (`FILTER_OPS`) so it cannot drift.
+*Applied in:* P6-09, `manifest.ts`.
+
+**L-291 — A server with nothing to offer does not advertise the capability.**
+With no resource available the SDK registers none, and `resources/list` is "method not found" rather than an empty list.
+Clients and tests treat both as "nothing"; do not register a placeholder resource to make the list answer.
+*Applied in:* P6-09, `test/resources.test.ts`.
 
 ## E. The Agility API client
 

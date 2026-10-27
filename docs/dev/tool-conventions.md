@@ -189,6 +189,24 @@ through the output shaper. The probe test feeds every tool and every output path
 structured content, composite sections) with poisoned strings: envelope look-alikes, instructions, HTML with scripts,
 bidi controls and very long values (L-038).
 
+## Resources and prompts (manifest)
+
+Resources (P6-09) and prompts (P6-08) are registered from one manifest, never from lists of their own (L-153):
+`packages/core/src/manifest.ts` (`ManifestEntry`: a stable snake_case `id` and `uses`, the tools that serve the entry) and
+`resources.ts` (`RESOURCE_MANIFEST`). An entry exists for a caller only when every tool in `uses` is allowed
+(`availableEntries`); `buildMcpServer` does the filtering, so stdio and HTTP both get it with no host change.
+
+- **Add a recipe resource** (P6-03, P6-06): one entry with `uri`, `title`, `description` (static, no instance words),
+  `mimeType`, `source`, `uses` and `read`. A `read` that needs Agility calls `reader.run('<tool>', input)`: that runs the
+  declared tool's handler with its schema, so budget, limits, cache, scope, envelope and audit are the tool's. A template
+  URI (`{variable}`) also gives `list`, built from the same tool output the read uses, so every listed URI is readable.
+- **Add a prompt** (P6-08): a sibling `PROMPT_MANIFEST` of `ManifestEntry` extensions, filtered with the same
+  `availableEntries`; the prompt's `uses` are the tools it calls.
+- Static text is our own; anything from Agility goes through the output shaper (the tool's, or `shapeOutput`) so it is
+  enveloped. The poisoned-string probe and a "read every listed entry" test cover every entry; `pnpm docs:resources`
+  regenerates [the resource reference](../reference/resources.md).
+- Reads are audited as `tool_call` rows whose action is `resource:<id>`.
+
 ## Catalogue size and `tools/list` budget
 
 - Default catalogue ≤ 25 tools (now 20); every group and all writes < 40 (now 35) (L-155, D-05).

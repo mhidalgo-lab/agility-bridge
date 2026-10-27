@@ -126,7 +126,10 @@ Registered only when every tool they use is allowed. Arguments use the tool voca
 
 ## Resources (Phase 6)
 
-Served through the same handlers, limits and audit as the tools; registered from one manifest (L-153).
+Served through the same handlers, limits and audit as the tools; registered from one manifest (L-153). Built in P6-09; the
+generated [resource reference](resources.md) is the current list. A resource is offered only when the tools it is served
+through are allowed. Recipe resources (regression, defects, issues, requests, goals, themes, retrospectives) come with
+P6-03 and P6-06.
 
 | URI | Content |
 |---|---|

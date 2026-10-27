@@ -72,3 +72,32 @@
   the whole text up to the byte cap.
 - **Recommendation:** (a): bounded results by default, and the common case (a log excerpt, a small CSV, a note) fits.
 - **Built:** (a).
+
+### D-92 — The quality rubric is defined in core now, ahead of `work_item_quality` *(P6-09)*
+- **Context:** the catalogue lists `agility-bridge://rubrics/backlog-item-quality` as "the versioned quality rubric (JSON)
+  used by `work_item_quality`", but P6-07 (that tool) is not built yet.
+- **Options:** (a) define the rubric in core now (`packages/core/src/rubric.ts`, version `1.0.0`) and serve it; P6-07 and the
+  `review_backlog_item_quality` prompt import the same object; (b) defer the resource until P6-07.
+- **Recommendation:** (a): one rubric for the resource, the tool and the prompt cannot drift, and the version is fixed from the
+  first release. The criteria and weights are a starting point for the owner to tune; any change bumps `version`.
+- **Built:** (a). The rubric resource is offered when `get_work_item` is allowed; P6-07 should add `work_item_quality` to its
+  `uses` when it lands.
+- **Owner:** _open_.
+
+### D-93 — Static resources are offered only with the tool they describe *(P6-09)*
+- **Context:** the filter vocabulary and the rubric need no Agility call. They could always be offered.
+- **Options:** (a) every entry declares `uses`; a static entry names the tool it describes (`query_assets`, `get_work_item`) and
+  exists only when that tool is allowed; (b) static entries are always offered.
+- **Recommendation:** (a): a workspace without the generic query tool is not shown how to use it, and one rule (all `uses`
+  allowed) covers every entry, which prompts reuse (L-290).
+- **Built:** (a).
+- **Owner:** _open_.
+
+### D-94 — Resource reads are audited as `tool_call` rows *(P6-09)*
+- **Context:** reads must be audited like tool calls (same limits, cache and audit), but a new audit `kind` needs a schema and
+  admin-UI change.
+- **Options:** (a) reuse `tool_call` with the action `resource:<manifest id>` (status, duration, requests, asset numbers, masked
+  queries, no content); (b) a new `resource_read` kind.
+- **Recommendation:** (a) now; (b) if the owner wants to filter resource reads apart from tool calls in the audit view.
+- **Built:** (a).
+- **Owner:** _open_.

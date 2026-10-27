@@ -2,7 +2,7 @@
 id: P6-09
 title: MCP resources
 phase: 6
-status: in-progress
+status: review
 priority: medium
 depends_on: [P2-17]
 adr: ["0015"]
@@ -25,8 +25,8 @@ are registered from one manifest that prompts (P6-08) and recipe resources (P6-0
   parsed by the tool's own schema, same request context, budget, limits, metadata cache and error contract) and returns
   their text, which is already enveloped. A reader can only run tools it declares and that are allowed for the caller.
 - **Availability.** A resource is registered, listed and readable only when every tool in `uses` is allowed for the
-  workspace and grant; otherwise it does not exist (not found). Resources whose content is static (no `uses`) are always
-  offered only when a tool that consumes them is allowed (declared in `uses` of the tool that gives them meaning), see below.
+  workspace and grant; otherwise it does not exist. Static entries (filter vocabulary, rubric) name the tool they describe
+  in `uses`, so they follow the same rule (D-93).
 - **Audit.** Every read is observed like a tool call (`onToolCall`, action `resource:<id>`): status, duration, requests used,
   asset numbers and masked queries; no content.
 - **The five catalogue resources:**
@@ -43,15 +43,15 @@ are registered from one manifest that prompts (P6-08) and recipe resources (P6-0
 - Generated `docs/reference/resources.md` (`pnpm docs:resources`, `--check` in the tests).
 
 ## Acceptance criteria
-- [ ] Every listed resource is readable (test over `resources/list` and the templates), over the 2025-era stateless path.
-- [ ] A resource is absent from `resources/list` and not readable when the tools it uses are not allowed; a denied asset type
+- [x] Every listed resource is readable (test over `resources/list` and the templates), over the 2025-era stateless path.
+- [x] A resource is absent from `resources/list` and not readable when the tools it uses are not allowed; a denied asset type
   is refused on read with no upstream call and no data (negative authorization tests).
-- [ ] Instance strings (project and status names, attribute names) are enveloped on every resource path; poisoned-string probe.
-- [ ] Reads count against the request budget and limits of the context, are audited like tool calls, and use the metadata cache.
-- [ ] The rubric is versioned JSON in core and documented for P6-07.
-- [ ] `docs/reference/resources.md` is generated and checked; tool conventions, THREAT_MODEL A12, a changeset and the lessons
+- [x] Instance strings (project and status names, attribute names) are enveloped on every resource path; poisoned-string probe.
+- [x] Reads count against the request budget and limits of the context, are audited like tool calls, and use the metadata cache.
+- [x] The rubric is versioned JSON in core and documented for P6-07.
+- [x] `docs/reference/resources.md` is generated and checked; tool conventions, THREAT_MODEL A12, a changeset and the lessons
   are done; stdio and HTTP both serve resources.
-- [ ] Live check (guarded suite): every upstream-reading resource reads and shows only shapes and counts.
+- [x] Live check (guarded suite): every upstream-reading resource reads and shows only shapes and counts.
 
 ## Security notes
 THREAT_MODEL A12: instance metadata appears only inside enveloped resource output, never in descriptions of tools or
@@ -71,3 +71,14 @@ identifiers from the metadata parser.
 ## Out of scope
 - Prompts (P6-08) and recipe resources (P6-03, P6-06), resource subscriptions and `listChanged` pushes.
 - Anything not listed under Scope.
+
+## Outcome
+- Built as scoped: `manifest.ts` (entry shape, `availableEntries`), `resources.ts` (`RESOURCE_MANIFEST`, readers),
+  `rubric.ts`, registration in `buildMcpServer` (default manifest, so stdio and HTTP need no change), `scripts/resource-reference.ts`
+  with a test that fails when `docs/reference/resources.md` is stale, `test/resources.test.ts` (mutation-checked: making
+  `isAvailable` always true fails four tests) and `live/resources.live.test.ts` (ran against the read-only tenant: passes,
+  counts only).
+- Decisions D-92 (rubric in core now), D-93 (static entries follow their tool), D-94 (audited as `tool_call`, action
+  `resource:<id>`); lessons L-288 - L-291.
+- Prompts (P6-08) add a `PROMPT_MANIFEST` of `ManifestEntry` and reuse `availableEntries`; recipe resources add entries.
+- Follow-ups: none needed beyond P6-07 adding `work_item_quality` to the rubric resource's `uses`.

@@ -90,6 +90,12 @@ export {
   silentLogger,
   stderrSink,
 } from './logger.ts';
+export {
+  assertManifest,
+  availableEntries,
+  isAvailable,
+  type ManifestEntry,
+} from './manifest.ts';
 export { metadataDrift } from './metadata/drift.ts';
 export {
   ASSET_TYPE_NAME_RE,
@@ -186,6 +192,16 @@ export {
   SECRET_FIELD_RE,
   ToolRegistry,
 } from './registry.ts';
+export {
+  isTemplate,
+  type ListedResource,
+  RESOURCE_MANIFEST,
+  RESOURCE_SCHEME,
+  type ResourceBody,
+  type ResourceDefinition,
+  type ResourceReader,
+} from './resources.ts';
+export { BACKLOG_ITEM_QUALITY_RUBRIC, type QualityRubric, type RubricCriterion } from './rubric.ts';
 export { Secret } from './secret.ts';
 export {
   auditFacts,
