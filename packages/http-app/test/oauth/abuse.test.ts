@@ -273,6 +273,24 @@ describe('OAuth abuse controls: limits, windows and cleanup (memory storage)', (
     expect(await h.registrations?.count()).toEqual({ dynamic: 0, documents: 0 });
   });
 
+  it('a bounded sweep that starts near the end wraps round to the start, so it always looks at its full slice', async () => {
+    const h = await host({ registrationIpLimit: 100 });
+    for (let i = 0; i < 5; i++) expect((await dcr(h, `198.51.100.${i + 1}`)).status).toBe(201);
+    h.advance?.(2 * HOUR);
+    const names = await h.storage.kv.list('oauth:client:', { limit: 1000 });
+    expect(names).toHaveLength(5);
+    // Resume after the fourth: only one record is left before the end of the list.
+    await h.storage.kv.set(SWEEP_CURSOR_KEY, names[3] as string, { expiresAt: Date.now() + HOUR });
+    expect(
+      await sweepRegistrations(h.storage, { now: () => Date.now(), unusedTtlSeconds: 3600, limit: 3 }),
+    ).toEqual({
+      removed: 3,
+      examined: 3,
+    });
+    // The fifth, then the first two; the third and fourth are left for the next call.
+    expect(await h.storage.kv.list('oauth:client:', { limit: 1000 })).toEqual([names[2], names[3]]);
+  });
+
   it('the sweep leaves stored documents and young registrations alone', async () => {
     const h = await host();
     expect((await dcr(h, ATTACKER)).status).toBe(201);
