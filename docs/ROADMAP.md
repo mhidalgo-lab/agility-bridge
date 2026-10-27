@@ -266,7 +266,7 @@ Status lives in each task file.
 | P6-08 | [MCP prompts (workflows)](tasks/phase-6-tool-breadth/P6-08-mcp-prompts.md) | medium | P6-07 | todo |
 | P6-09 | [MCP resources](tasks/phase-6-tool-breadth/P6-09-mcp-resources.md) | medium | P2-17 | review |
 | P6-10 | [Tool evaluations](tasks/phase-6-tool-breadth/P6-10-tool-evals.md) | medium | P6-07 | todo |
-| P6-11 | [Cost accounting and composite grants](tasks/phase-6-tool-breadth/P6-11-cost-composite-grants.md) | medium | P6-07 | todo |
+| P6-11 | [Cost accounting and composite grants](tasks/phase-6-tool-breadth/P6-11-cost-composite-grants.md) | medium | P6-07 | in-progress |
 | P6-12 | [Consistency pass (arguments, outputs, paging, tool count)](tasks/phase-6-tool-breadth/P6-12-consistency-pass.md) | medium | P6-07, P6-08, P6-09 | todo |
 | P6-13 | [Phase 6 review and live verification](tasks/phase-6-tool-breadth/P6-13-phase-6-review.md) | high | P6-03, P6-04, P6-06, P6-10, P6-11, P6-12 | todo |
 | P6-14 | [OAuth client matrix for the remaining clients](tasks/phase-6-tool-breadth/P6-14-oauth-client-matrix-rest.md) | medium | P5-06 | todo |
