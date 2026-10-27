@@ -61,7 +61,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Options:** (a) four work-item types now; portfolio items later; (b) add `Epic` now.
 - **Recommendation:** (a), with [P6-22](../tasks/phase-6-tool-breadth/P6-22-recent-changes-portfolio-items.md) adding epics
   once P6-01 settles how portfolio items are listed.
-- **Owner (2026-10-27):** Decided: (b), add epics now (deviates from the recommendation); [P6-22](../tasks/phase-6-tool-breadth/P6-22-recent-changes-portfolio-items.md) is brought forward.
+- **Owner (2026-10-27):** Decided: (b), add epics now (deviates from the recommendation); [P6-22](../tasks/phase-6-tool-breadth/P6-22-recent-changes-portfolio-items.md) is brought forward. Built in P6-22 (`Epic` is a value of `asset_type`); live check pending.
 
 ### D-86 — Where the attachment download is switched on *(P6-04)*
 - **Context:** D-08 wants `get_attachment` off by default and enabled "per workspace and grant". The access resolver

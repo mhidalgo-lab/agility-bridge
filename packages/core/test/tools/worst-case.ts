@@ -40,8 +40,8 @@ export const WORST_CASES: Readonly<Record<string, WorstCase>> = {
     why: 'number lookup then the history',
   },
   list_recent_changes: {
-    args: { project: 'Mobile App', team: 'Blue', asset_type: 'Story' },
-    why: 'project and team resolution',
+    args: { project: 'Mobile App', team: 'Blue' },
+    why: 'project and team resolution, all five types (epics included)',
   },
   get_conversations: { args: { asset: 'B-01001' }, why: 'number lookup then comments' },
   list_attachments: { args: { asset: 'B-01001' }, why: 'number lookup then attachments and links' },

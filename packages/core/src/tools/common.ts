@@ -16,6 +16,7 @@ const DESC = {
   timeRange: 'Window (UTC): "last 14 days", "yesterday" or "2026-10-01 to 2026-10-15".',
   assetType: 'Agility API name, e.g. Story, Defect, Task, Test, Epic.',
   workItemType: 'Story, Defect, Task or Test; all four when omitted.',
+  changedItemType: 'Story, Defect, Task, Test or Epic; all five when omitted.',
   status: 'Status names as configured on the instance.',
   limit: 'Most rows; the workspace page size when omitted.',
   cursor: 'nextCursor of the previous call, same arguments.',
@@ -28,7 +29,7 @@ const DESC = {
 export const ARGUMENT_VOCABULARY: Readonly<Record<string, readonly string[]>> = Object.freeze({
   asset: [DESC.asset, DESC.epic, DESC.workItem],
   assets: ['Asset numbers or OID tokens.'],
-  asset_type: [DESC.assetType, DESC.workItemType],
+  asset_type: [DESC.assetType, DESC.workItemType, DESC.changedItemType],
   project: [DESC.project],
   team: [DESC.team],
   sprint: [DESC.sprint],
@@ -67,6 +68,11 @@ export const timeRangeArg = (defaultValue: string): z.ZodDefault<z.ZodString> =>
 export const workItemTypeArg = <const T extends readonly [string, ...string[]]>(
   types: T,
 ): z.ZodOptional<z.ZodEnum<{ [K in T[number]]: K }>> => z.enum(types).optional().describe(DESC.workItemType);
+/** `asset_type` for a tool that also covers epics (portfolio items). */
+export const changedItemTypeArg = <const T extends readonly [string, ...string[]]>(
+  types: T,
+): z.ZodOptional<z.ZodEnum<{ [K in T[number]]: K }>> =>
+  z.enum(types).optional().describe(DESC.changedItemType);
 export const minimalOutputArg: z.ZodOptional<z.ZodBoolean> = z
   .boolean()
   .optional()
@@ -85,12 +91,12 @@ export const includeClosedArg: z.ZodDefault<z.ZodBoolean> = z
   .boolean()
   .default(false)
   .describe(DESC.includeClosed);
-const FORMATS: z.ZodEnum<{ auto: 'auto'; table: 'table'; csv: 'csv'; json: 'json' }> = z.enum([
-  'auto',
-  'table',
-  'csv',
-  'json',
-]);
+const FORMATS: z.ZodEnum<{
+  auto: 'auto';
+  table: 'table';
+  csv: 'csv';
+  json: 'json';
+}> = z.enum(['auto', 'table', 'csv', 'json']);
 export const formatArg: z.ZodDefault<typeof FORMATS> = FORMATS.default('auto').describe(DESC.format);
 
 /** A relation value as `{ oid, name }` when the row has both, else undefined. */

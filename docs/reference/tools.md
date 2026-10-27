@@ -306,7 +306,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **List recent changes** · group `history` · read · cost 24 Agility requests at most
 
-List work items (backlog items, defects, tasks, tests) changed inside a bounded time_range in an Agility project, a team or the whole workspace, newest first, with who changed them; get_asset_history shows what changed. Sorts by change date, about a second per call. Paged: pass nextCursor back as cursor. Cold call: up to 24 Agility requests.
+List work items (backlog items, defects, tasks, tests) and epics changed inside a bounded time_range in an Agility project, a team or the whole workspace, newest first, with who changed them; get_asset_history shows what changed. Sorts by change date, about a second per call. Paged: pass nextCursor back as cursor. Cold call: up to 24 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
@@ -314,7 +314,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 |---|---|---|---|---|
 | `project` | string |  |  | Agility project: name or Scope:<id>, within the workspace. |
 | `team` | string |  |  | Team: name or Team:<id>. |
-| `asset_type` | `Story` \| `Defect` \| `Task` \| `Test` |  |  | Story, Defect, Task or Test; all four when omitted. |
+| `asset_type` | `Story` \| `Defect` \| `Task` \| `Test` \| `Epic` |  |  | Story, Defect, Task, Test or Epic; all five when omitted. |
 | `time_range` | string |  | `"last 7 days"` | Window (UTC): "last 14 days", "yesterday" or "2026-10-01 to 2026-10-15". |
 | `include_closed` | boolean |  | `false` | Include closed items. |
 | `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows; the workspace page size when omitted. |
