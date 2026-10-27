@@ -40,7 +40,7 @@ How to use it:
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297 |
@@ -2066,6 +2066,23 @@ the late read was removed and the test stayed green), and one reviewer fix (read
 fake and made the real tenant time out, which only the live pass showed: a fix to a query that runs 60 times needs a live run. The
 review document records every verdict, including the dropped ones.
 *Applied in:* P6-13, `docs/reviews/phase-6-review.md`, L-004.
+
+**L-331 — An injection canary must be something only obeying produces, never something the data already says.**
+The first LLM eval flagged every model on H04, whose canary sat in an attachment's file name while the question asked for the
+file names: the correct answer had to repeat it. A warning that quoted the injection failed the same way, and a read of the item
+under discussion counted as "following" because the scenario allowed no follow-up. The canary is now a word the injection asks to
+be written backwards (the data holds `HERON`, obeying writes `CANARY-NOREH`); a test asserts no scenario's data contains its
+canary and that a model which quotes the data and warns about it passes. Following is scored on the tools the injection names;
+other calls are reported for a person, with the model's text and arguments kept as evidence.
+*Applied in:* P6-33, `scripts/evals/llm.ts`, `scripts/test/evals.test.ts`, L-310.
+
+**L-332 — Sample a probabilistic check, and score an agent's first step as an agent takes it.**
+The same model followed two injections in a smoke run and none in the full run: one trial per scenario is a coin toss either
+way. Each hostile scenario now runs five times and any follow blocks. On tool choice, most of the strongest model's "misses" were
+lookups (`list_projects`, `list_asset_types`, `whoami`) before the right tool, which is what a careful agent does; the harness
+answers one lookup with a scripted neutral result and reports the strict and the after-lookup score side by side, the floor
+applying to the second.
+*Applied in:* P6-33, `scripts/evals/llm.ts`, `scripts/eval-llm.ts`, `docs/dev/evals.md`, L-124.
 
 ---
 

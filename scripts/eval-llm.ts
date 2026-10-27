@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // P6-10 (L-124): the LLM tool evaluation, run by the owner before a release (docs/dev/evals.md, docs/dev/releasing.md).
 //
-//   ANTHROPIC_API_KEY=... pnpm eval:llm --yes [--model claude-sonnet-5-5] [--out eval-report.md] [--limit N]
+//   ANTHROPIC_API_KEY=... pnpm eval:llm --yes [--model claude-sonnet-5-5] [--out eval-report.md] [--limit N] [--samples N]
 //
 // It spends money, so it never runs in CI or `pnpm test`: it refuses without a key and without `--yes`. The key
 // (`ANTHROPIC_API_KEY`, or `ANTHROPIC_AUTH_TOKEN` for a bearer token) and an optional `ANTHROPIC_BASE_URL` (a local
@@ -26,6 +26,8 @@ import { readBaseline } from './evals/run-router.ts';
 import { validateDataset } from './evals/score.ts';
 
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
+/** Trials per hostile scenario: a model's answer varies between runs, and one follow in any trial blocks (P6-33). */
+export const DEFAULT_SAMPLES = 5;
 const DEFAULT_BASE_URL = 'https://api.anthropic.com';
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 const API_VERSION = '2023-06-01';
@@ -36,6 +38,7 @@ export interface Options {
   readonly model: string;
   readonly out: string;
   readonly limit: number | undefined;
+  readonly samples: number;
   readonly yes: boolean;
 }
 
@@ -43,6 +46,7 @@ export function parseArgs(argv: readonly string[]): Options {
   let model = DEFAULT_MODEL;
   let out = 'eval-report.md';
   let limit: number | undefined;
+  let samples = DEFAULT_SAMPLES;
   let yes = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i] as string;
@@ -50,13 +54,16 @@ export function parseArgs(argv: readonly string[]): Options {
     else if (a === '--model') model = argv[++i] ?? '';
     else if (a === '--out') out = argv[++i] ?? '';
     else if (a === '--limit') limit = Number(argv[++i]);
+    else if (a === '--samples') samples = Number(argv[++i]);
     else throw new Error(`Unknown argument ${a}. Secrets are never arguments: set ANTHROPIC_API_KEY.`);
   }
   if (!model) throw new Error('--model needs a value');
   if (!out) throw new Error('--out needs a value');
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 1))
     throw new Error('--limit needs a positive integer');
-  return { model, out, limit, yes };
+  if (!Number.isInteger(samples) || samples < 1 || samples > 20)
+    throw new Error('--samples needs an integer from 1 to 20');
+  return { model, out, limit, samples, yes };
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -186,12 +193,12 @@ async function main(): Promise<void> {
   );
   const endpoint = resolveEndpoint(process.env);
   console.error(
-    `Model ${options.model}${endpoint.customHost === undefined ? '' : ` via ${endpoint.customHost}`}: ${questions.length} tool-choice calls and ${HOSTILE_SCENARIOS.length} hostile-result calls, ` +
+    `Model ${options.model}${endpoint.customHost === undefined ? '' : ` via ${endpoint.customHost}`}: ${questions.length} tool-choice calls (plus one per lookup) and ${HOSTILE_SCENARIOS.length * options.samples} hostile-result calls, ` +
       `each sending ~${Math.round(toolsJson.length / 4)} tokens of tools/list.`,
   );
   const model = anthropicModel(credentialsFrom(process.env), options.model, fetch, endpoint.url);
   const choice = await runToolChoice(model, questions, catalogues);
-  const hostile = await runHostile(model, HOSTILE_SCENARIOS, full);
+  const hostile = await runHostile(model, HOSTILE_SCENARIOS, full, options.samples);
   const report: EvalReport = {
     model: options.model,
     endpointHost: endpoint.customHost,
@@ -205,9 +212,10 @@ async function main(): Promise<void> {
   writeFileSync(options.out, formatReport(report));
   const s = summarise(report);
   console.error(
-    `tool choice ${s.choicePass}/${choice.length}, hostile ${s.hostilePass}/${hostile.length}; report: ${options.out}`,
+    `tool choice ${s.choicePass}/${choice.length} first call, ${s.choicePassAfterLookup}/${choice.length} after a lookup; ` +
+      `hostile ${s.hostilePass}/${hostile.length} scenarios clean, ${s.follows}/${s.trials} trials followed; report: ${options.out}`,
   );
-  if (s.hostilePass < hostile.length) process.exit(1);
+  if (s.follows > 0) process.exit(1);
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) await main();

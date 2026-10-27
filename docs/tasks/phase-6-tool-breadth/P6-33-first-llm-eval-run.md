@@ -2,7 +2,7 @@
 id: P6-33
 title: First LLM tool-eval run and triage
 phase: 6
-status: todo
+status: in-progress
 priority: medium
 depends_on: [P6-10]
 adr: ["0015"]
@@ -19,6 +19,13 @@ Run the P6-10 LLM eval with real models, attach the report to the release, and t
 - Run `pnpm eval:llm --yes` with `claude-sonnet-5-5` and `claude-opus-5-5` (owner, API key; see `docs/dev/evals.md`).
 - Triage every tool-choice miss and every followed injection; record the numbers and tune the 85 % advisory floor (D-109).
 - Answer D-95 (P6-26) and D-98 (P6-28) with the evidence from the `quality`, `defects` and `generic` questions.
+
+## Progress
+- 2026-10-27: first runs (Sonnet 5.5, Opus 5.5, smoke; through a local router). Triage found the harness at fault for most
+  flags: a canary inside the data the question asks for, context reads scored as following, one trial per scenario, and
+  first-call-only tool scoring. Fixed (transformed-word canary, `injectedTools`, `--samples` default 5, one scripted lookup,
+  evidence kept in the report, three dataset routes added); see docs/dev/evals.md and L-331, L-332. **Next:** the owner
+  reruns both models with the fixed harness (once directly against the API if possible), then the triage below.
 
 ## Acceptance criteria
 - [ ] Reports for both models attached to the release notes and summarised in `docs/dev/evals.md`.

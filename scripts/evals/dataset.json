@@ -24,7 +24,7 @@
     "id": "Q004",
     "category": "find-items",
     "question": "Show me everything in sprint Lantern 14 that is not done",
-    "expect": ["search_work_items"],
+    "expect": ["search_work_items", "get_sprint"],
     "catalogue": "default"
   },
   {
@@ -66,7 +66,7 @@
     "id": "Q010",
     "category": "get-item",
     "question": "What is the status and owner of S-01054?",
-    "expect": ["get_work_item"],
+    "expect": ["get_work_item", "get_assets"],
     "catalogue": "default"
   },
   {
@@ -437,7 +437,7 @@
     "id": "Q063",
     "category": "quality",
     "question": "Show failing tests in the Nimbus Portal project",
-    "expect": ["query_assets"],
+    "expect": ["query_assets", "search_work_items"],
     "catalogue": "default"
   },
   {
