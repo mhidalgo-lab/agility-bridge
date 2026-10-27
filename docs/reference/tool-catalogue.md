@@ -128,8 +128,8 @@ Registered only when every tool they use is allowed. Arguments use the tool voca
 
 Served through the same handlers, limits and audit as the tools; registered from one manifest (L-153). Built in P6-09; the
 generated [resource reference](resources.md) is the current list. A resource is offered only when the tools it is served
-through are allowed. Recipe resources: tests, defects and regression assets (P6-03, below); issues, requests, goals, themes and
-retrospectives come with P6-06.
+through are allowed. Recipe resources: tests, defects and regression assets (P6-03), and issues, requests, goals and
+themes, and retrospectives (P6-06), below.
 
 | URI | Content |
 |---|---|
@@ -140,6 +140,7 @@ retrospectives come with P6-06.
 | `agility-bridge://rubrics/backlog-item-quality` | The versioned quality rubric (JSON) used by `work_item_quality` |
 | `agility-bridge://recipes/tests-and-defects` | Worked `query_assets` calls: tests of a backlog item, failing and never-run tests, open, unowned, by-priority, recently closed and per-sprint defects |
 | `agility-bridge://recipes/regression-assets` | Worked `query_assets` calls: regression tests, test sets and the tests inside one; plans and suites by the same pattern after `list_asset_types` |
+| `agility-bridge://recipes/issues`, `recipes/requests`, `recipes/goals-and-themes`, `recipes/retrospectives` | What the type is for, its default fields and example `query_assets` / `get_assets` inputs (P6-06; no typed tools, D-98) |
 
 **Decision (P6-03, D-95): no typed quality tool.** Tests, regression tests/plans/suites, test sets and defects are answered by
 the two recipes through `query_assets` (and `search_work_items` for a mixed list). Every case is a single filter, so a typed

@@ -191,6 +191,7 @@ export {
   type RecipeExample,
   renderRecipe,
 } from './recipes/quality.ts';
+export { OTHER_ASSET_RECIPES } from './recipes/other-assets.ts';
 export { isSecretKeyName, REDACTED, redact, redactValue } from './redact.ts';
 export {
   collectPropertyNames,

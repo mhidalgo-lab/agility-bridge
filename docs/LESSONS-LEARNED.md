@@ -27,7 +27,7 @@ How to use it:
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
-| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-295 |
+| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280 |
@@ -40,10 +40,10 @@ How to use it:
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241 |
-| [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287 |
+| [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297 |
 | [Top 20](#top-20) | the lessons that save the most time |
 
 ---
@@ -405,6 +405,14 @@ A recipe names the tools every step needs (`query_assets`, `describe_asset_type`
 only where the procedure works end to end. A tool that is merely a shortcut (`search_work_items`) is mentioned as "when
 allowed" and is not in `uses`, otherwise a workspace without it would lose the recipe for no reason.
 *Applied in:* P6-03, `recipes/quality.ts`.
+
+**L-296 — A recipe's examples are tests, extracted from the text that ships.**
+A recipe resource is documentation an agent copies from, so an example that does not compile is a bug that reaches users.
+The test reads every fenced `json` block out of the served text and runs it through the real tool (and so the real query
+compiler) against the committed snapshot; nothing is duplicated in the test, so the text cannot drift from what is checked.
+Examples use only attributes of the product model and synthetic values; statuses and custom fields are read with
+`describe_asset_type`, never written into a static recipe (A12).
+*Applied in:* P6-06, `test/recipes-other-assets.test.ts`.
 
 ## E. The Agility API client
 
@@ -1589,6 +1597,20 @@ a label we wrote), checks nulls structurally instead of by text (a tenant name c
 only.
 *Applied in:* P6-01, `live/portfolio.live.test.ts`.
 
+**L-298 — A type the tenant holds none of answers with zero rows, and that is a recorded gap, not a pass.**
+`query_assets` on a defined but empty type (Requests on the read-only tenant) returns an empty page, not an error, so a live
+test that only asserts "no error" would pass without exercising the type. The live suite records a level per type (absent,
+present) and treats absence as a gap with a follow-up task for the writable sandbox; the offline suite carries the
+behaviour for that type on fixtures.
+*Applied in:* P6-06, `live/other-assets.live.test.ts`, P6-27.
+
+**L-299 — A hand-written snapshot entry is a guess until the drift check has read it.**
+The first `RequestStatus` and `Retrospective` entries were wrong in three product details (the status list's base is `List`
+rather than `Status`, it has no `RollupState`, a retrospective has no `Number`), and only `pnpm metadata:drift` against the
+public example instance showed it. Add a type to the snapshot, run the drift check in the same change, and copy no
+attribute from memory; a type with a `Number` missing is also why its minimal tier has no `Number`.
+*Applied in:* P6-06, `test/fixtures/agility/meta-snapshot.json`.
+
 ## R. CI, release and supply chain
 
 **L-127 — Separate building from publishing.**
@@ -1810,6 +1832,13 @@ judged on the last page only (a full non-final page always carries the extra row
 under a fixed number per call, and they travel in batches of 20 under the 512 KiB response cap. A point that still does not
 fit is left out and named, never estimated.
 *Applied in:* P6-02.
+
+**L-297 — Not every work type has an owner list: pick `Owners` or `Owner` from the metadata.**
+Issues have a single `Owner` relation, while stories, defects, themes and epics have `Owners`. Default tiers are computed
+from the attributes a type has, so the owner column is `Owners.Name` when the list exists and `Owner.Name` otherwise; a
+fixed list would leave issues with no owner in their default fields. Requests and goals have neither in the product model
+(default tier: status or identity only).
+*Applied in:* P6-06, `metadata/service.ts` (`fieldTiers`).
 
 ---
 

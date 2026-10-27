@@ -2,7 +2,7 @@
 id: P6-06
 title: Requests, issues, goals, themes and retrospectives through the generic tools
 phase: 6
-status: in-progress
+status: review
 priority: medium
 depends_on: [P2-17]
 adr: ["0012"]
@@ -29,16 +29,22 @@ about one of them finds a recipe, gets sensible default fields and never has to 
   absent types recorded as a gap and a follow-up task for the writable sandbox.
 
 ## Acceptance criteria
-- [ ] Recipe resources for issues, requests, goals/themes and retrospectives are listed and readable only when their tools
+- [x] Recipe resources for issues, requests, goals/themes and retrospectives are listed and readable only when their tools
       are allowed; every example query in them compiles against the committed snapshot through the real query compiler.
-- [ ] Default tiers of Issue, Request, Goal, Theme and Retrospective are tested (identity in minimal, status/owner in
+- [x] Default tiers of Issue, Request, Goal, Theme and Retrospective are tested (identity in minimal, status/owner in
       default) and every tier path resolves.
-- [ ] The snapshot describes `RequestStatus` and `Retrospective`; `describe_asset_type` works for all five types offline;
+- [x] The snapshot describes `RequestStatus` and `Retrospective`; `describe_asset_type` works for all five types offline;
       a denied type is refused with no upstream call.
-- [ ] Each type present on the read-only tenant answers `query_assets` and `get_assets` with default tiers in the guarded
+- [x] Each type present on the read-only tenant answers `query_assets` and `get_assets` with default tiers in the guarded
       live suite; absent types are recorded as a gap with a follow-up task.
-- [ ] `docs/reference/tool-catalogue.md`, `docs/reference/resources.md`, `docs/RESEARCH.md` updated; decisions and
+- [x] `docs/reference/tool-catalogue.md`, `docs/reference/resources.md`, `docs/RESEARCH.md` updated; decisions and
       lessons recorded.
+
+## Outcome
+Built: four recipe resources (`packages/core/src/recipes/other-assets.ts`), a single-owner fallback in the computed default
+tier, `RequestStatus` and `Retrospective` in the synthetic snapshot (drift clean), the guarded live suite
+(`live/other-assets.live.test.ts`). Live levels: issues, goals, themes and retrospectives present; requests absent (gap:
+P6-27). Decisions D-98..D-100, lessons L-296..L-299, follow-up P6-28 (typed tools, only if evals show the need).
 
 ## Security notes
 Recipes are static and carry no instance data. Every example value is a bound parameter in the real compiler; the

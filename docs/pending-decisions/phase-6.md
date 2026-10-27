@@ -195,6 +195,30 @@
   ([P6-25](../tasks/phase-6-tool-breadth/P6-25-verify-regression-recipes-sandbox.md)); (b) invent examples from Agility
   documentation, unverified; (c) extend the synthetic snapshot by hand.
 - **Recommendation:** (a).
+
+### D-98 — Issues, requests, goals, themes and retrospectives get no typed tools *(P6-06)*
+- **Context:** the five types are read through `query_assets` and `get_assets`; L-155 caps the tool count. The read-only
+  tenant has issues, goals, themes and retrospectives (levels only) and no requests, so there is no usage data yet.
+- **Options:** (a) recipes, default tiers and no new tools; (b) typed `list_issues` / `list_requests` now; (c) a typed tool
+  per type later, driven by the P6-10 evals and real use.
+- **Recommendation:** (a) now, (c) when evals or usage show an agent failing with the generic route (follow-up P6-28).
+- **Built:** (a).
+- **Owner:** _open_.
+
+### D-99 — Four recipe resources, grouped by what is read together *(P6-06)*
+- **Context:** five types, and the manifest lists every resource to every client, so the list should stay short.
+- **Options:** (a) four recipes: issues, requests, goals and themes (one, they are both planning groupings), retrospectives;
+  (b) one recipe per type; (c) one recipe for all five.
+- **Recommendation:** (a): each recipe stays short enough to read in one go, and the list grows by four rather than five.
+- **Built:** (a). Each recipe is offered only when `query_assets` and `get_assets` are both allowed.
+- **Owner:** _open_.
+
+### D-100 — The single-owner fallback is in the computed default tier, not in per-type overrides *(P6-06)*
+- **Context:** issues have `Owner`, not `Owners`, so the default tier had no owner column for them. `tierOverrides` could
+  fix one type per host, but every deployment would need it.
+- **Options:** (a) the tier computation uses `Owner.Name` when the type has no `Owners`; (b) a built-in override table for
+  `Issue`; (c) leave issues without an owner by default.
+- **Recommendation:** (a): it follows the metadata (L-050) and needs no list of type names; an override still replaces it.
 - **Built:** (a).
 - **Owner:** _open_.
 

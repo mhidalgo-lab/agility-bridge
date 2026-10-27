@@ -138,6 +138,8 @@ const KNOWN_TYPES = new Set([
   'TaskStatus',
   'TestStatus',
   'EpicStatus',
+  'RequestStatus',
+  'Retrospective',
   'EpicCategory',
   'WorkitemPriority',
 ]);
@@ -550,6 +552,8 @@ export class InstanceMetadata {
       ...pick([
         'Status.Name',
         'Owners.Name',
+        // Issues have one owner (`Owner`), not a list (P6-06).
+        ...(has('Owners') ? [] : ['Owner.Name']),
         'Timebox.Name',
         'Team.Name',
         'Estimate',
