@@ -184,6 +184,13 @@ export {
 } from './query/cursor.ts';
 export { invalid, limitError } from './query/limits.ts';
 export { parseInstant, parseTimeRange, type TimeWindow } from './query/time.ts';
+export {
+  QUALITY_RECIPE_RESOURCES,
+  QUALITY_RECIPES,
+  type Recipe,
+  type RecipeExample,
+  renderRecipe,
+} from './recipes/quality.ts';
 export { isSecretKeyName, REDACTED, redact, redactValue } from './redact.ts';
 export {
   collectPropertyNames,

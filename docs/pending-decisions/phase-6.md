@@ -164,3 +164,37 @@
 - **Options:** (a) add `portfolio` to the stdio groups; (b) leave stdio at five groups and let each later group opt in.
 - **Recommendation:** (a): same default as the catalogue; the catalogue stays within the 25-tool default target (15 now).
 - **Owner:** *(open; built as (a))*
+
+### D-95 — No typed tool for quality views; recipes only *(P6-03)*
+- **Context:** the task asked whether a typed tool such as "test status for a backlog item" pays off under the tool budget
+  (L-155: 35 tools with every group, cap 40).
+- **Options:** (a) recipes only: every quality question is one `query_assets` call with a filter the recipe shows; (b) a typed
+  `get_test_status` (tests of an item with a status roll-up); (c) a typed defects tool.
+- **Recommendation:** (a): each case is a single filter (L-294); the live tenant answered all twelve recipe queries through the
+  generic tool. Revisit (b) if the tool evals (P6-10) show agents failing the recipe, or the owner wants a status roll-up
+  per backlog item ([P6-26](../tasks/phase-6-tool-breadth/P6-26-quality-typed-tool-revisit.md)).
+- **Built:** (a).
+- **Owner:** _open_.
+
+### D-96 — Two recipe resources, served through the generic query and metadata tools *(P6-03)*
+- **Context:** recipes are manifest entries that prompts (P6-08) can point at. One resource for everything would be long and
+  would mix types most workspaces have (tests, defects) with optional ones (regression assets).
+- **Options:** (a) two resources, `recipes/tests-and-defects` and `recipes/regression-assets`, each `uses`
+  `query_assets`, `describe_asset_type` and `list_asset_types`; `search_work_items` is a "when allowed" mention; (b) one
+  resource; (c) one per asset type.
+- **Recommendation:** (a): the optional-type warning stays with the optional types, and neither resource is lost when
+  `search_work_items` is off (L-295).
+- **Built:** (a).
+- **Owner:** _open_.
+
+### D-97 — Regression plans and suites have prose, not validated examples *(P6-03)*
+- **Context:** the committed metadata snapshot has `RegressionTest` and `TestSet` but not `RegressionPlan` or
+  `RegressionSuite`, and the read-only tenant has no regression assets to learn their relations from (verification.md).
+  An example for a relation we cannot check would be exactly the stale recipe L-292 forbids.
+- **Options:** (a) prose only ("query like regression tests after `describe_asset_type`"), verify on the writable sandbox
+  ([P6-25](../tasks/phase-6-tool-breadth/P6-25-verify-regression-recipes-sandbox.md)); (b) invent examples from Agility
+  documentation, unverified; (c) extend the synthetic snapshot by hand.
+- **Recommendation:** (a).
+- **Built:** (a).
+- **Owner:** _open_.
+

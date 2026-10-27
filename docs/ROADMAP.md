@@ -258,7 +258,7 @@ Status lives in each task file.
 |---|---|---|---|---|
 | P6-01 | [Portfolio tools (epics and portfolio items)](tasks/phase-6-tool-breadth/P6-01-tools-portfolio.md) | high | P2-17 | review |
 | P6-02 | [Planning tools (get_sprint)](tasks/phase-6-tool-breadth/P6-02-tools-planning.md) | high | P2-17 | review |
-| P6-03 | [Quality views (tests, regression assets, defects)](tasks/phase-6-tool-breadth/P6-03-tools-quality.md) | medium | P2-17 | todo |
+| P6-03 | [Quality views (tests, regression assets, defects)](tasks/phase-6-tool-breadth/P6-03-tools-quality.md) | medium | P2-17, P6-09 | review |
 | P6-04 | [Collaboration tools (conversations, links, attachments)](tasks/phase-6-tool-breadth/P6-04-tools-collaboration.md) | medium | P2-17 | review |
 | P6-05 | [History and activity tools](tasks/phase-6-tool-breadth/P6-05-tools-history.md) | medium | P2-17 | review |
 | P6-06 | [Requests, issues and other asset types](tasks/phase-6-tool-breadth/P6-06-other-asset-types.md) | medium | P2-17 | todo |
@@ -278,6 +278,8 @@ Status lives in each task file.
 | P6-20 | [Ranged reads of long attachment text](tasks/phase-6-tool-breadth/P6-20-attachment-ranged-reads.md) | low | P6-04 | todo |
 | P6-21 | [Verify history against known edits on the writable sandbox](tasks/phase-6-tool-breadth/P6-21-history-sandbox-verification.md) | medium | P6-05, P7-07 | todo |
 | P6-22 | [Portfolio items in list_recent_changes](tasks/phase-6-tool-breadth/P6-22-recent-changes-portfolio-items.md) | low | P6-05, P6-01 | todo |
+| P6-25 | [Verify the regression and test-set recipes on the writable sandbox](tasks/phase-6-tool-breadth/P6-25-verify-regression-recipes-sandbox.md) | low | P6-03, P7-07 | todo |
+| P6-26 | [Revisit a typed quality tool after the tool evals](tasks/phase-6-tool-breadth/P6-26-quality-typed-tool-revisit.md) | low | P6-03, P6-10 | todo |
 
 ### Phase 7
 

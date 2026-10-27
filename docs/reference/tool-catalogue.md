@@ -128,8 +128,8 @@ Registered only when every tool they use is allowed. Arguments use the tool voca
 
 Served through the same handlers, limits and audit as the tools; registered from one manifest (L-153). Built in P6-09; the
 generated [resource reference](resources.md) is the current list. A resource is offered only when the tools it is served
-through are allowed. Recipe resources (regression, defects, issues, requests, goals, themes, retrospectives) come with
-P6-03 and P6-06.
+through are allowed. Recipe resources: tests, defects and regression assets (P6-03, below); issues, requests, goals, themes and
+retrospectives come with P6-06.
 
 | URI | Content |
 |---|---|
@@ -138,6 +138,17 @@ P6-03 and P6-06.
 | `agility-bridge://instance/asset-types/{asset_type}` | Attributes, operations and statuses of one type |
 | `agility-bridge://workspace/projects` | The Agility projects this workspace allows, as a tree |
 | `agility-bridge://rubrics/backlog-item-quality` | The versioned quality rubric (JSON) used by `work_item_quality` |
+| `agility-bridge://recipes/tests-and-defects` | Worked `query_assets` calls: tests of a backlog item, failing and never-run tests, open, unowned, by-priority, recently closed and per-sprint defects |
+| `agility-bridge://recipes/regression-assets` | Worked `query_assets` calls: regression tests, test sets and the tests inside one; plans and suites by the same pattern after `list_asset_types` |
+
+**Decision (P6-03, D-95): no typed quality tool.** Tests, regression tests/plans/suites, test sets and defects are answered by
+the two recipes through `query_assets` (and `search_work_items` for a mixed list). Every case is a single filter, so a typed
+tool would only rename it and spend a slot of the 40-tool budget (L-155, L-294). The recipes are offered only when
+`query_assets`, `describe_asset_type` and `list_asset_types` are allowed, every example is compiled against the metadata
+snapshot in CI, and the examples were run against the read-only tenant (tests and defects present; regression assets
+absent there). Regression plans and suites have no validated example yet
+([P6-25](../tasks/phase-6-tool-breadth/P6-25-verify-regression-recipes-sandbox.md)). The typed tool is revisited in
+[P6-26](../tasks/phase-6-tool-breadth/P6-26-quality-typed-tool-revisit.md) if the tool evals say so.
 
 ## MCP Apps and Tasks (Phase 8)
 

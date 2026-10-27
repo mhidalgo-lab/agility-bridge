@@ -7,6 +7,7 @@ import { AbError, ErrorCode } from './errors.ts';
 import { assertManifest, type ManifestEntry } from './manifest.ts';
 import { shapeOutput } from './output/result.ts';
 import { FILTER_OPS } from './query/compiler.ts';
+import { QUALITY_RECIPE_RESOURCES } from './recipes/quality.ts';
 import { BACKLOG_ITEM_QUALITY_RUBRIC } from './rubric.ts';
 import type { ToolOutput } from './tool.ts';
 
@@ -246,6 +247,8 @@ export const RESOURCE_MANIFEST: readonly ResourceDefinition[] = Object.freeze([
     uses: ['get_work_item'],
     read: async () => ({ text: JSON.stringify(BACKLOG_ITEM_QUALITY_RUBRIC, null, 2) }),
   },
+  // Quality recipes (P6-03): a separate block, kept in recipes/quality.ts.
+  ...QUALITY_RECIPE_RESOURCES,
 ] satisfies ResourceDefinition[]);
 
 assertManifest(RESOURCE_MANIFEST);
