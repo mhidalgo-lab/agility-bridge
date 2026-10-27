@@ -38,6 +38,11 @@ What it checks (about 40 read requests, one at a time):
   every content type refused, so no content request is made). **Gap:** the guard allows no `attachments.img` request, so
   the download itself is verified on fixtures only (tracked in P6-19).
 
+- `live/sprint.live.test.ts` (P6-02): `get_sprint` on a recently used past and current sprint (picked by one read of the newest
+  items, addressed by OID): the categories add up to the items counted, history is at most 15 ordered points never after now,
+  the last point equals the totals' remaining estimate, no `null`, the envelope is present. Records coarse levels to the
+  ignored `live/results/sprint.json`. Findings: sprint dates have no zone (L-276), sprints hold hundreds of items (L-279).
+
 ## Tenant inventory (2026-10-21, Agility 26.0.3.2, hosted)
 
 Recorded by `live/inventory.live.test.ts` as size buckets and published here at a coarser level (the repository is

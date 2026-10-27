@@ -43,7 +43,7 @@ How to use it:
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241 |
-| [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-283, L-284 – L-287 |
+| [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287 |
 | [Top 20](#top-20) | the lessons that save the most time |
 
 ---
@@ -1725,6 +1725,34 @@ does not exist on `Attachment` in 26.0.3.2, so a declared size may be missing: t
 list says nothing about size rather than guessing. The live guard allows no attachment content request, so a live
 check stops at the metadata and scope steps and the download is verified on fixtures; record that gap.
 *Applied in:* P6-04 (`list_attachments`, live collaboration suite).
+
+**L-276 — Hosted sprint dates carry no time zone: read them as UTC and say so.**
+`Timebox.BeginDate` and `EndDate` come back as `YYYY-MM-DDTHH:MM:SS.fffffff` with no `Z` or offset (live, P6-02,
+26.0.3.2), so a parser that insists on a zone (L-149) reports "no dates" for every sprint and silently drops timing, committed
+and burndown. Sprint dates are read as UTC (the server's one time model, L-061) and the result carries a note saying the
+zone was assumed.
+*Applied in:* P6-02 (`get_sprint`).
+
+**L-277 — A missing rollup value is not `0`: `Number(null)` made every status "not started".**
+`category(null)` went through `Number(null) === 0` and mapped a status without `RollupState` to `not_started`, a plausible
+zero (L-033). A missing, null or empty code has no category; items with such a status are counted as `unknown` and the
+result names how many.
+*Applied in:* P6-02, `metadata/service.ts`.
+
+**L-278 — A past sprint is closed and its items move on: resolve closed sprints and read the sprint as it ended.**
+Name and OID resolution excluded closed assets, so every finished sprint answered "not found"; and unfinished items are
+moved to the next sprint, so the current membership of a past sprint hides its carry-over. Sprint resolution includes closed
+sprints, and a past sprint's contents are read `asof` its end date (bounded by `maxAsOfAgeDays`, with a note and no carry-over
+when the end is older).
+*Applied in:* P6-02, `identity/resolve.ts`.
+
+**L-279 — Size history reads for real sprints: hundreds of items, `limit + 1` only on the last page, one response cap.**
+The first design read one page of 100 items per history point and every real sprint overflowed it (live: a sprint of several
+hundred items). A point now reads as many pages as the sprint needs today plus headroom (at most five), "more exists" is
+judged on the last page only (a full non-final page always carries the extra row), the points are cut so the queries stay
+under a fixed number per call, and they travel in batches of 20 under the 512 KiB response cap. A point that still does not
+fit is left out and named, never estimated.
+*Applied in:* P6-02.
 
 ---
 

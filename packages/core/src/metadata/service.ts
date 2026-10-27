@@ -189,6 +189,8 @@ function badPath(type: string, path: string, why: string): AbError {
 
 /** `RollupState` codes on status lists: AssetState-style lifecycle values. *unverified* beyond 0, 64 and 128. */
 function category(code: unknown): StatusCategory | undefined {
+  // A missing value is not 0 ("not started"): Number(null) would say so (L-033).
+  if (code === null || code === undefined || code === '') return undefined;
   switch (Number(code)) {
     case 0:
       return 'not_started';

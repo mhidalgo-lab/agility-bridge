@@ -61,7 +61,7 @@ Default: 20 read tools (costs are worst cases with a cold metadata cache, verifi
 
 | Tool | Group | Cost | What it does |
 |---|---|---|---|
-| `get_sprint` | planning | 6 | Sprint summary: dates, committed vs done estimates, items by status category, carry-over, burndown points (bounded history). |
+| `get_sprint` | planning | 30 | One sprint: UTC dates and schedule, backlog items and defects by status category (the instance's rollup categories) with estimates, **committed** at the begin date vs done, scope change, **carry-over** of a finished sprint (read as it ended) and a daily **burndown** from bounded `asof` history (at most 15 points, 20 queries per request, `maxAsOfAgeDays`). Missing estimates, categories or history are reported in `notes`, never as zeros; capacity is not reported (D-83). Not paged. | `sprint` (default `current`), `team`, `project`, `burndown`, `format` | `sprint { oid, name, state, timing, beginDate, endDate, schedule }`, `basis`, `totals`, `byStatusCategory[]`, `committed?`, `planned?`, `scopeChange?`, `carryOver?`, `burndown[] { at, remaining?, ideal?, items }`, `items[]`, `truncated?` |
 | `list_portfolio_items` | portfolio | 3 | Portfolio items (epics by category such as Feature or Initiative) with status and progress. Paged. |
 | `get_portfolio_tree` | portfolio | 8 | An epic with its descendants (sub-epics, backlog items) and roll-ups (estimate, done %, open defects); depth-bounded. |
 | `get_conversations` | collaboration | 10 | Comments on one asset in scope, newest first, with author, date and text (rich text as text; `asset`, `limit`, `cursor`, `format`). Paged. |

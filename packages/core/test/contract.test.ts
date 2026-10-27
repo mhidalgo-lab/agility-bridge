@@ -153,6 +153,16 @@ describe('tools/list contract', () => {
             "idempotentHint": true,
             "openWorldHint": true,
             "readOnlyHint": true,
+            "title": "Get a sprint",
+          },
+          "name": "get_sprint",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
             "title": "List members",
           },
           "name": "list_members",
