@@ -2,11 +2,11 @@
 id: P6-03
 title: Quality views (tests, regression assets, defects)
 phase: 6
-status: in-progress
+status: review
 priority: medium
 depends_on: [P2-17, P6-09]
 adr: ["0012"]
-lessons: [L-035, L-155]
+lessons: [L-035, L-155, L-292, L-293, L-294, L-295]
 owner: ""
 ---
 
@@ -27,16 +27,16 @@ Cover test and defect questions mostly through existing tools, adding a typed to
   real query compiler against the committed metadata snapshot and a recipe cannot rot.
 - Decide (L-155) whether a typed tool such as test status for a backlog item is worth adding. Default: no (D-95).
 - Live verification of the examples for types the tenant has (tests, defects); regression plans, suites, regression tests and
-  test sets are absent there, so they are a recorded gap with a follow-up (P6-25).
+  test sets are absent there, so they are a recorded gap with a follow-up ([P6-25](P6-25-verify-regression-recipes-sandbox.md)).
 
 ## Acceptance criteria
-- [ ] Both recipe resources are listed and readable exactly when `query_assets` and `describe_asset_type` are allowed, and
+- [x] Both recipe resources are listed and readable exactly when `query_assets` and `describe_asset_type` are allowed, and
       refused with no upstream call otherwise; the generic resource tests cover them.
-- [ ] Every example call in every recipe validates through the real query compiler against the metadata snapshot (test).
-- [ ] The recipe text carries no instance words and every example is rendered from the tested data.
-- [ ] Live: each example for tests and defects runs against the read-only tenant through the guarded suite (counts and shapes
+- [x] Every example call in every recipe validates through the real query compiler against the metadata snapshot (test).
+- [x] The recipe text carries no instance words and every example is rendered from the tested data.
+- [x] Live: each example for tests and defects runs against the read-only tenant through the guarded suite (counts and shapes
       only); absent types are recorded as a gap with a follow-up task.
-- [ ] Typed-tool decision recorded in the tool catalogue (D-95); resource reference, tool catalogue and task index regenerated.
+- [x] Typed-tool decision recorded in the tool catalogue (D-95); resource reference, tool catalogue and task index regenerated.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.

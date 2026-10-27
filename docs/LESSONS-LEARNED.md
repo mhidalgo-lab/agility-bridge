@@ -27,7 +27,7 @@ How to use it:
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
-| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-291 |
+| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-295 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280 |
@@ -379,6 +379,32 @@ computed but did not list (`assetType`, `doneEstimate`, `parent`) vanished from 
 check caught `assetType`, but `parent` was missing until the live run, because no unit test asserted it. A test per
 promised output field, on the structured result and not on the row the tool built, is the cheap fix.
 *Applied in:* P6-01.
+
+**L-292 — A recipe is data the tests run, and its text is rendered from that data.**
+Each example call of a recipe resource is an object (`query_assets` input) and the markdown is generated from the same
+objects. A test compiles every example through the real query compiler against the committed metadata snapshot, so a
+renamed attribute path, a changed filter rule or a dropped operator fails CI instead of leaving an agent a stale example.
+*Applied in:* P6-03, `recipes/quality.ts`, `test/recipes-quality.test.ts`.
+
+**L-293 — A recipe over an optional asset type starts with "does the type exist here".**
+Regression tests, plans, suites and test sets exist only in some instances (and some workspaces). The recipe tells the agent
+to call `list_asset_types` first and to report a refusal for an absent or unallowed type as exactly that, never as "no
+coverage". The offline snapshot does not carry every optional type either, so examples are validated only for the types it
+has and the rest are prose until a sandbox can verify them.
+*Applied in:* P6-03, P6-25.
+
+**L-294 — A typed tool must beat one `query_assets` call, not restate it.**
+"Tests of a backlog item", "failing tests" and "defects by priority" are one filter each (`Parent.Number`,
+`Status.Name`, `Priority.Name`). A typed tool would rename a filter and cost a slot of the 40-tool budget (L-155). The bar for
+a typed tool is a join the generic query cannot express in one call (counts across relations, a rollup per backlog item) or
+a result the agent cannot shape itself; until the tool evals (P6-10) show agents failing a recipe, the recipe is the answer.
+*Applied in:* P6-03, D-95, `docs/reference/tool-catalogue.md`.
+
+**L-295 — A recipe's `uses` is the whole procedure; hedge optional tools in the prose.**
+A recipe names the tools every step needs (`query_assets`, `describe_asset_type`, `list_asset_types`), so it is offered
+only where the procedure works end to end. A tool that is merely a shortcut (`search_work_items`) is mentioned as "when
+allowed" and is not in `uses`, otherwise a workspace without it would lose the recipe for no reason.
+*Applied in:* P6-03, `recipes/quality.ts`.
 
 ## E. The Agility API client
 
