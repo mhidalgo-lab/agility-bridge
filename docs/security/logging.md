@@ -41,6 +41,7 @@ carry `requestId`.
 | error | `boot failed` | `error` (class), `reason` (names a setting, never a value) (Worker; written directly, the logger may not exist yet) | [index.ts](../../apps/worker/src/index.ts) |
 | debug | `tool ok` | `tool`, `ms`, `requests` | [server.ts](../../packages/core/src/server.ts) |
 | warn | `tool error` | `tool`, `ms`, `code`, `error` (class, redacted message) | [server.ts](../../packages/core/src/server.ts) |
+| info | `attachment downloaded` | `asset` (number), `attachment` (id), `bytes`, `contentType`; never the content | [attachments.ts](../../packages/core/src/tools/collaboration/attachments.ts) |
 | debug | `agility request` | `endpoint`, `method`, `attempt`, `status`, `ms`, `bytes` (no body, no token) | [client.ts](../../packages/core/src/agility/client.ts) |
 | debug | `agility error body` | `status`, the first 500 characters of the error body (redacted by the logger) | [client.ts](../../packages/core/src/agility/client.ts) |
 | error | `access resolution failed` | `requestId`, `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
@@ -116,7 +117,7 @@ the redacted, debug-level error body), client IP addresses (they go to the audit
 | `durationMs`, `agilityRequests` | Cost of the call | Counted in the record, not headers (L-101) |
 | `errorCode` | Stable error code | Never a message |
 | `targetType`, `targetId` | What an admin change touched | |
-| `details` | Refusals: `reason`, `slug`, `ip`; admin rows: `actor` role, `via` (`api`/`cli`), changed field names; rotation: versions and reason | Field names, never values |
+| `details` | Refusals: `reason`, `slug`, `ip`; admin rows: `actor` role, `via` (`api`/`cli`), changed field names; rotation: versions and reason; `get_attachment` tool calls: `download` (`asset`, `attachment`, `bytes`, `contentType`) | Field names, never values |
 
 Proven by a scan test that runs tool calls with filter values, refusals with request bodies and an admin change, then
 checks that no token, filter value, project, member or story name, or `Bearer` appears in any row
