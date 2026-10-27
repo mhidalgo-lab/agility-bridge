@@ -2,7 +2,7 @@
 id: P5-07
 title: OAuth documentation
 phase: 5
-status: review
+status: done
 priority: medium
 depends_on: [P5-06]
 adr: []

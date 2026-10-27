@@ -373,8 +373,11 @@ export function defineOAuthClientSuite(
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams(params).toString(),
       });
-      expect(down.status).toBe(400);
-      expect(((await down.json()) as { error: string }).error).toBe('invalid_client');
+      // A server that is down says nothing about the client: `invalid_client` would make an SDK client throw away its
+      // registration and tokens and ask the person to approve again (P5-10). It is a passing condition, so a 503.
+      expect(down.status).toBe(503);
+      expect(down.headers.get('retry-after')).not.toBeNull();
+      expect(((await down.json()) as { error: string }).error).toBe('temporarily_unavailable');
       h.documents.serveClient(DOC_URL);
       const again = await h.call(`${h.origin}/oauth/token`, {
         method: 'POST',
@@ -382,6 +385,39 @@ export function defineOAuthClientSuite(
         body: new URLSearchParams(params).toString(),
       });
       expect(again.status).toBe(200);
+    });
+
+    it('CIMD: at the token endpoint a document that is gone or no longer valid is invalid_client, one that is only unreachable is not (P5-10)', async () => {
+      const h = await host();
+      h.documents.serveClient(DOC_URL);
+      const refresh = (clientId: string) =>
+        h.call(`${h.origin}/oauth/token`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: 'usr_x:AbCdEfGhIjKlMnOp:SecretSecretSecretSecretSecret12',
+            client_id: clientId,
+          }).toString(),
+        });
+      const expectVerdict = async (status: number, error: string) => {
+        await h.storage.kv.delete(`oauth:client:${DOC_URL}`);
+        const res = await refresh(DOC_URL);
+        expect(res.status).toBe(status);
+        expect(((await res.json()) as { error: string }).error).toBe(error);
+      };
+      // Verdicts on the client: the document says another client, is not JSON, or is not there.
+      h.documents.serveClient(DOC_URL, { client_id: 'https://other.example.org/x' });
+      await expectVerdict(400, 'invalid_client');
+      h.documents.serve(DOC_URL, { headers: { 'content-type': 'application/json' }, body: 'nope' });
+      await expectVerdict(400, 'invalid_client');
+      h.documents.serve(DOC_URL, { status: 404 });
+      await expectVerdict(400, 'invalid_client');
+      // Passing conditions: the server errs or asks to slow down, or the fetch itself fails.
+      for (const status of [500, 502, 503, 429]) {
+        h.documents.serve(DOC_URL, { status });
+        await expectVerdict(503, 'temporarily_unavailable');
+      }
     });
 
     it('CIMD: one address can make the server fetch only so many documents per hour', async () => {
@@ -579,6 +615,54 @@ export function defineOAuthClientSuite(
       });
       const used = JSON.parse((await h.storage.kv.get(key)) as string) as { registrationExpiresAt: number };
       expect(used.registrationExpiresAt).toBeGreaterThan(nowS + 80 * 86_400);
+    });
+
+    it('DCR: a revocation request is not a use: it cannot renew an unused registration, public or confidential (P5-10)', async () => {
+      const h = await host();
+      const stamps = async (id: string) => {
+        const record = JSON.parse((await h.storage.kv.get(`oauth:client:${id}`)) as string) as {
+          registrationDate: number;
+          registrationExpiresAt: number;
+        };
+        return { span: record.registrationExpiresAt - record.registrationDate, record };
+      };
+      const revoke = (headers: Record<string, string>, params: Record<string, string>) =>
+        h.call(`${h.origin}/oauth/token`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
+          body: new URLSearchParams({ token: 'garbage:token:value', ...params }).toString(),
+        });
+      // Public: the id alone authenticates it.
+      const pub = (await (await register(h, good)).json()) as { client_id: string };
+      const before = await stamps(pub.client_id);
+      expect(before.span).toBeLessThanOrEqual(86_400 + 120);
+      expect((await revoke({}, { client_id: pub.client_id })).status).toBe(200);
+      expect((await stamps(pub.client_id)).record).toEqual(before.record);
+      // Confidential: an authenticated revocation of a token that is not its own changes nothing either.
+      const conf = (await (
+        await register(h, { ...good, token_endpoint_auth_method: 'client_secret_basic' })
+      ).json()) as { client_id: string; client_secret: string };
+      const confBefore = await stamps(conf.client_id);
+      const basic = `Basic ${btoa(`${conf.client_id}:${conf.client_secret}`)}`;
+      expect((await revoke({ authorization: basic }, {})).status).toBe(200);
+      expect((await stamps(conf.client_id)).record).toEqual(confBefore.record);
+      // A client that did exchange a code keeps the long lifetime a later revocation request must not shorten.
+      const client = { client_id: pub.client_id, redirect_uris: [LOOPBACK] } as OAuthClientInformationFull;
+      const a = await authorize(h, client);
+      await exchangeAuthorization(h.origin, {
+        metadata: await metadata(h),
+        clientInformation: client,
+        authorizationCode: a.code as string,
+        ...issOf(a),
+        codeVerifier: a.verifier,
+        redirectUri: a.redirect,
+        resource: resourceOf(h, 'team-a'),
+        fetchFn: fetchFn(h),
+      });
+      const used = await stamps(pub.client_id);
+      expect(used.span).toBeGreaterThan(80 * 86_400);
+      expect((await revoke({}, { client_id: pub.client_id })).status).toBe(200);
+      expect((await stamps(pub.client_id)).record).toEqual(used.record);
     });
 
     it('DCR: one address may register 10 clients an hour; the next gets a 429, audited once; others are unaffected', async () => {

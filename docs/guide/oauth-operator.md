@@ -19,6 +19,10 @@
    found" ([L-263](oauth-troubleshooting.md#not-found-on-an-item-that-exists)).
 4. **If a proxy or Cloudflare Access sits in front**, leave `/w/*`, `/oauth/*` and `/.well-known/*` outside it. Apps cannot
    pass an Access login page. Only the sign-in paths belong in an Access application.
+5. **On Node behind a reverse proxy, set `AB_TRUSTED_PROXY_HOPS`** ([configuration](configuration.md)). The OAuth limits are
+   per client address (an IPv6 address counts as its /64 network); without it every request comes from the proxy's address,
+   so one person's failed attempts or a burst of sign-ins count against everyone. The Worker reads the address Cloudflare
+   gives it.
 
 ## Node (`agility-bridge serve`)
 

@@ -434,6 +434,9 @@ export async function fetchMetadataDocument(
     if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
       throw new ClientMetadataError('redirect');
     }
+    // A server that is down or asking us to slow down is a condition that passes, not a verdict on the client: the token
+    // endpoint answers it as temporarily unavailable, never as `invalid_client` (P5-10).
+    if (response.status >= 500 || response.status === 429) throw new ClientMetadataError('unavailable');
     if (response.status !== 200) throw new ClientMetadataError('http_status');
     const mediaType = (response.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
     if (!JSON_TYPE.test(mediaType)) throw new ClientMetadataError('content_type');

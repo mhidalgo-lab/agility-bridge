@@ -60,6 +60,15 @@ describe('connect page', () => {
     expect(f.once.size).toBe(0);
   });
 
+  it('does not call OAuth a later release: it is shipped (P5-10)', async () => {
+    const f = fakeDeps();
+    api(f, { 'GET /grants/grt_1': grant(), 'GET /workspaces/wsp_1': workspace() });
+    const html = await (await get(f, '/admin/grants/grt_1/connect', asAdmin)).text();
+    expect(html).toContain('Needs OAuth');
+    expect(html).not.toContain('later release');
+    expect(html).not.toContain('yet.');
+  });
+
   it('escapes a hostile workspace name', async () => {
     const f = fakeDeps();
     api(f, { 'GET /grants/grt_1': grant(), 'GET /workspaces/wsp_1': workspace({ name: HOSTILE }) });

@@ -64,7 +64,8 @@ Against the Cloudflare deployment (Worker on a custom domain, Workers Free, sign
 | Cursor, Windsurf / Devin Desktop | — | — | not run (no subscription available) | | | | | |
 
 The rows marked "not run" are [P6-14](../tasks/phase-6-tool-breadth/P6-14-oauth-client-matrix-rest.md). No client has
-used dynamic registration yet (D-68), and none has needed a private-use redirect (D-69).
+used dynamic registration against this release (D-68; MCP Inspector did in the Phase 0 spike, above), and none has needed a
+private-use redirect (D-69). Only what the runs above observed is marked **V**: the guides say "documented only" for the rest.
 
 ## v0.1 client snippets (P1-14)
 

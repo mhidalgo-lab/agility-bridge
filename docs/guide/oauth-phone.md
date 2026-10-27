@@ -16,7 +16,8 @@
 
 ## claude.ai on the web
 
-Owner-verified 2026-10-26 (claude.ai web, custom connector).
+Owner-verified 2026-10-26 (claude.ai web, custom connector): discovery, sign-in, consent and tool calls. A refresh after
+the first hour, and disconnecting and connecting again, were not part of that run ([P6-14](../tasks/phase-6-tool-breadth/P6-14-oauth-client-matrix-rest.md)).
 
 1. In claude.ai open **Settings**, then **Connectors**, and choose **Add custom connector**.
 2. Give it a name and paste the workspace address. Leave any advanced client id and secret fields empty: claude.ai

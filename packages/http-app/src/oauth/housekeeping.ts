@@ -16,6 +16,21 @@ export const SWEEP_CURSOR_KEY = 'oauth-sweep-cursor';
 /** A registration whose expiry stamp is within this many seconds of its creation never exchanged a code. */
 const UNUSED_STAMP_MAX_S = 7 * 86_400;
 
+/**
+ * Whether a stored dynamic client record is one that never exchanged a code: its expiry stamp is still the short one
+ * the registration was given (the provider renews it to the long lifetime on a token exchange).
+ */
+export function isUnusedRegistration(record: {
+  readonly registrationDate?: unknown;
+  readonly registrationExpiresAt?: unknown;
+}): record is { readonly registrationDate: number; readonly registrationExpiresAt: number } {
+  return (
+    typeof record.registrationDate === 'number' &&
+    typeof record.registrationExpiresAt === 'number' &&
+    record.registrationExpiresAt - record.registrationDate <= UNUSED_STAMP_MAX_S
+  );
+}
+
 export interface SweepOptions {
   readonly now: () => number;
   /** The unused-registration lifetime in force (`AB_OAUTH_DCR_UNUSED_TTL`). */
@@ -55,12 +70,10 @@ export async function sweepRegistrations(
       readonly registrationDate?: unknown;
       readonly registrationExpiresAt?: unknown;
     } | null;
-    if (record === null || typeof record.registrationDate !== 'number') continue;
-    if (typeof record.registrationExpiresAt !== 'number') continue;
-    // Unused: the expiry stamp is still the short one the registration was given (a token exchange renews it to the long
-    // registration lifetime), and the unused lifetime configured now has run out.
-    const unused = record.registrationExpiresAt - record.registrationDate <= UNUSED_STAMP_MAX_S;
-    if (unused && record.registrationDate + options.unusedTtlSeconds <= nowSeconds) {
+    if (record === null) continue;
+    // Unused (a token exchange renews the stamp to the long registration lifetime), and the unused lifetime in force has
+    // run out.
+    if (isUnusedRegistration(record) && record.registrationDate + options.unusedTtlSeconds <= nowSeconds) {
       await namespace.delete(key);
       removed += 1;
     }

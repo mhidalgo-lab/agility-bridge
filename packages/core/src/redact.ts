@@ -12,7 +12,7 @@ const VALUE_PATTERNS: ReadonlyArray<[RegExp, (match: string, ...groups: string[]
   // Admin session and sign-in cookies (P4-02, P4-01): `__Host-ab_session=<user>.<secret>`, `ab_login=<binding>`.
   [/((?:__Host-)?ab_(?:session|login))(\s*=\s*)[^\s;,"]+/g, (_m, name, sep) => `${name}${sep}${REDACTED}`],
   // Bearer credentials in headers or messages (Agility access tokens travel this way).
-  [/\b(Bearer)\s+[A-Za-z0-9._~+/=-]{8,}/gi, (_m, scheme) => `${scheme} ${REDACTED}`],
+  [/\b(Bearer)\s+[A-Za-z0-9._~+/=:-]{8,}/gi, (_m, scheme) => `${scheme} ${REDACTED}`],
   // Authorization headers with any scheme (Basic, Token, Digest, custom): the scheme stays, the credential goes. A
   // quoted (JSON) value is cut at its closing quote; a header line to its end, because Digest-style parameters hold
   // quotes and commas.

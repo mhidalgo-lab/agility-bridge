@@ -45,10 +45,11 @@ export function SnippetList(props: {
         </section>
       ))}
       <section class="card" aria-label="Clients that need OAuth">
-        <h3>Needs OAuth (a later release)</h3>
+        <h3>Needs OAuth</h3>
         <p class="muted">
-          {OAUTH_ONLY_CLIENTS.join(', ')}: they cannot take a device token reliably, so they have no snippet
-          yet.
+          {OAUTH_ONLY_CLIENTS.join(', ')}: they cannot take a device token, so they have no snippet. When your
+          administrator has turned OAuth on, add the endpoint above as a connector in the app and approve it
+          in the browser; if the app cannot connect, ask them whether OAuth is on.
         </p>
       </section>
     </div>

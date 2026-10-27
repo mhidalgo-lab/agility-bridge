@@ -37,6 +37,7 @@ import type {
 } from '@cloudflare/workers-oauth-provider';
 import type { Context } from 'hono';
 import type { OAuthEvent } from '../audit.ts';
+import { addressKey } from '../rate-limit.ts';
 import { type AbuseRefusal, type AbuseSurface, createAbuseGuard } from './abuse.ts';
 import {
   ClientMetadataError,
@@ -46,7 +47,12 @@ import {
   fetchMetadataDocument,
   looksLikeClientIdUrl,
 } from './clients.ts';
-import { CLIENT_RECORD_PREFIX, DOCUMENT_CLIENT_PREFIX, sweepRegistrations } from './housekeeping.ts';
+import {
+  CLIENT_RECORD_PREFIX,
+  DOCUMENT_CLIENT_PREFIX,
+  isUnusedRegistration,
+  sweepRegistrations,
+} from './housekeeping.ts';
 import { OAUTH_KV_PREFIX, type OAuthKvNamespace, oauthKvNamespace } from './kv-namespace.ts';
 import {
   CLAIM_PREFIX,
@@ -134,6 +140,13 @@ const CIMD_IP_PREFIX = 'oauth-cimd-ip:';
 const CAP_AUDIT_PREFIX = 'oauth-cap-audit:';
 /** Most keys one `kv.list` returns (the store's own cap). */
 const KV_LIST_MAX = 1000;
+/**
+ * At the live-registration cap (P5-10): an unused registration older than this makes room for a new one (the sweep that
+ * finds it looks at {@link CAP_PRESSURE_SLICE} records, a Free-plan request has 50 D1 queries, L-097). A registration is
+ * used within minutes of being made, so one hour unused is abandoned or a flood.
+ */
+const CAP_PRESSURE_UNUSED_S = 3600;
+const CAP_PRESSURE_SLICE = 10;
 
 /** Stable reasons an OAuth bearer is refused on an MCP route (logs and audit only; the client gets the same 401). */
 export type OAuthDenyReason = 'oauth_invalid' | 'oauth_mismatch';
@@ -406,6 +419,15 @@ function repeated(params: URLSearchParams): boolean {
     seen.add(name);
   }
   return false;
+}
+
+/** A uniform integer in `[0, n)` from the platform's random source. */
+function randomBelow(n: number): number {
+  const limit = Math.floor(0x1_0000_0000 / n) * n;
+  const buffer = new Uint32Array(1);
+  do crypto.getRandomValues(buffer);
+  while ((buffer[0] as number) >= limit);
+  return (buffer[0] as number) % n;
 }
 
 async function sha256Hex(text: string): Promise<string> {
@@ -880,8 +902,13 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
 
   // ------------------------------------------------------------------------------------------------ clients (P5-03)
 
-  /** The caller's address as the limits key it: hashed, so no address sits in storage. */
-  const callerKey = async (c: Context): Promise<string> => (await sha256Hex(deps.clientIp(c))).slice(0, 32);
+  /**
+   * The caller as the limits key it: an IPv6 address by its /64 network (one client holds a whole /64 and could rotate
+   * addresses past every per-address limit, as for the general limiter; P5-10) and then hashed, so no address sits in
+   * storage as written (an IPv4 hash can still be guessed back: keep these rows short-lived, T25).
+   */
+  const callerKey = async (c: Context): Promise<string> =>
+    (await sha256Hex(addressKey(deps.clientIp(c)))).slice(0, 32);
   const hourWindow = (): number => Math.floor(clock.now() / 1000 / CAP_WINDOW_S);
   const secondsToWindowEnd = (window: number): number =>
     Math.max(1, (window + 1) * CAP_WINDOW_S - Math.floor(clock.now() / 1000));
@@ -1015,15 +1042,21 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     // may cause (counted before the fetch, atomically; a failure is not cached, so failures count too).
     const stored = await storage.kv.list(DOCUMENT_CLIENT_PREFIX, { limit: cimdMaxClients });
     if (stored.length >= cimdMaxClients) {
-      logger.warn('oauth metadata document client cap reached', { limit: cimdMaxClients });
+      // A stored document is only a cache: evicting one costs its next request a fetch. So the cap bounds storage
+      // without ever refusing a client, and a source that fills it (each document may be cached for a day) cannot keep
+      // everyone else out (P5-10, D-76). The fetch limits below still bound what one source and all of them can cause.
+      const victim = stored[randomBelow(stored.length)] as string;
+      await storage.kv.delete(victim);
+      logger.warn('oauth metadata document client cap reached; one stored document evicted', {
+        limit: cimdMaxClients,
+      });
       await auditCapOnce(c, 'cimd_clients', {
-        action: 'oauth.client.refused',
-        status: 'denied',
+        action: 'oauth.client.evicted',
+        status: 'ok',
         requestId: requestIdOf(c),
         reason: 'client_cap',
         details: { kind: 'metadata_document', limit: cimdMaxClients },
       });
-      return 'too_many_clients';
     }
     const window = hourWindow();
     const fetches = await storage.kv.increment(`${CIMD_IP_PREFIX}${await callerKey(c)}:${window}`, {
@@ -1083,13 +1116,79 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       return reason;
     }
   };
-  const refusedClient = (clientId: string, reason: string): Response => {
+  /**
+   * Reasons a client's document could not be had that say nothing about the client: its server is down or slow, the
+   * fetch failed, or our own fetch budget is spent.
+   */
+  const TRANSIENT_CLIENT_REASONS: ReadonlySet<string> = new Set([
+    'fetch_failed',
+    'timeout',
+    'unavailable',
+    'fetch_budget',
+  ]);
+  const refusedClient = (clientId: string, reason: string, endpoint: 'authorize' | 'token'): Response => {
     // The client id is public (a URL or a random id); log its host only, never the document.
     logger.info('oauth client refused', { reason, clientHost: hostOf(clientId) });
+    // At the token endpoint `invalid_client` makes a client throw away its registration and tokens and ask the person to
+    // approve again (the MCP SDK does), so a passing failure to fetch its document must not look like one (P5-10).
+    if (endpoint === 'token' && TRANSIENT_CLIENT_REASONS.has(reason)) {
+      if (reason === 'fetch_budget') {
+        return rateLimited(secondsToWindowEnd(hourWindow()), 'Too many requests; retry later.');
+      }
+      const unavailable = jsonError(
+        503,
+        'temporarily_unavailable',
+        'The client metadata document is not available right now; retry later.',
+      );
+      unavailable.headers.set('Retry-After', '30');
+      return unavailable;
+    }
     if (reason === 'client_revoked') {
       return jsonError(400, 'invalid_client', 'This client was revoked by an administrator.');
     }
     return jsonError(400, 'invalid_client', 'The client metadata document could not be used.');
+  };
+
+  /** The stored record of the unused dynamic registration a token request authenticates as; null for any other client. */
+  const unusedRegistrationOf = async (
+    c: Context,
+    form: URLSearchParams,
+  ): Promise<{ readonly key: string; readonly raw: string; readonly expiresAt: number } | null> => {
+    const clientId = requestClientId(c.req.header('authorization') ?? null, form);
+    if (clientId === null || looksLikeClientIdUrl(clientId) || !CLIENT_ID_KEY_RE.test(clientId)) return null;
+    const key = `client:${clientId}`;
+    const raw = (await env.OAUTH_KV.get(key)) as string | null;
+    if (raw === null) return null;
+    try {
+      const record = JSON.parse(raw) as Record<string, unknown> | null;
+      if (record === null || typeof record !== 'object' || !isUnusedRegistration(record)) return null;
+      return { key, raw, expiresAt: record.registrationExpiresAt };
+    } catch {
+      return null;
+    }
+  };
+  /** Puts an unused registration back as it was if the provider renewed it (a revocation never makes a client used). */
+  const keepUnused = async (before: {
+    readonly key: string;
+    readonly raw: string;
+    readonly expiresAt: number;
+  }) => {
+    if (before.expiresAt * 1000 <= clock.now()) return;
+    const now = (await env.OAUTH_KV.get(before.key)) as string | null;
+    // Gone (revoked, expired) stays gone; unchanged needs nothing.
+    if (now === null || now === before.raw) return;
+    try {
+      const record = JSON.parse(now) as { registrationExpiresAt?: unknown } | null;
+      if (
+        typeof record?.registrationExpiresAt !== 'number' ||
+        record.registrationExpiresAt <= before.expiresAt
+      ) {
+        return;
+      }
+    } catch {
+      return;
+    }
+    await env.OAUTH_KV.put(before.key, before.raw, { expiration: before.expiresAt });
   };
 
   const registrations: OAuthRegistrations = Object.freeze({
@@ -1878,7 +1977,18 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       if (churn !== null) return refuseAbuse(c, churn);
       // The deployment's cap on live registrations. Reads, so a burst may overshoot by its concurrency, which the
       // per-address limit and the request limiter bound.
-      if ((await countClients()).dynamic >= dcrMaxClients) {
+      let live = (await countClients()).dynamic;
+      if (live >= dcrMaxClients) {
+        // Room first: registrations nobody used within the hour go (P5-10, D-77), so a source that filled the cap with
+        // registrations it never uses cannot hold it for the unused lifetime.
+        const { removed } = await sweepRegistrations(storage, {
+          now: () => clock.now(),
+          unusedTtlSeconds: CAP_PRESSURE_UNUSED_S,
+          limit: CAP_PRESSURE_SLICE,
+        });
+        live -= removed;
+      }
+      if (live >= dcrMaxClients) {
         logger.warn('oauth registration cap reached', { limit: dcrMaxClients });
         await auditCapOnce(c, 'dcr_clients', {
           action: 'oauth.client.refused',
@@ -1940,7 +2050,7 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       // code is consumed, so a fetch failure does not burn it.
       const clientId = form.get('client_id');
       const clientProblem = await resolveClient(clientId, c);
-      if (clientProblem !== null) return refusedClient(clientId as string, clientProblem);
+      if (clientProblem !== null) return refusedClient(clientId as string, clientProblem, 'token');
       // RFC 8707: a `resource` on the token request must be one of ours (the provider then requires it to be the
       // grant's own, so a refresh cannot retarget). Left out, the grant's resource applies. Checked before the code is
       // consumed, so a client that sent a bad one can retry.
@@ -1972,7 +2082,11 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       }
       // RFC 7009 revocation shares this endpoint (no grant_type).
       const revocation = grantType === null && form.has('token');
+      // The provider renews the registration of any client that gets a `200` here, and a revocation answers `200` to
+      // anything: without this a client that never exchanged a code could keep its registration for 90 days (P5-10).
+      const unused = revocation ? await unusedRegistrationOf(c, form) : null;
       const response = await fetchProvider(as, c, body);
+      if (unused !== null) await keepUnused(unused);
       if (grantType === 'authorization_code') {
         if (response.ok && (await revokedMeanwhile(code, helpers))) {
           return jsonError(400, 'invalid_grant', 'Invalid authorization code');
@@ -2037,7 +2151,7 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       // 400 page, never a redirect: no redirect URI has been validated yet.
       const requestedClient = params.get('client_id');
       const clientProblem = await resolveClient(requestedClient, c);
-      if (clientProblem !== null) return refusedClient(requestedClient as string, clientProblem);
+      if (clientProblem !== null) return refusedClient(requestedClient as string, clientProblem, 'authorize');
       const mod = await provider();
       const as = await server([resource]);
       const helpers = as.getOAuthApi(env);

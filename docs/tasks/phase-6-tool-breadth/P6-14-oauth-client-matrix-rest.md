@@ -22,7 +22,8 @@ before the release gate.
   is available (otherwise documented as not verified).
 - For each: discovery, registration path (client metadata document or dynamic registration), consent, tool calls,
   refresh, disconnect from My access, reconnect (one device again).
-- claude.ai web and Claude Code: disconnect and reconnect, not run in P5-06.
+- claude.ai web and Claude Code: disconnect and reconnect, not run in P5-06; claude.ai web: a refresh after the first
+  hour (the matrix marks it "not run").
 - Answer D-68 (does any client still need dynamic registration?) and D-69 (does a client need a private-use redirect such
   as `cursor://`?) from the runs; P5-15 holds the work if one does.
 

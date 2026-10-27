@@ -2,6 +2,23 @@
 
 > Open questions and owner steps from Phase 5. Answer inline (`**Owner:** …` with a date).
 
+## Owner steps
+
+Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.md)); none needs a code change first.
+
+1. **The remaining client runs** ([P6-14](../tasks/phase-6-tool-breadth/P6-14-oauth-client-matrix-rest.md)), against the real
+   deployment: Claude mobile, Claude Desktop connectors, VS Code, JetBrains, Copilot CLI and MCP Inspector (Cursor and
+   Windsurf when a subscription exists). Record version and date in the [client matrix](../reference/client-compatibility.md#oauth-runs-p5-06);
+   evidence is the audit log (client id, grant type), never tenant content.
+2. **Disconnect and reconnect, and a refresh of claude.ai**, which the 2026-10-26 runs did not cover: in claude.ai and Claude Code,
+   disconnect the app on *My access*, connect it again (one device again), and let claude.ai go past the first hour so a silent
+   refresh shows in the audit log.
+3. **A real phone** (iOS Safari, Android Chrome): the consent page was exercised at 320 px in Chromium only.
+4. **Answer D-68 and D-69 from the runs** (does a client still need dynamic registration; does one need a private-use callback):
+   P5-15 holds the work if one does.
+5. **The decisions below** (D-76 … D-79): D-76 is built at its recommendation in the review's PR, so say so if you would
+   rather have the alternative.
+
 ## Open decisions
 
 ### D-60 — `AB_OAUTH=on` is refused until the consent screen exists *(P5-01)*
@@ -171,3 +188,61 @@
   concept, and keeps an admin from cutting an owner's access. No recent sign-in is asked: disconnecting only removes access
   (L-093).
 - **Owner (2026-10-26):** Decided: as recommended, (a).
+
+### D-76 — At a cap, the cache gives way and the unused go first; one source can no longer hold a cap *(P5-10)*
+- **Context:** the review reproduced that one address can keep both registration caps full for everyone else. Ten registrations an
+  hour, each living a day while unused, is 240 live against a cap of 200; twenty metadata fetches an hour, each cached up to a
+  day, is 480 against 200. At the cap every other client was refused (`429`, or `400` for a document client such as claude.ai
+  whose cached document had expired). An earlier note had accepted that "many addresses together can fill the cap", not one.
+- **Options:** (a) a stored metadata document is only a cache, so at the cap **evict one at random** instead of refusing, and at
+  the dynamic-registration cap **remove registrations that never exchanged a code and are over an hour old** first (a bounded
+  sweep of 10 records), refusing only when nothing is that old; (b) lower the per-address limits or the unused lifetime so that
+  rate times lifetime stays under the cap (10 an hour for a day needs 5 an hour, or a 12 h lifetime), which changes D-68's numbers
+  for every honest user; (c) keep refusing and tell operators to turn registration off when it happens.
+- **Recommendation:** (a), built in the P5-10 PR (tests fail when it is reverted). It keeps D-68's numbers, bounds storage the same,
+  and turns "held for a day by one address" into "held for an hour by a flood of at least the cap". The hourly deployment limit
+  (100) stays under the cap (200), which is what guarantees room; raise one without the other and the guarantee is gone.
+- **Owner:** pending.
+
+### D-77 — Which access refusals at a token issuance end the device for good *(P5-10)*
+- **Context:** every issuance (code exchange, refresh) re-runs the access decision, and any refusal is `invalid_grant`, on which the
+  provider revokes the device's whole grant (P5-01). Most refusals are final (grant revoked or expired, person gone). Some pass:
+  a workspace or instance switched off for maintenance, a person disabled for a while, a credential marked invalid until
+  someone replaces it. A device token comes back to life when that is fixed; an OAuth device has to be approved again, and a
+  client at its next refresh sees its tokens refused with no hint that waiting would have been enough. (Per request the access
+  token is refused either way, so nothing is weakened by keeping the device.)
+- **Options:** (a) keep: every refusal ends the device (simple, fail closed, today); (b) final refusals end it, recoverable ones
+  (`workspace_disabled`, `instance_disabled`, `user_disabled`, `credential_revoked`, `credential_unvalidated`) answer `503
+  temporarily_unavailable` and keep it, so the person is not asked to approve again after the fix; (c) never end the device on
+  a refusal (an access token that is refused per request is enough).
+- **Recommendation:** (b), as task P5-21. It needs care in `checkIssuance` and the repeat path of the refresh family, and the
+  docs ("how it works") say what a refresh does with each reason. Not built in the review: it changes what ADR-0009's
+  "revoke on refusal" means and the owner may prefer (a).
+- **Owner:** pending.
+
+### D-78 — Abuse counters key on a plain hash of the address, which an IPv4 address can be recovered from *(P5-10)*
+- **Context:** the OAuth counters (`oauth-abuse:`, `oauth-dcr-ip:`, `oauth-cimd-ip:`) are keyed by the first 128 bits of SHA-256 of
+  the address (an IPv6 address by its /64 network). The docs say "no address sits in storage". True as written, but the IPv4
+  space is 2^32, so anyone with a copy of the database can try every address against a counter name. The rows live for one
+  window (10 minutes to an hour) and the purge removes them.
+- **Options:** (a) keep, and say so (pseudonymous, short-lived); (b) a keyed hash (HMAC) under a key from the master keyring, which
+  the OAuth runtime does not hold today (D-70) and the Worker would read per request; (c) a random per-deployment salt in the same
+  database (no protection from a copy of it, so no better than (a)).
+- **Recommendation:** (a) now, with the docs corrected in the P5-10 PR; (b) as task P5-22 if the deployment's privacy position needs
+  it (an address is personal data under some regimes), since it adds a key read to every limited request.
+- **Owner:** pending.
+
+### D-79 — Go for Phase 6 *(P5-10)*
+- **Context:** Phase 5 is built, reviewed (P5-10: four medium findings fixed, the rest recorded) and deployed; the unauthenticated live
+  pass on 2026-10-27 matched the design. Not proven by a real client: refresh and disconnect for claude.ai, every client of
+  [P6-14](../tasks/phase-6-tool-breadth/P6-14-oauth-client-matrix-rest.md), a real phone. **Dependencies per the
+  [ROADMAP](../ROADMAP.md#phases-at-a-glance):** Phase 6 (tool breadth) depends only on Phase 2 and is independent of
+  Phase 5; **Phase 7 (writes) depends on Phases 2, 4 and 5, not on Phase 6**, and its review (P7-09) needs P5-10 to verify the
+  `mcp:write` scope end to end; Phase 8 needs both 6 and 7. So starting Phase 6 does not unlock Phase 7: P5-10 does, once
+  merged.
+- **Options:** (a) go now: start Phase 6, and run P6-14 and the owner steps above in parallel with it; (b) go after the owner
+  steps (client runs, disconnect and reconnect, a phone); (c) hold Phase 6 for the follow-ups (P5-13 … P5-16, P5-19 … P5-22).
+- **Recommendation:** (a). Phase 6's tools need no OAuth change, P6-14 is already its own task, and a client defect in the matrix
+  shows up at the run whatever the order. Treat the follow-ups as priority work, not a gate. Take Phase 7 in whichever order
+  suits: it needs P5-10 merged, not Phase 6.
+- **Owner:** pending.
