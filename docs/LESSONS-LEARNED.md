@@ -43,7 +43,7 @@ How to use it:
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241 |
-| [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163 |
+| [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-284 – L-287 |
 | [Top 20](#top-20) | the lessons that save the most time |
 
 ---
