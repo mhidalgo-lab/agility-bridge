@@ -185,7 +185,8 @@ curl -s https://mcp.example.com/w/my-team/mcp -H "Authorization: Bearer $AGILITY
 ```
 
 Then ask your assistant "who am I in Agility?" (the `whoami` tool). claude.ai on the web, Claude Desktop connectors and Claude
-mobile need OAuth, which is a later phase; they have no snippet yet.
+mobile need [OAuth](oauth-operator.md) (set `AB_OAUTH=on`); they have no snippet, you paste the workspace address into their
+connector screen ([claude.ai and phone](oauth-phone.md)).
 
 ## 5. What next
 

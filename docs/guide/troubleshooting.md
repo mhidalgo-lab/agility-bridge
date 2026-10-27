@@ -22,5 +22,8 @@ tokens are always redacted.
 The admin panel, sign-in and device-token problems of a team server (`403 reauth_required`, sign-in refused, cookies,
 `Clear-Site-Data`, a lost device) are in the [admin guide](admin-guide.md#troubleshooting).
 
+OAuth connections (claude.ai, phones, IDEs) that do not start or stop working are in
+[troubleshooting OAuth](oauth-troubleshooting.md).
+
 Still stuck? Open an issue with the error code, the client and its version, and the agility-bridge version
 (`npx -y agility-bridge --version`); never include your token or Agility content.

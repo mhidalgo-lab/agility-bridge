@@ -2,11 +2,11 @@
 id: P5-07
 title: OAuth documentation
 phase: 5
-status: in-progress
+status: review
 priority: medium
 depends_on: [P5-06]
 adr: []
-lessons: [L-133]
+lessons: [L-133, L-264]
 owner: "claude (agent)"
 ---
 
@@ -36,12 +36,30 @@ the README and the guide pages that mention OAuth.
   marked "owner-verified" with the date or listed as owner steps.
 
 ## Acceptance criteria
-- [ ] The web and phone guide, the IDE and CLI guide, the operator page and the troubleshooting page exist and the how-it-works page is updated; all are linked from the README.
-- [ ] Each client in the IDE guide says whether OAuth was verified (version, date) or is documented only, matching the client matrix.
-- [ ] `AB_OAUTH` survives a repeated `cf:setup` run (an `--oauth on|off` option that keeps the value when omitted, with tests), and the guides say how to turn OAuth on for Workers and Node.
-- [ ] Every runnable command in the guides ran (docs tests, `cf:setup --dry-run`), and the discovery documents and the 401 challenge were checked against the real deployment without authenticating.
-- [ ] Browser steps are marked "owner-verified 2026-10-26" where the owner's run covered them, otherwise listed as owner steps in the Outcome.
-- [ ] No real host name, tenant name, id or email appears in the docs.
+- [x] The web and phone guide, the IDE and CLI guide, the operator page and the troubleshooting page exist and the how-it-works page is updated; all are linked from the README.
+- [x] Each client in the IDE guide says whether OAuth was verified (version, date) or is documented only, matching the client matrix.
+- [x] `AB_OAUTH` survives a repeated `cf:setup` run (an `--oauth on|off` option that keeps the value when omitted, with tests), and the guides say how to turn OAuth on for Workers and Node.
+- [x] Every runnable command in the guides ran (docs tests, `cf:setup --dry-run`), and the discovery documents and the 401 challenge were checked against the real deployment without authenticating.
+- [x] Browser steps are marked "owner-verified 2026-10-26" where the owner's run covered them, otherwise listed as owner steps in the Outcome.
+- [x] No real host name, tenant name, id or email appears in the docs.
+
+## Outcome
+- **Pages:** [operator guide](../../guide/oauth-operator.md), [claude.ai and phone](../../guide/oauth-phone.md) (rewritten),
+  [IDEs and CLIs](../../guide/oauth-ides.md), [how it works](../../guide/oauth-how-it-works.md) (discovery and registration
+  added), [troubleshooting](../../guide/oauth-troubleshooting.md); linked from the README, the configuration, clients,
+  quickstart, admin panel, deploy and troubleshooting guides.
+- **cf:setup:** `--oauth on|off` added (small): it writes `AB_OAUTH` into the local config and a later run without the flag
+  keeps the value (`scripts/test/cf-setup.test.ts`). It warns when OAuth is on and no sign-in variable is in the config.
+- **Executed (2026-10-27):** the discovery `curl`s (`/health`, both `/.well-known/*` documents, tokenless `POST` to the MCP
+  route: `401` with the `resource_metadata` challenge) against the real deployment, unauthenticated; and against a throwaway
+  local `serve` (built CLI, fake Google client): the same documents, `403` for a wrong `Host`, `404` for a malformed slug,
+  `404` and a bare `Bearer` challenge with OAuth off, the refusal when no provider is configured, DCR `201` for a loopback
+  redirect and `invalid_redirect_uri` for a private-use one. Run from source the registration answers `500` because the
+  `cloudflare:workers` alias exists only in the built bundle (not a defect of the product). Docs snippet tests pass.
+- **Owner-verified 2026-10-26:** claude.ai web connector (sign-in, consent, tools), Claude Code 2.1.310 (`claude mcp add`,
+  Authenticate, silent refresh), the Access sign-in and the `reauth_stale` then success retry, the project-scope "not found".
+- **Owner steps left:** the phone app (iOS and Android), Claude Desktop, VS Code, JetBrains, Copilot CLI, Cursor, Windsurf
+  and MCP Inspector against this release (P6-14); disconnect and reconnect of claude.ai and Claude Code.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.

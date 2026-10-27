@@ -1,22 +1,43 @@
-# Connect a phone or a browser app with OAuth
+# Connect claude.ai and a phone with OAuth
 
-> For `agility-bridge serve` and the Cloudflare Worker with `AB_OAUTH=on`. Apps that cannot hold a device token (claude.ai
-> in a browser, Claude on a phone) connect by OAuth: you sign in, see who is asking and approve. How tokens rotate and why a reconnect can be needed: [how it works](oauth-how-it-works.md). Developer details:
-> [OAuth server](../dev/oauth.md).
+> For `agility-bridge serve` and the Cloudflare Worker with `AB_OAUTH=on` ([operator guide](oauth-operator.md)). Apps that
+> cannot hold a device token (claude.ai in a browser, Claude on a phone) connect by OAuth: you sign in, see who is asking
+> and approve. IDEs and command-line clients: [connect an IDE or CLI](oauth-ides.md). How tokens rotate and why a reconnect
+> can be needed: [how it works](oauth-how-it-works.md). If a step fails: [troubleshooting OAuth](oauth-troubleshooting.md).
+> Developer details: [OAuth server](../dev/oauth.md).
 
-## What the operator turns on
+## What you need
 
-OAuth needs two things already in place: `AB_PUBLIC_URL` (the address people and apps use) and a
-[sign-in provider](identity-providers.md), because you approve an app after signing in. Then set `AB_OAUTH=on`
-([configuration](configuration.md)). Without a provider the server refuses to start and says so.
+- The workspace address, `https://<host>/w/<workspace slug>/mcp`, for example `https://bridge.example.com/w/my-team/mcp`.
+  It must be public HTTPS: claude.ai connects from Anthropic's servers, so a laptop-only address cannot work.
+- A **grant** on the workspace ([access model](access-model.md)): an app can only be given access you already have.
+  Without one the consent page says so and offers only *Deny*.
+- Your operator turned OAuth on and set up sign-in ([operator guide](oauth-operator.md)).
 
-You also need a **grant** on the workspace ([access model](access-model.md)): an app can only be given access you
-already have. Without one the consent page says so and offers only *Deny*.
+## claude.ai on the web
 
-## What you do
+Owner-verified 2026-10-26 (claude.ai web, custom connector).
 
-1. In the app, add the server: the address is `https://<server>/w/<workspace slug>/mcp`. The app opens your browser (on a
-   phone, the default browser).
+1. In claude.ai open **Settings**, then **Connectors**, and choose **Add custom connector**.
+2. Give it a name and paste the workspace address. Leave any advanced client id and secret fields empty: claude.ai
+   identifies itself with a client metadata document, nothing is registered by hand.
+3. Choose **Connect**. A browser window opens at your server.
+4. **Sign in** if you are not already (with Cloudflare Access, Access asks first). You come back to the same request.
+5. Check the **Connect an app** page (below) and choose **Allow**.
+6. The connector shows as connected. Enable it in a chat and ask "who am I in Agility?" (the `whoami` tool).
+
+## The phone
+
+Connectors you add on claude.ai on the web (or in the desktop app) are available in the Claude mobile app with the same
+account, so do the steps above once on a computer and then enable the connector in the app. If you add it from the phone
+itself, the sign-in opens in the phone's browser and the rest is the same. Connecting from a phone was not part of the
+2026-10-26 runs: see [P6-14](../tasks/phase-6-tool-breadth/P6-14-oauth-client-matrix-rest.md) for what is verified.
+
+## What the consent page shows
+
+The consent page, whichever app asks:
+
+1. The app opens your browser (on a phone, the default browser) at your server's `/oauth/authorize` address.
 2. **Sign in** if you are not already. You return to the same request automatically.
 3. The **Connect an app** page shows:
    - **Who is asking**: the name the app gave itself, always marked **not verified**. Anyone can register an app under any
@@ -53,4 +74,4 @@ its answers, when you connected it and when its access ends.
 | A name or address you do not recognise | Choose **Deny**. If you already allowed it, disconnect it on **My access**. |
 
 > Manual check (P5-04): the page was exercised in Chromium at 1280 px and 320 px by the browser tests. A check on real
-> phones (iOS Safari, Android Chrome) is recorded in the task outcome when done.
+> phones (iOS Safari, Android Chrome) is still an owner step (P6-14).

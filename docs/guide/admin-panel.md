@@ -189,7 +189,7 @@ CLI. They are the snippets of the [client setup guide](clients.md#remote-server-
   and admins too. Owners and admins open any grant's page from the screens above.
 - A revoked or expired grant and a disabled workspace are said so on the page, and a grant that cannot issue tokens offers
   no button.
-- claude.ai, Claude Desktop connectors and Claude mobile need OAuth and are listed without a snippet.
+- claude.ai, Claude Desktop connectors and Claude mobile need [OAuth](oauth-operator.md) and are listed without a snippet: see [connect claude.ai and a phone](oauth-phone.md).
 
 ### Audit log and usage
 

@@ -140,8 +140,9 @@ for it nor read it from a variable; the panel fills it in there only on the one-
 other snippets read it from a password prompt (VS Code) or from the `AGILITY_BRIDGE_TOKEN` environment variable. The
 address must be `https`.
 
-Clients that need OAuth (claude.ai on the web, Claude Desktop connectors and Claude mobile) have no snippet until the
-OAuth release. Formats follow each vendor's documentation (checked 2026-10-23, see the
+Clients that need OAuth (claude.ai on the web, Claude Desktop connectors and Claude mobile) have no snippet: they take the
+workspace address in their own connector screen ([connect claude.ai and a phone](oauth-phone.md)). IDEs and CLIs can also
+sign in with OAuth instead of a token ([connect an IDE or CLI](oauth-ides.md)). Formats follow each vendor's documentation (checked 2026-10-23, see the
 [client matrix](../reference/client-compatibility.md#remote-snippets-p4-06)); the owner's runs against `serve` are
 recorded there too.
 

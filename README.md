@@ -74,6 +74,9 @@ The tools are listed in the [tool reference](docs/reference/tools.md).
 - **Guides:** [local quickstart](docs/guide/quickstart-local.md) · [remote quickstart](docs/guide/quickstart-remote.md) ·
   [admin guide](docs/guide/admin-guide.md) · [self-hosting](docs/guide/self-hosting.md) ·
   [Cloudflare deploy](docs/guide/cloudflare-deploy.md) · [troubleshooting](docs/guide/troubleshooting.md)
+- **OAuth** (claude.ai, phones, IDEs): [turn it on](docs/guide/oauth-operator.md) ·
+  [claude.ai and phone](docs/guide/oauth-phone.md) · [IDEs and CLIs](docs/guide/oauth-ides.md) ·
+  [how it works](docs/guide/oauth-how-it-works.md) · [troubleshooting](docs/guide/oauth-troubleshooting.md)
 - **Research:** [Agility APIs, MCP, OAuth and platform facts](docs/RESEARCH.md)
 - **Security:** [threat model](docs/THREAT_MODEL.md)
 - **Lessons learned:** [engineering rules and known failure modes](docs/LESSONS-LEARNED.md)
