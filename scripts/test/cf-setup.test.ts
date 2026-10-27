@@ -196,6 +196,24 @@ describe('cf:setup', () => {
     ).rejects.toThrow(/disagree/);
   });
 
+  it('--oauth sets AB_OAUTH, and a later run without it keeps the value (P5-07)', async () => {
+    const { wrangler } = fakeWrangler();
+    const vars = () =>
+      (
+        readJsonc(readFileSync(localConfigPath(workerDir, 'agility-bridge-staging'), 'utf8')) as {
+          vars: Record<string, string>;
+        }
+      ).vars;
+    await setup(options(wrangler));
+    expect(vars()['AB_OAUTH']).toBeUndefined();
+    await setup(options(wrangler, { oauth: 'on', secretsFile: join(dir, 'a.secrets') }));
+    expect(vars()['AB_OAUTH']).toBe('on');
+    await setup(options(wrangler, { secretsFile: join(dir, 'c.secrets') }));
+    expect(vars()['AB_OAUTH']).toBe('on');
+    await setup(options(wrangler, { oauth: 'off', secretsFile: join(dir, 'b.secrets') }));
+    expect(vars()['AB_OAUTH']).toBe('off');
+  });
+
   it('writes each secret to the file before Cloudflare gets it (P3-11 review)', async () => {
     const { state, wrangler } = fakeWrangler();
     const file = join(dir, 'order.secrets');
