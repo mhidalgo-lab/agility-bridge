@@ -28,3 +28,4 @@ dist-e2e-browser/
 playwright-report/
 test-results/
 zap-reports/
+eval-report*.md

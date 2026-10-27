@@ -40,7 +40,7 @@ How to use it:
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297 |
@@ -1648,6 +1648,34 @@ rather than `Status`, it has no `RollupState`, a retrospective has no `Number`),
 public example instance showed it. Add a type to the snapshot, run the drift check in the same change, and copy no
 attribute from memory; a type with a `Number` missing is also why its minimal tier has no `Number`.
 *Applied in:* P6-06, `test/fixtures/agility/meta-snapshot.json`.
+
+**L-309 — A lexical router over the exact `tools/list` is a cheap floor, and its misses are triage, not failures.**
+BM25 over names and descriptions, with a dataset of realistic questions and a committed baseline rounded down to a whole
+percent, turns "a description edit made agents worse" into a red test, offline and deterministically. It measures the words,
+not the agent (first run: 65.8 % top-1, 83.6 % top-3), so each miss is classified (wording bug, accepted ambiguity, length
+bias) in `docs/dev/evals.md`, and the baseline is raised with a flag, never lowered to turn a test green.
+*Applied in:* P6-10, `docs/dev/evals.md`.
+
+**L-310 — Replay a scripted prior turn with the real envelope to test injection, and score on tool calls and a canary.**
+A hostile-result eval that lets the model choose the first call tests the model's routing, not the injection. Script the
+assistant's `tool_use`, return the real `envelope()` text with the injection inside it (title, description with a forged
+closing marker, comment, attachment name, custom field, error text, report row), and fail the scenario when the model calls
+a tool outside the scenario's allowed follow-ups or repeats the canary phrase the injection asked for. A canary is
+unambiguous where "did it obey?" is a judgement.
+*Applied in:* P6-10, THREAT_MODEL A1.
+
+**L-311 — A paid eval is opt-in three ways: explicit key, explicit `--yes`, and absent from CI and `pnpm test`.**
+The script refuses without `ANTHROPIC_API_KEY` and without `--yes`, takes no secret as an argument, and a test fails when a
+workflow or another package script mentions it. Its scoring is tested with a stubbed model, so the harness is proven
+without spending anything; the first real run is the owner's, with the report attached to the release.
+*Applied in:* P6-10, `docs/dev/releasing.md`.
+
+**L-312 — A dataset question lists every acceptable tool and the catalogue it is asked in.**
+"Open defects in project X" is a `search_work_items` call or a `query_assets` call; scoring only one punishes a correct
+agent and trains descriptions toward a single route. A question about an opt-in tool (reports, attachments) is scored against
+the catalogue that includes it, as a workspace that enabled the group would see it, and one about a default tool against the
+default list, so an opt-in tool never steals a default question.
+*Applied in:* P6-10, `scripts/evals/dataset.json`.
 
 ## R. CI, release and supply chain
 

@@ -2,7 +2,7 @@
 id: P6-10
 title: Tool evaluations
 phase: 6
-status: in-progress
+status: review
 priority: medium
 depends_on: [P6-07]
 adr: ["0015"]
@@ -34,15 +34,15 @@ Check that agents pick the right tool and resist injected content.
   `docs/dev/evals.md`.
 
 ## Acceptance criteria
-- [ ] Dataset of at least 60 questions over every category above, invented data only, every expected tool exists.
-- [ ] Router scored over the exact `tools/list` (default catalogue for default-group questions, full catalogue for
+- [x] Dataset of at least 60 questions over every category above, invented data only, every expected tool exists.
+- [x] Router scored over the exact `tools/list` (default catalogue for default-group questions, full catalogue for
       opt-in ones); baseline committed; CI fails below it; raising the baseline is a documented one-liner.
-- [ ] Misses the router shows are triaged in `docs/dev/evals.md` (fixed in a description, or accepted with a reason).
-- [ ] LLM harness: exact `tools/list`, hostile scenarios, tool-choice and injection scoring, refuses without a key and
+- [x] Misses the router shows are triaged in `docs/dev/evals.md` (fixed in a description, or accepted with a reason).
+- [x] LLM harness: exact `tools/list`, hostile scenarios, tool-choice and injection scoring, refuses without a key and
       `--yes`, writes a Markdown report; scoring unit-tested with a stubbed model; not wired into CI or `pnpm test`.
-- [ ] `docs/dev/evals.md` explains both evals, how to add a question and how the owner runs the LLM eval.
-- [ ] Release checklist item for the eval report in `docs/dev/releasing.md`.
-- [ ] **Owner:** the first real LLM run and the attached report (not run by the implementing agent: it spends money).
+- [x] `docs/dev/evals.md` explains both evals, how to add a question and how the owner runs the LLM eval.
+- [x] Release checklist item for the eval report in `docs/dev/releasing.md`.
+- [ ] **Owner:** the first real LLM run and the attached report. **Not done:** the implementing agent did not call a paid API; the harness is built and its scoring is tested with a stub. Tracked as P6-33.
 
 ## Security notes
 THREAT_MODEL A1.
