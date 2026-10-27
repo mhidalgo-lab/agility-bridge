@@ -25,6 +25,7 @@ Statuses: `proposed` · `accepted` · `accepted (pending spike PX-NN)` · `super
 | [0015](0015-tool-output-contract.md) | Tool output contract and untrusted-data envelope | accepted (2026-10-21, P0-11) |
 | [0016](0016-mcp-client-support.md) | MCP client support policy | accepted (owner) |
 | [0017](0017-oauth-secrets-at-rest.md) | OAuth secrets at rest: token-bound keys instead of the master key | accepted (owner, 2026-10-26) |
+| [0018](0018-recoverable-issuance-refusals-keep-the-device.md) | A refusal at token issuance that can pass keeps the OAuth device | accepted (owner, 2026-10-27) |
 
 "accepted (owner)" means the project owner took the decision on 2026-10-16 while reviewing the initial plan; the
 details of those ADRs can still be refined by the tasks they reference.

@@ -56,27 +56,31 @@ export interface AccessRecords {
   readonly user: User | null;
 }
 
-export type DenyReason =
-  | 'wrong_workspace'
-  | 'token_revoked'
-  | 'token_expired'
-  | 'grant_missing'
-  | 'grant_revoked'
-  | 'grant_expired'
-  | 'workspace_missing'
-  | 'workspace_disabled'
-  | 'instance_missing'
-  | 'instance_disabled'
-  | 'user_missing'
-  | 'user_disabled'
-  | 'credential_missing'
-  | 'credential_revoked'
-  | 'credential_unvalidated'
-  | 'credential_mismatch'
-  | 'malformed_policy'
-  | 'no_projects'
-  | 'no_tools'
-  | 'not_passthrough';
+/** Every reason `resolveAccess` can refuse for: the one list the type, the classes (`DENY_CLASS`) and their test follow. */
+export const DENY_REASONS = [
+  'wrong_workspace',
+  'token_revoked',
+  'token_expired',
+  'grant_missing',
+  'grant_revoked',
+  'grant_expired',
+  'workspace_missing',
+  'workspace_disabled',
+  'instance_missing',
+  'instance_disabled',
+  'user_missing',
+  'user_disabled',
+  'credential_missing',
+  'credential_revoked',
+  'credential_unvalidated',
+  'credential_mismatch',
+  'malformed_policy',
+  'no_projects',
+  'no_tools',
+  'not_passthrough',
+] as const;
+
+export type DenyReason = (typeof DENY_REASONS)[number];
 
 export interface EffectiveAccess {
   readonly workspace: { readonly id: string; readonly slug: string; readonly name: string };

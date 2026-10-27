@@ -1058,17 +1058,7 @@ export function defineOAuthSuite(name: string, makeHost: () => Promise<OAuthHost
           (h) =>
             h.storage.grants.update(h.ids.aliceGrantA, { expiresAt: Date.now() - 1 }).then(() => undefined),
         ],
-        [
-          'user_disabled',
-          'disabled user',
-          (h) => h.storage.users.update(h.ids.alice, { disabledAt: Date.now() }).then(() => undefined),
-        ],
-        [
-          'workspace_disabled',
-          'disabled workspace',
-          (h) =>
-            h.storage.workspaces.update(h.ids.workspaceA, { disabledAt: Date.now() }).then(() => undefined),
-        ],
+        // (A disabled user or workspace is refused per request too, but a refresh keeps the device: see RECOVERABLE.)
         [
           'workspace_missing',
           'deleted grant',
@@ -1092,6 +1082,172 @@ export function defineOAuthSuite(name: string, makeHost: () => Promise<OAuthHost
         const refused = await auditRows(h, (r) => r.action === 'oauth.token.refused');
         expect(refused[0], label).toMatchObject({ status: 'denied', errorCode: reason });
       }
+    });
+
+    /** The refusals that can pass (P5-21, D-77 (b), ADR-0018): how to cause each and how to fix it. */
+    const RECOVERABLE: {
+      readonly reason: string;
+      readonly cause: (h: OAuthHost) => Promise<void>;
+      readonly fix: (h: OAuthHost) => Promise<void>;
+    }[] = [
+      {
+        reason: 'workspace_disabled',
+        cause: (h) =>
+          h.storage.workspaces.update(h.ids.workspaceA, { disabledAt: Date.now() }).then(() => {}),
+        fix: (h) => h.storage.workspaces.update(h.ids.workspaceA, { disabledAt: null }).then(() => {}),
+      },
+      {
+        reason: 'user_disabled',
+        cause: (h) => h.storage.users.update(h.ids.alice, { disabledAt: Date.now() }).then(() => {}),
+        fix: (h) => h.storage.users.update(h.ids.alice, { disabledAt: null }).then(() => {}),
+      },
+      {
+        reason: 'instance_disabled',
+        cause: async (h) => {
+          const w = await h.storage.workspaces.get(h.ids.workspaceA);
+          await h.storage.instances.update(w?.instanceId as string, { disabledAt: Date.now() });
+        },
+        fix: async (h) => {
+          const w = await h.storage.workspaces.get(h.ids.workspaceA);
+          await h.storage.instances.update(w?.instanceId as string, { disabledAt: null });
+        },
+      },
+      {
+        reason: 'credential_unvalidated',
+        cause: async (h) => {
+          const g = await h.storage.grants.get(h.ids.aliceGrantA);
+          await h.storage.credentials.update(g?.credentialId as string, { validationStatus: 'invalid' });
+        },
+        fix: async (h) => {
+          const g = await h.storage.grants.get(h.ids.aliceGrantA);
+          await h.storage.credentials.update(g?.credentialId as string, { validationStatus: 'valid' });
+        },
+      },
+      {
+        reason: 'credential_revoked',
+        cause: async (h) => {
+          const g = await h.storage.grants.get(h.ids.aliceGrantA);
+          await h.storage.credentials.update(g?.credentialId as string, { revokedAt: Date.now() });
+        },
+        // A revoked credential stays revoked: the grant is pointed at a valid one (the deployment's shared one, which
+        // every host has) the way an administrator replaces it.
+        fix: async (h) => {
+          const shared = (await h.storage.credentials.list({ ownerUserId: null })).find(
+            (c) => c.revokedAt === null && c.validationStatus === 'valid',
+          );
+          await h.storage.grants.update(h.ids.aliceGrantA, { credentialId: shared?.id as string });
+        },
+      },
+      {
+        reason: 'no_projects',
+        // The grant names only projects the workspace does not allow (a workspace cannot be left with none).
+        cause: (h) => h.storage.grants.update(h.ids.aliceGrantA, { scopeIds: ['Scope:9999'] }).then(() => {}),
+        fix: (h) => h.storage.grants.update(h.ids.aliceGrantA, { scopeIds: null }).then(() => {}),
+      },
+      {
+        reason: 'no_tools',
+        cause: (h) =>
+          h.storage.workspaces.update(h.ids.workspaceA, { enabledTools: ['no_such_tool'] }).then(() => {}),
+        fix: (h) => h.storage.workspaces.update(h.ids.workspaceA, { enabledTools: null }).then(() => {}),
+      },
+    ];
+
+    it('a refresh refused for a recoverable reason is a 503 with Retry-After and keeps the device; the access token stays refused meanwhile', async () => {
+      for (const { reason, cause, fix } of RECOVERABLE) {
+        const h = await host();
+        const { tokens, client } = await connectWorkspace(h);
+        expect((await mcp(h, 'team-a', tokens.access_token)).status, reason).toBe(200);
+        await cause(h);
+        // Per request the access token is refused (no Agility request, no tool call), as for any other reason.
+        await expectDenied(h, 'team-a', tokens.access_token, reason);
+        const requests = h.agilityRequests();
+        const refused = await tokenEndpoint(h, {
+          grant_type: 'refresh_token',
+          refresh_token: tokens.refresh_token as string,
+          client_id: client.client_id,
+        });
+        const body = (await refused.json()) as { error: string };
+        expect(refused.status, reason).toBe(503);
+        expect(body.error, reason).toBe('temporarily_unavailable');
+        expect(refused.headers.get('retry-after'), reason).toBe('60');
+        expect(h.agilityRequests(), reason).toBe(requests);
+        const rows = await auditRows(h, (r) => r.action === 'oauth.token.refused');
+        expect(rows[0], reason).toMatchObject({
+          status: 'denied',
+          errorCode: reason,
+          details: { grantType: 'refresh_token', revoked: false },
+        });
+        // The device is still there, and still refused on every request while the reason holds.
+        expect((await h.storage.kv.list('oauth:grant:')).length, reason).toBe(1);
+        await expectDenied(h, 'team-a', tokens.access_token, reason);
+        // Once the reason is gone the same refresh token works (the 503 spent nothing) and so do its tokens.
+        await fix(h);
+        const again = await tokenEndpoint(h, {
+          grant_type: 'refresh_token',
+          refresh_token: tokens.refresh_token as string,
+          client_id: client.client_id,
+        });
+        expect(again.status, reason).toBe(200);
+        const next = (await again.json()) as { access_token: string; refresh_token: string };
+        expect((await mcp(h, 'team-a', next.access_token)).status, reason).toBe(200);
+        expect((await mcp(h, 'team-a', tokens.access_token)).status, reason).toBe(200);
+      }
+    });
+
+    it('a code exchange refused for a recoverable reason is a 503, spends the code and ends no other device', async () => {
+      for (const { reason, cause, fix } of RECOVERABLE) {
+        const h = await host();
+        const first = await connectWorkspace(h);
+        const a = await authorize(h, first.client);
+        expect(a.code, reason).not.toBeNull();
+        await cause(h);
+        const requests = h.agilityRequests();
+        const refused = await tokenEndpoint(h, exchangeParams(a, 'team-a', h));
+        const body = (await refused.json()) as { error: string };
+        expect(refused.status, reason).toBe(503);
+        expect(body.error, reason).toBe('temporarily_unavailable');
+        expect(refused.headers.get('retry-after'), reason).toBe('60');
+        expect(h.agilityRequests(), reason).toBe(requests);
+        const rows = await auditRows(h, (r) => r.action === 'oauth.token.refused');
+        expect(rows[0], reason).toMatchObject({
+          status: 'denied',
+          errorCode: reason,
+          details: { grantType: 'authorization_code', revoked: false },
+        });
+        await fix(h);
+        // The code is spent: the same one is refused for good (a replay), and the app approves again.
+        const replay = await tokenEndpoint(h, exchangeParams(a, 'team-a', h));
+        expect(replay.status, reason).toBe(400);
+        expect(((await replay.json()) as { error: string }).error, reason).toBe('invalid_grant');
+        // Nothing else ended: the first device still works and refreshes.
+        expect((await mcp(h, 'team-a', first.tokens.access_token)).status, reason).toBe(200);
+        const refreshed = await tokenEndpoint(h, {
+          grant_type: 'refresh_token',
+          refresh_token: first.tokens.refresh_token as string,
+          client_id: first.client.client_id,
+        });
+        expect(refreshed.status, reason).toBe(200);
+        // A new approval works.
+        const second = await connectWorkspace(h, 'team-a', undefined, first.client);
+        expect((await mcp(h, 'team-a', second.tokens.access_token)).status, reason).toBe(200);
+      }
+    });
+
+    it('a final reason at a refresh still revokes the device at once (revoked: true)', async () => {
+      const h = await host();
+      const { tokens, client } = await connectWorkspace(h);
+      await h.storage.grants.update(h.ids.aliceGrantA, { revokedAt: Date.now() });
+      const res = await tokenEndpoint(h, {
+        grant_type: 'refresh_token',
+        refresh_token: tokens.refresh_token as string,
+        client_id: client.client_id,
+      });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toBe('invalid_grant');
+      const rows = await auditRows(h, (r) => r.action === 'oauth.token.refused');
+      expect(rows[0]).toMatchObject({ errorCode: 'grant_revoked', details: { revoked: true } });
+      expect(await h.storage.kv.list('oauth:grant:')).toEqual([]);
+      expect((await mcp(h, 'team-a', tokens.access_token)).status).toBe(401);
     });
 
     it('a token for workspace A is the one 401 at B, at an unknown workspace and as a garbled bearer', async () => {
@@ -1655,6 +1811,35 @@ export function defineRefreshFamilySuite(
       expect(await errorOf(res)).toBe('invalid_grant');
       expect(await h.storage.kv.get(`oauth:grant:${userId}:${grantId}`)).toBeNull();
       expect((await mcp(h, 'team-a', tokens.access_token)).status).toBe(401);
+    });
+
+    it('a repeat inside the window refused for a recoverable reason is a 503 and keeps the device; it works once the reason is gone', async () => {
+      const h = await hostWith(30);
+      const { tokens, client } = await connectWorkspace(h);
+      const r0 = tokens.refresh_token as string;
+      const first = await rotate(h, client, r0);
+      await h.storage.workspaces.update(h.ids.workspaceA, { disabledAt: Date.now() });
+      const requests = h.agilityRequests();
+      const held = await refresh(h, client, r0);
+      const body = (await held.json()) as { error: string };
+      expect(held.status).toBe(503);
+      expect(body.error).toBe('temporarily_unavailable');
+      expect(held.headers.get('retry-after')).toBe('60');
+      expect(h.agilityRequests()).toBe(requests);
+      // The successor is refused per request meanwhile, and its refresh token is held the same way.
+      expect((await mcp(h, 'team-a', first.access_token)).status).toBe(401);
+      expect((await refresh(h, client, first.refresh_token)).status).toBe(503);
+      const refused = await auditRows(h, (r) => r.action === 'oauth.token.refused');
+      expect(refused[0]).toMatchObject({ errorCode: 'workspace_disabled', details: { revoked: false } });
+      expect((await reuseRows(h)).length).toBe(0);
+      await h.storage.workspaces.update(h.ids.workspaceA, { disabledAt: null });
+      // Same answer for the repeat as before, and the successor rotates on.
+      const repeat = await refresh(h, client, r0);
+      expect(repeat.status).toBe(200);
+      expect(((await repeat.json()) as Rotated).refresh_token).toBe(first.refresh_token);
+      expect((await mcp(h, 'team-a', first.access_token)).status).toBe(200);
+      const next = await rotate(h, client, first.refresh_token);
+      expect((await mcp(h, 'team-a', next.access_token)).status).toBe(200);
     });
 
     it('a device whose access was withdrawn cannot refresh inside the window, and is revoked', async () => {

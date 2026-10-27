@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
+
+export { DENY_CLASS, type DenyClass, isRecoverableDeny } from './deny-class.ts';
 export {
   type Actor,
   ForbiddenError,
@@ -33,6 +35,7 @@ export {
   type AccessDecision,
   type AccessRecords,
   type AccessSettings,
+  DENY_REASONS,
   type DenyReason,
   type EffectiveAccess,
   type Principal,

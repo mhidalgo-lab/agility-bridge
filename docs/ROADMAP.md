@@ -249,7 +249,7 @@ Status lives in each task file.
 | P5-16 | [Metadata document policy extras](tasks/phase-5-oauth/P5-16-client-document-policy.md) | low | P5-06 | todo |
 | P5-19 | [Edge rate limits for the OAuth routes on Workers](tasks/phase-5-oauth/P5-19-oauth-edge-rate-limits.md) | low | P5-09 | todo |
 | P5-20 | [Operator view of OAuth abuse refusals and caps](tasks/phase-5-oauth/P5-20-oauth-abuse-visibility.md) | low | P5-08, P5-09 | todo |
-| P5-21 | [Keep the device when an issuance refusal can pass](tasks/phase-5-oauth/P5-21-recoverable-issuance-refusals.md) | low | P5-10 | todo |
+| P5-21 | [Keep the device when an issuance refusal can pass](tasks/phase-5-oauth/P5-21-recoverable-issuance-refusals.md) | low | P5-10 | review |
 | P5-22 | [Key the OAuth abuse counters with a secret](tasks/phase-5-oauth/P5-22-keyed-address-hash.md) | low | P5-10 | todo |
 
 ### Phase 6

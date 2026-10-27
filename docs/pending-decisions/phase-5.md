@@ -218,7 +218,7 @@ Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.m
 - **Recommendation:** (b), as task P5-21. It needs care in `checkIssuance` and the repeat path of the refresh family, and the
   docs ("how it works") say what a refresh does with each reason. Not built in the review: it changes what ADR-0009's
   "revoke on refusal" means and the owner may prefer (a).
-- **Owner (2026-10-27):** Decided: as recommended, (b); built as task [P5-21](../tasks/phase-5-oauth/P5-21-recoverable-issuance-refusals.md).
+- **Owner (2026-10-27):** Decided: as recommended, (b); built as task [P5-21](../tasks/phase-5-oauth/P5-21-recoverable-issuance-refusals.md), [ADR-0018](../adr/0018-recoverable-issuance-refusals-keep-the-device.md).
 
 ### D-78 — Abuse counters key on a plain hash of the address, which an IPv4 address can be recovered from *(P5-10)*
 - **Context:** the OAuth counters (`oauth-abuse:`, `oauth-dcr-ip:`, `oauth-cimd-ip:`) are keyed by the first 128 bits of SHA-256 of

@@ -136,9 +136,13 @@ If it still fails, check the grant's own tools and project restriction on **My a
   already spent, after the 30 second window, and the bridge ended the whole device because it cannot tell a stolen copy from
   a broken app ([how it works](oauth-how-it-works.md#why-a-repeat-is-tolerated-for-30-seconds)). Approve the app again. If one
   client does it repeatedly, give it a longer `AB_OAUTH_REFRESH_REUSE_WINDOW` (up to 120 seconds) or report the client.
-- **`oauth.token.refused` with a reason:** the check on every use failed: the client was revoked (`client_revoked`), the
-  access was withdrawn or expired, or the workspace or person was disabled. The device is disconnected; fix the cause and
-  connect again.
+- **`oauth.token.refused` with a reason:** the check on every use failed, and `details.revoked` says what happened to the
+  device. `revoked: true` (the client was revoked, `client_revoked`, the access was withdrawn, expired or deleted, or the
+  person was removed): the device is disconnected; fix the cause and connect again. `revoked: false` (`workspace_disabled`,
+  `instance_disabled`, `user_disabled`, `credential_revoked`, `credential_unvalidated`, `no_projects`, `no_tools`): the app
+  got `503 temporarily_unavailable` with `Retry-After: 60` and the device is **kept**. Switch the workspace or person back
+  on, replace or validate the credential, or give the access a project and a tool, and the app's next refresh works with
+  no new approval. Until then every call with its access token is a `401`.
 - **`oauth.code.replayed`:** an authorization code was used twice (a retried request, or something copied the address from
   the browser). The device is revoked as a precaution: connect again.
 

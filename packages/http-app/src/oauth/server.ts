@@ -18,8 +18,10 @@
 
 import {
   type AccessSettings,
+  DENY_CLASS,
   type DenyReason,
   type EffectiveAccess,
+  isRecoverableDeny,
   loadAccessRecords,
   resolveAccess,
 } from '@agility-bridge/auth';
@@ -84,6 +86,12 @@ export const MAX_OAUTH_REFRESH_REUSE_WINDOW_S = 120;
 const REFRESH_CLAIM_TTL_MS = 15_000;
 /** A request that finds its token being spent waits for the result: up to about 40 polls, 10 to 250 ms apart. */
 const REFRESH_WAIT_POLLS = 40;
+/** `Retry-After` of a recoverable issuance refusal (P5-21): about one access-cache lifetime. */
+const RECOVERABLE_RETRY_AFTER_S = 60;
+
+/** A refusal of an issuance that can pass: the device is kept (ADR-0018). Final reasons, and ones that are not access reasons, are not. */
+const isRecoverableRefusal = (reason: string): boolean =>
+  Object.hasOwn(DENY_CLASS, reason) && isRecoverableDeny(reason as DenyReason);
 /** How long an authorization code may wait for its exchange (the provider's own grant TTL is the same). */
 export const OAUTH_CODE_TTL_S = 600;
 /** Largest token or registration request body read. */
@@ -795,8 +803,9 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
 
   /**
    * Every token issuance (code exchange, refresh) re-runs the access decision for the grant the device was approved
-   * with. A refusal is `invalid_grant`, on which the provider revokes the device's grant (its whole token family). On
-   * success the access token (and, at the code exchange, the refresh lifetime) is capped at the grant's own expiry.
+   * with. A final refusal is `invalid_grant`, on which the provider revokes the device's grant (its whole token family);
+   * a recoverable one (`DENY_CLASS`, ADR-0018) is `503 temporarily_unavailable` with `Retry-After` and keeps the device.
+   * On success the access token (and, at the code exchange, the refresh lifetime) is capped at the grant's own expiry.
    */
   const checkIssuance = async (
     mod: ProviderModule,
@@ -808,7 +817,8 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     }
     const tokenId = `oauth_${o.grantId}`;
     const refuse = (reason: string, workspaceId: string | null): never => {
-      logger.info('oauth token refused; device revoked', {
+      const keep = isRecoverableRefusal(reason);
+      logger.info(keep ? 'oauth token refused; device kept' : 'oauth token refused; device revoked', {
         reason,
         oauthGrant: o.grantId,
         grantType: o.grantType,
@@ -823,8 +833,15 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
         clientId: o.clientId,
         tokenId,
         reason,
-        details: { grantType: o.grantType, revoked: true },
+        details: { grantType: o.grantType, revoked: !keep },
       });
+      if (keep) {
+        throw new mod.OAuthError('temporarily_unavailable', {
+          description: 'Access is unavailable right now; try again later.',
+          statusCode: 503,
+          headers: { 'Retry-After': String(RECOVERABLE_RETRY_AFTER_S) },
+        });
+      }
       throw new mod.OAuthError('invalid_grant', { description: 'The authorization is no longer valid.' });
     };
     // A revoked client gets nothing new, whatever its grants say (P5-08): refused here, the provider revokes the device.
@@ -1359,9 +1376,12 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
         { tokenId, clientId: successor.clientId, expiresAt: null },
       );
       if (!decision.ok) {
-        await revokeFamily(userId, grantId, helpers);
-        onRevocation();
-        logger.info('oauth token refused; device revoked', {
+        const keep = isRecoverableRefusal(decision.reason);
+        if (!keep) {
+          await revokeFamily(userId, grantId, helpers);
+          onRevocation();
+        }
+        logger.info(keep ? 'oauth token refused; device kept' : 'oauth token refused; device revoked', {
           reason: decision.reason,
           oauthGrant: grantId,
           grantType: 'refresh_token',
@@ -1376,10 +1396,19 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
             clientId: successor.clientId,
             tokenId,
             reason: decision.reason,
-            details: { grantType: 'refresh_token', revoked: true },
+            details: { grantType: 'refresh_token', revoked: !keep },
           },
           c,
         );
+        if (keep) {
+          const unavailable = jsonError(
+            503,
+            'temporarily_unavailable',
+            'Access is unavailable right now; try again later.',
+          );
+          unavailable.headers.set('Retry-After', String(RECOVERABLE_RETRY_AFTER_S));
+          return unavailable;
+        }
         return invalid('The authorization is no longer valid.');
       }
       issued(true, successor.clientId);
