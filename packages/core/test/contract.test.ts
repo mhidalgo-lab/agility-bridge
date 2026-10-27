@@ -8,10 +8,12 @@ import snapshotJson from './fixtures/agility/meta-snapshot.json' with { type: 'j
 import {
   DEFAULT_CATALOGUE_MAX_BYTES,
   DEFAULT_CATALOGUE_MAX_TOOLS,
+  DEFAULT_CATALOGUE_TARGET_BYTES,
   defaultCatalogue,
   FakeAgility,
   FULL_CATALOGUE_MAX_BYTES,
   makeContext,
+  TOOL_MAX_BYTES,
   toolsListContract,
 } from './harness/index.ts';
 import { rpc } from './helpers/mcp.ts';
@@ -22,6 +24,20 @@ describe('tools/list contract', () => {
     const contract = await toolsListContract(defaultCatalogue(CORE_TOOLS));
     expect(contract.count).toBeLessThanOrEqual(DEFAULT_CATALOGUE_MAX_TOOLS);
     expect(contract.bytes).toBeLessThanOrEqual(DEFAULT_CATALOGUE_MAX_BYTES);
+  });
+
+  it('keeps real headroom: the default catalogue under its target, no tool above the per-tool cap (P6-12)', async () => {
+    const contract = await toolsListContract(defaultCatalogue(CORE_TOOLS));
+    expect(contract.bytes).toBeLessThanOrEqual(DEFAULT_CATALOGUE_TARGET_BYTES);
+    const all = await toolsListContract(CORE_TOOLS);
+    for (const t of all.tools)
+      expect(t.bytes, `${t.name} is ${t.bytes} bytes`).toBeLessThanOrEqual(TOOL_MAX_BYTES);
+  });
+
+  it('counts: every read group plus the nine planned Phase 7 write tools stays below 40 tools (L-155)', async () => {
+    const all = await toolsListContract(CORE_TOOLS);
+    const PLANNED_WRITE_TOOLS = 9;
+    expect(all.count + PLANNED_WRITE_TOOLS).toBeLessThan(40);
   });
 
   it('lists exactly the catalogue, with derived annotations', async () => {
