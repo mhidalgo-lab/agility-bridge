@@ -10,6 +10,7 @@ import { whoami } from './core/whoami.ts';
 import { getAssetHistory } from './history/asset-history.ts';
 import { listRecentChanges } from './history/recent-changes.ts';
 import { listMembers } from './planning/members.ts';
+import { getSprint } from './planning/sprint.ts';
 import { listSprints } from './planning/sprints.ts';
 import { getTeam, listTeams } from './planning/teams.ts';
 import { getAssets } from './query/get-assets.ts';
@@ -31,6 +32,7 @@ export const CORE_TOOLS: readonly ToolDefinition[] = Object.freeze([
   listTeams,
   getTeam,
   listSprints,
+  getSprint,
   listMembers,
   getAssetHistory,
   listRecentChanges,

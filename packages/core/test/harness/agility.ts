@@ -18,6 +18,14 @@ export interface FakeAgilityOptions {
   readonly assets?: Readonly<Record<string, readonly Row[]>>;
   /** `meta.v1/<Type>` bodies. */
   readonly meta?: Readonly<Record<string, unknown>>;
+  /**
+   * Point-in-time state per asset type (`asof` queries): the rows of the latest snapshot at or before the requested
+   * instant; before the first snapshot nothing existed. A type without snapshots ignores `asof` and answers its
+   * current rows.
+   */
+  readonly history?: Readonly<
+    Record<string, ReadonlyArray<{ readonly at: string; readonly rows: readonly Row[] }>>
+  >;
   /** Answer before the fake does (status codes, malformed bodies, delays); return undefined to fall through. */
   readonly override?: (req: Request, call: FakeCall) => Response | undefined | Promise<Response | undefined>;
   /**
@@ -45,6 +53,7 @@ interface Query {
   readonly with?: Readonly<Record<string, unknown>>;
   readonly sort?: readonly string[];
   readonly page?: { readonly start?: number; readonly size?: number };
+  readonly asof?: string;
 }
 
 /** Agility splits a scalar bound value at commas into a list (L-162); the fake does the same. */
@@ -226,7 +235,15 @@ export class FakeAgility {
   #run(q: Query): Row[] {
     if (typeof q?.from !== 'string') throw new FakeAgilityError('query.v1 needs `from`.');
     const type = q.from.split(':')[0] ?? '';
-    const all = this.#options.assets?.[type] ?? [];
+    let all = this.#options.assets?.[type] ?? [];
+    const snapshots = this.#options.history?.[type];
+    if (q.asof !== undefined && snapshots !== undefined) {
+      const at = Date.parse(q.asof);
+      const hit = snapshots
+        .filter((x) => Date.parse(x.at) <= at)
+        .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
+      all = hit?.rows ?? [];
+    }
     let rows = this.#options.filters === 'ignore-filters' ? [...all] : all.filter((r) => matches(r, q));
     for (const key of [...(q.sort ?? [])].reverse()) {
       const desc = key.startsWith('-');

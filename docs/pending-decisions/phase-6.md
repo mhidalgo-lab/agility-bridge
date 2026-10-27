@@ -102,3 +102,32 @@
 - **Recommendation:** (a) now; (b) if the owner wants to filter resource reads apart from tool calls in the audit view.
 - **Built:** (a).
 - **Owner:** _open_.
+
+### D-83 — `get_sprint` reports no capacity *(P6-02)*
+- **Context:** the task asked for schedules and capacity "where the instance exposes them". The Agility schema the metadata
+  snapshot is built from has a `Schedule` (name, scheduled projects) but no capacity model on a sprint, and the read-only
+  tenant offers nothing to verify one against. Schedules are reported; capacity is not.
+- **Options:** (a) report the schedule only and say in `notes` that capacity is not reported; (b) read a `Capacity` asset type
+  when the instance has one, unverified; (c) estimate capacity from members and sprint length.
+- **Recommendation:** (a): (b) cannot be tested against anything real yet and (c) is a plausible number with no source
+  (L-033). P6-17 picks it up once an instance with capacity data is available.
+- **Owner:** pending (built as (a)).
+
+### D-84 — The burndown is read with `asof` queries, not `Hist` *(P6-02)*
+- **Context:** ADR-0011 names `rest-1.v1/Hist` the history authority for what changed on one asset. A sprint burndown needs
+  the state of many assets at many instants, which `Hist` (one asset per request) cannot give within the request budget;
+  `query.v1` with `asof` returns the sprint's items as they were, several instants per request.
+- **Options:** (a) `asof` queries of the sprint's items at up to 15 daily points (fewer for big sprints), batched at 20 queries
+  per request, bounded by `maxAsOfAgeDays`; (b) `Hist` per item (hundreds of requests); (c) only the begin and now.
+- **Recommendation:** (a). Points that cannot be read in full are left out and named. `get_asset_history` (P6-05) keeps
+  `Hist` as the authority for one asset.
+- **Owner:** pending (built as (a)).
+
+### D-85 — Burndown counts estimate of items not in a `completed` status category *(P6-02)*
+- **Context:** "done" needs a rule that works on any instance. The status lists carry a rollup category per status
+  (`RollupState`, L-142); an item whose status has no category counts as done only when it is closed, otherwise it is
+  `unknown` and counted as not done, with a note naming how many.
+- **Options:** (a) the rollup category (as built); (b) `AssetState` closed only; (c) a configurable list of status names.
+- **Recommendation:** (a): it is the instance's own definition and needs no configuration. Hour-based (task) burndown and
+  velocity are follow-ups (P6-17).
+- **Owner:** pending (built as (a)).

@@ -2,7 +2,7 @@
 
 # Tool reference
 
-18 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
+19 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
 later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a cold metadata cache.
 
 | Tool | Group | Cost | Title |
@@ -19,6 +19,7 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 | [`list_teams`](#list_teams) | planning | 2 | List teams |
 | [`get_team`](#get_team) | planning | 20 | Get a team |
 | [`list_sprints`](#list_sprints) | planning | 10 | List sprints |
+| [`get_sprint`](#get_sprint) | planning | 30 | Get a sprint |
 | [`list_members`](#list_members) | people | 6 | List members |
 | [`get_asset_history`](#get_asset_history) | history | 14 | Get asset history |
 | [`list_recent_changes`](#list_recent_changes) | history | 24 | List recent changes |
@@ -240,6 +241,24 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 | `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
+
+## `get_sprint`
+
+**Get a sprint** · group `planning` · read · cost 30 Agility requests at most
+
+Get one sprint: dates (UTC), schedule, backlog items and defects by status category with estimates, committed at the begin date vs done, scope change, carry-over of a past sprint and a daily burndown from bounded history. Not paged. A cold call can make up to 30 Agility requests.
+
+Annotations: read-only true, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `sprint` | string |  | `"current"` | Sprint name, Timebox:<id>, or current, previous or next (relative to team or project, by dates UTC). |
+| `team` | string |  |  | Team name or Team:<id>: narrows the sprint lookup. |
+| `project` | string |  |  | Agility project name or Scope:<id>: narrows the sprint lookup to its schedule. |
+| `burndown` | boolean |  | `true` | Read history for committed, scope change and burndown. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+
+`structuredContent`: `sprint`, `totals`, `byStatusCategory`, `items`, `truncated`, `partial`, `notes` (open: more fields may be added).
 
 ## `list_members`
 

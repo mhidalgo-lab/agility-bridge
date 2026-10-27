@@ -184,6 +184,8 @@ interface NameQuery {
   readonly fields?: readonly string[];
   /** The attribute holding the name (default `Name`). */
   readonly nameField?: string;
+  /** Also match closed assets (a closed sprint is still a sprint: P6-02). */
+  readonly includeClosed?: boolean;
 }
 
 const OID_TOKEN = /^[A-Za-z][A-Za-z0-9_]*:\d{1,12}$/;
@@ -201,7 +203,13 @@ export async function resolveByName(ctx: ToolContext, q: NameQuery): Promise<Nam
   const run = async (filters: FilterInput[], limit: number) => {
     const compiled = await compileQuery(
       ctx,
-      { assetType: q.assetType, fields, filters: [...(q.filters ?? []), ...filters], limit },
+      {
+        assetType: q.assetType,
+        fields,
+        filters: [...(q.filters ?? []), ...filters],
+        limit,
+        ...(q.includeClosed === true ? { includeClosed: true } : {}),
+      },
       { allowGlobal: q.allowGlobal === true },
     );
     return (await runQuery(ctx, compiled)).rows;
@@ -302,7 +310,14 @@ export async function resolveSprint(
   ];
   const fields = ['Name', 'BeginDate', 'EndDate', 'Schedule'];
   if (t !== 'current' && t !== 'previous' && t !== 'next') {
-    return resolveByName(ctx, { what: 'sprint', assetType: 'Timebox', text, filters, fields });
+    return resolveByName(ctx, {
+      what: 'sprint',
+      assetType: 'Timebox',
+      text,
+      filters,
+      fields,
+      includeClosed: true,
+    });
   }
   const now = new Date(ctx.clock.now()).toISOString();
   const relative: Record<
