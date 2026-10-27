@@ -202,7 +202,7 @@ Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.m
 - **Recommendation:** (a), built in the P5-10 PR (tests fail when it is reverted). It keeps D-68's numbers, bounds storage the same,
   and turns "held for a day by one address" into "held for an hour by a flood of at least the cap". The hourly deployment limit
   (100) stays under the cap (200), which is what guarantees room; raise one without the other and the guarantee is gone.
-- **Owner:** pending.
+- **Owner (2026-10-27):** Decided: as recommended, (a).
 
 ### D-77 — Which access refusals at a token issuance end the device for good *(P5-10)*
 - **Context:** every issuance (code exchange, refresh) re-runs the access decision, and any refusal is `invalid_grant`, on which the
@@ -218,7 +218,7 @@ Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.m
 - **Recommendation:** (b), as task P5-21. It needs care in `checkIssuance` and the repeat path of the refresh family, and the
   docs ("how it works") say what a refresh does with each reason. Not built in the review: it changes what ADR-0009's
   "revoke on refusal" means and the owner may prefer (a).
-- **Owner:** pending.
+- **Owner (2026-10-27):** Decided: as recommended, (b); built as task [P5-21](../tasks/phase-5-oauth/P5-21-recoverable-issuance-refusals.md).
 
 ### D-78 — Abuse counters key on a plain hash of the address, which an IPv4 address can be recovered from *(P5-10)*
 - **Context:** the OAuth counters (`oauth-abuse:`, `oauth-dcr-ip:`, `oauth-cimd-ip:`) are keyed by the first 128 bits of SHA-256 of
@@ -230,7 +230,7 @@ Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.m
   database (no protection from a copy of it, so no better than (a)).
 - **Recommendation:** (a) now, with the docs corrected in the P5-10 PR; (b) as task P5-22 if the deployment's privacy position needs
   it (an address is personal data under some regimes), since it adds a key read to every limited request.
-- **Owner:** pending.
+- **Owner (2026-10-27):** Decided: as recommended, (a); P5-22 stays a follow-up.
 
 ### D-79 — Go for Phase 6 *(P5-10)*
 - **Context:** Phase 5 is built, reviewed (P5-10: four medium findings fixed, the rest recorded) and deployed; the unauthenticated live
@@ -245,4 +245,4 @@ Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.m
 - **Recommendation:** (a). Phase 6's tools need no OAuth change, P6-14 is already its own task, and a client defect in the matrix
   shows up at the run whatever the order. Treat the follow-ups as priority work, not a gate. Take Phase 7 in whichever order
   suits: it needs P5-10 merged, not Phase 6.
-- **Owner:** pending.
+- **Owner (2026-10-27):** Decided: as recommended, (a), go for Phase 6 now (built and reviewed in P6-01 … P6-13).
