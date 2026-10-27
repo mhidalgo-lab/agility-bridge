@@ -8,10 +8,11 @@ import { describe, expect, it } from 'vitest';
 import { TextField } from '../src/components.tsx';
 import { createUiKit, ONCE_FIELD, ONCE_MAX_OUTSTANDING } from '../src/kit.ts';
 import { renderDocument } from '../src/pages.tsx';
-import { parseTokenPage, parseUser, type User } from '../src/screens/data.ts';
+import { parseTokenPage, parseTool, parseUser, type User } from '../src/screens/data.ts';
 import { parsePrefixText, prefixText } from '../src/screens/instances.tsx';
 import {
   assetTypesFrom,
+  compositeNotes,
   formMessage,
   limitFieldOf,
   limitsFrom,
@@ -117,9 +118,9 @@ describe('shared form helpers', () => {
     expect(wholeNumber(f({ n: '1e3' }), 'n', 1, 2000)).toBeNull();
     expect(wholeNumber(f({}), 'n', 1, 20)).toBeUndefined();
     const tools = [
-      { name: 'whoami', kind: 'read', group: 'a' },
-      { name: 'get_assets', kind: 'read', group: 'a' },
-      { name: 'update_work_item', kind: 'write', group: 'b' },
+      { name: 'whoami', kind: 'read', group: 'a', siblings: [] },
+      { name: 'get_assets', kind: 'read', group: 'a', siblings: [] },
+      { name: 'update_work_item', kind: 'write', group: 'b', siblings: [] },
     ] as const;
     expect(toolsFrom(f({ tools_all: '1' }), tools)).toEqual({ value: null });
     expect(toolsFrom(f({ tools_all: '1', tools: 'update_work_item' }), tools)).toEqual({
@@ -627,5 +628,41 @@ describe('P4-15 helpers and screens', () => {
     ]);
     expect((await get(f, '/admin/tokens', asMember)).status).toBe(403);
     expect(f.calls.filter((c) => c.path === '/tokens')).toHaveLength(2);
+  });
+});
+
+describe('composite grant notes (P6-11)', () => {
+  const tools = [
+    { name: 'whoami', kind: 'read', group: 'core', siblings: [] },
+    { name: 'sprint_health', kind: 'read', group: 'reports', siblings: ['get_sprint', 'search_work_items'] },
+    { name: 'get_sprint', kind: 'read', group: 'planning', siblings: [] },
+    { name: 'search_work_items', kind: 'read', group: 'work', siblings: [] },
+  ] as const;
+
+  it('names each granted composite with the siblings missing from the list', () => {
+    expect(compositeNotes(['whoami', 'sprint_health'], tools)).toEqual([
+      'sprint_health is granted without get_sprint, search_work_items: the sections that read them are skipped and reported as not read.',
+    ]);
+    expect(compositeNotes(['sprint_health', 'get_sprint'], tools)[0]).toContain('without search_work_items:');
+  });
+
+  it('says nothing for a complete list, a list without the composite, or "every read tool" (null)', () => {
+    expect(compositeNotes(['sprint_health', 'get_sprint', 'search_work_items'], tools)).toEqual([]);
+    expect(compositeNotes(['whoami', 'get_sprint'], tools)).toEqual([]);
+    expect(compositeNotes(null, tools)).toEqual([]);
+  });
+
+  it('parses only well-formed sibling names from the API, whatever else it sends', () => {
+    const evil = '<img src=x onerror=alert(1)>';
+    expect(
+      parseTool({
+        name: 'sprint_health',
+        kind: 'read',
+        group: 'reports',
+        siblings: ['get_sprint', evil, 7, null],
+      })?.siblings,
+    ).toEqual(['get_sprint']);
+    expect(parseTool({ name: 'whoami', kind: 'read', group: 'core', siblings: evil })?.siblings).toEqual([]);
+    expect(parseTool({ name: 'whoami', kind: 'read', group: 'core' })?.siblings).toEqual([]);
   });
 });

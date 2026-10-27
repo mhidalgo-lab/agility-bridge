@@ -397,6 +397,25 @@ export function toolsFrom(
 export const hasWriteTools = (list: readonly string[] | null, tools: readonly Tool[]): boolean =>
   (list ?? []).some((n) => tools.some((t) => t.name === n && t.kind !== 'read'));
 
+/**
+ * One fixed sentence per composite in `list` that lacks some tool it reads (P6-11, L-037). `list` is a stored tool list;
+ * null means "every read tool", which has them all. Tool names are our own catalogue's, shown as text.
+ */
+export function compositeNotes(list: readonly string[] | null, tools: readonly Tool[]): string[] {
+  if (list === null) return [];
+  const have = new Set(list);
+  const notes: string[] = [];
+  for (const t of tools) {
+    if (!have.has(t.name)) continue;
+    const missing = t.siblings.filter((s) => !have.has(s));
+    if (missing.length > 0)
+      notes.push(
+        `${t.name} is granted without ${missing.join(', ')}: the sections that read them are skipped and reported as not read.`,
+      );
+  }
+  return notes;
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Limits
 // ---------------------------------------------------------------------------------------------------------------

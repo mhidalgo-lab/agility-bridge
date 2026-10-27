@@ -379,6 +379,8 @@ export interface Tool {
   readonly name: string;
   readonly kind: 'read' | 'write' | 'destructive';
   readonly group: string;
+  /** The tools a composite reads (empty for any other tool). */
+  readonly siblings: readonly string[];
 }
 
 const TOOL_NAME = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
@@ -387,7 +389,17 @@ export function parseTool(r: Row): Tool | null {
   const name = str(r['name']);
   if (!TOOL_NAME.test(name) || name.length > 64) return null;
   const kind = r['kind'];
-  return { name, kind: kind === 'write' || kind === 'destructive' ? kind : 'read', group: str(r['group']) };
+  const siblings = Array.isArray(r['siblings'])
+    ? (r['siblings'] as unknown[]).filter(
+        (n): n is string => typeof n === 'string' && n.length <= 64 && TOOL_NAME.test(n),
+      )
+    : [];
+  return {
+    name,
+    kind: kind === 'write' || kind === 'destructive' ? kind : 'read',
+    group: str(r['group']),
+    siblings,
+  };
 }
 
 /** A JSON array answer parsed row by row; null when the body is not an array. */

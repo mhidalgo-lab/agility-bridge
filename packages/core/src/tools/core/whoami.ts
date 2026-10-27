@@ -4,6 +4,7 @@ import { resolveMember } from '../../identity/resolve.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { shapeOutput, untrusted } from '../../output/result.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
+import { compositeWarnings } from '../reports/siblings.ts';
 
 export const whoami: ToolDefinition = defineTool({
   name: 'whoami',
@@ -35,6 +36,7 @@ export const whoami: ToolDefinition = defineTool({
     const version = metadataFor(ctx).fingerprint?.match(/^"(\d+(?:\.\d+){1,3})/)?.[1];
     const { workspace, projects, assetTypes, limits, budget } = ctx;
     const username = typeof member.row['Username'] === 'string' ? member.row['Username'] : undefined;
+    const warnings = compositeWarnings(ctx.grantedTools ?? []);
     const structured = {
       member: { oid: member.oid, name: member.name, ...(username === undefined ? {} : { username }) },
       instance: {
@@ -51,8 +53,10 @@ export const whoami: ToolDefinition = defineTool({
       limits: { ...limits },
       budget: { requestsPerCall: budget.limit, requestsUsed: budget.used },
       writes: { ...workspace.writes },
+      ...(warnings.length === 0 ? {} : { warnings }),
     };
     const notes = [
+      ...warnings.map((w) => w.message),
       projects.allowed.length === 0
         ? 'Every Agility project the member can see is in scope (no project restriction).'
         : `${projects.allowed.length} allowed Agility project(s)${projects.includeChildren ? ' and their sub-projects' : ''}; list_projects shows their names.`,

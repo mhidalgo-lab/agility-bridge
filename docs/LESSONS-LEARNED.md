@@ -27,10 +27,10 @@ How to use it:
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
-| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303 |
+| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-313 – L-315 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282 |
-| [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280, L-304 |
+| [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280, L-304, L-316 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267 |
@@ -1877,6 +1877,32 @@ from the attributes a type has, so the owner column is `Owners.Name` when the li
 fixed list would leave issues with no owner in their default fields. Requests and goals have neither in the product model
 (default tier: status or identity only).
 *Applied in:* P6-06, `metadata/service.ts` (`fieldTiers`).
+
+**L-313 — A cost test that covers only the tools someone remembered covers nothing: iterate the catalogue and fail on a missing fixture.**
+One test walks `CORE_TOOLS` and needs a worst-case fixture for every name (and none for a removed tool), so adding a tool
+without its worst case fails CI. The fixture must also be a real worst case: a call that errors early or makes no Agility
+request under-measures, so both fail the test (the harness reports `isError` and the first error text). Composites are
+measured with their siblings registered, as the host does; without them a report does nothing and "passes" with zero
+requests.
+*Applied in:* P6-11, `test/tools/cost.test.ts`, `test/tools/worst-case.ts`, L-114.
+
+**L-314 — What a composite depends on is data with one source, tied to its behaviour by a test.**
+`COMPOSITE_SIBLINGS` names the tools each report reads; `whoami`, the admin API and the panel read it, and a test runs
+every report with all siblings granted and asserts the sections' tools equal the table. A report that starts reading a
+new sibling fails until the table (and so every warning) is updated.
+*Applied in:* P6-11, `tools/reports/siblings.ts`.
+
+**L-315 — Add new output to an open schema, not to the declared one, when `tools/list` is at its budget.**
+`whoami` returns `warnings` only when there are any, and the output schema stays as it was (it allows extra properties), so
+the default `tools/list` did not grow (39.2 of 40 KB). The contract test still pins the schema, and a test pins that the
+field is absent when nothing is wrong.
+*Applied in:* P6-11, `tools/core/whoami.ts`, L-005.
+
+**L-316 — The panel gets catalogue facts through the admin API and re-derives only fixed text from them.**
+`admin-ui` imports nothing but `hono`, so the sibling list travels in `GET /tools` and the screens build the sentence from
+catalogue names that pass the tool-name pattern; a hostile or missing field parses to "no siblings". The grant page
+computes from what the grant can really call (its list inside the workspace's), not from its own list alone.
+*Applied in:* P6-11, `screens/shared.tsx` (`compositeNotes`), L-095.
 
 ---
 
