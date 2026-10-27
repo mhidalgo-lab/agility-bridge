@@ -52,31 +52,39 @@ export async function sweepRegistrations(
   const bounded = options.limit !== undefined;
   const budget = Math.min(KV_LIST_MAX, Math.max(1, options.limit ?? KV_LIST_MAX));
   const after = bounded ? ((await kv.get(SWEEP_CURSOR_KEY)) ?? undefined) : undefined;
-  const names = await kv.list(CLIENT_RECORD_PREFIX, {
-    limit: KV_LIST_MAX,
-    ...(after === undefined ? {} : { after }),
-  });
   const nowSeconds = Math.floor(options.now() / 1000);
   let removed = 0;
   let examined = 0;
   let last: string | undefined;
-  for (const name of names) {
-    if (name.startsWith(DOCUMENT_CLIENT_PREFIX)) continue;
-    if (examined >= budget) break;
-    examined += 1;
-    last = name;
-    const key = name.slice(OAUTH_KV_PREFIX.length);
-    const record = (await namespace.get(key, { type: 'json' })) as {
-      readonly registrationDate?: unknown;
-      readonly registrationExpiresAt?: unknown;
-    } | null;
-    if (record === null) continue;
-    // Unused (a token exchange renews the stamp to the long registration lifetime), and the unused lifetime in force has
-    // run out.
-    if (isUnusedRegistration(record) && record.registrationDate + options.unusedTtlSeconds <= nowSeconds) {
-      await namespace.delete(key);
-      removed += 1;
+  /** Looks at the names in order until the budget is spent or a name past `upTo` comes. */
+  const visit = async (names: readonly string[], upTo?: string): Promise<void> => {
+    for (const name of names) {
+      if (upTo !== undefined && name > upTo) return;
+      if (name.startsWith(DOCUMENT_CLIENT_PREFIX)) continue;
+      if (examined >= budget) return;
+      examined += 1;
+      last = name;
+      const key = name.slice(OAUTH_KV_PREFIX.length);
+      const record = (await namespace.get(key, { type: 'json' })) as {
+        readonly registrationDate?: unknown;
+        readonly registrationExpiresAt?: unknown;
+      } | null;
+      if (record === null) continue;
+      // Unused (a token exchange renews the stamp to the long registration lifetime), and the unused lifetime in force
+      // has run out.
+      if (isUnusedRegistration(record) && record.registrationDate + options.unusedTtlSeconds <= nowSeconds) {
+        await namespace.delete(key);
+        removed += 1;
+      }
     }
+  };
+  await visit(
+    await kv.list(CLIENT_RECORD_PREFIX, { limit: KV_LIST_MAX, ...(after === undefined ? {} : { after }) }),
+  );
+  // A cursor near the end of the list leaves the budget half spent: wrap round to the start, up to the cursor, so a call
+  // at the cap always looks at its full slice (P5-10 flake: the tail held only fresh registrations and the cap refused).
+  if (after !== undefined && examined < budget) {
+    await visit(await kv.list(CLIENT_RECORD_PREFIX, { limit: KV_LIST_MAX }), after);
   }
   if (bounded) {
     // Resume after the last one looked at; past the end of the list, start over next time.

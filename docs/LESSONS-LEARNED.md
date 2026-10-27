@@ -32,7 +32,7 @@ How to use it:
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
-| [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268 |
+| [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
@@ -684,6 +684,14 @@ per-address limit (P2-17). The OAuth counters of P5-09 were keyed by the exact a
 per-address limit and still exhaust the deployment-wide caps that lock everyone out of connecting. A new limiter takes its key from the
 existing function (`addressKey`) and has a test that rotates addresses inside one network.
 *Applied in:* P5-10, `server.ts` (`callerKey`), `abuse.test.ts`.
+
+**L-271 — A resumable bounded scan must wrap round within the call, or a cursor near the end makes it blind.**
+The cap's room-making sweep looks at 10 registrations, resuming where the last sweep stopped. When the cursor sat near the end
+of the key order it looked at the last few (all fresh), removed nothing, and the cap refused a newcomer although abandoned
+registrations sat at the start. The P5-10 test caught it only now and then (random ids decide the order), on the release
+PR's CI. Wrap to the start, up to the cursor, until the slice is spent, and test the wrap with a cursor placed on purpose; run a
+test that depends on random order with `repeats` before trusting it.
+*Applied in:* P5-10 follow-up, `housekeeping.ts` (`sweepRegistrations`), `abuse.test.ts`.
 
 ## J. OAuth and identity
 
