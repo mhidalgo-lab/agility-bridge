@@ -157,6 +157,26 @@ describe('tools/list contract', () => {
           },
           "name": "list_members",
         },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Get asset history",
+          },
+          "name": "get_asset_history",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "List recent changes",
+          },
+          "name": "list_recent_changes",
+        },
       ]
     `,
     );

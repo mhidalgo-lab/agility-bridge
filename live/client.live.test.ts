@@ -266,6 +266,8 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
       get_team: { team },
       list_sprints: { timing: 'past', limit: 3 },
       list_members: { limit: 3 },
+      get_asset_history: { asset: defect, time_range: 'last 90 days', limit: 5 },
+      list_recent_changes: { time_range: 'last 7 days', limit: 3 },
     };
     for (const tool of CORE_TOOLS) {
       const fresh: ToolContext = { ...ctx, metadata: new MetadataService(), budget: createBudget(60) };
