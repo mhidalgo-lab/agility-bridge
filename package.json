@@ -26,6 +26,7 @@
     "storage:fixture": "node --conditions=source scripts/storage-fixture.ts",
     "docs:tools": "node scripts/tool-reference.ts",
     "docs:resources": "node scripts/resource-reference.ts",
+    "docs:prompts": "node scripts/prompt-reference.ts",
     "docs:admin-api": "node --conditions=source scripts/admin-api-reference.ts",
     "docs:cli": "node --conditions=source scripts/cli-reference.ts",
     "version-packages": "changeset version && node scripts/release.ts sync-version",

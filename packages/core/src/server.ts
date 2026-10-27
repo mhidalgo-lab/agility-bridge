@@ -17,6 +17,7 @@ import {
 } from './errors.ts';
 import { availableEntries } from './manifest.ts';
 import { envelopeRenderer, newEnvelopeId } from './output/envelope.ts';
+import { PROMPT_MANIFEST, type PromptDefinition } from './prompts.ts';
 import { isTemplate, RESOURCE_MANIFEST, type ResourceDefinition, type ResourceReader } from './resources.ts';
 import { annotationsFor, type ToolDefinition, type ToolOutput } from './tool.ts';
 import { VERSION } from './version.ts';
@@ -121,6 +122,11 @@ export interface BuildServerOptions {
    * registered, so a resource exists exactly when the tools it is served through are allowed (L-153).
    */
   readonly resources?: readonly ResourceDefinition[];
+  /**
+   * The prompt manifest to serve (default: `PROMPT_MANIFEST`), filtered exactly like the resources (L-153): a prompt
+   * exists only when every tool it tells the model to call is in `tools`. A prompt never calls Agility itself.
+   */
+  readonly prompts?: readonly PromptDefinition[];
   /**
    * Advertise `tools.listChanged` (default false). A per-request HTTP server never pushes a change, so it must not
    * promise one (ADR-0005, L-016); stdio may pass true.
@@ -232,6 +238,7 @@ export function buildMcpServer({
   ctx: context,
   info = DEFAULT_SERVER_INFO,
   resources = RESOURCE_MANIFEST,
+  prompts = PROMPT_MANIFEST,
   listChanged = false,
   errors,
   onToolCall,
@@ -298,7 +305,39 @@ export function buildMcpServer({
     contextFor,
     onToolCall,
   });
+  for (const def of availableEntries(
+    prompts,
+    tools.map((t) => t.name),
+  )) {
+    registerPrompt(server, def);
+  }
   return server;
+}
+
+/** Registers one available prompt: arguments validated by its schema, then its static text built from them. */
+function registerPrompt(server: McpServer, def: PromptDefinition): void {
+  server.registerPrompt(
+    def.id,
+    {
+      title: def.title,
+      description: def.description,
+      argsSchema: withCachedJsonSchema(def.arguments) as never,
+    },
+    ((args: Record<string, string | undefined>) => {
+      let text: string;
+      try {
+        text = def.build(args);
+      } catch (error) {
+        throw toProtocolError(
+          new AbError(ErrorCode.InputInvalid, error instanceof Error ? error.message : 'Invalid arguments.'),
+        );
+      }
+      return {
+        description: def.title,
+        messages: [{ role: 'user' as const, content: { type: 'text' as const, text } }],
+      };
+    }) as never,
+  );
 }
 
 interface ResourceRegistration {

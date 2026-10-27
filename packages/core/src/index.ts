@@ -161,6 +161,7 @@ export {
   untrusted,
 } from './output/result.ts';
 export { cleanText, decodeEntities, htmlToText, richText, utcIso } from './output/text.ts';
+export { PROMPT_MANIFEST, PROMPT_RULES, type PromptDefinition } from './prompts.ts';
 export {
   type CompiledQuery,
   type CompileOptions,

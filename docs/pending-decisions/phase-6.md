@@ -318,4 +318,34 @@
 - **Recommendation:** (a): cheap enough to run every release, and two tiers show whether a miss is the description or the
   model. Revisit the models when new ones ship; the id is an argument, not code.
 - **Built:** (a).
+
+### D-105 — Prompts on report tools exist only when `reports` is on; no fallback to base tools *(P6-08)*
+- **Context:** `review_backlog_item_quality`, `standup` and `triage_defects` use `work_item_quality`, `standup_summary` and
+  `defect_triage`, which are in the opt-in `reports` group (D-101). With the group off the default catalogue offers four of
+  the seven prompts.
+- **Options:** (a) strict: a prompt's `uses` is its tools, the prompt vanishes without them; (b) the entry's `uses` lists
+  only the base tools and the text adds the report step when `reports` is granted; (c) two entries per workflow.
+- **Recommendation:** (a): the catalogue table's contract, one rule everywhere (L-153), and a stand-up prompt that quietly
+  composes its own report from search calls would give a different answer than the tool. (b) as follow-up
+  [P6-31](../tasks/phase-6-tool-breadth/P6-31-prompt-fallbacks-without-reports.md) when an owner asks.
+- **Owner:** *(open; built as (a))*
+
+### D-106 — Prompt arguments are strings with a plain-text rule; prompts are not audited or logged *(P6-08)*
+- **Context:** MCP prompt arguments are strings. A prompt does no work against Agility, so there is no request, budget or
+  scope decision to record.
+- **Options:** (a) strings validated by a schema (length, plain text on one line, asset reference shape, `limit` 1-20),
+  JSON-quoted into the text, no audit row and no log line; (b) also write an audit row `prompt:<id>` per get; (c) accept
+  free text and rely on the model.
+- **Recommendation:** (a). (b) is cheap to add if an owner wants to know who asked for which workflow (the host's request
+  log already shows `prompts/get`); (c) was refused by L-305.
+- **Owner:** *(open; built as (a))*
+
+### D-107 — Prompts guide a workflow; they do not read Agility to fill the message *(P6-08)*
+- **Context:** a prompt could run its tools at `prompts/get` and embed the result (a ready stand-up note) or only tell the
+  model which tools to call.
+- **Options:** (a) instructions only: the model calls the tools, so every read is a normal, audited, budgeted tool call
+  and nothing from Agility sits in a prompt message; (b) embed enveloped tool output in the message (one round trip, but
+  prompts get a request budget, audit and error handling of their own, and a client may cache them).
+- **Recommendation:** (a). It keeps the untrusted-data path to one place (the tools) and prompts free of upstream failure
+  modes; (b) can be added per prompt later without changing the argument contract.
 - **Owner:** *(open; built as (a))*
