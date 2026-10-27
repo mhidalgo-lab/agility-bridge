@@ -174,6 +174,9 @@ describe('redactValue and Secret', () => {
       `refresh_token=${token}&client_id=c`,
       `authorizationCode=${secret}`,
       `GET /oauth/callback?code=${token}&state=s`,
+      // A bearer in free text: the scheme pattern must take the whole token, colons included (P5-10).
+      `upstream said no to Bearer ${token} here`,
+      `Authorization: Bearer ${token}`,
     ]) {
       const out = redact(line);
       expect(out).not.toContain(secret);

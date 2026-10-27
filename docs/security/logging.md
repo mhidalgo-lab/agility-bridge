@@ -75,7 +75,7 @@ carry `requestId`.
 | info | `oauth registration refused` | `reason` (stable code); never the request body | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | warn | `oauth registration per-address limit reached` | `limit` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | warn | `oauth registration cap reached` | `limit` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
-| warn | `oauth metadata document client cap reached` | `limit` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
+| warn | `oauth metadata document client cap reached; one stored document evicted` | `limit` | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | warn | `oauth limit reached` | `surface`, `scope` (`address` or `deployment`), `limit`; first refusal per window only; never the address | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | warn | `oauth abuse limiter failed; allowing the request` | `surface`, `error` (class) | [server.ts](../../packages/http-app/src/oauth/server.ts) |
 | info | `storage housekeeping` | `expiredRows`, `registrationsSwept` | [housekeeping.ts](../../packages/http-app/src/oauth/housekeeping.ts) |

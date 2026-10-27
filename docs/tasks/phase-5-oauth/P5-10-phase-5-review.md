@@ -2,7 +2,7 @@
 id: P5-10
 title: Phase 5 review
 phase: 5
-status: todo
+status: review
 priority: high
 depends_on: [P5-07, P5-08, P5-09]
 adr: []
@@ -38,12 +38,20 @@ read-only live pass against the real deployment, and a go or no-go for Phase 6.
   P5-07 set to `done` (PR #115 is merged).
 
 ## Acceptance criteria
-- [ ] `docs/reviews/phase-5-review.md`; every finding fixed or recorded, with tests.
-- [ ] Matrix re-check recorded; no unverified claim of "verified".
-- [ ] Live results recorded without the hostname; owner steps listed (P6-14 client runs, disconnect and reconnect).
-- [ ] Go for Phase 6 recorded as a decision with options and a recommendation.
-- [ ] Every Phase 5 task is `done` or an open follow-up; no unticked box left in a done task; lesson and decision
+- [x] `docs/reviews/phase-5-review.md`; every finding fixed or recorded, with tests.
+- [x] Matrix re-check recorded; no unverified claim of "verified".
+- [x] Live results recorded without the hostname; owner steps listed (P6-14 client runs, disconnect and reconnect).
+- [x] Go for Phase 6 recorded as a decision with options and a recommendation.
+- [x] Every Phase 5 task is `done` or an open follow-up; no unticked box left in a done task; lesson and decision
       numbering consistent.
+
+## Outcome
+- [docs/reviews/phase-5-review.md](../../reviews/phase-5-review.md): four medium findings (M1 a revocation request renewed unused
+  registrations for 90 days; M2 one source could hold the registration caps; M3 a passing document-fetch failure answered
+  `invalid_client` at the token endpoint; M4 OAuth limits keyed per IPv6 address), two low (redaction of `Bearer` tokens, stale
+  Connect page copy), all fixed with mutation-checked tests; recorded: D-77 (refusals that pass end the device), D-78 (plain address hash).
+- Live pass: unauthenticated and read-only, matched the design. Go for Phase 6 recorded as D-79 (owner pending).
+- New: lessons L-265 to L-270, decisions D-76 to D-79, tasks P5-21 and P5-22. P5-07 set to done; Phase 5 lessons moved into their theme.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md. Security-relevant fixes update THREAT_MODEL in the same PR.

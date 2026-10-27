@@ -212,7 +212,10 @@ consumed:
    not our own host.
 2. A stored record (`client:<url>`) means no fetch. Otherwise the stored-document cap (`AB_OAUTH_CIMD_MAX_CLIENTS`, 200) and
    the per-address budget (`AB_OAUTH_CIMD_FETCH_LIMIT`, 20 an hour, an atomic `kv.increment` with `max`, keyed by a hash of
-   the address) are checked, then the fetch counts, success or not.
+   the address) are checked, then the fetch counts, success or not. **At the cap one stored document, chosen at random, is
+   evicted** (audited once per window as `oauth.client.evicted`) instead of the request being refused: a stored document is
+   only a cache, so the cap bounds storage without letting one source that fills it (each document may be cached for a day)
+   keep every other client out (P5-10, D-76).
 3. The fetch is `GET`, `Accept: application/json`, no redirects (a 3xx is a failure), 5 s for headers and body together
    (raced, so a fetcher that ignores its signal cannot hold the request), 200 and a JSON media type, 5 KiB declared and
    streamed, UTF-8. **The guard is the host's fetcher**: Node refuses any non-public address at connect time
@@ -225,7 +228,11 @@ consumed:
 5. The record is stored with the `Cache-Control` lifetime clamped to 5 min - 24 h (1 h default). Errors are never cached.
 
 A refusal is a `400 invalid_client` JSON answer with one generic sentence, never a redirect and never a 500; the reason
-and the id's host go to the log and to an `oauth.client.refused` audit row.
+and the id's host go to the log and to an `oauth.client.refused` audit row. **At the token endpoint only verdicts on the
+client are `invalid_client`** (the document names another client, is not valid, is gone with a `4xx`): a passing condition
+(the client's server answered `5xx` or `429`, the fetch failed or timed out) is `503 temporarily_unavailable` with
+`Retry-After`, and a spent fetch budget is `429`, because an SDK client answers `invalid_client` by discarding its
+registration and tokens and asking the person to approve again (P5-10). The authorization endpoint keeps its `400` page.
 
 **Dynamic Client Registration (RFC 7591)**, on by default (`AB_OAUTH_DCR`, D-68). The request is parsed and **rebuilt**:
 only `redirect_uris`, `client_name`, `token_endpoint_auth_method` (`none`, `client_secret_basic`, `client_secret_post`),
@@ -236,10 +243,15 @@ whitespace; `https` on a DNS name or `http` on loopback; `javascript:`, `data:` 
 schemes are dropped (D-69), and a request left with none is refused; `AB_OAUTH_DCR_REDIRECT_HOSTS` limits https hosts.
 Caps, in this order: per address and hour (`AB_OAUTH_DCR_IP_LIMIT`, 10; atomic counter, so a flood stops at its own
 limit and cannot use up the deployment cap for others), then live registrations per deployment
-(`AB_OAUTH_DCR_MAX_CLIENTS`, 200, counted from the `kv` table; a concurrent burst may overshoot by its concurrency). Over
-either: `429` and `Retry-After`; the first refusal per window and reason is audited, not each one (T20). An unused
+(`AB_OAUTH_DCR_MAX_CLIENTS`, 200, counted from the `kv` table; a concurrent burst may overshoot by its concurrency). At the
+cap a bounded sweep (10 records) first removes registrations that never exchanged a code and are over an hour old (D-77), so
+a source that fills the cap with registrations it never uses holds it for an hour, not for the unused lifetime. Over either
+cap: `429` and `Retry-After`; the first refusal per window and reason is audited, not each one (T20). An unused
 registration lives 24 h (`AB_OAUTH_DCR_UNUSED_TTL`); the first token exchange renews it to the registration lifetime
-(the provider's half-life rule), so a flood nobody completes is gone in a day.
+(the provider's half-life rule), so a flood nobody completes is gone in a day. **Only an exchange renews it**: the provider
+also renews the registration of any client that gets a `200` at the token endpoint, and an RFC 7009 revocation request
+answers `200` to anything, so a public client could keep an unused registration for 90 days with one garbage revocation
+request; `token()` puts the stored record back as it was when a revocation renewed a still-unused registration (P5-10).
 
 **Cleanup hooks** (`HttpApp.oauthRegistrations`): `count()` (live dynamic registrations and stored documents) and
 `sweep()` (deletes unused registrations older than the unused lifetime now configured: lowering
@@ -266,6 +278,10 @@ add what it cannot: a shared count, and limits that differ per surface (L-079). 
 | `POST /oauth/register` | per address (P5-03, 10) then **deployment registrations** (new) then live clients (P5-03, 200) | 10 (`AB_OAUTH_DCR_IP_LIMIT`) | 100 (`AB_OAUTH_DCR_LIMIT`) | 1 h |
 | CIMD fetches (cache misses) | per address (P5-03, 20) then **deployment fetches** (new) and the stored-document cap (200) | 20 (`AB_OAUTH_CIMD_FETCH_LIMIT`) | 200 (`AB_OAUTH_CIMD_LIMIT`) | 1 h |
 
+- **Address key**: the caller's address as the general limiter keys it (`addressKey`: an IPv6 address by its /64 network,
+  an IPv4-mapped one as IPv4), then hashed. Keyed per exact IPv6 address, one host with a /64 could rotate addresses past
+  every per-address limit and then exhaust the deployment caps alone (P5-10). The hash keeps the address out of storage as
+  written, but an IPv4 hash can be guessed back by brute force: the rows live for one window (D-78).
 - **Order**: the address first, then the deployment (L-251). A flood from one address stops at its own limit and has taken
   nothing from the deployment counter, so it cannot lock others out; only many addresses together can reach a deployment
   cap (documented, T20; the knobs are the settings above, `AB_OAUTH_DCR=off` and an edge rule, P5-19).
@@ -300,7 +316,7 @@ runtime is not involved. Stored document clients expire by their own TTL (5 min 
 
 `auth` rows: `oauth.authorize` (ok or denied, with the deny reason; a deny names the person), `oauth.token.issued`,
 `oauth.token.refused`, `oauth.token.revoked`, `oauth.code.replayed`, `oauth.refresh.reuse` (a spent refresh token reused after
-the window: the device was revoked; `details` carry the window, never a token), `oauth.device.replaced`, `oauth.device.revoke`, `oauth.client.revoked`, `oauth.client.restored`, and for clients `oauth.client.registered`, `oauth.client.fetched`, `oauth.client.refused` (kind, host, limit, stable reason; never a document);
+the window: the device was revoked; `details` carry the window, never a token), `oauth.device.replaced`, `oauth.device.revoke`, `oauth.client.revoked`, `oauth.client.restored`, and for clients `oauth.client.registered`, `oauth.client.fetched`, `oauth.client.refused` (kind, host, limit, stable reason; never a document), `oauth.client.evicted` (a stored document dropped at the cap, once per window);
 `oauth.token.issued` rows of a refresh say `reused: true` when the reuse window answered them;
 `admin` rows: `oauth.consent.refused` (the handle and grant refusals above); `auth` rows `oauth.request.refused` (P5-09: a limit was reached; reason, surface, scope and limit, once per window, never an address); the device is `oauth_<provider grant id>` in `token_id`, the client in
 `client_id`. Tool-call rows of OAuth requests carry the same two ids.

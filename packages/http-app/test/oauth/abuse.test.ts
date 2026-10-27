@@ -92,6 +92,25 @@ describe('OAuth abuse controls: limits, windows and cleanup (memory storage)', (
     expect((await authorizeAs(h, ATTACKER)).status).not.toBe(429);
   });
 
+  it('the address limits hold per IPv6 /64, as the general limiter does: rotating addresses inside one network gains nothing (P5-10)', async () => {
+    const h = await host({ authorizeIpLimit: 3, registrationIpLimit: 2 });
+    const v6 = (n: number) => `2001:db8:1:2::${n.toString(16)}`;
+    // Authorization: the fourth request of the network is refused, whichever of its addresses it comes from.
+    for (let i = 0; i < 3; i++) expect((await authorizeAs(h, v6(i))).status).not.toBe(429);
+    expect((await authorizeAs(h, v6(100))).status).toBe(429);
+    expect((await authorizeAs(h, '2001:db8:1:2:ffff:ffff:ffff:ffff')).status).toBe(429);
+    // Another network, an IPv4 address and the IPv4-mapped spelling of one are separate callers.
+    expect((await authorizeAs(h, '2001:db8:1:3::1')).status).not.toBe(429);
+    expect((await authorizeAs(h, '203.0.113.9')).status).not.toBe(429);
+    // Registration has its own per-address counter, keyed the same way.
+    expect((await dcr(h, v6(1))).status).toBe(201);
+    expect((await dcr(h, v6(2))).status).toBe(201);
+    expect((await dcr(h, v6(3))).status).toBe(429);
+    expect((await dcr(h, '::ffff:203.0.113.9')).status).toBe(201);
+    expect((await dcr(h, '203.0.113.9')).status).toBe(201);
+    expect((await dcr(h, '203.0.113.9')).status).toBe(429);
+  });
+
   it('the address limit is taken first: a flood from one address does not use up the deployment limit', async () => {
     const h = await host({ authorizeIpLimit: 3, authorizeLimit: 5 });
     for (let i = 0; i < 20; i++) await authorizeAs(h, ATTACKER);

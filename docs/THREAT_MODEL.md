@@ -311,3 +311,24 @@ metadata-document fetches, a bounded sweep of unused registrations, and an hourl
 | T25 | verified | Counters use a hash of the address; the audit row, log line and response carry surface, scope and limit, never an address, hash, token or client secret (asserted, with the hash and address as needles) |
 
 Residual: edge limits on Workers (P5-19) and an operator view of refusals (P5-20).
+
+## 8e. Status after P5-10 (2026-10-27)
+
+The Phase 5 review ([reviews/phase-5-review.md](reviews/phase-5-review.md)) read the OAuth surface adversarially and reproduced
+four medium and two low issues, all fixed with tests that fail when the fix is reverted. It **corrects** two statements above: the
+T10 note that "one source cannot use up the deployment cap" held only for the per-address counter, not for the cap on live
+registrations, and the T25 note that counters hold "a hash of the address", which reads as if the address could not be recovered.
+
+| Id | Status | Evidence |
+|---|---|---|
+| T10 | verified (caps held by one source) | One address could keep the dynamic-registration cap full (10 an hour for a day is 240 against 200) and, through a revocation request, keep an unused registration alive for 90 days (the provider renews on any `200` and a revocation answers `200` to anything); both fixed: only an exchange renews, and registrations unused for an hour make room at the cap. **Accepted:** a flood of at least the cap within the hour (the hourly deployment limit, 100, is below it) can still refuse registrations for that hour; `AB_OAUTH_DCR=off` closes it |
+| T11 | verified (document cap) | A stored document is a cache: at the cap one is evicted at random, so one address filling it (20 fetches an hour, each cached up to a day) no longer refuses other clients such as claude.ai; fetches stay bounded per address (20) and per deployment (200). At the token endpoint a document that cannot be fetched now is `503` or `429`, not `invalid_client`, so a passing failure no longer makes an SDK client discard its tokens |
+| T20 | verified (address keying) | The OAuth counters use the /64 network of an IPv6 address, like the general limiter; before, one host could rotate addresses past every per-address limit and exhaust the deployment caps (authorize 600, consent 300 per ten minutes) that lock everyone out of connecting. **Accepted:** an attacker page can send a visitor's browser to `/oauth/authorize` and use up that address's 30 per ten minutes (a nuisance, bounded by the window) |
+| T25 | corrected | Counter names are a plain hash of the address: not an address as written, but an IPv4 address can be recovered from it by brute force. The rows live for one window; a keyed hash is a follow-up ([P5-22](tasks/phase-5-oauth/P5-22-keyed-address-hash.md), D-78) |
+| T8 | verified (redaction) | `Bearer <provider token>` in free text left the grant id and the secret visible (the Bearer pattern stopped at the colon); fixed and covered in the redaction corpus |
+| T9, T15 | recorded | Any access refusal at a token issuance revokes the device for good, including ones that pass (a workspace switched off, a credential replaced later), so the person has to approve again. Not a weakening, but harsher than a device token: D-77 and [P5-21](tasks/phase-5-oauth/P5-21-recoverable-issuance-refusals.md) |
+| T19 | verified (live) | Unauthenticated checks against the real deployment: the metadata and the `401` challenge are the same for a made-up workspace name; a bad or missing `client_id` is a `400` with no redirect; `GET /oauth/token` is `404`; a wrong `Host` is refused at the edge |
+
+Residual: edge limits on Workers (P5-19), the operator view of refusals (P5-20), keyed address hashes (P5-22), recoverable
+refusals (P5-21). The §8e sections of P5-08, P5-09 and this one sit after §9 in this file for historical reasons; the order is
+not a statement of priority.

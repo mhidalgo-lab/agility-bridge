@@ -32,14 +32,14 @@ How to use it:
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
-| [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-264 |
-| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235 |
+| [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267 |
+| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116 |
-| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240 |
+| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241 |
@@ -670,6 +670,21 @@ allowed for actions that take none), reached Hono's validator, which throws `HTT
 routes.
 *Applied in:* P4-08.
 
+**L-266 — A cap that one source can fill is a lock: make what it bounds evictable, or keep rate times lifetime below it.**
+Ten registrations an hour per address, each living a day when unused, is 240 against a cap of 200; twenty metadata fetches an hour,
+each cached up to a day, is 480 against 200. One address filled each cap within a day and kept it full, so every other client was
+refused. The review had accepted "many addresses can fill the cap", which is true, but not that one can. Check the product of the
+per-source rate and the lifetime against the cap; where the stored thing is only a cache, evict one instead of refusing; where it is
+not, free what was never used first and keep the guaranteed room (the hourly limit) under the cap.
+*Applied in:* P5-10, `server.ts` (`resolveClient`, `register`), D-76.
+
+**L-268 — Key every limiter the same way: a second keying scheme is a bypass of the first.**
+The general limiter counts an IPv6 address by its /64 network because one host holds a whole /64 and can rotate addresses past any
+per-address limit (P2-17). The OAuth counters of P5-09 were keyed by the exact address, so one host could stay under every
+per-address limit and still exhaust the deployment-wide caps that lock everyone out of connecting. A new limiter takes its key from the
+existing function (`addressKey`) and has a test that rotates addresses inside one network.
+*Applied in:* P5-10, `server.ts` (`callerKey`), `abuse.test.ts`.
+
 ## J. OAuth and identity
 
 **L-086 — OAuth state lives in shared storage.**
@@ -868,6 +883,145 @@ away from the data (L-074), rotate or lose, and no per-request key fetch on Work
 other than the token's holder must read the value later.
 *Applied in:* P5-05 (D-70).
 
+**L-242 — A library's own rule is not a test of ours: prove each guard with a case the library lets through.**
+`workers-oauth-provider` insists on PKCE for public clients, validates `resource` and the content type of token
+requests itself, so our checks for the same things looked tested while a mutation of them survived. A guard is only
+proven by a client the library would accept without it (a confidential client without a challenge, a foreign `resource`
+that must not spend the code, a refresh after the grant ended). Keep the library's check and ours both, and say in the
+test which one it exercises; where only the library can fail (a forged props block), record the mutant as equivalent.
+*Applied in:* P5-01 (mutation checks recorded in the task Outcome).
+
+**L-243 — The OAuth library's time is `Date.now()`, ours is injected: give tests one clock.**
+Codes expire by the `kv` TTL (our clock) while token records carry the provider's own timestamps, so a test that moves
+only the injected clock sees one half expire. Memory-backed tests run on a live clock moved with `vi.setSystemTime`;
+a store that captured `Date.now` at open (SQLite) cannot be moved, so those hosts skip the time-travel cases.
+*Applied in:* P5-01.
+
+**L-244 — Discovery documents and challenges are functions of the path, not of the database.**
+Protected resource metadata and the `WWW-Authenticate` challenge are the first things an unauthenticated caller sees. If
+they depend on whether the workspace exists or is enabled (a `404` for unknown ones, a different challenge for known
+ones), they enumerate workspaces for free next to an MCP route that is careful to answer one `401`. Build both from the
+slug's syntax and the configured public URL only, and test known, unknown and disabled side by side; a slug that is not
+valid syntax is the only `404`.
+*Applied in:* P5-02, `packages/http-app/src/oauth/server.ts`.
+
+**L-245 — A test stand-in for a missing sibling feature carries a task id and goes in that feature's PR.**
+P5-01's SDK `auth()` test named the resource through `validateResourceURL` because discovery did not exist yet. With a
+comment pointing at P5-02, the workaround was found and removed in one place, and the same test now proves that the
+client learns the resource from the server alone. A stand-in without a pointer outlives its reason and hides the gap.
+*Applied in:* P5-02 (suite `auth()` cases).
+
+**L-246 — Per-route cache headers lose to the app-wide response policy: decide, then test the header you get.**
+The app sets `Cache-Control: no-store` on every response except the panel's hashed assets. A route that sets its own
+cache header silently ends up with `no-store`, so a "cacheable" metadata document was never cacheable. Either teach the
+policy an exception on purpose (with a reason) or keep the default and assert it; the document is small and rate limited,
+so the default stays (D-65).
+*Applied in:* P5-02.
+
+**L-250 — An id a stranger chooses is a storage key: size it to the key limit before it is stored.**
+A `client_id` goes into `client:<id>` keys. A URL id near the store's 512-character key limit would make our own `put` of
+its validated document throw once the `oauth:client:` prefix is added, so ids are capped at 400 characters before any
+fetch. The provider already turns a lookup the store rejects into a `400`, and the KV adapter now also answers `null` for
+reads and deletes of keys the store cannot hold; that second guard is defence in depth (a mutation of it survives, as the
+provider's own error handling covers it, L-242). Test the long id on every host.
+*Applied in:* P5-03, `kv-namespace.ts`, `clients-suite.ts`.
+
+**L-251 — Cap anonymous writes per source first, and by what is stored, not by a shared window.**
+relic-bridge's deployment-wide registration window let one address use it up and lock everyone out. Count attempts per
+source with an atomic counter that refuses at its own maximum (`kv.increment` with `max`), then cap what is alive (live
+registrations, stored documents), and the flood stops at its own limit. A refusal that writes an audit row per request
+turns the cap into a storage flood, so audit the first refusal per window and reason.
+*Applied in:* P5-03 (relic-bridge Phase 5 review M1 and L4), P5-09.
+
+**L-252 — Rebuild a registration request from an allowlist of fields; do not filter what the client sent.**
+RFC 7591 clients send `logo_uri`, `jwks_uri`, `client_uri`, contacts and statements. Anything stored may later be fetched,
+shown or trusted by a feature written after this one. Parse, validate, and hand the provider a new body holding only the
+fields we use; refuse unsupported grants and auth methods instead of dropping them so the client does not believe it has
+them. The same rule keeps metadata-document clients to a name and the callbacks on their own host.
+*Applied in:* P5-03, `clients.ts` (`checkRegistration`).
+
+**L-256 — Expired rows are only removed by a job: check that every host runs one.**
+Counters, markers and provider records carry an expiry, and a read treats an expired row as absent, which hides that
+nothing deletes it. The Worker had a cron `purgeExpired`; `agility-bridge serve` had no job at all, so a long-running Node
+server grew by every expired session, marker and (now) counter. When a feature adds rows that expire, name the job that
+removes them on each host and test that it runs, with a bound per run that fits the cheapest host (50 D1 queries).
+*Applied in:* P5-09, `scheduleStorageHousekeeping`, `scheduled.ts`.
+
+**L-257 — Remember a refusal in the isolate when each check costs a billed write.**
+A shared counter makes the limit exact, but on D1 every `increment` is a query (and a row written when it counts). Once a
+counter has refused, it will refuse until its window ends, so the isolate keeps `counter -> until` (a hashed name and a
+time: no request data, so it is allowed state, L-013) and answers the rest of the flood from memory. Do the same for the
+audit marker. The cache is only an optimisation: losing it costs one more refused increment, and the storage stays the
+authority. Test it by counting storage calls, not by timing.
+*Applied in:* P5-09, `abuse.ts`.
+
+**L-258 — A deployment-wide cap on failures should only refuse the callers that already failed.**
+A global failure budget on a token endpoint lets anyone who can produce failures lock out every client. Counting failures
+per address, and applying the deployment limit only to addresses that already have a failure in the window, keeps the
+protection (the sum of failures is bounded) without turning it into a denial of service for clean clients. Caps that
+guard a shared resource and cannot work this way (authorize, consent, registration) are documented as deployment-wide, with
+the setting that raises them.
+*Applied in:* P5-09, `abuse.ts` (`blocked`).
+
+**L-259 — Revoke the principal first, then its parts, and make every path look at the revocation.**
+Ending a client means ending many devices, and a store without transactions can stop halfway (a timeout, a plan's query
+limit). Writing the block on the client before touching anything, and having authorization, the token endpoint, the
+refresh check and the resource route all read it, turns a half-finished revoke into a finished refusal; pressing the button
+again only tidies up. A revoke that works from the leaves up leaves a window in which the rest still works.
+*Applied in:* P5-08, `server.ts` (`revokeClient`, `isBlocked`).
+
+**L-260 — The cache lifetime is the disconnect promise: say it, and test both sides of it.**
+"Disconnect takes effect within N seconds" is true only where the cache is cleared at once (the process that revoked) and
+where it ends by itself (every other process). Test it by changing the shared store without clearing the cache: the token
+still works inside the lifetime and not a moment after, and the path that has no cache (refresh) fails immediately.
+Documenting only "at once" would be a lie on every second replica.
+*Applied in:* P5-08, `defineOAuthCacheSuite`.
+
+**L-261 — A list across people over storage keyed by person needs its own read budget, and its counts must degrade.**
+The provider keys grants by person, so "every device" or "devices per client" is a scan, one read per record. Page the list
+by a cursor over the key order, cap the pages and the counting scan to what the cheapest plan allows, say "at least" when the
+cap was hit and "unknown" when the reads fail, and never let a decoration (a count) take the page down.
+*Applied in:* P5-08, `allDevices`, `clients`.
+
+**L-262 — A header-based identity provider protects paths, not routes: list every route that reads the header.**
+Cloudflare Access adds its assertion only on the paths its application covers. The guide named `/auth/cf-access`, but
+the first-owner form posts to `/auth/setup` and re-authentication goes to `/auth/reauth`, and both read the same header:
+the first real run failed with `missing_assertion`, then with `not_allowed` on the retry (a plain sign-in without the
+setup code). Derive the path list from the code (every handler that calls the header login), document it, and run the
+bootstrap once against the real provider before calling the provider done.
+*Applied in:* owner run 2026-10-26, `docs/guide/identity-providers.md`, RESEARCH §9.
+
+**L-263 — A task lives in its parent's project: "not found" may be the workspace's project boundary.**
+The first real OAuth run listed the person's sprint tasks but answered "not found" for a task under a release item. The
+release item, and so the task, belonged to a release project outside the workspace's allowed tree, and an out-of-scope
+asset answers exactly like a missing one (T3, L-140). Adding the release project fixed it. When someone reports a missing
+item, check the workspace's projects before the code, and set up workspaces on a parent that covers both the team's
+projects and their releases.
+*Applied in:* P5-06 (owner run 2026-10-26), P6-14.
+
+**L-264 — A generated config must carry every setting an operator turns on by hand, or the generator must own it.**
+`cf:setup` rewrote the local Worker config from the committed one plus the variables it knew (the public URL, the
+sign-in settings). `AB_OAUTH=on`, added by hand for the first real OAuth run, was not one of them, so the next setup run
+would have written a config without it and the guides could only say "edit the file". Give each switch a flag
+(`--oauth on|off`), read the previous value back when the flag is absent, and test the rerun that must not change it.
+*Applied in:* P5-07, `scripts/cf-setup.ts`, `docs/guide/oauth-operator.md`.
+
+**L-265 — A library that renews on success renews on every success: read which answers it counts as use.**
+The OAuth provider renews a client's registration whenever its token endpoint answers `200`, and an RFC 7009 revocation answers
+`200` to anything. A public client that never exchanged a code could therefore keep an unused registration for 90 days with one
+garbage revocation request, which defeated the unused lifetime, the sweep built on it and the registration cap. When a control
+depends on "used", list every path on which the wrapped library records use and test the control against each of them, not only the
+one it was written for; put the state back when a path that is not a use changed it.
+*Applied in:* P5-10, `server.ts` (`unusedRegistrationOf`, `keepUnused`).
+
+**L-267 — A passing failure at the token endpoint must not look like a verdict on the client.**
+An SDK client that gets `invalid_client` discards its registration and tokens and asks the person to approve again; on `invalid_grant`
+it discards its tokens. A metadata document that was unreachable for a moment, or a fetch budget a flood had used up, answered
+`invalid_client` at the refresh and signed people out. Answer a condition that passes with `503` or `429` and `Retry-After`, keep the
+`4xx` verdicts for what is wrong with the client, and do not count the passing ones as the client's failures. Decide the same way for
+every refusal a refresh makes (D-77).
+*Applied in:* P5-10, `server.ts` (`refusedClient`), `clients.ts`.
+
 ## K. Admin UI
 
 **L-095 — Server-rendered, script-light, and calling its own API.**
@@ -1043,6 +1197,12 @@ from the server's disk and decides whom stored member tokens are sent to (A14). 
 grepping the screens for owner-only conditions and checking that a guard says the same; a role-matrix row and a test through
 the API are the evidence.
 *Applied in:* P4-09.
+
+**L-270 — Copy that names a future release is a bug the day it ships: search for it at the end of a phase.**
+The Connect page said OAuth clients are "a later release" and "have no snippet yet" a phase after OAuth shipped, which would have
+sent a person with a working server to a device token. At the end of each phase, search the pages and guides for "later release",
+"not yet" and "yet" and the names of the phase's tasks, and have a test pin the new wording where it is rendered.
+*Applied in:* P5-10, `packages/admin-ui/src/screens/connect.tsx`.
 
 ## L. Cloudflare Workers
 
@@ -1235,128 +1395,11 @@ three forms (a `name=value` string, an object key, a URL query), and keep a plai
 codes live under that name.
 *Applied in:* P4-11 review, `packages/core/src/redact.ts`, `packages/core/test/redact.test.ts`.
 
-**L-242 — A library's own rule is not a test of ours: prove each guard with a case the library lets through.**
-`workers-oauth-provider` insists on PKCE for public clients, validates `resource` and the content type of token
-requests itself, so our checks for the same things looked tested while a mutation of them survived. A guard is only
-proven by a client the library would accept without it (a confidential client without a challenge, a foreign `resource`
-that must not spend the code, a refresh after the grant ended). Keep the library's check and ours both, and say in the
-test which one it exercises; where only the library can fail (a forged props block), record the mutant as equivalent.
-*Applied in:* P5-01 (mutation checks recorded in the task Outcome).
-
-**L-243 — The OAuth library's time is `Date.now()`, ours is injected: give tests one clock.**
-Codes expire by the `kv` TTL (our clock) while token records carry the provider's own timestamps, so a test that moves
-only the injected clock sees one half expire. Memory-backed tests run on a live clock moved with `vi.setSystemTime`;
-a store that captured `Date.now` at open (SQLite) cannot be moved, so those hosts skip the time-travel cases.
-*Applied in:* P5-01.
-
-**L-244 — Discovery documents and challenges are functions of the path, not of the database.**
-Protected resource metadata and the `WWW-Authenticate` challenge are the first things an unauthenticated caller sees. If
-they depend on whether the workspace exists or is enabled (a `404` for unknown ones, a different challenge for known
-ones), they enumerate workspaces for free next to an MCP route that is careful to answer one `401`. Build both from the
-slug's syntax and the configured public URL only, and test known, unknown and disabled side by side; a slug that is not
-valid syntax is the only `404`.
-*Applied in:* P5-02, `packages/http-app/src/oauth/server.ts`.
-
-**L-245 — A test stand-in for a missing sibling feature carries a task id and goes in that feature's PR.**
-P5-01's SDK `auth()` test named the resource through `validateResourceURL` because discovery did not exist yet. With a
-comment pointing at P5-02, the workaround was found and removed in one place, and the same test now proves that the
-client learns the resource from the server alone. A stand-in without a pointer outlives its reason and hides the gap.
-*Applied in:* P5-02 (suite `auth()` cases).
-
-**L-246 — Per-route cache headers lose to the app-wide response policy: decide, then test the header you get.**
-The app sets `Cache-Control: no-store` on every response except the panel's hashed assets. A route that sets its own
-cache header silently ends up with `no-store`, so a "cacheable" metadata document was never cacheable. Either teach the
-policy an exception on purpose (with a reason) or keep the default and assert it; the document is small and rate limited,
-so the default stays (D-65).
-*Applied in:* P5-02.
-
-**L-250 — An id a stranger chooses is a storage key: size it to the key limit before it is stored.**
-A `client_id` goes into `client:<id>` keys. A URL id near the store's 512-character key limit would make our own `put` of
-its validated document throw once the `oauth:client:` prefix is added, so ids are capped at 400 characters before any
-fetch. The provider already turns a lookup the store rejects into a `400`, and the KV adapter now also answers `null` for
-reads and deletes of keys the store cannot hold; that second guard is defence in depth (a mutation of it survives, as the
-provider's own error handling covers it, L-242). Test the long id on every host.
-*Applied in:* P5-03, `kv-namespace.ts`, `clients-suite.ts`.
-
-**L-251 — Cap anonymous writes per source first, and by what is stored, not by a shared window.**
-relic-bridge's deployment-wide registration window let one address use it up and lock everyone out. Count attempts per
-source with an atomic counter that refuses at its own maximum (`kv.increment` with `max`), then cap what is alive (live
-registrations, stored documents), and the flood stops at its own limit. A refusal that writes an audit row per request
-turns the cap into a storage flood, so audit the first refusal per window and reason.
-*Applied in:* P5-03 (relic-bridge Phase 5 review M1 and L4), P5-09.
-
-**L-252 — Rebuild a registration request from an allowlist of fields; do not filter what the client sent.**
-RFC 7591 clients send `logo_uri`, `jwks_uri`, `client_uri`, contacts and statements. Anything stored may later be fetched,
-shown or trusted by a feature written after this one. Parse, validate, and hand the provider a new body holding only the
-fields we use; refuse unsupported grants and auth methods instead of dropping them so the client does not believe it has
-them. The same rule keeps metadata-document clients to a name and the callbacks on their own host.
-*Applied in:* P5-03, `clients.ts` (`checkRegistration`).
-
-**L-256 — Expired rows are only removed by a job: check that every host runs one.**
-Counters, markers and provider records carry an expiry, and a read treats an expired row as absent, which hides that
-nothing deletes it. The Worker had a cron `purgeExpired`; `agility-bridge serve` had no job at all, so a long-running Node
-server grew by every expired session, marker and (now) counter. When a feature adds rows that expire, name the job that
-removes them on each host and test that it runs, with a bound per run that fits the cheapest host (50 D1 queries).
-*Applied in:* P5-09, `scheduleStorageHousekeeping`, `scheduled.ts`.
-
-**L-257 — Remember a refusal in the isolate when each check costs a billed write.**
-A shared counter makes the limit exact, but on D1 every `increment` is a query (and a row written when it counts). Once a
-counter has refused, it will refuse until its window ends, so the isolate keeps `counter -> until` (a hashed name and a
-time: no request data, so it is allowed state, L-013) and answers the rest of the flood from memory. Do the same for the
-audit marker. The cache is only an optimisation: losing it costs one more refused increment, and the storage stays the
-authority. Test it by counting storage calls, not by timing.
-*Applied in:* P5-09, `abuse.ts`.
-
-**L-258 — A deployment-wide cap on failures should only refuse the callers that already failed.**
-A global failure budget on a token endpoint lets anyone who can produce failures lock out every client. Counting failures
-per address, and applying the deployment limit only to addresses that already have a failure in the window, keeps the
-protection (the sum of failures is bounded) without turning it into a denial of service for clean clients. Caps that
-guard a shared resource and cannot work this way (authorize, consent, registration) are documented as deployment-wide, with
-the setting that raises them.
-*Applied in:* P5-09, `abuse.ts` (`blocked`).
-
-**L-259 — Revoke the principal first, then its parts, and make every path look at the revocation.**
-Ending a client means ending many devices, and a store without transactions can stop halfway (a timeout, a plan's query
-limit). Writing the block on the client before touching anything, and having authorization, the token endpoint, the
-refresh check and the resource route all read it, turns a half-finished revoke into a finished refusal; pressing the button
-again only tidies up. A revoke that works from the leaves up leaves a window in which the rest still works.
-*Applied in:* P5-08, `server.ts` (`revokeClient`, `isBlocked`).
-
-**L-260 — The cache lifetime is the disconnect promise: say it, and test both sides of it.**
-"Disconnect takes effect within N seconds" is true only where the cache is cleared at once (the process that revoked) and
-where it ends by itself (every other process). Test it by changing the shared store without clearing the cache: the token
-still works inside the lifetime and not a moment after, and the path that has no cache (refresh) fails immediately.
-Documenting only "at once" would be a lie on every second replica.
-*Applied in:* P5-08, `defineOAuthCacheSuite`.
-
-**L-261 — A list across people over storage keyed by person needs its own read budget, and its counts must degrade.**
-The provider keys grants by person, so "every device" or "devices per client" is a scan, one read per record. Page the list
-by a cursor over the key order, cap the pages and the counting scan to what the cheapest plan allows, say "at least" when the
-cap was hit and "unknown" when the reads fail, and never let a decoration (a count) take the page down.
-*Applied in:* P5-08, `allDevices`, `clients`.
-
-**L-262 — A header-based identity provider protects paths, not routes: list every route that reads the header.**
-Cloudflare Access adds its assertion only on the paths its application covers. The guide named `/auth/cf-access`, but
-the first-owner form posts to `/auth/setup` and re-authentication goes to `/auth/reauth`, and both read the same header:
-the first real run failed with `missing_assertion`, then with `not_allowed` on the retry (a plain sign-in without the
-setup code). Derive the path list from the code (every handler that calls the header login), document it, and run the
-bootstrap once against the real provider before calling the provider done.
-*Applied in:* owner run 2026-10-26, `docs/guide/identity-providers.md`, RESEARCH §9.
-
-**L-263 — A task lives in its parent's project: "not found" may be the workspace's project boundary.**
-The first real OAuth run listed the person's sprint tasks but answered "not found" for a task under a release item. The
-release item, and so the task, belonged to a release project outside the workspace's allowed tree, and an out-of-scope
-asset answers exactly like a missing one (T3, L-140). Adding the release project fixed it. When someone reports a missing
-item, check the workspace's projects before the code, and set up workspaces on a parent that covers both the team's
-projects and their releases.
-*Applied in:* P5-06 (owner run 2026-10-26), P6-14.
-
-**L-264 — A generated config must carry every setting an operator turns on by hand, or the generator must own it.**
-`cf:setup` rewrote the local Worker config from the committed one plus the variables it knew (the public URL, the
-sign-in settings). `AB_OAUTH=on`, added by hand for the first real OAuth run, was not one of them, so the next setup run
-would have written a config without it and the guides could only say "edit the file". Give each switch a flag
-(`--oauth on|off`), read the previous value back when the flag is absent, and test the rerun that must not change it.
-*Applied in:* P5-07, `scripts/cf-setup.ts`, `docs/guide/oauth-operator.md`.
+**L-269 — A redaction pattern for a scheme must take the whole shape of what follows it.**
+The `Bearer` pattern stopped at a colon, and OAuth tokens here are `<user>:<grant>:<secret>`: `Bearer <token>` in free text came out
+as `Bearer [REDACTED]:<grant>:<secret>`, with the secret in the clear, because the token pattern that runs next needs all three parts.
+When a new token shape joins the corpus, run it through every scheme and key pattern that can sit in front of it, not only bare.
+*Applied in:* P5-10, `packages/core/src/redact.ts`, `redact.test.ts`.
 
 ## Q. Testing, evals and live verification
 
