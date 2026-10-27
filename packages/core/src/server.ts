@@ -155,7 +155,7 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-/** Drops `$schema` (2020-12 is the MCP default) and, for outputs, `additionalProperties: false` (open schemas). */
+/** Drops `$schema` (2020-12 is the MCP default) and, for outputs, `additionalProperties` that only says "open" (`false`, `{}`). */
 function advertised(schema: Record<string, unknown>, io: 'input' | 'output'): Record<string, unknown> {
   const { $schema: _dialect, ...rest } = schema;
   return io === 'output' ? (openSchema(rest) as Record<string, unknown>) : rest;
@@ -166,7 +166,12 @@ function openSchema(schema: unknown): unknown {
   if (schema === null || typeof schema !== 'object') return schema;
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(schema)) {
-    if (k === 'additionalProperties' && v === false) continue;
+    // Open is the JSON Schema default: `false` (closed) is refused and `{}` (zod's loose object) says nothing.
+    if (
+      k === 'additionalProperties' &&
+      (v === false || (typeof v === 'object' && v !== null && Object.keys(v).length === 0))
+    )
+      continue;
     out[k] = openSchema(v);
   }
   return out;

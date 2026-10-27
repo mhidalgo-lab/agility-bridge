@@ -194,7 +194,7 @@ describe('a running sprint', () => {
     expect(out['basis']).toBe('now');
     // Now: B-1 done (5), B-2 in progress (3), D-3 not started (no estimate), B-12 in progress (3), B-4 in progress (8).
     expect(out['totals']).toEqual({
-      items: 5,
+      itemCount: 5,
       estimate: 19,
       done: 5,
       remaining: 14,
@@ -202,13 +202,13 @@ describe('a running sprint', () => {
       unknownCategoryItems: 0,
     });
     expect(out['byStatusCategory']).toEqual([
-      { category: 'not_started', items: 1, unestimatedItems: 1 },
-      { category: 'in_progress', items: 3, estimate: 14, unestimatedItems: 0 },
-      { category: 'completed', items: 1, estimate: 5, unestimatedItems: 0 },
+      { category: 'not_started', itemCount: 1, unestimatedItems: 1 },
+      { category: 'in_progress', itemCount: 3, estimate: 14, unestimatedItems: 0 },
+      { category: 'completed', itemCount: 1, estimate: 5, unestimatedItems: 0 },
     ]);
     // Committed at the begin date: B-1, B-2 and D-3 were planned; B-12 and B-4 arrived later.
     expect(out['committed']).toEqual({
-      items: 3,
+      itemCount: 3,
       estimate: 8,
       unestimatedItems: 1,
       at: '2026-10-15T00:00:00.000Z',
@@ -258,7 +258,7 @@ describe('a running sprint', () => {
     expect(asofCalls(fake.calls)).toHaveLength(0);
     expect(out['burndown']).toBeUndefined();
     expect(out['committed']).toBeUndefined();
-    expect(out['totals']).toMatchObject({ items: 5 });
+    expect(out['totals']).toMatchObject({ itemCount: 5 });
   });
 });
 
@@ -271,9 +271,9 @@ describe('a finished sprint', () => {
     expect(out['sprint']).toMatchObject({ timing: 'past', state: 'closed' });
     expect(out['basis']).toBe('end_of_sprint');
     // At the end: B-11 done (5), B-12 in progress (3), B-14 in progress (4); B-13 had left, B-12 moved on afterwards.
-    expect(out['totals']).toMatchObject({ items: 3, estimate: 12, done: 5, remaining: 7 });
-    expect(out['carryOver']).toEqual({ items: 2, estimate: 7, unestimatedItems: 0 });
-    expect(out['committed']).toMatchObject({ items: 3, estimate: 10, at: '2026-10-01T00:00:00.000Z' });
+    expect(out['totals']).toMatchObject({ itemCount: 3, estimate: 12, done: 5, remaining: 7 });
+    expect(out['carryOver']).toEqual({ itemCount: 2, estimate: 7, unestimatedItems: 0 });
+    expect(out['committed']).toMatchObject({ itemCount: 3, estimate: 10, at: '2026-10-01T00:00:00.000Z' });
     expect(out['scopeChange']).toEqual({ addedAfterStart: 1, removedSinceStart: 1 });
     const points = out['burndown'] as Array<{ at: string; remaining: number; ideal: number }>;
     expect(points).toHaveLength(15);
@@ -329,7 +329,7 @@ describe('a future sprint', () => {
     const { ctx, fake } = setup();
     const out = s(await call(ctx(), { sprint: 'next' }));
     expect(out['sprint']).toMatchObject({ oid: 'Timebox:43', timing: 'future' });
-    expect(out['planned']).toMatchObject({ items: 1, estimate: 2 });
+    expect(out['planned']).toMatchObject({ itemCount: 1, estimate: 2 });
     expect(out['committed']).toBeUndefined();
     expect(out['burndown']).toBeUndefined();
     expect(asofCalls(fake.calls)).toHaveLength(0);
@@ -347,11 +347,11 @@ describe('missing data is never turned into zeros (L-033)', () => {
     const { ctx } = setup(world(false, undefined, noEstimates));
     const out = s(await call(ctx(), { sprint: 'Sprint 42' }));
     expect(out['totals']).toEqual({
-      items: 5,
+      itemCount: 5,
       unestimatedItems: 5,
       unknownCategoryItems: 0,
     });
-    expect(out['committed']).toEqual({ items: 3, unestimatedItems: 3, at: '2026-10-15T00:00:00.000Z' });
+    expect(out['committed']).toEqual({ itemCount: 3, unestimatedItems: 3, at: '2026-10-15T00:00:00.000Z' });
     expect(
       (out['burndown'] as Array<Record<string, unknown>>).every((x) => x['remaining'] === undefined),
     ).toBe(true);
@@ -391,7 +391,7 @@ describe('missing data is never turned into zeros (L-033)', () => {
     expect(r['isError'], text(r)).toBeUndefined();
     const out = s(r);
     expect(out['partial']).toBe(true);
-    expect(out['totals']).toMatchObject({ items: 2 });
+    expect(out['totals']).toMatchObject({ itemCount: 2 });
     expect(out['committed']).toBeUndefined();
     expect(out['notes']).toEqual(
       expect.arrayContaining([
@@ -412,7 +412,7 @@ describe('missing data is never turned into zeros (L-033)', () => {
     expect(r['isError'], text(r)).toBeUndefined();
     const out = s(r);
     expect(out['partial']).toBe(true);
-    expect(out['totals']).toMatchObject({ items: 5, estimate: 5 });
+    expect(out['totals']).toMatchObject({ itemCount: 5, estimate: 5 });
     expect(out['burndown']).toBeUndefined();
     expect(out['committed']).toBeUndefined();
     expect(asofCalls(fake.calls)).toHaveLength(0);

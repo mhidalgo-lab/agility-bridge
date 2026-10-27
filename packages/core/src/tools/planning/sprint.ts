@@ -14,7 +14,7 @@ import { assetState, shapeOutput, untrusted } from '../../output/result.ts';
 import { utcIso } from '../../output/text.ts';
 import { type CompiledQuery, compileQuery } from '../../query/compiler.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { formatArg, ref, rowOid } from '../common.ts';
+import { currentSprintArg, formatArg, projectArg, ref, rowOid, teamArg } from '../common.ts';
 import { readableWorkTypes } from '../work/search.ts';
 
 const NAME = 'get_sprint';
@@ -41,7 +41,7 @@ interface Item {
 }
 
 interface Sums {
-  readonly items: number;
+  readonly itemCount: number;
   /** Omitted when no item has an estimate: a sum of nothing is not zero (L-033). */
   readonly estimate?: number;
   readonly unestimatedItems: number;
@@ -77,7 +77,7 @@ function sums(items: readonly Item[]): Sums {
     else estimate += i.estimate;
   }
   const known = items.length === 0 || unestimatedItems < items.length;
-  return { items: items.length, ...(known ? { estimate: round(estimate) } : {}), unestimatedItems };
+  return { itemCount: items.length, ...(known ? { estimate: round(estimate) } : {}), unestimatedItems };
 }
 
 /** Rows that passed the scope recheck and are of a readable work-item type. */
@@ -104,40 +104,23 @@ export const getSprint: ToolDefinition = defineTool({
   name: NAME,
   title: 'Get a sprint',
   description:
-    'Get one sprint: dates (UTC), schedule, backlog items and defects by status category with estimates, committed at the begin date vs done, scope change, carry-over of a past sprint and a daily burndown from bounded history. Not paged. A cold call can make up to 30 Agility requests.',
+    'Get one sprint: dates (UTC), schedule, backlog items and defects by status category with estimates, committed at the begin date vs done, scope change, carry-over of a past sprint and a daily burndown from bounded history. Not paged. Cold call: up to 30 Agility requests.',
   kind: 'read',
   group: 'planning',
   // Capped at run time: team/project and sprint resolution, the sprint, metadata and status lists, up to three pages of
   // items, batched history requests.
   cost: COST,
   inputSchema: z.object({
-    sprint: z
-      .string()
-      .min(1)
-      .max(200)
-      .default('current')
-      .describe(
-        'Sprint name, Timebox:<id>, or current, previous or next (relative to team or project, by dates UTC).',
-      ),
-    team: z
-      .string()
-      .min(1)
-      .max(200)
-      .optional()
-      .describe('Team name or Team:<id>: narrows the sprint lookup.'),
-    project: z
-      .string()
-      .min(1)
-      .max(200)
-      .optional()
-      .describe('Agility project name or Scope:<id>: narrows the sprint lookup to its schedule.'),
+    sprint: currentSprintArg,
+    team: teamArg,
+    project: projectArg,
     burndown: z.boolean().default(true).describe('Read history for committed, scope change and burndown.'),
     format: formatArg,
   }),
   outputSchema: z.looseObject({
     sprint: z.looseObject({ oid: z.string(), name: z.string() }),
-    totals: z.looseObject({ items: z.number(), estimate: z.number().optional() }),
-    byStatusCategory: z.array(z.looseObject({ category: z.string(), items: z.number() })),
+    totals: z.looseObject({ itemCount: z.number(), estimate: z.number().optional() }),
+    byStatusCategory: z.array(z.looseObject({ category: z.string(), itemCount: z.number() })),
     items: z.array(z.looseObject({ oid: z.string() })),
     truncated: z.boolean().optional(),
     partial: z.boolean().optional(),
@@ -298,13 +281,13 @@ export const getSprint: ToolDefinition = defineTool({
       );
     const byStatusCategory = CATEGORIES.flatMap((category) => {
       const group = sums(current.filter((i) => i.category === category));
-      return group.items === 0 && category === 'unknown' ? [] : [{ category, ...group }];
+      return group.itemCount === 0 && category === 'unknown' ? [] : [{ category, ...group }];
     });
 
     // History: begin (committed) and the days between, one batched request.
     let committed: (Sums & { at: string }) | undefined;
     let scopeChange: { addedAfterStart: number; removedSinceStart: number } | undefined;
-    const burndown: Array<{ at: string; remaining?: number; items: number; ideal?: number }> = [];
+    const burndown: Array<{ at: string; remaining?: number; itemCount: number; ideal?: number }> = [];
     let wantHistory = input.burndown !== false && begin !== undefined && end !== undefined;
     if (wantHistory && (timing === 'future' || capped)) wantHistory = false;
     if (wantHistory && basis === 'now' && timing === 'past') wantHistory = false;
@@ -404,7 +387,7 @@ export const getSprint: ToolDefinition = defineTool({
         burndown.push({
           at: new Date(t).toISOString(),
           ...(remaining.estimate === undefined ? {} : { remaining: remaining.estimate }),
-          items: remaining.items,
+          itemCount: remaining.itemCount,
           ...(ideal === undefined ? {} : { ideal }),
         });
       }
@@ -460,7 +443,7 @@ export const getSprint: ToolDefinition = defineTool({
       summary: [
         'Sprint ',
         untrusted(sprint.name),
-        `: ${timing ?? 'dates unknown'}, ${total.items} item${total.items === 1 ? '' : 's'}, ${total.estimate === undefined ? 'no estimates' : `${done.estimate ?? (done.items === 0 ? 0 : 'none estimated')} of ${total.estimate} estimate done`}${total.unestimatedItems > 0 ? ` (${total.unestimatedItems} unestimated)` : ''}${committed?.estimate === undefined ? '' : `, ${committed.estimate} committed at the start`}.`,
+        `: ${timing ?? 'dates unknown'}, ${total.itemCount} item${total.itemCount === 1 ? '' : 's'}, ${total.estimate === undefined ? 'no estimates' : `${done.estimate ?? (done.itemCount === 0 ? 0 : 'none estimated')} of ${total.estimate} estimate done`}${total.unestimatedItems > 0 ? ` (${total.unestimatedItems} unestimated)` : ''}${committed?.estimate === undefined ? '' : `, ${committed.estimate} committed at the start`}.`,
       ],
       notes,
       blocks: [
@@ -481,7 +464,7 @@ export const getSprint: ToolDefinition = defineTool({
         sprint,
         basis,
         totals: {
-          items: total.items,
+          itemCount: total.itemCount,
           ...(total.estimate === undefined ? {} : { estimate: total.estimate }),
           ...(done.estimate === undefined ? {} : { done: done.estimate }),
           ...(open.estimate === undefined ? {} : { remaining: open.estimate }),

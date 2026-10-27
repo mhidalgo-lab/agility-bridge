@@ -19,7 +19,7 @@ export const listMembers: ToolDefinition = defineTool({
   name: NAME,
   title: 'List members',
   description:
-    'Find members by name or username among the members of the workspace’s Agility projects (all members when the workspace has no project restriction). Emails only when the workspace enables them. Paged: pass nextCursor back as cursor.',
+    'Find members by name or username among the workspace’s Agility projects (all members when it has no project restriction). Emails only when the workspace enables them. Paged: pass nextCursor back as cursor.',
   kind: 'read',
   group: 'people',
   // Capped at run time: Member and Scope metadata, the project tree, the project membership and the page.
@@ -35,6 +35,9 @@ export const listMembers: ToolDefinition = defineTool({
     const ctx = { ...outer, budget: capBudget(outer.budget, COST) };
     const filters: FilterInput[] = [];
     const notes: string[] = [];
+    // A cursor is checked before anything else, so a bad one is refused even when the list turns out to be empty.
+    const binding = await cursorBinding(ctx, NAME, { contains: input.contains });
+    const offset = input.cursor === undefined ? 0 : (await decodeCursor(ctx, input.cursor, binding)).offset;
     if (ctx.projects.allowed.length > 0) {
       // Members of the allowed projects (and sub-projects), through Scope.Members.
       const tree = ctx.projects.includeChildren
@@ -70,8 +73,6 @@ export const listMembers: ToolDefinition = defineTool({
       });
     }
     if (input.contains !== undefined) filters.push({ field: 'Name', op: 'contains', value: input.contains });
-    const binding = await cursorBinding(ctx, NAME, { contains: input.contains });
-    const offset = input.cursor === undefined ? 0 : (await decodeCursor(ctx, input.cursor, binding)).offset;
     const emails = ctx.limits.memberEmails;
     const compiled = await compileQuery(
       ctx,

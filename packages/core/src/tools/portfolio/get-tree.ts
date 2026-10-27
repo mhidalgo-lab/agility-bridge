@@ -12,7 +12,7 @@ import { assetState, shapeOutput, untrusted } from '../../output/result.ts';
 import { type CompiledQuery, compileQuery, type FilterInput } from '../../query/compiler.ts';
 import { invalid } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { formatArg } from '../common.ts';
+import { epicArg, formatArg } from '../common.ts';
 import { identityFor } from '../work/items.ts';
 import { EPIC, epicFields, epicRow, isReadable, requireReadable, runBatch } from './epics.ts';
 
@@ -56,13 +56,13 @@ export const getPortfolioTree: ToolDefinition = defineTool({
   name: NAME,
   title: 'Get a portfolio tree',
   description:
-    'Get an epic with its descendant epics down to a depth (at most 4) and roll-ups per epic over the backlog items below it: item counts, done items, open defects, estimate and done percentage. Roll-ups that a depth, size or permission cut touches are marked incomplete and the result is partial. Not paged. A cold call can make up to 20 Agility requests.',
+    'Get an epic with its descendant epics down to a depth (at most 4) and roll-ups per epic over the backlog items below it: item counts, done items, open defects, estimate and done percentage. Roll-ups touched by a depth, size or permission cut are marked incomplete and the result is partial. Not paged. Cold call: up to 20 Agility requests.',
   kind: 'read',
   group: 'portfolio',
   // Capped at run time: Epic, Story and Defect metadata and status lists, resolution, one request per level (four at most), up to three item pages.
   cost: COST,
   inputSchema: z.object({
-    asset: z.string().min(1).max(64).describe('Epic number (E-01234) or OID token (Epic:1234).'),
+    asset: epicArg,
     depth: z
       .number()
       .int()
@@ -80,7 +80,7 @@ export const getPortfolioTree: ToolDefinition = defineTool({
       .min(1)
       .max(1_000)
       .optional()
-      .describe('Most epics per level and most backlog items listed; when omitted, the workspace maximum.'),
+      .describe('Most epics per level and backlog items listed; the workspace maximum when omitted.'),
     format: formatArg,
   }),
   outputSchema: z.looseObject({

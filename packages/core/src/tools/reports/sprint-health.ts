@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { capBudget } from '../../context.ts';
 import { shapeOutput, untrusted } from '../../output/result.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
+import { currentSprintArg, projectArg, teamArg } from '../common.ts';
 import { getSprint } from '../planning/sprint.ts';
 import { searchWorkItems } from '../work/search.ts';
 import {
@@ -52,20 +53,15 @@ export const sprintHealth: ToolDefinition = defineTool({
   name: NAME,
   title: 'Sprint health',
   description:
-    'Report a sprint’s health in one call: share done against share of time elapsed (a status only for a current sprint), scope change since the start, unestimated items, open defects, open items without an owner or unchanged for 3 days. Sections not granted or not read are named, never counted as zero. Not paged. A cold call can make up to 54 Agility requests.',
+    'Report a sprint’s health in one call: share done against share of time elapsed (a status only for a current sprint), scope change since the start, unestimated items, open defects, open items without an owner or unchanged for 3 days. Sections not granted or not read are named, never counted as zero. Not paged. Cold call: up to 54 Agility requests.',
   kind: 'read',
   group: 'reports',
   // get_sprint and search_work_items, each capped at its own cost; the shared budget is capped here.
   cost: COST,
   inputSchema: z.object({
-    sprint: z
-      .string()
-      .min(1)
-      .max(200)
-      .default('current')
-      .describe('Sprint name, Timebox:<id>, or current, previous or next.'),
-    team: z.string().min(1).max(200).optional().describe('Team name or Team:<id>.'),
-    project: z.string().min(1).max(200).optional().describe('Agility project name or Scope:<id>.'),
+    sprint: currentSprintArg,
+    team: teamArg,
+    project: projectArg,
   }),
   outputSchema: reportOutput({
     sprint: z.looseObject({}).optional(),
@@ -105,8 +101,8 @@ export const sprintHealth: ToolDefinition = defineTool({
     const end = Date.parse(strOf(sprint?.['endDate']) ?? '');
     const totals = obj(sprintData?.['totals']);
     const byCategory = arr(sprintData?.['byStatusCategory']);
-    const items = numOf(totals?.['items']);
-    const doneItems = numOf(byCategory.find((c) => c['category'] === 'completed')?.['items']);
+    const items = numOf(totals?.['itemCount']);
+    const doneItems = numOf(byCategory.find((c) => c['category'] === 'completed')?.['itemCount']);
     let donePercent: number | undefined;
     let basis: 'estimate' | 'items' | undefined;
     const estimate = numOf(totals?.['estimate']);
@@ -136,7 +132,7 @@ export const sprintHealth: ToolDefinition = defineTool({
     const committed = obj(sprintData?.['committed']);
     const scopeChange = obj(sprintData?.['scopeChange']);
     const added = numOf(scopeChange?.['addedAfterStart']);
-    const committedItems = numOf(committed?.['items']);
+    const committedItems = numOf(committed?.['itemCount']);
     const sprintItems = arr(sprintData?.['items']);
     const listComplete = items !== undefined && sprintItems.length >= items;
     const openDefects =

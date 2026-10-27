@@ -12,7 +12,17 @@ import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts
 import { invalid } from '../../query/limits.ts';
 import { parseTimeRange } from '../../query/time.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { cursorArg, formatArg, includeClosedArg, limitArg, listOutput } from '../common.ts';
+import {
+  cursorArg,
+  formatArg,
+  includeClosedArg,
+  limitArg,
+  listOutput,
+  projectArg,
+  teamArg,
+  timeRangeArg,
+  workItemTypeArg,
+} from '../common.ts';
 import { identityFor, WORK_ITEM_TYPES, workItem, workItemFields } from '../work/items.ts';
 import { idOf, multiPage, offsetsAfter, type TypedRow } from '../work/multi.ts';
 import { readableWorkTypes, workFilters } from '../work/search.ts';
@@ -25,31 +35,16 @@ export const listRecentChanges: ToolDefinition = defineTool({
   name: NAME,
   title: 'List recent changes',
   description:
-    'List work items (backlog items, defects, tasks, tests) changed inside a bounded time_range (last 7 days unless given) in an Agility project, a team or the whole workspace, newest change first, with who changed them. Sorts by change date, which costs about a second per call; use get_asset_history for what changed. Paged: pass nextCursor back as cursor. A cold call can make up to 24 Agility requests.',
+    'List work items (backlog items, defects, tasks, tests) changed inside a bounded time_range in an Agility project, a team or the whole workspace, newest first, with who changed them; get_asset_history shows what changed. Sorts by change date, about a second per call. Paged: pass nextCursor back as cursor. Cold call: up to 24 Agility requests.',
   kind: 'read',
   group: 'history',
   // Capped at run time: metadata for the types, name resolution, the project tree, one page of one batched request.
   cost: COST,
   inputSchema: z.object({
-    project: z
-      .string()
-      .min(1)
-      .max(200)
-      .optional()
-      .describe('Agility project name or Scope:<id> within the workspace.'),
-    team: z.string().min(1).max(200).optional().describe('Team name or Team:<id>.'),
-    asset_type: z
-      .enum(WORK_ITEM_TYPES)
-      .optional()
-      .describe('Story, Defect, Task or Test; all four when omitted.'),
-    time_range: z
-      .string()
-      .min(1)
-      .max(100)
-      .default(DEFAULT_WINDOW)
-      .describe(
-        'Window (UTC, bounded by the workspace), e.g. "last 3 days", "this week", "2026-10-01 to 2026-10-15".',
-      ),
+    project: projectArg,
+    team: teamArg,
+    asset_type: workItemTypeArg(WORK_ITEM_TYPES),
+    time_range: timeRangeArg(DEFAULT_WINDOW),
     include_closed: includeClosedArg,
     limit: limitArg,
     cursor: cursorArg,
@@ -149,14 +144,14 @@ export const listRecentChanges: ToolDefinition = defineTool({
         'number',
         'assetType',
         'oid',
-        'changedAt',
-        'changedBy',
         'state',
         'project',
         'name',
         'status',
         'owners',
         'sprint',
+        'changedAt',
+        'changedBy',
       ],
       hasMore: page.hasMore,
       cursorFor: (shown) => encodeCursor(binding, { offset: 0, offsets: offsetsAfter(offsets, page, shown) }),

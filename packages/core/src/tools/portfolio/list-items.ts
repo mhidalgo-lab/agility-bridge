@@ -8,7 +8,16 @@ import { compileQuery, type FilterInput } from '../../query/compiler.ts';
 import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { invalid } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { containsArg, cursorArg, formatArg, includeClosedArg, limitArg, listOutput } from '../common.ts';
+import {
+  containsArg,
+  cursorArg,
+  formatArg,
+  includeClosedArg,
+  limitArg,
+  listOutput,
+  projectArg,
+  statusArg,
+} from '../common.ts';
 import { identityFor } from '../work/items.ts';
 import { EPIC, epicFields, epicRow, requireReadable } from './epics.ts';
 
@@ -19,7 +28,7 @@ export const listPortfolioItems: ToolDefinition = defineTool({
   name: NAME,
   title: 'List portfolio items',
   description:
-    'List portfolio items (epics) of the workspace’s Agility projects with category (Feature, Initiative, …), status, parent, estimates and how many live children each has; filter by category, Agility project, status names, parent epic or name text. Sorted by ID or name. Paged: pass nextCursor back as cursor. A cold call can make up to 12 Agility requests; get_portfolio_tree has roll-ups.',
+    'List portfolio items (epics) of the workspace’s Agility projects with category (Feature, Initiative, …), status, parent, estimates and how many live children each has; filter by category, project, status, parent epic or name. Sorted by ID or name. Paged: pass nextCursor back as cursor. Cold call: up to 12 Agility requests. get_portfolio_tree has roll-ups.',
   kind: 'read',
   group: 'portfolio',
   // Capped at run time: Epic metadata, project and parent resolution, the project tree, the page.
@@ -30,17 +39,8 @@ export const listPortfolioItems: ToolDefinition = defineTool({
       .max(10)
       .optional()
       .describe('Category names as configured on the instance (for example Feature).'),
-    project: z
-      .string()
-      .min(1)
-      .max(200)
-      .optional()
-      .describe('Agility project name or Scope:<id> within the workspace.'),
-    status: z
-      .array(z.string().min(1).max(100))
-      .max(20)
-      .optional()
-      .describe('Epic status names as configured on the instance.'),
+    project: projectArg,
+    status: statusArg,
     parent: z
       .string()
       .min(1)

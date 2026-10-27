@@ -5,7 +5,7 @@ import { AbError, ErrorCode } from '../../errors.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { shapeList, shapeOutput } from '../../output/result.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { containsArg, formatArg } from '../common.ts';
+import { assetTypeArg, boundedListOutput, containsArg, formatArg } from '../common.ts';
 
 /** Product types offered when the workspace has no allow list (ARCHITECTURE §6.3). */
 export const DEFAULT_READABLE_TYPES: readonly string[] = Object.freeze([
@@ -40,23 +40,20 @@ export const listAssetTypes: ToolDefinition = defineTool({
   name: 'list_asset_types',
   title: 'List asset types',
   description:
-    'List the asset types this workspace allows on the instance, with base type, number prefix and how each is kept inside the workspace (scope strategy); types the workspace does not allow are not listed. Not paged. The first call loads metadata for each type and can make up to 24 Agility requests; later calls use the cache.',
+    'List the asset types you can query in this workspace, with base type, number prefix and scope strategy. Not paged. Cold call: up to 24 Agility requests (metadata per type); later calls use the cache.',
   kind: 'read',
   group: 'core',
   // One meta.v1 load per candidate type and its bases, plus the number-prefix sample (cold cache).
   cost: 24,
   inputSchema: z.object({ contains: containsArg('asset types'), format: formatArg }),
-  outputSchema: z.looseObject({
-    truncated: z.boolean().optional(),
-    items: z.array(
-      z.looseObject({
-        assetType: z.string(),
-        base: z.string().optional(),
-        prefix: z.string().optional(),
-        scopeStrategy: z.string(),
-      }),
-    ),
-  }),
+  outputSchema: boundedListOutput(
+    z.looseObject({
+      assetType: z.string(),
+      base: z.string().optional(),
+      prefix: z.string().optional(),
+      scopeStrategy: z.string(),
+    }),
+  ),
   handler: async (input, ctx) => {
     const md = metadataFor(ctx);
     const candidates = (ctx.assetTypes.allow ?? DEFAULT_READABLE_TYPES).filter((t) => typeAllowed(ctx, t));
@@ -92,17 +89,13 @@ export const describeAssetType: ToolDefinition = defineTool({
   name: 'describe_asset_type',
   title: 'Describe an asset type',
   description:
-    'Describe one asset type on this instance: attributes (type, relation target, multi-value, custom, read-only, required), operations, statuses and the minimal/default/full field tiers used by other tools. Not paged.',
+    'Describe one asset type on this instance: its fields (attributes with type, relation target, multi-value, custom, read-only, required), operations, statuses and the minimal/default/full field tiers other tools use. Not paged.',
   kind: 'read',
   group: 'core',
   // The type, its bases or derived scope path, and its status list type and statuses (cold cache).
   cost: 5,
   inputSchema: z.object({
-    asset_type: z
-      .string()
-      .min(1)
-      .max(64)
-      .describe('Agility API name of the asset type, e.g. Story, Defect, Task.'),
+    asset_type: assetTypeArg,
     contains: containsArg('attributes'),
     format: formatArg,
   }),

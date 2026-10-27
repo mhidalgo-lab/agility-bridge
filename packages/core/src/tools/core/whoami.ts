@@ -10,7 +10,7 @@ export const whoami: ToolDefinition = defineTool({
   name: 'whoami',
   title: 'Who am I',
   description:
-    'Show the connection: the Agility instance and version, the member behind the token, the workspace, its allowed Agility projects and asset types, enabled tool groups, limits by unit, the per-call request budget, and whether writes and which approval channel are available. Not paged.',
+    'Show who you are connected as: the Agility instance and version, the member behind the token, the workspace, which projects and asset types you can see, enabled tool groups, limits, the per-call request budget and write availability. Not paged.',
   kind: 'read',
   group: 'core',
   // Member metadata (cold cache) and the member query.
@@ -22,14 +22,10 @@ export const whoami: ToolDefinition = defineTool({
     workspace: z.looseObject({ id: z.string(), name: z.string(), groups: z.array(z.string()) }),
     projects: z.looseObject({ allowed: z.array(z.string()), includeChildProjects: z.boolean() }),
     assetTypes: z.looseObject({ allow: z.array(z.string()).optional(), deny: z.array(z.string()) }),
-    limits: z.looseObject({
-      maxRows: z.number(),
-      maxResponseBytes: z.number(),
-      requestTimeoutMs: z.number(),
-      memberEmails: z.boolean(),
-    }),
-    budget: z.looseObject({ requestsPerCall: z.number(), requestsUsed: z.number() }),
+    limits: z.looseObject({ maxRows: z.number() }),
+    budget: z.looseObject({ requestsPerCall: z.number() }),
     writes: z.looseObject({ enabled: z.boolean(), approval: z.string() }),
+    notes: z.array(z.string()).optional(),
   }),
   handler: async (_input, ctx) => {
     const member = await resolveMember(ctx, 'me');

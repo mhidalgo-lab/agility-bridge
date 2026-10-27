@@ -38,19 +38,19 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 
 **Who am I** · group `core` · read · cost 2 Agility requests at most
 
-Show the connection: the Agility instance and version, the member behind the token, the workspace, its allowed Agility projects and asset types, enabled tool groups, limits by unit, the per-call request budget, and whether writes and which approval channel are available. Not paged.
+Show who you are connected as: the Agility instance and version, the member behind the token, the workspace, which projects and asset types you can see, enabled tool groups, limits, the per-call request budget and write availability. Not paged.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 No arguments.
 
-`structuredContent`: `member`, `instance`, `workspace`, `projects`, `assetTypes`, `limits`, `budget`, `writes` (open: more fields may be added).
+`structuredContent`: `member`, `instance`, `workspace`, `projects`, `assetTypes`, `limits`, `budget`, `writes`, `notes` (open: more fields may be added).
 
 ## `list_projects`
 
 **List Agility projects** · group `core` · read · cost 5 Agility requests at most
 
-List the Agility projects (Scope) this workspace allows, including sub-projects when the workspace includes them, with parent, state and schedule. Paged: pass nextCursor back as cursor.
+List the Agility projects this workspace allows (Scope), sub-projects included when the workspace includes them, with parent, state and schedule. Paged: pass nextCursor back as cursor.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
@@ -58,9 +58,9 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 |---|---|---|---|---|
 | `contains` | string |  |  | Only projects whose name contains this text. |
 | `include_closed` | boolean |  | `false` | Include closed items. |
-| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
-| `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows; the workspace page size when omitted. |
+| `cursor` | string |  |  | nextCursor of the previous call, same arguments. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
 
@@ -68,30 +68,30 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **List asset types** · group `core` · read · cost 24 Agility requests at most
 
-List the asset types this workspace allows on the instance, with base type, number prefix and how each is kept inside the workspace (scope strategy); types the workspace does not allow are not listed. Not paged. The first call loads metadata for each type and can make up to 24 Agility requests; later calls use the cache.
+List the asset types you can query in this workspace, with base type, number prefix and scope strategy. Not paged. Cold call: up to 24 Agility requests (metadata per type); later calls use the cache.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `contains` | string |  |  | Only asset types whose name contains this text. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
-`structuredContent`: `truncated`, `items` (open: more fields may be added).
+`structuredContent`: `items`, `truncated`, `partial`, `notes` (open: more fields may be added).
 
 ## `describe_asset_type`
 
 **Describe an asset type** · group `core` · read · cost 5 Agility requests at most
 
-Describe one asset type on this instance: attributes (type, relation target, multi-value, custom, read-only, required), operations, statuses and the minimal/default/full field tiers used by other tools. Not paged.
+Describe one asset type on this instance: its fields (attributes with type, relation target, multi-value, custom, read-only, required), operations, statuses and the minimal/default/full field tiers other tools use. Not paged.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `asset_type` | string | yes |  | Agility API name of the asset type, e.g. Story, Defect, Task. |
+| `asset_type` | string | yes |  | Agility API name, e.g. Story, Defect, Task, Test, Epic. |
 | `contains` | string |  |  | Only attributes whose name contains this text. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `assetType`, `scopeStrategy`, `attributes`, `operations`, `statuses`, `tiers` (open: more fields may be added).
 
@@ -99,25 +99,25 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Query assets** · group `query` · read · cost 12 Agility requests at most
 
-Query any asset type this workspace allows (stories, defects, tasks, tests, epics, issues, requests, regression tests, custom fields) with structured filters, fields and sort; values are always bound and the workspace scope is enforced. Sorting by ChangeDate costs about a second per call. Paged: pass nextCursor back as cursor. A cold call can make up to 12 Agility requests.
+Query any asset type this workspace allows (stories, defects, tasks, tests, epics, issues, requests, custom fields) with structured filters, fields and sort; values are bound and the workspace scope is enforced. Sorting by ChangeDate costs about a second per call. Paged: pass nextCursor back as cursor. Cold call: up to 12 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `asset_type` | string | yes |  | Agility API name, e.g. Story, Defect, Task, Test, Epic, Issue. |
+| `asset_type` | string | yes |  | Agility API name, e.g. Story, Defect, Task, Test, Epic. |
 | `fields` | string[] (≤ 30) |  |  | Attribute paths to return; the type’s default tier when omitted. |
 | `filters` | object[] (≤ 20) |  |  | ANDed filters: { field, op, value }. |
-| `any_of` | object[] (≤ 10)[] (≤ 3) |  |  | OR between groups of filters, AND inside a group. |
-| `project` | string |  |  | One Agility project of the workspace: name or Scope:<id>. |
+| `any_of` | object[] (≤ 10)[] (≤ 3) |  |  | OR between groups of filters (same shape as filters), AND inside a group. |
+| `project` | string |  |  | Agility project: name or Scope:<id>, within the workspace. |
 | `include_child_projects` | boolean |  |  | With project: include its sub-projects (the workspace setting when omitted). |
 | `include_closed` | boolean |  | `false` | Include closed items. |
 | `sort` | object[] (≤ 3) |  |  | Sort fields; ID is the order when omitted and always the last tiebreaker. |
 | `as_of` | string |  |  | ISO 8601 UTC point in time (bounded by the workspace). |
-| `minimal_output` | boolean |  |  | Only the minimal fields (identity and name). |
-| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
-| `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `minimal_output` | boolean |  |  | Only the identity columns and name. |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows; the workspace page size when omitted. |
+| `cursor` | string |  |  | nextCursor of the previous call, same arguments. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
 
@@ -125,7 +125,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Get assets** · group `query` · read · cost 16 Agility requests at most
 
-Get one or more assets of any allowed type by number (B-01234, D-00012, TK-00007, AT-00003) or OID token (Story:1234), with chosen fields; numbers that are not found or not visible are listed in notFound. Not paged. At most 50 per call; a cold call can make up to 16 Agility requests.
+Get assets of any allowed type by number (B-01234, D-00012, TK-00007) or OID token (Story:1234) with chosen fields; numbers not found or not visible are listed in notFound. Not paged. At most 50 per call. Cold call: up to 16 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
@@ -133,34 +133,34 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 |---|---|---|---|---|
 | `assets` | string[] (≤ 50) | yes |  | Asset numbers or OID tokens. |
 | `fields` | string[] (≤ 30) |  |  | Attribute paths; each type’s default tier when omitted. |
-| `minimal_output` | boolean |  |  | Only the minimal fields (identity and name). |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `minimal_output` | boolean |  |  | Only the identity columns and name. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
-`structuredContent`: `items`, `notFound`, `truncated` (open: more fields may be added).
+`structuredContent`: `items`, `truncated`, `partial`, `notes`, `notFound` (open: more fields may be added).
 
 ## `search_work_items`
 
 **Search work items** · group `work` · read · cost 24 Agility requests at most
 
-Search backlog items (stories), defects, tasks and tests within the workspace by Agility project, team, sprint (name or current/previous/next), owner (member or me), status names, status category or name text. Sorting by recent change costs about a second per call. Paged: pass nextCursor back as cursor. A cold call can make up to 24 Agility requests.
+Find and filter work items (backlog items or stories, defects, tasks and tests) within the workspace by Agility project, team, sprint, owner (member), status, status category or words in the name. Sorting by recent change costs about a second per call. Paged: pass nextCursor back as cursor. Cold call: up to 24 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `asset_type` | `Story` \| `Defect` \| `Task` \| `Test` |  |  | Story, Defect, Task or Test; all four when omitted. |
-| `project` | string |  |  | Agility project name or Scope:<id> within the workspace. |
-| `team` | string |  |  | Team name or Team:<id>. |
-| `sprint` | string |  |  | Sprint name, Timebox:<id>, or current/previous/next. |
-| `member` | string |  |  | Owner: me, a username, a name or Member:<id>. |
+| `project` | string |  |  | Agility project: name or Scope:<id>, within the workspace. |
+| `team` | string |  |  | Team: name or Team:<id>. |
+| `sprint` | string |  |  | Sprint: name, Timebox:<id>, or current, previous or next. |
+| `member` | string |  |  | Member: me, a username, a name or Member:<id>. |
 | `status` | string[] (≤ 20) |  |  | Status names as configured on the instance. |
 | `status_category` | `not_started` \| `in_progress` \| `completed` |  |  | Rollup category of the status. |
 | `contains` | string |  |  | Only items whose name contains this text. |
 | `include_closed` | boolean |  | `false` | Include closed items. |
-| `sort_by` | `id` \| `name` \| `recently_changed` |  | `"id"` | id is cheap and stable; recently_changed costs about a second per call. |
-| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
-| `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `sort_by` | `id` \| `name` \| `recently_changed` |  | `"id"` | recently_changed costs about a second per call. |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows; the workspace page size when omitted. |
+| `cursor` | string |  |  | nextCursor of the previous call, same arguments. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
 
@@ -168,33 +168,33 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Get a work item** · group `work` · read · cost 24 Agility requests at most
 
-Get one work item (backlog item, defect, task, test or epic) by number or OID token with its description and acceptance criteria as text, owners, status, sprint, parent and epic, child tasks and tests, links and comment count. Not paged. Children and links are capped at 20 each; a cold call can make up to 24 Agility requests.
+Get one work item (backlog item, defect, task, test or epic) by number or OID token with description and acceptance criteria as text, owners, status, sprint, parent, epic, child tasks and tests, links and comment count. Not paged. Children and links are capped at 20 each. Cold call: up to 24 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `asset` | string | yes |  | Number (B-01234, D-00012, TK-00007, AT-00003) or OID token. |
+| `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
 | `minimal_output` | boolean |  |  | Skip children, links and comments (cheaper). |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
-`structuredContent`: `item`, `children`, `links` (open: more fields may be added).
+`structuredContent`: `item`, `children`, `links`, `partial`, `notes` (open: more fields may be added).
 
 ## `list_my_work`
 
 **List my work** · group `work` · read · cost 20 Agility requests at most
 
-List the open backlog items, defects, tasks and tests owned by the token’s member (or another member) within the workspace, ordered and grouped by sprint and status. Paged: pass nextCursor back as cursor. A cold call can make up to 20 Agility requests.
+List the open backlog items, defects, tasks and tests of the token’s member (or another member) within the workspace, ordered by sprint and status. Paged: pass nextCursor back as cursor. Cold call: up to 20 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `member` | string |  | `"me"` | The owner: me, a username, a name or Member:<id>. |
+| `member` | string |  | `"me"` | Member: me, a username, a name or Member:<id>. |
 | `include_closed` | boolean |  | `false` | Include closed items. |
-| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
-| `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows; the workspace page size when omitted. |
+| `cursor` | string |  |  | nextCursor of the previous call, same arguments. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
 
@@ -202,16 +202,16 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **List teams** · group `planning` · read · cost 2 Agility requests at most
 
-List the teams on the instance by name (teams are not tied to an Agility project); use get_team for a team’s workflow, current sprint and members, and list_sprints for its sprints. Paged: pass nextCursor back as cursor.
+List the teams on the instance by name (teams are not tied to an Agility project); use get_team for one team. Paged: pass nextCursor back as cursor.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `contains` | string |  |  | Only teams whose name contains this text. |
-| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
-| `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows; the workspace page size when omitted. |
+| `cursor` | string |  |  | nextCursor of the previous call, same arguments. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
 
@@ -219,33 +219,33 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Get a team** · group `planning` · read · cost 20 Agility requests at most
 
-Get one team: its own workflow statuses where the instance has them, its current sprint, and its members as derived from assignments (owners of open work items with this team inside the workspace; Agility teams have no roster). Not paged. A cold call can make up to 20 Agility requests.
+Get one team: who is on it (members derived from the owners of open work items in the workspace, as Agility teams have no roster), its workflow statuses where the instance has them, and its current sprint. Not paged. Cold call: up to 20 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `team` | string | yes |  | Team name or Team:<id>. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `team` | string | yes |  | Team: name or Team:<id>. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
-`structuredContent`: `team`, `members`, `statuses` (open: more fields may be added).
+`structuredContent`: `team`, `members`, `statuses`, `partial`, `notes` (open: more fields may be added).
 
 ## `list_sprints`
 
 **List sprints** · group `planning` · read · cost 10 Agility requests at most
 
-List sprints (iterations) of the workspace’s Agility projects with begin and end dates (UTC) and whether each is past, current or future; filter by team, Agility project or timing. Ordered by begin date, newest first. Paged: pass nextCursor back as cursor. A cold call can make up to 10 Agility requests.
+List the sprints of the workspace’s Agility projects or of a team with begin and end dates (UTC) and whether each is past, current or future (which one is current, which starts next); newest first. Paged: pass nextCursor back as cursor. Cold call: up to 10 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `team` | string |  |  | Only sprints with work of this team (name or Team:<id>). |
-| `project` | string |  |  | Only sprints of this Agility project’s schedule. |
+| `team` | string |  |  | Team: name or Team:<id>. |
+| `project` | string |  |  | Agility project: name or Scope:<id>, within the workspace. |
 | `timing` | `current` \| `past` \| `future` \| `all` |  | `"all"` | By dates relative to now (UTC). |
-| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
-| `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows; the workspace page size when omitted. |
+| `cursor` | string |  |  | nextCursor of the previous call, same arguments. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
 
@@ -253,17 +253,17 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Get a sprint** · group `planning` · read · cost 30 Agility requests at most
 
-Get one sprint: dates (UTC), schedule, backlog items and defects by status category with estimates, committed at the begin date vs done, scope change, carry-over of a past sprint and a daily burndown from bounded history. Not paged. A cold call can make up to 30 Agility requests.
+Get one sprint: dates (UTC), schedule, backlog items and defects by status category with estimates, committed at the begin date vs done, scope change, carry-over of a past sprint and a daily burndown from bounded history. Not paged. Cold call: up to 30 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `sprint` | string |  | `"current"` | Sprint name, Timebox:<id>, or current, previous or next (relative to team or project, by dates UTC). |
-| `team` | string |  |  | Team name or Team:<id>: narrows the sprint lookup. |
-| `project` | string |  |  | Agility project name or Scope:<id>: narrows the sprint lookup to its schedule. |
+| `sprint` | string |  | `"current"` | Sprint: name, Timebox:<id>, or current, previous or next. |
+| `team` | string |  |  | Team: name or Team:<id>. |
+| `project` | string |  |  | Agility project: name or Scope:<id>, within the workspace. |
 | `burndown` | boolean |  | `true` | Read history for committed, scope change and burndown. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `sprint`, `totals`, `byStatusCategory`, `items`, `truncated`, `partial`, `notes` (open: more fields may be added).
 
@@ -271,16 +271,16 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **List members** · group `people` · read · cost 6 Agility requests at most
 
-Find members by name or username among the members of the workspace’s Agility projects (all members when the workspace has no project restriction). Emails only when the workspace enables them. Paged: pass nextCursor back as cursor.
+Find members by name or username among the workspace’s Agility projects (all members when it has no project restriction). Emails only when the workspace enables them. Paged: pass nextCursor back as cursor.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `contains` | string |  |  | Only members whose name contains this text. |
-| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
-| `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows; the workspace page size when omitted. |
+| `cursor` | string |  |  | nextCursor of the previous call, same arguments. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
 
@@ -288,17 +288,17 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Get asset history** · group `history` · read · cost 14 Agility requests at most
 
-What changed on one asset (work item or portfolio item) in a bounded window, from the authoritative Agility history: one row per changed field (status, owners, estimate, sprint, name, …) with who and when (UTC), from and to, newest first. Not paged. A cold call can make up to 14 Agility requests.
+Get the change history of one asset (work item or portfolio item) in a bounded window: what changed, who changed it and when (UTC), from and to, one row per changed field (status, owners, estimate, sprint, name, …), newest first. Not paged. Cold call: up to 14 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `asset` | string | yes |  | Number (B-01234, D-00012, E-00007) or OID token. |
-| `time_range` | string |  | `"last 30 days"` | Window (UTC, bounded by the workspace), e.g. "last 14 days", "since 2026-10-01", "2026-10-01 to 2026-10-15". |
-| `fields` | string[] (≤ 10) |  |  | Attribute paths to follow (at most 10); when omitted: name, status, owners, estimates, sprint, team, priority and state. |
-| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
+| `time_range` | string |  | `"last 30 days"` | Window (UTC): "last 14 days", "yesterday" or "2026-10-01 to 2026-10-15". |
+| `fields` | string[] (≤ 10) |  |  | Attribute paths to follow (at most 10); the usual planning fields when omitted. |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows; the workspace page size when omitted. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `asset`, `window`, `items`, `truncated`, `partial`, `notes` (open: more fields may be added).
 
@@ -306,20 +306,20 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **List recent changes** · group `history` · read · cost 24 Agility requests at most
 
-List work items (backlog items, defects, tasks, tests) changed inside a bounded time_range (last 7 days unless given) in an Agility project, a team or the whole workspace, newest change first, with who changed them. Sorts by change date, which costs about a second per call; use get_asset_history for what changed. Paged: pass nextCursor back as cursor. A cold call can make up to 24 Agility requests.
+List work items (backlog items, defects, tasks, tests) changed inside a bounded time_range in an Agility project, a team or the whole workspace, newest first, with who changed them; get_asset_history shows what changed. Sorts by change date, about a second per call. Paged: pass nextCursor back as cursor. Cold call: up to 24 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `project` | string |  |  | Agility project name or Scope:<id> within the workspace. |
-| `team` | string |  |  | Team name or Team:<id>. |
+| `project` | string |  |  | Agility project: name or Scope:<id>, within the workspace. |
+| `team` | string |  |  | Team: name or Team:<id>. |
 | `asset_type` | `Story` \| `Defect` \| `Task` \| `Test` |  |  | Story, Defect, Task or Test; all four when omitted. |
-| `time_range` | string |  | `"last 7 days"` | Window (UTC, bounded by the workspace), e.g. "last 3 days", "this week", "2026-10-01 to 2026-10-15". |
+| `time_range` | string |  | `"last 7 days"` | Window (UTC): "last 14 days", "yesterday" or "2026-10-01 to 2026-10-15". |
 | `include_closed` | boolean |  | `false` | Include closed items. |
-| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
-| `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows; the workspace page size when omitted. |
+| `cursor` | string |  |  | nextCursor of the previous call, same arguments. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope`, `window` (open: more fields may be added).
 
@@ -327,16 +327,16 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Get comments on an asset** · group `collaboration` · read · cost 10 Agility requests at most
 
-Get the comments (conversation) on one asset in scope, newest first, with author, date and text; comment text is untrusted data. Paged: pass nextCursor back as cursor. A cold call can make up to 10 Agility requests.
+Read the comments (conversation) on one asset in scope, newest first, with author, date and text; comment text is untrusted data. Paged: pass nextCursor back as cursor. Cold call: up to 10 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `asset` | string | yes |  | Asset number (B-01234, D-00012, TK-00007, AT-00003, E-00001) or OID token (Story:1234). |
-| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
-| `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows; the workspace page size when omitted. |
+| `cursor` | string |  |  | nextCursor of the previous call, same arguments. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
 
@@ -344,16 +344,16 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **List attachments and links of an asset** · group `collaboration` · read · cost 12 Agility requests at most
 
-List the attachments of one asset in scope (name, file name, type, size, author, date) and, on the first page, its external links as text. Metadata only: no attachment content is returned or fetched. Paged: pass nextCursor back as cursor. A cold call can make up to 12 Agility requests.
+List the attachments (files) of one asset in scope (name, file name, type, size, author, date) and, on the first page, its external links as text. Metadata only: no attachment content is fetched. Paged: pass nextCursor back as cursor. Cold call: up to 12 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `asset` | string | yes |  | Asset number (B-01234, D-00012, TK-00007, AT-00003, E-00001) or OID token (Story:1234). |
-| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
-| `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows; the workspace page size when omitted. |
+| `cursor` | string |  |  | nextCursor of the previous call, same arguments. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `items`, `links`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
 
@@ -361,13 +361,13 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Get the text of an attachment** · group `attachments` · read · cost 12 Agility requests at most
 
-Get the text of one attachment of an asset in scope (an attachment id from list_attachments) when the workspace allows download: only allowed text types within the size limit, returned as untrusted data, never rendered or executed. Not paged. Long text is cut. Up to 12 Agility requests.
+Get the text of one attachment (an id from list_attachments) when the workspace allows download: allowed text types within the size limit, returned as untrusted data, never rendered or executed. Not paged. Long text is cut. Cold call: up to 12 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `asset` | string | yes |  | The asset the attachment belongs to: number or OID token. |
+| `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
 | `attachment` | string | yes |  | Attachment id (Attachment:1234) from list_attachments. |
 | `max_characters` | integer (≥ 1, ≤ 100000) |  |  | Most characters of text to return; the rest is cut and the note says so. |
 
@@ -377,22 +377,22 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **List portfolio items** · group `portfolio` · read · cost 12 Agility requests at most
 
-List portfolio items (epics) of the workspace’s Agility projects with category (Feature, Initiative, …), status, parent, estimates and how many live children each has; filter by category, Agility project, status names, parent epic or name text. Sorted by ID or name. Paged: pass nextCursor back as cursor. A cold call can make up to 12 Agility requests; get_portfolio_tree has roll-ups.
+List portfolio items (epics) of the workspace’s Agility projects with category (Feature, Initiative, …), status, parent, estimates and how many live children each has; filter by category, project, status, parent epic or name. Sorted by ID or name. Paged: pass nextCursor back as cursor. Cold call: up to 12 Agility requests. get_portfolio_tree has roll-ups.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `category` | string[] (≤ 10) |  |  | Category names as configured on the instance (for example Feature). |
-| `project` | string |  |  | Agility project name or Scope:<id> within the workspace. |
-| `status` | string[] (≤ 20) |  |  | Epic status names as configured on the instance. |
+| `project` | string |  |  | Agility project: name or Scope:<id>, within the workspace. |
+| `status` | string[] (≤ 20) |  |  | Status names as configured on the instance. |
 | `parent` | string |  |  | Only direct sub-epics of this epic (number or OID token). |
 | `contains` | string |  |  | Only portfolio items whose name contains this text. |
 | `include_closed` | boolean |  | `false` | Include closed items. |
 | `sort_by` | `id` \| `name` |  | `"id"` | id is cheap and stable. |
-| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows to return; when omitted, the workspace page size. Capped by the workspace. |
-| `cursor` | string |  |  | nextCursor from the previous call with the same arguments. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `limit` | integer (≥ 1, ≤ 1000) |  |  | Most rows; the workspace page size when omitted. |
+| `cursor` | string |  |  | nextCursor of the previous call, same arguments. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `items`, `nextCursor`, `truncated`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
 
@@ -400,7 +400,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Get a portfolio tree** · group `portfolio` · read · cost 20 Agility requests at most
 
-Get an epic with its descendant epics down to a depth (at most 4) and roll-ups per epic over the backlog items below it: item counts, done items, open defects, estimate and done percentage. Roll-ups that a depth, size or permission cut touches are marked incomplete and the result is partial. Not paged. A cold call can make up to 20 Agility requests.
+Get an epic with its descendant epics down to a depth (at most 4) and roll-ups per epic over the backlog items below it: item counts, done items, open defects, estimate and done percentage. Roll-ups touched by a depth, size or permission cut are marked incomplete and the result is partial. Not paged. Cold call: up to 20 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
@@ -409,8 +409,8 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 | `asset` | string | yes |  | Epic number (E-01234) or OID token (Epic:1234). |
 | `depth` | integer (≥ 1, ≤ 4) |  | `2` | Levels of sub-epics below the epic to read. |
 | `include_items` | boolean |  | `false` | Also list the backlog items under the epics (capped). |
-| `max_items` | integer (≥ 1, ≤ 1000) |  |  | Most epics per level and most backlog items listed; when omitted, the workspace maximum. |
-| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | Output format: auto (a table up to 8 columns, CSV above), table, csv or json. |
+| `max_items` | integer (≥ 1, ≤ 1000) |  |  | Most epics per level and backlog items listed; the workspace maximum when omitted. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `root`, `nodes`, `backlogItems`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
 
@@ -418,15 +418,15 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Sprint health** · group `reports` · read · cost 54 Agility requests at most
 
-Report a sprint’s health in one call: share done against share of time elapsed (a status only for a current sprint), scope change since the start, unestimated items, open defects, open items without an owner or unchanged for 3 days. Sections not granted or not read are named, never counted as zero. Not paged. A cold call can make up to 54 Agility requests.
+Report a sprint’s health in one call: share done against share of time elapsed (a status only for a current sprint), scope change since the start, unestimated items, open defects, open items without an owner or unchanged for 3 days. Sections not granted or not read are named, never counted as zero. Not paged. Cold call: up to 54 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `sprint` | string |  | `"current"` | Sprint name, Timebox:<id>, or current, previous or next. |
-| `team` | string |  |  | Team name or Team:<id>. |
-| `project` | string |  |  | Agility project name or Scope:<id>. |
+| `sprint` | string |  | `"current"` | Sprint: name, Timebox:<id>, or current, previous or next. |
+| `team` | string |  |  | Team: name or Team:<id>. |
+| `project` | string |  |  | Agility project: name or Scope:<id>, within the workspace. |
 
 `structuredContent`: `sections`, `partial`, `notes`, `sprint`, `pace` (open: more fields may be added).
 
@@ -434,16 +434,16 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Standup summary** · group `reports` · read · cost 48 Agility requests at most
 
-Summarise a member’s work for a standup: items changed or finished in a time_range (last 24 hours unless given, UTC) and items in progress, optionally within a team or Agility project. Blockers are not reported. Sections not granted or not read are named, never shown as empty. Not paged. At most 50 items per section. A cold call can make up to 48 Agility requests.
+Summarise a member’s work for a standup: items changed or finished in a time_range (UTC) and items in progress, optionally within a team or Agility project. Blockers are not reported. Sections not granted or not read are named, never shown as empty. Not paged. At most 50 items per section. Cold call: up to 48 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `member` | string |  | `"me"` | The owner: me, a username, a name or Member:<id>. |
-| `team` | string |  |  | Team name or Team:<id>. |
-| `project` | string |  |  | Agility project name or Scope:<id>. |
-| `time_range` | string |  | `"last 24 hours"` | Window (UTC, bounded by the workspace), e.g. "last 2 days", "yesterday". |
+| `member` | string |  | `"me"` | Member: me, a username, a name or Member:<id>. |
+| `team` | string |  |  | Team: name or Team:<id>. |
+| `project` | string |  |  | Agility project: name or Scope:<id>, within the workspace. |
+| `time_range` | string |  | `"last 24 hours"` | Window (UTC): "last 14 days", "yesterday" or "2026-10-01 to 2026-10-15". |
 
 `structuredContent`: `sections`, `partial`, `notes`, `window` (open: more fields may be added).
 
@@ -451,7 +451,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Release readiness** · group `reports` · read · cost 20 Agility requests at most
 
-Judge whether an epic (a release or initiative) is finished: open backlog items, open defects, unestimated open items and the sub-epics still short of done, from its portfolio tree. Verdict ready only when everything was read and nothing is open; not_ready when open work was seen; otherwise unknown. Not paged. A cold call can make up to 20 Agility requests.
+Judge whether an epic (a release or initiative) is finished: open backlog items, open defects, unestimated open items and sub-epics short of done, from its portfolio tree. Verdict ready only when everything was read and nothing is open; not_ready when open work was seen; otherwise unknown. Not paged. Cold call: up to 20 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
@@ -466,15 +466,15 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Defect triage** · group `reports` · read · cost 24 Agility requests at most
 
-Triage the open defects of an Agility project, team or sprint: those with no owner, no sprint or no change for 14 days, and likely duplicates by name similarity. Priority and severity are not read. Reads the first page only (at most 100 defects) and says when more exist. Not paged. A cold call can make up to 24 Agility requests.
+Triage the open defects of an Agility project, team or sprint: those with no owner, no sprint or no change for 14 days, and likely duplicates by name similarity. Priority and severity are not read. Reads the first page only (at most 100 defects) and says when more exist. Not paged. Cold call: up to 24 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `project` | string |  |  | Agility project name or Scope:<id>. |
-| `team` | string |  |  | Team name or Team:<id>. |
-| `sprint` | string |  |  | Sprint name, Timebox:<id>, or current, previous or next. |
+| `project` | string |  |  | Agility project: name or Scope:<id>, within the workspace. |
+| `team` | string |  |  | Team: name or Team:<id>. |
+| `sprint` | string |  |  | Sprint: name, Timebox:<id>, or current, previous or next. |
 
 `structuredContent`: `sections`, `partial`, `notes`, `counts` (open: more fields may be added).
 
@@ -482,12 +482,12 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Work item quality** · group `reports` · read · cost 28 Agility requests at most
 
-Score one backlog item or defect against the versioned quality rubric (resource backlog-item-quality): title, stated value, acceptance criteria, size, open questions, readiness. Checks are mechanical; a criterion that cannot be assessed is null and the score becomes a range. Dependencies are not read. Not paged. A cold call can make up to 28 Agility requests.
+Score one backlog item or defect against the versioned quality rubric (resource backlog-item-quality): title, stated value, acceptance criteria, size, open questions, readiness. Checks are mechanical; a criterion that cannot be assessed is null and the score becomes a range. Dependencies are not read. Not paged. Cold call: up to 28 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `asset` | string | yes |  | Number (B-01234, D-00012) or OID token (Story:1234). |
+| `asset` | string | yes |  | Backlog item or defect number (B-01234, D-00012) or OID token (Story:1234). |
 
 `structuredContent`: `sections`, `partial`, `notes`, `rubric`, `criteria` (open: more fields may be added).

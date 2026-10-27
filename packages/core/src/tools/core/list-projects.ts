@@ -22,7 +22,7 @@ export const listProjects: ToolDefinition = defineTool({
   name: NAME,
   title: 'List Agility projects',
   description:
-    'List the Agility projects (Scope) this workspace allows, including sub-projects when the workspace includes them, with parent, state and schedule. Paged: pass nextCursor back as cursor.',
+    'List the Agility projects this workspace allows (Scope), sub-projects included when the workspace includes them, with parent, state and schedule. Paged: pass nextCursor back as cursor.',
   kind: 'read',
   group: 'core',
   // Scope, Schedule and BaseAsset metadata (the related-asset checks), the project tree and the page (cold cache).

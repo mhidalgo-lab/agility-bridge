@@ -9,7 +9,7 @@ import { shapeOutput, untrusted } from '../../output/result.ts';
 import { type CompiledQuery, compileQuery } from '../../query/compiler.ts';
 import { invalid } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { formatArg } from '../common.ts';
+import { assetArg, formatArg } from '../common.ts';
 import { identityFor, workItem, workItemFields } from './items.ts';
 
 const COST = 24;
@@ -24,13 +24,13 @@ export const getWorkItem: ToolDefinition = defineTool({
   name: 'get_work_item',
   title: 'Get a work item',
   description:
-    'Get one work item (backlog item, defect, task, test or epic) by number or OID token with its description and acceptance criteria as text, owners, status, sprint, parent and epic, child tasks and tests, links and comment count. Not paged. Children and links are capped at 20 each; a cold call can make up to 24 Agility requests.',
+    'Get one work item (backlog item, defect, task, test or epic) by number or OID token with description and acceptance criteria as text, owners, status, sprint, parent, epic, child tasks and tests, links and comment count. Not paged. Children and links are capped at 20 each. Cold call: up to 24 Agility requests.',
   kind: 'read',
   group: 'work',
   // Capped at run time: resolution, metadata for the item, its relations and child types (cold cache), one batch.
   cost: COST,
   inputSchema: z.object({
-    asset: z.string().min(1).max(64).describe('Number (B-01234, D-00012, TK-00007, AT-00003) or OID token.'),
+    asset: assetArg,
     minimal_output: z.boolean().optional().describe('Skip children, links and comments (cheaper).'),
     format: formatArg,
   }),
@@ -38,6 +38,8 @@ export const getWorkItem: ToolDefinition = defineTool({
     item: z.looseObject({ assetType: z.string(), oid: z.string() }),
     children: z.array(z.looseObject({ assetType: z.string(), oid: z.string() })),
     links: z.array(z.looseObject({ oid: z.string() })),
+    partial: z.boolean().optional(),
+    notes: z.array(z.string()).optional(),
   }),
   handler: async (input, outer) => {
     const ctx = { ...outer, budget: capBudget(outer.budget, COST) };

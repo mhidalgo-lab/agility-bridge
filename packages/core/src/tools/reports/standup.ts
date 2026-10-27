@@ -6,6 +6,7 @@ import { capBudget } from '../../context.ts';
 import { shapeOutput } from '../../output/result.ts';
 import { parseTimeRange } from '../../query/time.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
+import { myMemberArg, projectArg, teamArg, timeRangeArg } from '../common.ts';
 import { searchWorkItems } from '../work/search.ts';
 import {
   allQueries,
@@ -31,26 +32,16 @@ export const standupSummary: ToolDefinition = defineTool({
   name: NAME,
   title: 'Standup summary',
   description:
-    'Summarise a member’s work for a standup: items changed or finished in a time_range (last 24 hours unless given, UTC) and items in progress, optionally within a team or Agility project. Blockers are not reported. Sections not granted or not read are named, never shown as empty. Not paged. At most 50 items per section. A cold call can make up to 48 Agility requests.',
+    'Summarise a member’s work for a standup: items changed or finished in a time_range (UTC) and items in progress, optionally within a team or Agility project. Blockers are not reported. Sections not granted or not read are named, never shown as empty. Not paged. At most 50 items per section. Cold call: up to 48 Agility requests.',
   kind: 'read',
   group: 'reports',
   // Two search_work_items calls, each capped at its own cost; the shared budget is capped here.
   cost: COST,
   inputSchema: z.object({
-    member: z
-      .string()
-      .min(1)
-      .max(200)
-      .default('me')
-      .describe('The owner: me, a username, a name or Member:<id>.'),
-    team: z.string().min(1).max(200).optional().describe('Team name or Team:<id>.'),
-    project: z.string().min(1).max(200).optional().describe('Agility project name or Scope:<id>.'),
-    time_range: z
-      .string()
-      .min(1)
-      .max(100)
-      .default(DEFAULT_WINDOW)
-      .describe('Window (UTC, bounded by the workspace), e.g. "last 2 days", "yesterday".'),
+    member: myMemberArg,
+    team: teamArg,
+    project: projectArg,
+    time_range: timeRangeArg(DEFAULT_WINDOW),
   }),
   outputSchema: reportOutput({
     window: z.looseObject({ since: z.string(), until: z.string() }),
