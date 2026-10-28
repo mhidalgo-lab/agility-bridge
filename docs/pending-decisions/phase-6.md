@@ -534,3 +534,9 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Recommendation:** (a): velocity is a basic planning question and (b) mixes a non-composite tool into the reports group.
 - **Owner:** *(open; built as (a))*
 
+
+### D-148 — The sprint end-date check waits for a sandbox *(P6-47)*
+- **Context:** The task asks for a live check of whether a sprint that ends today is still current on its last day (the end date may be inclusive), and a fix of `timing` and the ideal line if so. No live run is allowed in this change and a fix without the evidence could move a boundary that is right.
+- **Options:** (a) build the output polish now (most similar duplicate pairs first, cut notes, a stop-word list, the items block found by its `source`) and move the end-date check to a follow-up (P6-56); (b) hold the whole task for the sandbox; (c) treat the end date as inclusive without evidence.
+- **Recommendation:** (a), built.
+- **Owner:** *(open; built as a)*

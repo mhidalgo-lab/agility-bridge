@@ -32,12 +32,36 @@ const PAIR_CAP = 10;
 export const DUPLICATE_SIMILARITY = 0.6;
 const TITLES = { open_defects: 'Open defects' };
 
+/** Short function words that make unrelated titles look alike ("the", "not", "when"). English only: others pass through. */
+export const STOP_WORDS: ReadonlySet<string> = new Set([
+  'the',
+  'and',
+  'for',
+  'with',
+  'not',
+  'but',
+  'are',
+  'was',
+  'has',
+  'have',
+  'when',
+  'from',
+  'that',
+  'this',
+  'then',
+  'into',
+  'does',
+  'doesn',
+  'cannot',
+  'can',
+]);
+
 const words = (name: string): Set<string> =>
   new Set(
     name
       .toLowerCase()
       .split(/[^\p{L}\p{N}]+/u)
-      .filter((w) => w.length > 2),
+      .filter((w) => w.length > 2 && !STOP_WORDS.has(w)),
   );
 
 /** Jaccard similarity of two names' word sets; 0 when either has fewer than three words (too little to compare). */
@@ -91,6 +115,8 @@ export const defectTriage: ToolDefinition = defineTool({
     let flagged: Record<string, unknown>[] = [];
     let pairs: Record<string, unknown>[] = [];
     let more = false;
+    let pairsCut = 0;
+    let flaggedTotal = 0;
     if (run.info.status === 'ok') {
       const rows = arr(run.data?.['items']);
       more = typeof run.data?.['nextCursor'] === 'string';
@@ -130,6 +156,7 @@ export const defectTriage: ToolDefinition = defineTool({
         ...(noDate === rows.length && rows.length > 0 ? {} : { stale: count('stale') }),
         lowerBound: more,
       };
+      flaggedTotal = view.filter((v) => v.flags.length > 0).length;
       flagged = view
         .filter((v) => v.flags.length > 0)
         .sort(
@@ -144,22 +171,38 @@ export const defectTriage: ToolDefinition = defineTool({
           ...(strOf(v.row['status']) === undefined ? {} : { status: v.row['status'] }),
           ...(strOf(v.row['name']) === undefined ? {} : { name: v.row['name'] }),
         }));
-      const found: Record<string, unknown>[] = [];
+      // Every pair is scored (at most 100 defects), then the most similar come first (ties keep the page order).
+      const found: Array<{ similarity: number; at: number; pair: Record<string, unknown> }> = [];
       const wordSets = rows.map((r) => words(strOf(r['name']) ?? ''));
-      for (let i = 0; i < rows.length && found.length < PAIR_CAP; i++) {
-        for (let j = i + 1; j < rows.length && found.length < PAIR_CAP; j++) {
+      for (let i = 0; i < rows.length; i++) {
+        for (let j = i + 1; j < rows.length; j++) {
           const a = rows[i] as Record<string, unknown>;
           const b = rows[j] as Record<string, unknown>;
-          const s = setSimilarity(wordSets[i] as Set<string>, wordSets[j] as Set<string>);
-          if (s >= DUPLICATE_SIMILARITY)
+          const sim = setSimilarity(wordSets[i] as Set<string>, wordSets[j] as Set<string>);
+          if (sim >= DUPLICATE_SIMILARITY)
             found.push({
-              first: strOf(a['number']) ?? a['oid'],
-              second: strOf(b['number']) ?? b['oid'],
-              similarity: Math.round(s * 100) / 100,
+              similarity: sim,
+              at: found.length,
+              pair: {
+                first: strOf(a['number']) ?? a['oid'],
+                second: strOf(b['number']) ?? b['oid'],
+                similarity: Math.round(sim * 100) / 100,
+              },
             });
         }
       }
-      pairs = found;
+      found.sort((x, y) => y.similarity - x.similarity || x.at - y.at);
+      if (found.length > PAIR_CAP) {
+        pairsCut = found.length - PAIR_CAP;
+        notes.push(
+          `${found.length} likely duplicate pairs found: the ${PAIR_CAP} most similar are listed, ${pairsCut} are not.`,
+        );
+      }
+      if (flaggedTotal > LIST_CAP)
+        notes.push(
+          `${flaggedTotal} defects are flagged: the first ${LIST_CAP} are listed (most flags, then oldest).`,
+        );
+      pairs = found.slice(0, PAIR_CAP).map((f) => f.pair);
     }
     const { output } = shapeOutput(ctx, {
       summary:
@@ -176,7 +219,17 @@ export const defectTriage: ToolDefinition = defineTool({
       partial: incomplete(runs) || more || run.data?.['hiddenOutsideScope'] === true,
       structured: {
         sections: sectionInfos(runs),
-        ...(counts === undefined ? {} : { counts, flagged, likelyDuplicates: pairs }),
+        ...(counts === undefined
+          ? {}
+          : {
+              counts: {
+                ...counts,
+                flagged: flaggedTotal,
+                ...(pairsCut > 0 ? { duplicatePairsNotListed: pairsCut } : {}),
+              },
+              flagged,
+              likelyDuplicates: pairs,
+            }),
       },
       meta: { queries: allQueries(runs) },
     });
