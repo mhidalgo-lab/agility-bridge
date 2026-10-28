@@ -10,7 +10,7 @@ import { AbError, ErrorCode } from '../../errors.ts';
 import { resolveAsset, runPage, runQuery } from '../../identity/resolve.ts';
 import { oidsOf } from '../../identity/scope.ts';
 import { metadataFor } from '../../metadata/service.ts';
-import { shapeList, shapeOutput, untrusted } from '../../output/result.ts';
+import { MAX_TEXT_BLOCK_CHARS, shapeList, shapeOutput, untrusted } from '../../output/result.ts';
 import { utcIso } from '../../output/text.ts';
 import { compileQuery } from '../../query/compiler.ts';
 import { checkCursorShape, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
@@ -185,11 +185,18 @@ function decodeText(bytes: Uint8Array): string | null {
   }
 }
 
+function isLowSurrogate(s: string, i: number): boolean {
+  const c = s.charCodeAt(i);
+  return (
+    i > 0 && c >= 0xdc00 && c <= 0xdfff && s.charCodeAt(i - 1) >= 0xd800 && s.charCodeAt(i - 1) <= 0xdbff
+  );
+}
+
 export const getAttachment: ToolDefinition = defineTool({
   name: 'get_attachment',
   title: 'Get the text of an attachment',
   description:
-    'Get the text of one attachment (an id from list_attachments) when the workspace allows download: allowed text types within the size limit, returned as untrusted data, never rendered or executed. Not paged. Long text is cut. Cold call: up to 12 Agility requests.',
+    'Get the text of one attachment (an id from list_attachments) when the workspace allows download: allowed text types within the size limit, returned as untrusted data, never rendered or executed. Not paged. Long text is read in steps: pass nextOffset back as offset_characters; each step downloads it again, budgeted and audited. Cold call: up to 12 Agility requests.',
   kind: 'read',
   group: 'attachments',
   // Capped at run time: the asset, Attachment metadata (cold cache), the attachment row, the content (retried reads).
@@ -206,11 +213,18 @@ export const getAttachment: ToolDefinition = defineTool({
       .min(1)
       .max(100_000)
       .optional()
-      .describe('Most characters of text to return; the rest is cut and the note says so.'),
+      .describe('Most characters of text to return in this step; nextOffset says where the rest starts.'),
+    offset_characters: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe('Character to start at: pass nextOffset from the previous step. Each step is a download.'),
   }),
   outputSchema: z.looseObject({
     attachment: z.looseObject({ oid: z.string(), contentType: z.string(), bytes: z.number() }),
     truncated: z.boolean().optional(),
+    nextOffset: z.number().int().optional(),
   }),
   handler: async (input, outer) => {
     const ctx = { ...outer, budget: capBudget(outer.budget, GET_COST) };
@@ -304,20 +318,40 @@ export const getAttachment: ToolDefinition = defineTool({
     const download = { asset, attachment: oid, bytes: bytes.byteLength, contentType };
     ctx.logger.info('attachment downloaded', download);
     const limit = input.max_characters ?? DEFAULT_CHARS;
+    const total = content.length;
+    const start = input.offset_characters ?? 0;
+    // Offsets count UTF-16 code units, as `characters` does; never start inside a surrogate pair.
+    if (start >= total && !(start === 0 && total === 0)) {
+      fail(
+        refuse(
+          `The offset ${start} is past the end of the text (${total} characters).`,
+          'Use nextOffset from the previous step, or omit offset_characters to start at the beginning.',
+        ),
+      );
+    }
+    if (isLowSurrogate(content, start)) {
+      fail(
+        refuse(`The offset ${start} is not a character boundary.`, 'Use nextOffset from the previous step.'),
+      );
+    }
+    let end = Math.min(total, start + limit);
+    if (end < total && isLowSurrogate(content, end)) end = end - 1 > start ? end - 1 : end + 1;
+    const slice = content.slice(start, end);
+    const nextOffset = end < total ? end : undefined;
     const name = text(row['Name']) ?? text(row['Filename']);
     const { output, texts } = shapeOutput(ctx, {
       summary: [
         'Attachment ',
         untrusted(name ?? oid),
-        ` of ${asset}: ${content.length} characters, ${bytes.byteLength} bytes, ${contentType}.`,
+        ` of ${asset}: ${total} characters, ${bytes.byteLength} bytes, ${contentType}${start > 0 || nextOffset !== undefined ? `; characters ${start} to ${end}` : ''}.`,
       ],
       notes:
-        content.length > limit
-          ? [
-              `The text was cut at ${limit} of ${content.length} characters; ask for more with max_characters (at most 100000).`,
-            ]
-          : [],
-      texts: [{ source: 'attachment content', text: content, maxChars: limit }],
+        nextOffset === undefined
+          ? []
+          : [
+              `The text continues: read on with offset_characters ${nextOffset} (each step downloads the attachment again), or ask for more at once with max_characters (at most 100000).`,
+            ],
+      texts: [{ source: 'attachment content', text: slice, maxChars: MAX_TEXT_BLOCK_CHARS }],
       structured: {
         asset: { oid: target.oid, ...(target.number === undefined ? {} : { number: target.number }) },
         attachment: {
@@ -325,7 +359,7 @@ export const getAttachment: ToolDefinition = defineTool({
           ...(name === undefined ? {} : { name }),
           contentType,
           bytes: bytes.byteLength,
-          characters: content.length,
+          characters: total,
         },
       },
       meta: { queries: [compiled.masked] },
@@ -335,7 +369,8 @@ export const getAttachment: ToolDefinition = defineTool({
       ...output,
       structured: {
         ...(output.structured as { attachment: { oid: string; contentType: string; bytes: number } }),
-        ...(shown?.cut === true ? { truncated: true } : {}),
+        ...(nextOffset === undefined && shown?.cut !== true ? {} : { truncated: true }),
+        ...(nextOffset === undefined ? {} : { nextOffset }),
       },
       meta: { ...output.meta, 'agility-bridge/download': download },
     };

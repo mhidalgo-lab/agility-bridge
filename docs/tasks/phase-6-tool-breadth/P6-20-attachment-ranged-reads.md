@@ -2,7 +2,7 @@
 id: P6-20
 title: Ranged reads of long attachment text
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-04]
 adr: ["0015"]
@@ -22,10 +22,10 @@ size of a single result (D-88).
 - Each step is a download: budgeted and audited like the first.
 
 ## Acceptance criteria
-- [ ] Reading a long text in steps returns every character once, with no overlap and no gap, and the last step has no
+- [x] Reading a long text in steps returns every character once, with no overlap and no gap, and the last step has no
       `nextOffset`.
-- [ ] An offset past the end is an input error; every step stays inside the envelope and the size cap.
-- [ ] The tool description and the generated reference say that each step is a download.
+- [x] An offset past the end is an input error; every step stays inside the envelope and the size cap.
+- [x] The tool description and the generated reference say that each step is a download.
 
 ## Security notes
 THREAT_MODEL A8: no cached content, every step re-checks scope, type and size.
