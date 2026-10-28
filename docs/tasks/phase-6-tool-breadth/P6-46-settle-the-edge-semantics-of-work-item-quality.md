@@ -2,7 +2,7 @@
 id: P6-46
 title: Settle the edge semantics of `work_item_quality`
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-13, P6-03]
 adr: []
@@ -19,7 +19,7 @@ An estimate of 0 scores as sized; `readPriority` hides a budget or permission fa
 - Decide and document the zero estimate (recommended: not estimated); report a budget or permission failure as such, not as unreadable; say when the description was cut.
 
 ## Acceptance criteria
-- [ ] Tests for each case; the rubric resource states the zero-estimate rule; D-103 updated.
+- [x] Tests for each case; the rubric resource states the zero-estimate rule; D-103 updated.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md; a change to what is read or logged updates THREAT_MODEL in the same PR.
