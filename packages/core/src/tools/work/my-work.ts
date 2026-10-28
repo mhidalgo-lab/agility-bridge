@@ -4,7 +4,7 @@ import { capBudget } from '../../context.ts';
 import { AbError, ErrorCode } from '../../errors.ts';
 import { resolveMember } from '../../identity/resolve.ts';
 import { shapeList, untrusted } from '../../output/result.ts';
-import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
+import { checkCursorShape, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { invalid } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import { cursorArg, formatArg, includeClosedArg, limitArg, listOutput, myMemberArg } from '../common.ts';
@@ -40,6 +40,7 @@ export const listMyWork: ToolDefinition = defineTool({
   outputSchema: listOutput(z.looseObject({ assetType: z.string(), oid: z.string() })),
   handler: async (input, outer) => {
     const ctx = { ...outer, budget: capBudget(outer.budget, COST) };
+    checkCursorShape(ctx, input.cursor);
     const types = readableWorkTypes(ctx, WORK_ITEM_TYPES);
     if (types.length === 0)
       throw new AbError(ErrorCode.AuthForbidden, 'No work-item type is allowed in this workspace.');

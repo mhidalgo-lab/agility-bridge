@@ -6,7 +6,13 @@ import { oidsOf } from '../../identity/scope.ts';
 import { assetState, shapeList } from '../../output/result.ts';
 import { utcIso } from '../../output/text.ts';
 import { compileQuery, type FilterInput } from '../../query/compiler.ts';
-import { bindFixed, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
+import {
+  bindFixed,
+  checkCursorShape,
+  cursorBinding,
+  decodeCursor,
+  encodeCursor,
+} from '../../query/cursor.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import { cursorArg, formatArg, limitArg, listOutput, projectArg, rowOid, teamArg } from '../common.ts';
 
@@ -35,6 +41,7 @@ export const listSprints: ToolDefinition = defineTool({
   }),
   outputSchema: listOutput(z.looseObject({ assetType: z.string(), oid: z.string(), name: z.string() })),
   handler: async (input, outer) => {
+    checkCursorShape(outer, input.cursor);
     const ctx = { ...outer, budget: capBudget(outer.budget, COST) };
     // Timing is evaluated against the first page's "now", kept in the cursor, so a sprint that ends while the caller
     // pages neither moves between pages nor is skipped (P1-18).

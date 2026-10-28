@@ -6,7 +6,7 @@ import { resolveMember, resolveProject, resolveSprint, resolveTeam } from '../..
 import { metadataFor, type StatusCategory } from '../../metadata/service.ts';
 import { shapeList } from '../../output/result.ts';
 import type { FilterInput } from '../../query/compiler.ts';
-import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
+import { checkCursorShape, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { invalid } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import {
@@ -164,6 +164,7 @@ export const searchWorkItems: ToolDefinition = defineTool({
   outputSchema: listOutput(z.looseObject({ assetType: z.string(), oid: z.string() })),
   handler: async (input, outer) => {
     const ctx = { ...outer, budget: capBudget(outer.budget, COST) };
+    checkCursorShape(ctx, input.cursor);
     const types = readableWorkTypes(
       ctx,
       input.asset_type === undefined ? WORK_ITEM_TYPES : [input.asset_type],

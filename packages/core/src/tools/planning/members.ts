@@ -7,7 +7,7 @@ import { oidsOf } from '../../identity/scope.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { assetState, shapeList } from '../../output/result.ts';
 import { compileQuery, type FilterInput } from '../../query/compiler.ts';
-import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
+import { checkCursorShape, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import { containsArg, cursorArg, formatArg, limitArg, listOutput, rowOid } from '../common.ts';
 
@@ -32,6 +32,7 @@ export const listMembers: ToolDefinition = defineTool({
   }),
   outputSchema: listOutput(z.looseObject({ assetType: z.string(), oid: z.string(), name: z.string() })),
   handler: async (input, outer) => {
+    checkCursorShape(outer, input.cursor);
     const ctx = { ...outer, budget: capBudget(outer.budget, COST) };
     const filters: FilterInput[] = [];
     const notes: string[] = [];

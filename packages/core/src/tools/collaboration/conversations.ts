@@ -7,7 +7,7 @@ import { metadataFor } from '../../metadata/service.ts';
 import { shapeList } from '../../output/result.ts';
 import { utcIso } from '../../output/text.ts';
 import { compileQuery } from '../../query/compiler.ts';
-import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
+import { checkCursorShape, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import { assetArg, cursorArg, formatArg, limitArg, listOutput, rowOid } from '../common.ts';
 
@@ -33,6 +33,7 @@ export const getConversations: ToolDefinition = defineTool({
   }),
   outputSchema: listOutput(z.looseObject({ oid: z.string() })),
   handler: async (input, outer) => {
+    checkCursorShape(outer, input.cursor);
     const ctx = { ...outer, budget: capBudget(outer.budget, COST) };
     // Scope is verified through the asset itself before any comment is requested (THREAT_MODEL A1, T3).
     const target = await resolveAsset(ctx, input.asset);

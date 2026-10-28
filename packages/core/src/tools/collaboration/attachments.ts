@@ -13,7 +13,7 @@ import { metadataFor } from '../../metadata/service.ts';
 import { shapeList, shapeOutput, untrusted } from '../../output/result.ts';
 import { utcIso } from '../../output/text.ts';
 import { compileQuery } from '../../query/compiler.ts';
-import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
+import { checkCursorShape, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { invalid } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import { assetArg, cursorArg, formatArg, limitArg, rowOid } from '../common.ts';
@@ -97,6 +97,7 @@ export const listAttachments: ToolDefinition = defineTool({
     hiddenOutsideScope: z.boolean().optional(),
   }),
   handler: async (input, outer) => {
+    checkCursorShape(outer, input.cursor);
     const ctx = { ...outer, budget: capBudget(outer.budget, LIST_COST) };
     const target = await resolveAsset(ctx, input.asset);
     const binding = await cursorBinding(ctx, LIST_NAME, { asset: target.oid });

@@ -2,7 +2,7 @@
 id: P6-38
 title: Run the consistency checks on an empty and a denied world
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-12]
 adr: ["0015"]
@@ -24,8 +24,8 @@ restricted world reaches. Cover those branches the same way.
 - Negative authorization cases stay in each tool's own tests; this adds only the cross-tool contract.
 
 ## Acceptance criteria
-- [ ] One parametrised test over `CORE_TOOLS` and at least three worlds; a branch that returns before validating input fails.
-- [ ] Any drift found is fixed or filed as a task.
+- [x] One parametrised test over `CORE_TOOLS` and at least three worlds; a branch that returns before validating input fails.
+- [x] Any drift found is fixed or filed as a task.
 
 ## Security notes
 No new surface; confirms that a denial returns no data and makes no upstream call for every tool.

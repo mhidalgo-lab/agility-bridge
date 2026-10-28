@@ -5,7 +5,7 @@ import { resolveAsset, resolveProject, runPage } from '../../identity/resolve.ts
 import { metadataFor } from '../../metadata/service.ts';
 import { shapeList } from '../../output/result.ts';
 import { compileQuery, type FilterInput } from '../../query/compiler.ts';
-import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
+import { checkCursorShape, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { invalid } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import {
@@ -56,6 +56,7 @@ export const listPortfolioItems: ToolDefinition = defineTool({
   }),
   outputSchema: listOutput(z.looseObject({ assetType: z.string(), oid: z.string() })),
   handler: async (input, outer) => {
+    checkCursorShape(outer, input.cursor);
     const ctx = { ...outer, budget: capBudget(outer.budget, COST) };
     requireReadable(ctx, EPIC);
     const md = metadataFor(ctx);

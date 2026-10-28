@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { runPage } from '../../identity/resolve.ts';
 import { assetState, shapeList } from '../../output/result.ts';
 import { compileQuery } from '../../query/compiler.ts';
-import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
+import { checkCursorShape, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import {
   containsArg,
@@ -38,6 +38,7 @@ export const listProjects: ToolDefinition = defineTool({
     z.looseObject({ assetType: z.string(), oid: z.string(), name: z.string(), state: z.string() }),
   ),
   handler: async (input, ctx) => {
+    checkCursorShape(ctx, input.cursor);
     const binding = await cursorBinding(ctx, NAME, {
       contains: input.contains,
       includeClosed: input.include_closed === true,
