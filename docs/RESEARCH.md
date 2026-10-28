@@ -686,3 +686,13 @@ Checked 2026-10-23.
   `get_assets` with default tiers (levels only; the tenant is a third party's). `Request` is a defined type with no
   assets: the query returns an empty page, not an error. Writable-sandbox checks of requests: P6-27.
 
+### Downcast aggregates over `Subs` for portfolio roll-ups (P6-15)
+
+- **Read-only tenant (26.0.3.2, 2026-10-28), shapes only.** `query.v1` on `Epic` accepts the downcast aggregate selections
+  `Subs:Story[AssetState!='Dead'].@Count`, `Subs:Story[AssetState!='Dead'].Estimate.@Sum`, `Subs:Defect[...]@Count` and
+  conditions on `AssetState` (`[AssetState='128']`, `[AssetState='64']`) with HTTP 200 and numeric values. **They do not agree with the
+  rows:** for three epics with stories, the rows read with `Super = epic` were more than the aggregate in every case, and with no
+  condition at all the aggregate was still lower (`Subs:Story.@Count`); `Children:Story` returned zero. So the relation an
+  aggregate follows is not the one the tree reads (`Story.Super`), and no aggregate form was found that equals the rows
+  (D-143). Roll-ups stay computed from the rows. Live check: `live/portfolio-aggregates.live.test.ts` (asserts that the forms are
+  accepted; the disagreement is recorded on stderr as a level, not asserted). *verified on one tenant; unverified elsewhere*

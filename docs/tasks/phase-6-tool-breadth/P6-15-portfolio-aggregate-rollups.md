@@ -2,7 +2,7 @@
 id: P6-15
 title: Server-side aggregate roll-ups for the portfolio tree
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-01]
 adr: ["0012"]
@@ -12,7 +12,8 @@ owner: ""
 
 # P6-15 — Server-side aggregate roll-ups for the portfolio tree
 
-> Later-phase task: **refine scope and acceptance criteria before starting** (tasks/README rule 7).
+> Closed as **not supported** (2026-10-28, D-143): the aggregate forms are accepted live but do not equal the rows read, so
+> `get_portfolio_tree` keeps the computed roll-ups. Evidence: RESEARCH, `live/portfolio-aggregates.live.test.ts`.
 
 ## Goal
 Make the portfolio roll-ups exact and cheap on large epics by asking Agility to aggregate, instead of reading up to three
@@ -26,8 +27,8 @@ pages of backlog items per type ([D-80](../../pending-decisions/phase-6.md)).
   `get_portfolio_tree` per epic in one batched request, with the current read-the-rows path kept as the fallback.
 
 ## Acceptance criteria
-- [ ] RESEARCH records what was verified, with date and instance version (shapes only).
-- [ ] If used: roll-ups equal the read-the-rows result on the synthetic fixtures; cost lower or equal; the 300-item
+- [x] RESEARCH records what was verified, with date and instance version (shapes only).
+- [x] (Not used: the aggregate does not match the rows, so nothing changes.) If used: roll-ups equal the read-the-rows result on the synthetic fixtures; cost lower or equal; the 300-item
       cap and its `incomplete` marking go away only where the aggregate is exact.
 
 ## Security notes
