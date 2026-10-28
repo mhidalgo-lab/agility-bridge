@@ -46,6 +46,7 @@ carry `requestId`.
 | warn | `resource error` | `resource`, `ms`, `error` (class, redacted message) | [server.ts](../../packages/core/src/server.ts) |
 | debug | `agility request` | `endpoint`, `method`, `attempt`, `status`, `ms`, `bytes` (no body, no token) | [client.ts](../../packages/core/src/agility/client.ts) |
 | debug | `agility error body` | `status`, the first 500 characters of the error body (redacted by the logger) | [client.ts](../../packages/core/src/agility/client.ts) |
+| warn | `agility refused the request` | `status`, Agility's `error` and up to five exception `messages` (500 characters each, redacted by the logger): the text withheld from the tool result (P6-33, L-333) | [client.ts](../../packages/core/src/agility/client.ts) |
 | error | `access resolution failed` | `requestId`, `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
 | error | `credential could not be decrypted` | `requestId`, `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
 | warn | `response stream hit the deadline` | `requestId` | [app.ts](../../packages/http-app/src/app.ts) |

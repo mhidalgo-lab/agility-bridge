@@ -9,6 +9,7 @@ export {
   type AgilityResponse,
   agilityClient,
   type QueryBody,
+  UPSTREAM_REFUSAL_HINT,
 } from './agility/client.ts';
 export {
   type AddressClass,

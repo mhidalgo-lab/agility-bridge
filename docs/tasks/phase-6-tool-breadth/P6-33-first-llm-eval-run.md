@@ -26,6 +26,9 @@ Run the P6-10 LLM eval with real models, attach the report to the release, and t
   first-call-only tool scoring. Fixed (transformed-word canary, `injectedTools`, `--samples` default 5, one scripted lookup,
   evidence kept in the report, three dataset routes added); see docs/dev/evals.md and L-331, L-332. **Next:** the owner
   reruns both models with the fixed harness (once directly against the API if possible), then the triage below.
+- 2026-10-27: second runs: six scenarios clean in all trials; H06 (instruction in Agility error text) followed by both
+  models. Fixed in the product: Agility error messages withheld from results, trusted hint on every upstream refusal
+  (L-333); H06 rebuilt on the real error path; no-tool answers keep their evidence. **Next:** the owner reruns both models.
 
 ## Acceptance criteria
 - [ ] Reports for both models attached to the release notes and summarised in `docs/dev/evals.md`.
