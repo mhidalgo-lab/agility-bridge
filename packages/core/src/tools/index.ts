@@ -13,6 +13,7 @@ import { listMembers } from './planning/members.ts';
 import { getSprint } from './planning/sprint.ts';
 import { listSprints } from './planning/sprints.ts';
 import { getTeam, listTeams } from './planning/teams.ts';
+import { getVelocity } from './planning/velocity.ts';
 import { getPortfolioTree } from './portfolio/get-tree.ts';
 import { listPortfolioItems } from './portfolio/list-items.ts';
 import { getAssets } from './query/get-assets.ts';
@@ -40,6 +41,7 @@ export const CORE_TOOLS: readonly ToolDefinition[] = Object.freeze([
   getTeam,
   listSprints,
   getSprint,
+  getVelocity,
   listMembers,
   getAssetHistory,
   listRecentChanges,

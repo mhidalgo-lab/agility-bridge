@@ -71,7 +71,7 @@ const round = (n: number): number => Math.round(n * 100) / 100;
  * A sprint date as a UTC instant. Hosted Agility returns sprint dates without a zone (live, P6-02): they are read as UTC,
  * the server's one time model (L-061), and the result says so. Anything that is not a date reads as no date (L-149).
  */
-function instant(value: unknown): number | undefined {
+export function instant(value: unknown): number | undefined {
   if (typeof value !== 'string') return undefined;
   const v = value.trim();
   const iso =
@@ -100,7 +100,7 @@ function sums(items: readonly Item[]): Sums {
 }
 
 /** Rows that passed the scope recheck and are of a readable work-item type. */
-function keep(
+export function keep(
   ctx: ToolContext,
   compiled: CompiledQuery,
   rows: readonly Row[],

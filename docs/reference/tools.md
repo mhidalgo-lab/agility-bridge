@@ -2,7 +2,7 @@
 
 # Tool reference
 
-26 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
+27 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
 later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a cold metadata cache.
 
 | Tool | Group | Cost | Title |
@@ -20,6 +20,7 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 | [`get_team`](#get_team) | planning | 20 | Get a team |
 | [`list_sprints`](#list_sprints) | planning | 10 | List sprints |
 | [`get_sprint`](#get_sprint) | planning | 30 | Get a sprint |
+| [`get_velocity`](#get_velocity) | planning | 16 | Get velocity |
 | [`list_members`](#list_members) | people | 6 | List members |
 | [`get_asset_history`](#get_asset_history) | history | 14 | Get asset history |
 | [`list_recent_changes`](#list_recent_changes) | history | 24 | List recent changes |
@@ -266,6 +267,23 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 | `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `sprint`, `totals`, `byStatusCategory`, `items`, `truncated`, `partial`, `notes` (open: more fields may be added).
+
+## `get_velocity`
+
+**Get velocity** · group `planning` · read · cost 16 Agility requests at most
+
+Velocity: completed estimate of the last past sprints (at most 10) of a team or Agility project, each read as it ended, and the average over those read in full. Sprints that could not be read are named in notes. No capacity. Not paged. Cold call: up to 16 Agility requests.
+
+Annotations: read-only true, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `team` | string |  |  | Team: name or Team:<id>. |
+| `project` | string |  |  | Agility project: name or Scope:<id>, within the workspace. |
+| `sprints` | integer (≥ 1, ≤ 10) |  | `6` | How many past sprints, newest first. |
+| `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
+
+`structuredContent`: `sprints`, `average`, `sprintsCounted`, `partial`, `notes` (open: more fields may be added).
 
 ## `list_members`
 

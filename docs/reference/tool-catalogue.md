@@ -27,7 +27,7 @@
 | `core` | on | `whoami`, `list_projects`, `list_asset_types`, `describe_asset_type` |
 | `query` | on (workspace switch `AB_GENERIC_QUERY`) | `query_assets`, `get_assets` |
 | `work` | on | `search_work_items`, `get_work_item`, `list_my_work` |
-| `planning` | on | `list_teams`, `get_team`, `list_sprints`, `get_sprint` |
+| `planning` | on | `list_teams`, `get_team`, `list_sprints`, `get_sprint`, `get_velocity` |
 | `people` | on | `list_members` |
 | `portfolio` | on | `list_portfolio_items`, `get_portfolio_tree` |
 | `collaboration` | on | `get_conversations`, `list_attachments` |
@@ -43,16 +43,16 @@ Measured by the contract test (`packages/core/test/contract.test.ts`) on the reg
 
 | Catalogue | Tools | `tools/list` bytes | Budget | Before P6-12 |
 |---|---|---|---|---|
-| Default (no opt-in group): `core` 4, `query` 2, `work` 3, `planning` 4, `people` 1, `portfolio` 2, `collaboration` 2, `history` 2 | 20 | **35,892** | 40,000 (test target 36,500) | 39,179 |
+| Default (no opt-in group): `core` 4, `query` 2, `work` 3, `planning` 5, `people` 1, `portfolio` 2, `collaboration` 2, `history` 2 | 21 | **37,207** (35,892 after P6-12, +1,315 for `get_velocity`) | 40,000 (test target 37,300) | 39,179 |
 | `attachments` (opt-in) | +1 | +1,335 | | |
 | `reports` (opt-in) | +5 | +6,952 | | |
-| Every read group | 26 | **44,157** | 72,000 | 47,946 |
+| Every read group | 27 | about **45,500** (44,157 + 1,315) | 72,000 | 47,946 |
 | Every read group + the nine Phase 7 write tools | 35 | about 60,000 (estimate: about 1.8 KB per write tool; measured when Phase 7 lands) | 72,000 | |
 
-Tool count with everything on: 20 default + 1 attachments + 5 reports = 26 read tools, plus the 9 planned write tools
+Tool count with everything on: 21 default + 1 attachments + 5 reports = 27 read tools, plus the 9 planned write tools
 (`add_comment`, `update_status`, `log_effort`, `assign_owners`, `move_to_sprint`, `create_work_item`, `update_fields`,
-`close_asset`, `reopen_asset`) = **35, five below the cap of 40** (L-155). The largest entry is `query_assets` (3.8 KB, the
-generic tool with filters and sort); a test caps one tool at 4,000 bytes and the default catalogue at 36,500, so a tool
+`close_asset`, `reopen_asset`) = **36, four below the cap of 40** (L-155). The largest entry is `query_assets` (3.8 KB, the
+generic tool with filters and sort); a test caps one tool at 4,000 bytes and the default catalogue at 37,300 (raised from 36,500 for `get_velocity`, D-140), so a tool
 that does not fit is redesigned or pays for it in the same PR (D-116).
 
 ## Read tools
@@ -80,6 +80,7 @@ that does not fit is redesigned or pays for it in the same PR (D-116).
 | Tool | Group | Cost | What it does | Key arguments | Output highlights |
 |---|---|---|---|---|---|
 | `get_sprint` | planning | 30 | One sprint: UTC dates and schedule, backlog items and defects by status category (the instance's rollup categories) with estimates, **committed** at the begin date vs done, scope change, **carry-over** of a finished sprint (read as it ended) and a daily **burndown** from bounded `asof` history (at most 15 points, 20 queries per request, `maxAsOfAgeDays`). Missing estimates, categories or history are reported in `notes`, never as zeros; capacity is not reported (D-83). Not paged. | `sprint` (default `current`), `team`, `project`, `burndown`, `format` | `sprint { oid, name, state, timing, beginDate, endDate, schedule }`, `basis`, `totals { itemCount, estimate?, done?, remaining?, unestimatedItems }`, `byStatusCategory[] { category, itemCount, estimate?, unestimatedItems }`, `committed?`, `planned?`, `scopeChange?`, `carryOver?`, `burndown[] { at, remaining?, ideal?, itemCount }`, `items[]`, `truncated?` (counts are `<thing>Count`, D-115) |
+| `get_velocity` | planning | 16 | Velocity (P6-17): the completed estimate of the last past sprints (`sprints`, at most 10, default 6) of a team or Agility project, each read as it ended (`asof` its end date, one batched request, bounded by `maxAsOfAgeDays`), with the average over the sprints read in full. A sprint that is too old, too large, over the response cap or has no estimate on its completed items is named in `notes` and never estimated; capacity is not reported (D-83). Not paged. | `team`, `project`, `sprints`, `format` | `sprints[] { oid, name, read, endDate?, itemCount?, completedItems?, completedEstimate?, unestimatedCompleted? }`, `average?`, `sprintsCounted`, `partial?`, `notes?` |
 | `list_portfolio_items` | portfolio | 12 | Portfolio items (epics; Feature, Initiative and the like are values of the epic's category) of the workspace's Agility projects with status, parent, estimates and the number of live children; filter by category, Agility project, status, parent epic or name. Paged. | `category`, `project`, `status`, `parent`, `contains`, `include_closed`, `sort_by` (`id` \| `name`), `limit`, `cursor`, `format` | `items[] { number, assetType, oid, state, project, category, name, status, parent, childCount }` |
 | `get_portfolio_tree` | portfolio | 20 | An epic with its descendant epics (`depth` 1 to 4) and roll-ups per epic over the stories and defects below it: items, done, open defects, estimate, done %. A depth, size, budget or permission cut is `partial` and marks the roll-ups it touches `incomplete`. Paged for very large epics: `nextCursor` continues the item read with the totals carried (P6-16); only the last step is exact. | `asset` (epic), `depth`, `include_items`, `max_items`, `cursor`, `format` | `root`, `nodes[]`, `backlogItems[]?`, `partial?`, `notes?` |
 | `get_conversations` | collaboration | 10 | Comments on one asset in scope, newest first, with author, date and text (rich text as text). Paged. | `asset`, `limit`, `cursor`, `format` | `items[] { oid, authoredAt, author, conversation, content }` |

@@ -526,3 +526,11 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   The totals are the caller's own numbers and never carry scope or items; a changed tree refuses the cursor.
 - **Owner:** *(open; built as (a))*
 
+### D-140 — `get_velocity` is a planning tool and the default `tools/list` target moves to 37.3 KB *(P6-17)*
+- **Context:** velocity needs its own tool (the sprint tool's cost and output are full). The default catalogue was at 35,892 of 36,500
+  bytes (D-116); the tool adds 1,315.
+- **Options:** (a) planning group, default on, target 37,300 (the 40,000 cap holds, 2.7 KB of headroom left); (b) the opt-in `reports`
+  group (its tests and the sibling table assume composite reports); (c) fold velocity into `get_sprint` (costlier, bigger output).
+- **Recommendation:** (a): velocity is a basic planning question and (b) mixes a non-composite tool into the reports group.
+- **Owner:** *(open; built as (a))*
+
