@@ -15,6 +15,7 @@ import {
   type Role,
   type Storage,
   type User,
+  type ValidationPatch,
   type Workspace,
 } from '@agility-bridge/storage';
 import type { z } from 'zod';
@@ -259,10 +260,10 @@ export function accessServices(options: AccessServicesOptions) {
     return r.fingerprint;
   }
 
-  /** Records a validation result; a transient failure keeps the previous status (and records its code). */
-  async function record(id: string, result: ValidationResult): Promise<Credential> {
+  /** The fields a validation result sets; a transient failure keeps the previous status (and records its code). */
+  function validationPatch(result: ValidationResult): ValidationPatch {
     if (result.status === 'valid') {
-      return storage.credentials.update(id, {
+      return {
         validationStatus: 'valid',
         validationErrorCode: null,
         validatedAt: now(),
@@ -270,16 +271,12 @@ export function accessServices(options: AccessServicesOptions) {
         memberName: result.memberName,
         memberUsername: result.memberUsername,
         reachableScopeIds: result.reachableScopeIds,
-      });
+      };
     }
     if (result.status === 'invalid') {
-      return storage.credentials.update(id, {
-        validationStatus: 'invalid',
-        validationErrorCode: result.code,
-        validatedAt: now(),
-      });
+      return { validationStatus: 'invalid', validationErrorCode: result.code, validatedAt: now() };
     }
-    return storage.credentials.update(id, { validationErrorCode: result.code });
+    return { validationErrorCode: result.code };
   }
 
   /** Validates one credential against Agility now (P2-13). Without a validator, returns it unchanged. */
@@ -291,18 +288,17 @@ export function accessServices(options: AccessServicesOptions) {
     const instance = await mustGet(storage.instances.get(c.instanceId), 'instance');
     const token = await openCredentialToken(keyring, c);
     const result = await options.validator.validate(instance, id, token);
-    // The answer is about the token opened above. A replacement (or a re-encryption) that landed while Agility was answering
-    // makes it someone else's answer: keep what the credential now says instead of vouching for a token nobody checked
-    // (P4-09). A write between this read and `record` is not covered; a compare-and-swap in storage would close it.
-    const now = await mustGet(storage.credentials.get(id), 'credential');
-    if (
-      now.tokenCiphertext !== c.tokenCiphertext ||
-      now.tokenIv !== c.tokenIv ||
-      now.keyVersion !== c.keyVersion
-    ) {
-      return now;
-    }
-    return record(id, result);
+    // The answer is about the token opened above. It is written in one conditional statement that holds only while the row
+    // still has that sealed token: a replacement (or a re-encryption) that landed while Agility was answering, or between a
+    // read and the write, makes it someone else's answer, so it is dropped and the credential keeps what it now says instead
+    // of vouching for a token nobody checked (P4-09, P4-37).
+    await storage.credentials.recordValidation(
+      id,
+      { tokenCiphertext: c.tokenCiphertext, tokenIv: c.tokenIv, keyVersion: c.keyVersion },
+      validationPatch(result),
+    );
+    // Applied or dropped, the stored record is the answer.
+    return mustGet(storage.credentials.get(id), 'credential');
   }
 
   const users = {

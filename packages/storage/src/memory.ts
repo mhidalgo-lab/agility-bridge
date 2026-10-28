@@ -9,6 +9,7 @@ import {
   checkSealedToken,
   checkSettingValue,
   checkStatsQuery,
+  checkValidationPatch,
   clampLimit,
   finishStats,
   prepareBind,
@@ -309,6 +310,22 @@ export function createMemoryStorage(options: MemoryStorageOptions = {}): Storage
       row.tokenCiphertext = next.tokenCiphertext;
       row.tokenIv = next.tokenIv;
       row.keyVersion = next.keyVersion;
+      return true;
+    },
+    async recordValidation(id, expected, patch) {
+      checkId('credentials', id);
+      checkSealedToken(expected);
+      const values = preparePatch<Record<string, unknown>>('credentials', checkValidationPatch(patch));
+      const row = tables.credentials.get(id);
+      if (
+        row === undefined ||
+        row.keyVersion !== expected.keyVersion ||
+        row.tokenCiphertext !== expected.tokenCiphertext ||
+        row.tokenIv !== expected.tokenIv
+      ) {
+        return false;
+      }
+      Object.assign(row, values, { updatedAt: now() });
       return true;
     },
   };

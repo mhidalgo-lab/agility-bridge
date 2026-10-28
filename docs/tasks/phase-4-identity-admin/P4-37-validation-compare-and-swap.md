@@ -2,7 +2,7 @@
 id: P4-37
 title: Record a credential validation only while the sealed token is the one that was checked
 phase: 4
-status: todo
+status: done
 priority: low
 depends_on: [P4-09]
 adr: ["0007"]
@@ -25,8 +25,8 @@ not about.
 - `validateCredential` uses it instead of the read-then-update added in P4-09, and returns the stored record on `false`.
 
 ## Acceptance criteria
-- [ ] A contract test on every adapter: a replacement between read and record leaves the validation fields untouched.
-- [ ] The P4-09 regression test (late answer for the old token) still passes and fails when the swap is reverted.
+- [x] A contract test on every adapter: a replacement between read and record leaves the validation fields untouched.
+- [x] The P4-09 regression test (late answer for the old token) still passes and fails when the swap is reverted.
 
 ## Security notes
 THREAT_MODEL T14, A5 (a credential is used only after its own validation).

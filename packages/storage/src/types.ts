@@ -191,6 +191,17 @@ export type CredentialPatch = Partial<
     | 'revokedAt'
   >
 >;
+/** The fields a validation result sets (`recordValidation`). */
+export type ValidationPatch = Pick<
+  CredentialPatch,
+  | 'validationStatus'
+  | 'validationErrorCode'
+  | 'validatedAt'
+  | 'memberOid'
+  | 'memberName'
+  | 'memberUsername'
+  | 'reachableScopeIds'
+>;
 export type WorkspacePatch = Partial<
   Pick<
     Workspace,
@@ -275,6 +286,12 @@ export interface CredentialRepository extends Repository<Credential, NewCredenti
    * token replacement); `true` when it wrote. `updatedAt` is not changed by a re-encryption.
    */
   replaceSecret(id: string, expected: SealedToken, next: SealedToken): Promise<boolean>;
+  /**
+   * Records a validation result only while the row still holds the sealed token that was checked, in one conditional write
+   * (compare-and-swap, P4-37): `false`, with nothing written, when the token was replaced or re-encrypted in between or the
+   * credential does not exist. Only the validation fields can be set.
+   */
+  recordValidation(id: string, expected: SealedToken, patch: ValidationPatch): Promise<boolean>;
 }
 
 export interface WorkspaceRepository extends Repository<Workspace, NewWorkspace, WorkspacePatch> {

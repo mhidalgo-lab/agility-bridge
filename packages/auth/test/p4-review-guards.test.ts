@@ -2,7 +2,7 @@
 // Phase 4 admin security review at the guards (P4-09, THREAT_MODEL T14, A5, A14, ADR-0013, L-065, L-093, L-121). Each test named
 // `fix: ...` failed with its fix reverted (checked one by one); the others record what holds. A refusal changes nothing.
 import { ConflictError, createMemoryStorage, type JsonObject, type Storage } from '@agility-bridge/storage';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   type Actor,
   accessServices,
@@ -408,5 +408,38 @@ describe('a validation that started before a token replacement cannot vouch for 
     const after = await storage.credentials.get(made.id);
     expect(after?.validationStatus).toBe('invalid');
     expect(after?.memberName).toBeNull();
+  });
+
+  it('fix: a replacement between the last read and the write cannot be vouched for either (P4-37)', async () => {
+    const oldToken = secret('Old');
+    const validator = {
+      probe: async () => ({ ok: true as const, fingerprint: null }),
+      validate: async () => ({
+        status: 'valid' as const,
+        memberOid: 'Member:20',
+        memberName: 'Old Owner',
+        memberUsername: 'old',
+        reachableScopeIds: ['Scope:1'],
+      }),
+    };
+    const keyring = await Keyring.create(generateMasterKey(1));
+    const plain = accessServices({ storage, keyring, tools: TOOLS });
+    const racing = accessServices({ storage, keyring, tools: TOOLS, validator: validator as never });
+    const made = await plain.credentials.create({
+      instanceId: ids['instance'] as string,
+      ownerUserId: ids['bob'] as string,
+      label: 'window',
+      token: oldToken,
+    });
+    // The token is replaced at the last moment before the validation is recorded: the check no longer applies.
+    const record = storage.credentials.recordValidation.bind(storage.credentials);
+    vi.spyOn(storage.credentials, 'recordValidation').mockImplementationOnce(async (id, expected, patch) => {
+      await plain.credentials.replaceToken(id, secret('New'));
+      return record(id, expected, patch);
+    });
+    const result = await racing.credentials.validate(made.id);
+    expect(result.validationStatus).not.toBe('valid');
+    expect(result.memberName).toBeNull();
+    expect((await storage.credentials.get(made.id))?.memberName).toBeNull();
   });
 });

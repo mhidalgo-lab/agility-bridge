@@ -10,6 +10,7 @@ import {
   checkSealedToken,
   checkSettingValue,
   checkStatsQuery,
+  checkValidationPatch,
   clampLimit,
   finishStats,
   prepareBind,
@@ -236,6 +237,27 @@ export function createSqlStorage(driver: SqlDriver, options: SqlStorageOptions =
         db
           .update(c)
           .set({ tokenCiphertext: next.tokenCiphertext, tokenIv: next.tokenIv, keyVersion: next.keyVersion })
+          .where(
+            and(
+              eq(c.id, id),
+              eq(c.keyVersion, expected.keyVersion),
+              eq(c.tokenCiphertext, expected.tokenCiphertext),
+              eq(c.tokenIv, expected.tokenIv),
+            ),
+          )
+          .returning({ id: c.id }),
+      );
+      return rows.length > 0;
+    },
+    async recordValidation(id, expected, patch) {
+      checkId('credentials', id);
+      checkSealedToken(expected);
+      const values = preparePatch<Record<string, unknown>>('credentials', checkValidationPatch(patch));
+      const c = schema.credentials;
+      const rows = await guard('credentials', 'write', () =>
+        db
+          .update(c)
+          .set({ ...values, updatedAt: now() })
           .where(
             and(
               eq(c.id, id),
