@@ -40,7 +40,7 @@ How to use it:
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297 |
@@ -2092,6 +2092,14 @@ agent wants a next step, and the error offered none of ours. Agility's exception
 in an error (the candidates of an ambiguous name) stays enveloped beside our own hint. The eval's error scenario is built with
 the server's own error path, flagged `is_error`, so it tests what an agent really receives.
 *Applied in:* P6-33, `agility/client.ts` (`UPSTREAM_REFUSAL_HINT`), `scripts/evals/llm.ts`, THREAT_MODEL A1, L-038.
+
+**L-334 — Whatever sits between the harness and the model is part of what is measured: make it visible in the report.**
+The release evals ran through the maintainer's router (no direct API key on a project with no sponsor). The report's
+`Endpoint` line and the text of answers without a tool exposed that the router validates tool calls and replaces one it
+rejects with its own message, which scores as "no tool": the eight silent answers of an earlier Opus run, and a dropped call
+that could hide a followed injection. Router runs are accepted as evidence with that caveat stated, and every report is read
+for router messages.
+*Applied in:* P6-33, `scripts/eval-llm.ts` (`ANTHROPIC_BASE_URL`), `docs/dev/evals.md`, L-332.
 
 ---
 

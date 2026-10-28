@@ -21,6 +21,11 @@ recipes, or whether a typed tool (for example a test-status roll-up per backlog 
 - If a case needs a join or roll-up `query_assets` cannot express in one call, design the typed tool against the tool-count
   budget (what is dropped or merged to fit); otherwise record "keep recipes" and close.
 
+## Evidence (P6-33, 2026-10-28)
+Release runs of the LLM eval (Sonnet 5.5 and Opus 5.5, `docs/dev/eval-reports/`): the quality and defect questions (Q017 –
+Q020, Q061 – Q063) passed in 12 of 14 answers allowing one lookup, through `search_work_items` or `query_assets`; both misses
+were a second lookup, not a wrong tool. Points to "keep recipes"; the decision is this task's.
+
 ## Acceptance criteria
 - [ ] Decision recorded in the tool catalogue and D-95 answered, with the eval evidence.
 - [ ] If a tool is added: conventions, negative authorization tests, catalogue size test within budget.

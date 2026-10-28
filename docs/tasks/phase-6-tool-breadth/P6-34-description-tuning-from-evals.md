@@ -17,6 +17,9 @@ Raise tool-choice accuracy where the LLM eval and the lexical router agree a des
 
 ## Scope
 - Start from the misses in the P6-10 triage table (get_conversations, get_asset_history, list_my_work, "open defects" questions) and the P6-33 report.
+- P6-33 (2026-10-28) named three: Q023 (`list_my_work` does not say it takes another member: "Marcus's plate"), Q030
+  (`list_sprints` should say it covers future sprints: "which sprint starts next"), Q049 (`list_attachments` should name
+  links). See the table in docs/dev/evals.md.
 - Change wording only, inside the description lints and the default `tools/list` budget (40 KB); trade words, not features.
 - Raise the router baseline with the change (`pnpm eval:router --write-baseline`).
 

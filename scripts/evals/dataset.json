@@ -3,7 +3,7 @@
     "id": "Q001",
     "category": "find-items",
     "question": "Find stories in the Orchard Checkout project that mention gift cards",
-    "expect": ["search_work_items"],
+    "expect": ["search_work_items", "query_assets"],
     "catalogue": "default"
   },
   {

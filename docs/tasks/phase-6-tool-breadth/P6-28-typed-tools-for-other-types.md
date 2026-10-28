@@ -24,6 +24,12 @@ the P6-10 evals and observed use, whether any of them needs a typed tool.
 - Only where the generic route fails repeatedly: propose one typed tool (its output contract, cost and the tool it would
   replace in the cap) as a new decision; otherwise record "no typed tools" and close.
 
+## Evidence (P6-33, 2026-10-28)
+Release runs of the LLM eval (Sonnet 5.5 and Opus 5.5, `docs/dev/eval-reports/`): the generic questions for requests,
+issues, goals and regression tests (Q070 – Q073) passed in 4 of 8 answers allowing one lookup; every miss was a second lookup
+(`list_asset_types` or `list_projects`), never a wrong tool. Themes and retrospectives have no eval question yet (this task's
+scope). Points to "no typed tools"; the cost is an extra call.
+
 ## Acceptance criteria
 - [ ] Eval results for the five types are recorded.
 - [ ] A decision (typed tool or none) is recorded in the pending decisions with the evidence.
