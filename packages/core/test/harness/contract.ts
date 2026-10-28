@@ -9,9 +9,9 @@ export const DEFAULT_CATALOGUE_MAX_BYTES = 40_000;
 export const FULL_CATALOGUE_MAX_BYTES = 72_000;
 /**
  * A tripwire below the cap (P6-12, D-116): the default catalogue was 39.2 of 40 KB; the consistency pass left it at about
- * 35.9 KB. A change that crosses this says why instead of eating the headroom one tool at a time.
+ * 35.9 KB; `get_velocity` (P6-17, D-140) raised the target to 37.6 KB. A change that crosses this says why instead of eating the headroom one tool at a time.
  */
-export const DEFAULT_CATALOGUE_TARGET_BYTES = 36_500;
+export const DEFAULT_CATALOGUE_TARGET_BYTES = 37_600;
 /** One tool's entry in `tools/list` (description, input and output schema); the generic `query_assets` is the largest. */
 export const TOOL_MAX_BYTES = 4_000;
 /** Groups a workspace must switch on (docs/reference/tool-catalogue.md): not part of the default catalogue. */

@@ -267,12 +267,12 @@ Resources (P6-09) and prompts (P6-08) are registered from one manifest, never fr
 
 ## Catalogue size and `tools/list` budget
 
-- Default catalogue ≤ 25 tools (now 20); every group and all writes < 40 (now 26 read tools + the 9 planned Phase 7
-  write tools = 35) (L-155, D-05). The arithmetic is recorded in the [tool catalogue](../reference/tool-catalogue.md#counts-and-toolslist-size);
+- Default catalogue ≤ 25 tools (now 21); every group and all writes < 40 (now 27 read tools + the 9 planned Phase 7
+  write tools = 36) (L-155, D-05). The arithmetic is recorded in the [tool catalogue](../reference/tool-catalogue.md#counts-and-toolslist-size);
   the contract test fails when the count of tools with every group plus nine reaches 40.
 - Serialised `tools/list`: **≤ 40 KB for the default catalogue and ≤ 72 KB with every group**, plus a tripwire for headroom:
-  the default catalogue stays at **≤ 36.5 KB** and no single tool above **4,000 bytes** (D-116). Measured after the P6-12
-  consistency pass: default 20 tools, **35,892 B** (was 39,179); every group 26 tools, **44,157 B** (was 47,946); the five
+  the default catalogue stays at **≤ 37.6 KB** (36.5 KB until `get_velocity`, D-140) and no single tool above **4,000 bytes** (D-116). Measured after the P6-12
+  consistency pass: default 20 tools, **35,892 B** (21 tools and 37,498 B with `get_velocity`) (was 39,179); every group 26 tools, **44,157 B** (was 47,946); the five
   reports add 6,952 B and `get_attachment` 1,335 B. A tool that would break a limit is redesigned, not exempted.
 - The default catalogue is every group a workspace gets without switching one on; the opt-in groups (`attachments`,
   `reports`, `writes`) count only against the every-group budget.

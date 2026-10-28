@@ -181,6 +181,16 @@ describe('tools/list contract', () => {
             "idempotentHint": true,
             "openWorldHint": true,
             "readOnlyHint": true,
+            "title": "Get velocity",
+          },
+          "name": "get_velocity",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
             "title": "List members",
           },
           "name": "list_members",

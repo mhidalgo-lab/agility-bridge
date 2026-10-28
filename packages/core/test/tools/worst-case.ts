@@ -34,6 +34,10 @@ export const WORST_CASES: Readonly<Record<string, WorstCase>> = {
     args: { sprint: 'current', project: 'Mobile App' },
     why: 'sprint, team and project resolution plus items',
   },
+  get_velocity: {
+    args: { team: 'Team:5', project: 'Mobile App', sprints: 10 },
+    why: 'team and project resolution, metadata, the sprint list and one batched read of ten sprints',
+  },
   list_members: { args: {}, why: 'members with roles' },
   get_asset_history: {
     args: { asset: 'B-01001', time_range: 'last 30 days' },

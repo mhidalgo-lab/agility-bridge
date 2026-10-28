@@ -24,7 +24,7 @@ literals, which the formatter turns into raw characters (L-166).
 ## What every tool adds (P1-07 onwards)
 
 1. Its entry in `CORE_TOOLS` (`packages/core/src/tools/index.ts`) and in the `tools/list` snapshot of
-   `test/contract.test.ts`; the count and size budgets (≤ 25 tools, ≤ 36.5 KB by default, ≤ 4 KB per tool) must still hold, the tool must pass the title, argument, paging, cost and output lints without an exception, and the consistency test (`test/tools/consistency.test.ts`) covers it through its worst-case fixture.
+   `test/contract.test.ts`; the count and size budgets (≤ 25 tools, ≤ 37.6 KB by default, ≤ 4 KB per tool) must still hold, the tool must pass the title, argument, paging, cost and output lints without an exception, and the consistency test (`test/tools/consistency.test.ts`) covers it through its worst-case fixture.
 2. A **probe test**: `probeTool` with `poisonedRows` for every output path (list, empty result, error, each composite
    section), expecting no leaks.
 3. **Hostile upstream tests**: foreign-scope rows (dropped, `hiddenOutsideScope`), forged ids, permission-limited rows,
