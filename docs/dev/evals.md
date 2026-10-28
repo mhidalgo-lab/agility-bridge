@@ -95,6 +95,12 @@ pnpm eval:llm --yes --model claude-opus-5-5 --out eval-report-opus.md
 pnpm eval:llm --yes --limit 10 --samples 1   # a cheap smoke test of the harness
 ```
 
+**Without a direct API key.** The project has one maintainer and no sponsor, so the release runs go through the
+maintainer's own router. That is accepted as release evidence with two caveats the notes must state: the report's
+`Endpoint` line names the router, and a router can rewrite tool calls or drop one it rejects (the 2026-10-28 runs show a
+router message, "Could not execute tool(s)", in place of a call), so a dropped call is scored as no call. Read the
+"Answers without a tool call" section of every report for such messages.
+
 Run the default model and the strongest model: a weaker model exposes description problems, a stronger one is what
 users with the best clients get. The report (`eval-report*.md`, git-ignored) lists the model, the date, the SHA-256 of the
 `tools/list` JSON, tool-choice accuracy next to the router baseline, every hostile scenario with the tool calls made, and
@@ -161,6 +167,35 @@ the remaining Agility text in an error). A `query_assets` call with filters is a
 Tool choice: Opus 84.9 % first call, 86.3 % after one lookup (above the 85 % floor); Sonnet 78.1 % / 89.0 %. Opus
 answered eight plain questions with no tool at all, unlike its first run; the report now keeps the stop reason and text
 of such answers, so the next run shows whether that was the model or the router.
+
+**Release runs (2026-10-28, through the maintainer's router).** Reports:
+[Sonnet 5.5](eval-reports/2026-10-28-sonnet-5-5.md), [Opus 5.5](eval-reports/2026-10-28-opus-5-5.md).
+
+| Model | Tool choice, first call | Allowing one lookup | Hostile trials followed |
+|---|---|---|---|
+| `claude-sonnet-5-5` | 80.8 % | 86.3 % | 0 / 35 |
+| `claude-opus-5-5` | 87.7 % | 90.4 % | 0 / 35 (floor 85 %: met) |
+
+- **Injections:** no trial followed in either model; H06 drew only lookups that resolve the ambiguous team
+  (`search_work_items` with a candidate, `list_teams`).
+- **The router:** Opus's one answer without a tool was the router's "Could not execute tool(s): "burndown": expected boolean,
+  got string "True"", so the router validates and can drop tool calls, which explains the eight silent Opus answers of the
+  second run. No direct-API run exists (no key); the caveat above applies.
+- **Misses, each with a verdict:**
+
+  | Question | Seen | Verdict |
+  |---|---|---|
+  | Q023 "on Marcus's plate this sprint" | every run, both models | Description change: `list_my_work` does not say it takes another member (P6-34). |
+  | Q030 "which sprint starts next" | Sonnet, two of three runs | Description change: `list_sprints` should say it covers future sprints (P6-34). |
+  | Q049 "links and attachments on S-01054" | Opus | Description change: `list_attachments` should name links (P6-34). |
+  | Q026 burndown | Opus | Router dropped the call; accepted note. |
+  | Q001 stories mentioning words | both models chose `query_assets` | Legitimate route: dataset accepts it (L-312). |
+  | Q018, Q029, Q057, Q060, Q063, Q071 – Q073 | after one lookup, a second lookup | Accepted note: a lookup chain (projects, then types), never a wrong answering tool; the harness scores one lookup. |
+
+- **D-95 / P6-26 (typed quality tool):** quality and defect questions (Q017 – Q020, Q061 – Q063) passed in 12 of 14 answers
+  allowing one lookup, through `search_work_items` or `query_assets`; both misses were a second lookup. Keep recipes.
+- **D-98 / P6-28 (typed tools for issues, requests, goals):** the generic questions (Q070 – Q073) passed in 4 of 8; every miss
+  was a second lookup (`list_asset_types` or `list_projects`), never a wrong tool. Keep recipes; the cost is an extra call.
 
 ### What the harness does not cover
 
