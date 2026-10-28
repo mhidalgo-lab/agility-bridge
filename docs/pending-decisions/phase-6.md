@@ -507,5 +507,14 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Context:** `completion/complete` for `team`, `project` and `sprint` needs candidate names the caller may see.
 - **Options:** (a) call the granted list tool (`list_teams`, `list_projects`, `list_sprints`) with the typed text through its handler: same scope, budget and shaping, one call per completion, nothing when that tool is not granted; (b) read the metadata cache; (c) no completion.
 - **Recommendation:** (a), built; `sprint` also offers `current`, `previous`, `next` first, and every value must pass the prompt's argument schema. Completion is not audited as a tool call of its own beyond an observer event named `completion:<prompt>.<argument>`.
+
+### D-139 — Large sprints: raise the row bound to 1,000 and trade burndown points for it *(P6-18)*
+- **Context:** `get_sprint` read at most five pages of items, so a sprint of more than 500 items lost its history, and every
+  history point needs as many pages as the sprint. Aggregations would avoid reading rows but need live measurements and a
+  compiler extension (P6-52).
+- **Options:** (a) read up to 1,000 items (five to ten pages by page size), keep 60 history queries per call so a bigger sprint
+  has fewer points; (b) aggregations now, unmeasured; (c) leave the bound.
+- **Recommendation:** (a): it stays inside tested bounds (60 history queries, 20 per request, the P6-42 response-cap guard)
+  and needs no new query shape beyond more pages; the live check is P6-51 (L-330).
 - **Owner:** *(open; built as (a))*
 

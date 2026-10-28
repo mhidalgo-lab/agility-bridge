@@ -493,15 +493,36 @@ describe('missing data is never turned into zeros (L-033)', () => {
     expect(out['totals']).toMatchObject({ itemCount: 5 });
   });
 
+  it('reads a sprint of more than five pages in full, with fewer burndown points (P6-18)', async () => {
+    const w = world();
+    const many = Array.from({ length: 8 }, (_, i) => item(300 + i, 'Story', 42, 2, 1));
+    const { ctx, fake } = setup({
+      assets: { ...w.assets, PrimaryWorkitem: many },
+      history: { PrimaryWorkitem: [{ at: '2026-10-10T00:00:00Z', rows: many }] },
+    });
+    const r = await call(ctx({ limits: { ...DEFAULT_LIMITS, maxRows: 1 } }), { sprint: 'Timebox:42' });
+    expect(r['isError'], text(r)).toBeUndefined();
+    const out = s(r);
+    expect(out['totals']).toMatchObject({ itemCount: 8, estimate: 8 });
+    expect(out['partial']).not.toBe(true);
+    expect(out['committed']).toMatchObject({ itemCount: 8 });
+    // 8 items x 1.25 over pages of one: ten pages per point, so at most 60 / 10 + 1 = 7 points and 60 queries in all.
+    const history = asofCalls(fake.calls);
+    const queries = history.reduce((n, c) => n + (c.body as unknown[]).length, 0);
+    expect(queries).toBeLessThanOrEqual(60);
+    expect((out['burndown'] as unknown[]).length).toBeLessThanOrEqual(7);
+    expect(history.every((c) => (c.body as unknown[]).length <= 20)).toBe(true);
+  });
+
   it('reports lower bounds and no history for a sprint with more items than the pages read', async () => {
     const w = world();
-    const many = Array.from({ length: 6 }, (_, i) => item(200 + i, 'Story', 42, 2, 1));
+    const many = Array.from({ length: 12 }, (_, i) => item(200 + i, 'Story', 42, 2, 1));
     const { ctx, fake } = setup({ assets: { ...w.assets, PrimaryWorkitem: many } });
     const r = await call(ctx({ limits: { ...DEFAULT_LIMITS, maxRows: 1 } }), { sprint: 'Timebox:42' });
     expect(r['isError'], text(r)).toBeUndefined();
     const out = s(r);
     expect(out['partial']).toBe(true);
-    expect(out['totals']).toMatchObject({ itemCount: 5, estimate: 5 });
+    expect(out['totals']).toMatchObject({ itemCount: 10, estimate: 10 });
     expect(out['burndown']).toBeUndefined();
     expect(out['committed']).toBeUndefined();
     expect(asofCalls(fake.calls)).toHaveLength(0);

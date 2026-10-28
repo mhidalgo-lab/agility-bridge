@@ -29,8 +29,13 @@ const COST = 30;
 const DAY = 86_400_000;
 /** Burndown points per call, begin and end included (L-060). */
 const MAX_POINTS = 15;
-/** Pages of items read for the sprint's contents. */
-const MAX_PAGES = 5;
+/**
+ * Pages of items read for the sprint's contents: up to 1,000 items, but never fewer than five pages nor more than ten
+ * (P6-18). More pages mean fewer burndown points (the history queries per call stay at 60, L-279).
+ */
+const ITEMS_CAP = 1000;
+const MIN_PAGES = 5;
+const MAX_PAGES = 10;
 /** History queries per call (points times pages) and per batched request (response cap, L-049). */
 const MAX_HISTORY_QUERIES = 60;
 const QUERIES_PER_REQUEST = 20;
@@ -293,19 +298,32 @@ export const getSprint: ToolDefinition = defineTool({
       for (const [i, c] of pair.entries())
         ahead.set(i, pageOf(ctx, c, Array.isArray(res.data) ? res.data[i] : undefined));
     }
-    for (let page = 0; page < MAX_PAGES; page++) {
+    const maxPages = Math.max(MIN_PAGES, Math.min(MAX_PAGES, Math.ceil(ITEMS_CAP / pageSize)));
+    // A sprint with more than two pages: the rest of the pages in one more request (when it is too large for the
+    // response cap the pages are read one by one instead).
+    if (ahead.get(1)?.hasMore === true && maxPages > 2) {
+      const rest = await Promise.all(Array.from({ length: maxPages - 2 }, (_, i) => richAt(i + 2)));
+      try {
+        const res = await agilityClient(ctx).query<unknown[]>(rest.map((c) => c.body));
+        for (const [i, c] of rest.entries())
+          ahead.set(i + 2, pageOf(ctx, c, Array.isArray(res.data) ? res.data[i] : undefined));
+      } catch (error) {
+        if (!(error instanceof AbError && error.code === ErrorCode.LimitResponseTooLarge)) throw error;
+      }
+    }
+    for (let page = 0; page < maxPages; page++) {
       const compiled = await richAt(page);
       const result = ahead.get(page) ?? (await runPage(ctx, compiled));
       const { kept, hidden: h } = keep(ctx, compiled, result.rows);
       hidden += h + result.hidden;
       current.push(...kept.map(toItem));
       if (!result.hasMore) break;
-      if (page === MAX_PAGES - 1) capped = true;
+      if (page === maxPages - 1) capped = true;
     }
     if (capped) {
       partial = true;
       notes.push(
-        `The sprint has more than ${MAX_PAGES * pageSize} items: totals cover the first ${MAX_PAGES * pageSize} and are lower bounds; burndown and scope change are not reported.`,
+        `The sprint has more than ${maxPages * pageSize} items: totals cover the first ${maxPages * pageSize} and are lower bounds; burndown and scope change are not reported.`,
       );
     }
     const total = sums(current);
@@ -339,7 +357,7 @@ export const getSprint: ToolDefinition = defineTool({
     if (wantHistory && begin !== undefined && end !== undefined) {
       const last = Math.min(end, now);
       const days = Math.max(0, Math.ceil((last - begin) / DAY));
-      const pagesPerPoint = Math.min(MAX_PAGES, Math.max(1, Math.ceil((current.length * 1.25) / pageSize)));
+      const pagesPerPoint = Math.min(maxPages, Math.max(1, Math.ceil((current.length * 1.25) / pageSize)));
       const maxPoints = Math.max(
         2,
         Math.min(MAX_POINTS, Math.floor(MAX_HISTORY_QUERIES / pagesPerPoint) + 1),

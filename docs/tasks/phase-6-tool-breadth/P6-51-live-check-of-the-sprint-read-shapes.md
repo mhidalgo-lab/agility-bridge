@@ -4,7 +4,7 @@ title: Live check of the get_sprint read shapes
 phase: 6
 status: todo
 priority: low
-depends_on: [P6-41, P6-42]
+depends_on: [P6-41, P6-42, P6-18]
 adr: []
 lessons: [L-279, L-330]
 owner: ""
@@ -19,6 +19,7 @@ batch when the page size is large). The fakes cannot show whether the real tenan
 ## Scope
 - Run `get_sprint` on the live suite for a running and a past sprint: the call finishes, request count and wall time are no worse than before (levels only).
 - With `AB_MAX_ROWS` above 250, check that the oversized-chunk path (P6-42) still answers with a note and not an error.
+- A sprint of several hundred items (P6-18: up to ten pages per item read, at most 60 history queries): the call finishes in time, with the points it names.
 - On the sandbox, check whether `query.v1` accepts one shared `with` for the scope list across the queries of a batch (unverified); if so, build it.
 
 ## Acceptance criteria

@@ -275,7 +275,7 @@ Status lives in each task file.
 | P6-15 | [Server-side aggregate roll-ups for the portfolio tree](tasks/phase-6-tool-breadth/P6-15-portfolio-aggregate-rollups.md) | low | P6-01 | done |
 | P6-16 | [Portfolio tree for very large epics (per-child roll-ups)](tasks/phase-6-tool-breadth/P6-16-portfolio-tree-large-epics.md) | low | P6-01 | todo |
 | P6-17 | [Sprint capacity, velocity and hour-based burndown](tasks/phase-6-tool-breadth/P6-17-sprint-capacity-velocity.md) | low | P6-02 | todo |
-| P6-18 | [Burndown for sprints with hundreds of items](tasks/phase-6-tool-breadth/P6-18-sprint-burndown-large-sprints.md) | medium | P6-02 | todo |
+| P6-18 | [Burndown for sprints with hundreds of items](tasks/phase-6-tool-breadth/P6-18-sprint-burndown-large-sprints.md) | medium | P6-02 | done |
 | P6-19 | [Verify the attachment download on a writable sandbox](tasks/phase-6-tool-breadth/P6-19-verify-attachment-download.md) | medium | P6-04 | todo |
 | P6-20 | [Ranged reads of long attachment text](tasks/phase-6-tool-breadth/P6-20-attachment-ranged-reads.md) | low | P6-04 | done |
 | P6-21 | [Verify history against known edits on the writable sandbox](tasks/phase-6-tool-breadth/P6-21-history-sandbox-verification.md) | medium | P6-05, P7-07 | todo |
@@ -304,7 +304,8 @@ Status lives in each task file.
 | P6-46 | [Settle the edge semantics of `work_item_quality`](tasks/phase-6-tool-breadth/P6-46-settle-the-edge-semantics-of-work-item-quality.md) | low | P6-13, P6-03 | todo |
 | P6-47 | [Polish defect triage, standup and get_sprint output details](tasks/phase-6-tool-breadth/P6-47-polish-defect-triage-standup-and-get-sprint-output.md) | low | P6-13 | todo |
 | P6-48 | [Forward sibling facts in composites as codes, with a lint](tasks/phase-6-tool-breadth/P6-48-forward-sibling-facts-in-composites-as-codes-with.md) | low | P6-13, P6-07 | done |
-| P6-51 | [Live check of the get_sprint read shapes](tasks/phase-6-tool-breadth/P6-51-live-check-of-the-sprint-read-shapes.md) | low | P6-41, P6-42 | todo |
+| P6-51 | [Live check of the get_sprint read shapes](tasks/phase-6-tool-breadth/P6-51-live-check-of-the-sprint-read-shapes.md) | low | P6-41, P6-42, P6-18 | todo |
+| P6-52 | [Sprint burndown by aggregation for very large sprints](tasks/phase-6-tool-breadth/P6-52-sprint-burndown-by-aggregation.md) | low | P6-18 | todo |
 | P6-55 | [Filter standup_summary on the change date instead of reading the newest page](tasks/phase-6-tool-breadth/P6-55-standup-change-date-filter.md) | low | P6-40, P6-27 | todo |
 | P6-58 | [Show the budget-hidden tools note for an inherited call budget in the panel](tasks/phase-6-tool-breadth/P6-58-panel-inherited-call-budget-note.md) | low | P6-36 | todo |
 

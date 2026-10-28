@@ -2,7 +2,7 @@
 id: P6-18
 title: Burndown for sprints with hundreds of items
 phase: 6
-status: todo
+status: done
 priority: medium
 depends_on: [P6-02]
 adr: ["0011"]
@@ -20,14 +20,18 @@ owner: ""
 items, lose the history altogether. Make the burndown work for them.
 
 ## Scope
-- Measure whether `query.v1` aggregations over `Timebox.Workitems` (count and estimate sum, with an `asof`) can give the
-  remaining estimate per status category without reading rows; the compiler today allows one relation hop and no bracket
-  filter on a status category, so this may need a compiler extension with its own safety tests (ADR-0012).
-- Otherwise raise the bounds deliberately (rows per call, response cap on the Node and Worker hosts) and say so in the docs.
+Refined 2026-10-28 (no live access in this change; the aggregation route needs live measurements and is split off):
+- Raise the bounds deliberately and inside tested limits: the sprint's contents are read up to 1,000 items (five to ten pages
+  by page size, the pages beyond the first two in one batched request), the history queries per call stay at 60 and 20 per
+  request, so a bigger sprint gets fewer burndown points instead of none; past 1,000 items the totals stay lower bounds and
+  the result is `partial` with the reason (as today).
+- Aggregations over `Timebox.Workitems` (remaining estimate per status category without reading rows) need a compiler
+  extension (one relation hop, no bracket filter on a status category today) and live measurements: [P6-52](P6-52-sprint-burndown-by-aggregation.md).
+- The new request shapes need a live check before release: added to [P6-51](P6-51-live-check-of-the-sprint-read-shapes.md).
 
 ## Acceptance criteria
-- [ ] Refined with the live measurements (levels only) and the chosen approach.
-- [ ] A fixture sprint above today's bound reads fully, or is reported as partial with the reason.
+- [x] Refined with the chosen approach (the live measurements move to P6-52).
+- [x] A fixture sprint above today's bound reads fully, or is reported as partial with the reason (tests for both).
 
 ## Out of scope
 - Anything not about the size bound of the sprint burndown.
