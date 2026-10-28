@@ -79,6 +79,10 @@ describe('display names', () => {
 describe('client id policy', () => {
   it('accepts a canonical https URL on a public-looking DNS name', () => {
     expect(clientIdUrlProblem(URL_OK, 'bridge.example.com')).toBeNull();
+    expect(clientIdUrlProblem(URL_OK, 'bridge.example.com', ['client.example.org'])).toBeNull();
+    expect(clientIdUrlProblem(URL_OK, 'bridge.example.com', ['other.example.org'])).toBe(
+      'client_host_not_allowed',
+    );
     expect(
       clientIdUrlProblem('https://claude.ai/oauth/claude-code-client-metadata', 'bridge.example.com'),
     ).toBeNull();

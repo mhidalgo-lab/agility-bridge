@@ -269,3 +269,11 @@ Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.m
 - **Recommendation:** (a): same audience as the client list, no new writes. (b) is one line (`authorizeClients` becomes manager-level)
   if the owner wants administrators to see it; (c) only if windows prove too coarse to tune from.
 - **Owner:** *(open; built as (a))*
+
+### D-133 — The document host allowlist matches exact host names *(P5-16)*
+- **Context:** `AB_OAUTH_CIMD_HOSTS` lets an operator accept metadata-document clients only from known hosts. A client's document host is
+  not always its product's apex (a client may publish under a subdomain).
+- **Options:** (a) exact host names only; (b) also `*.example.org` wildcards; (c) a registrable-domain match (needs a public suffix list).
+- **Recommendation:** (a): the list is a security control, and a suffix or wildcard match widens it to hosts nobody reviewed (anyone can
+  publish under a shared domain). List each host; add a wildcard only if a real client needs one.
+- **Owner:** *(open; built as (a))*

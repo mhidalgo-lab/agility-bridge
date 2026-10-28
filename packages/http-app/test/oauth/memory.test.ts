@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // The OAuth suites on Node with memory storage (P5-01, P5-03): the host is `memory-host.ts`.
 import { defineOAuthAdminSuite } from './admin-suite.ts';
-import { defineOAuthClientSuite } from './clients-suite.ts';
+import { defineDocumentHostsSuite, defineOAuthClientSuite } from './clients-suite.ts';
 import { memoryHost } from './memory-host.ts';
 import {
   defineDeviceActivitySuite,
@@ -40,4 +40,10 @@ defineDeviceActivitySuite('memory storage, per-request isolation (the Workers sh
     request: true,
     oauth: shape.idleTtlSeconds === undefined ? {} : { idleTtlSeconds: shape.idleTtlSeconds },
   }),
+);
+defineDocumentHostsSuite('memory storage', (shape) =>
+  memoryHost({ oauth: { clientMetadataHosts: shape.cimdHosts } }),
+);
+defineDocumentHostsSuite('memory storage, per-request isolation (the Workers shape)', (shape) =>
+  memoryHost({ request: true, oauth: { clientMetadataHosts: shape.cimdHosts } }),
 );

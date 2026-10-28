@@ -702,3 +702,91 @@ export function defineOAuthClientSuite(
     });
   });
 }
+
+/** What a host is built with for the document allowlist suite. */
+export interface DocumentHostsShape {
+  /** `AB_OAUTH_CIMD_HOSTS`. */
+  readonly cimdHosts: readonly string[];
+}
+
+/**
+ * The metadata-document host allowlist (P5-16, THREAT_MODEL T10, T11, L-088): with `AB_OAUTH_CIMD_HOSTS` set, a client id on any
+ * other host is refused before the cache, the budgets and any fetch, at the authorization and at the token endpoint; a listed
+ * host connects as before. Exact host names: a subdomain or a longer name that merely contains a listed one is another host.
+ */
+export function defineDocumentHostsSuite(
+  name: string,
+  makeHost: (shape: DocumentHostsShape) => Promise<OAuthHost>,
+): void {
+  describe(`OAuth client documents, host allowlist: ${name}`, () => {
+    const open: OAuthHost[] = [];
+    afterEach(async () => {
+      await Promise.all(open.splice(0).map((h) => h.close()));
+    });
+    const host = async (cimdHosts: readonly string[]): Promise<OAuthHost> => {
+      const h = await makeHost({ cimdHosts });
+      started.set(h, h.agilityRequests());
+      open.push(h);
+      return h;
+    };
+
+    it('refuses every client id on another host before any fetch, and still serves a listed host', async () => {
+      const h = await host(['client.example.org']);
+      const others = [
+        'https://other.example.net/meta.json',
+        'https://sub.client.example.org/meta.json',
+        'https://client.example.org.evil.test/meta.json',
+        'https://notclient.example.org/meta.json',
+      ];
+      for (const url of others) {
+        h.documents.serveClient(url, { client_name: 'Not listed' });
+        const res = await rawAuthorize(h, url);
+        await expectClientRefused(h, url, res);
+        const token = await h.call(`${h.origin}/oauth/token`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: 'not-a-code',
+            code_verifier: 'a'.repeat(43),
+            client_id: url,
+            redirect_uri: LOOPBACK,
+          }).toString(),
+        });
+        const body = (await token.json()) as { error: string };
+        expect(token.status).toBe(400);
+        expect(body.error).toBe('invalid_client');
+      }
+      // Nothing was fetched, and no fetch budget was spent on them.
+      expect(h.documents.fetched()).toEqual([]);
+      expect(await h.storage.kv.list('oauth-abuse:metadata_fetch:')).toEqual([]);
+      // The listed host works.
+      h.documents.serveClient(DOC_URL, { client_name: 'Listed client' });
+      const a = await authorize(h, documentClient(DOC_URL, LOOPBACK), { redirect: LOOPBACK });
+      expect(a.code, `authorize answered ${a.response.status}`).not.toBeNull();
+      expect(h.documents.fetched()).toEqual([DOC_URL]);
+    });
+
+    it('a document stored before the list was set is refused too', async () => {
+      const h = await host(['other.example.net']);
+      // A record for the listed-out host sits in the store, as if cached before the list was set.
+      await h.storage.kv.set(
+        `oauth:client:${DOC_URL}`,
+        JSON.stringify({
+          clientId: DOC_URL,
+          clientName: 'Cached',
+          redirectUris: [LOOPBACK],
+          tokenEndpointAuthMethod: 'none',
+          grantTypes: ['authorization_code', 'refresh_token'],
+          responseTypes: ['code'],
+          registrationDate: Math.floor(Date.now() / 1000),
+        }),
+      );
+      const res = await rawAuthorize(h, DOC_URL);
+      await res.text();
+      expect(res.status).toBe(400);
+      expect(res.headers.get('location')).toBeNull();
+      expect(h.documents.fetched()).toEqual([]);
+    });
+  });
+}

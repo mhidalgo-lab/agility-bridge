@@ -173,6 +173,19 @@ describe('AB_OAUTH settings', () => {
     }
   });
 
+  it('reads the metadata-document host allowlist (host names, at most 50; unset = any)', () => {
+    const on = { AB_OAUTH: 'on' };
+    expect(oauthSettingsFromEnv(on, PUBLIC)).toEqual({});
+    expect(
+      oauthSettingsFromEnv({ ...on, AB_OAUTH_CIMD_HOSTS: 'Claude.ai, client.example.org,claude.ai' }, PUBLIC),
+    ).toEqual({ clientMetadataHosts: ['claude.ai', 'client.example.org'] });
+    for (const value of ['https://claude.ai', 'claude.ai:443', 'a b', ',', '*.example.org']) {
+      expect(() => oauthSettingsFromEnv({ ...on, AB_OAUTH_CIMD_HOSTS: value }, PUBLIC), value).toThrow(
+        OAuthConfigError,
+      );
+    }
+  });
+
   it('the shared parser names the variable, never the value, and is registered for both hosts', () => {
     const defaults = { callBudget: 1000, maxResponseBytes: 8_388_608 };
     expect(SERVER_SETTING_NAMES).toEqual(
@@ -182,6 +195,7 @@ describe('AB_OAUTH settings', () => {
         'AB_OAUTH_REFRESH_TTL',
         'AB_OAUTH_REFRESH_REUSE_WINDOW',
         'AB_OAUTH_IDLE_TTL',
+        'AB_OAUTH_CIMD_HOSTS',
       ]),
     );
     const secretish = 'hunter2-not-a-duration';

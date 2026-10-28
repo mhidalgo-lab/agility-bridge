@@ -240,7 +240,7 @@ consumed:
    segments, uppercase host, `:443`, backslash), https, a path, no userinfo, fragment or port (stricter than the draft,
    which allows a port), a DNS name with a dot (no IP literal in any spelling, no `.local`, `.internal`, `.test`, ...),
    not our own host.
-2. A stored record (`client:<url>`) means no fetch. Otherwise the stored-document cap (`AB_OAUTH_CIMD_MAX_CLIENTS`, 200) and
+2. With `AB_OAUTH_CIMD_HOSTS` set, `clientIdUrlProblem` also refuses a host that is not exactly on the list (`client_host_not_allowed`, P5-16, D-133), before this step, so a record cached earlier does not outlive the list. A stored record (`client:<url>`) means no fetch. Otherwise the stored-document cap (`AB_OAUTH_CIMD_MAX_CLIENTS`, 200) and
    the per-address budget (`AB_OAUTH_CIMD_FETCH_LIMIT`, 20 an hour, an atomic `kv.increment` with `max`, keyed by a hash of
    the address) are checked, then the fetch counts, success or not. **At the cap one stored document, chosen at random, is
    evicted** (audited once per window as `oauth.client.evicted`) instead of the request being refused: a stored document is

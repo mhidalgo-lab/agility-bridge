@@ -10,7 +10,11 @@ import { CORE_TOOLS } from '@agility-bridge/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { defineOAuthAbuseSuite } from '../../../packages/http-app/test/oauth/abuse-suite.ts';
 import { defineOAuthAdminSuite } from '../../../packages/http-app/test/oauth/admin-suite.ts';
-import { defineOAuthClientSuite } from '../../../packages/http-app/test/oauth/clients-suite.ts';
+import {
+  type DocumentHostsShape,
+  defineDocumentHostsSuite,
+  defineOAuthClientSuite,
+} from '../../../packages/http-app/test/oauth/clients-suite.ts';
 import { testConsent } from '../../../packages/http-app/test/oauth/consent.ts';
 import { createFakeDocuments } from '../../../packages/http-app/test/oauth/documents.ts';
 import {
@@ -32,7 +36,9 @@ beforeAll(async () => {
 });
 afterAll(() => agility.close());
 
-async function sqliteHost(shape?: Partial<RefreshHostShape> & ActivityHostShape): Promise<OAuthHost> {
+async function sqliteHost(
+  shape?: Partial<RefreshHostShape> & ActivityHostShape & Partial<DocumentHostsShape>,
+): Promise<OAuthHost> {
   const dir = mkdtempSync(join(tmpdir(), 'ab-oauth-'));
   const key = generateMasterKey(1);
   writeFileSync(join(dir, 'master.key'), key, { mode: 0o600 });
@@ -51,6 +57,7 @@ async function sqliteHost(shape?: Partial<RefreshHostShape> & ActivityHostShape)
         ? {}
         : { AB_OAUTH_REFRESH_REUSE_WINDOW: String(shape.reuseWindowSeconds) }),
       ...(shape?.idleTtlSeconds === undefined ? {} : { AB_OAUTH_IDLE_TTL: String(shape.idleTtlSeconds) }),
+      ...(shape?.cimdHosts === undefined ? {} : { AB_OAUTH_CIMD_HOSTS: shape.cimdHosts.join(',') }),
       AB_ACCESS_CACHE_TTL: '0',
       AB_ALLOW_HTTP_INSTANCES: 'on',
       AB_ENVIRONMENT: 'production',
@@ -166,6 +173,7 @@ defineOAuthSuite('SQLite storage (agility-bridge serve)', () => sqliteHost());
 defineRefreshFamilySuite('SQLite storage (agility-bridge serve)', sqliteHost);
 defineDeviceActivitySuite('SQLite storage (agility-bridge serve)', sqliteHost);
 defineOAuthClientSuite('SQLite storage (agility-bridge serve)', sqliteHost);
+defineDocumentHostsSuite('SQLite storage (agility-bridge serve)', sqliteHost);
 defineOAuthAdminSuite('SQLite storage (agility-bridge serve)', sqliteHost);
 defineOAuthAbuseSuite('SQLite storage (agility-bridge serve)', sqliteHost);
 
