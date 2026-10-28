@@ -481,3 +481,14 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Options:** (a) an optional `memo` map on the per-request context, created by the report handler, with the resolvers memoising through it; the date filter is left for a sandbox check (follow-up P6-55); (b) a module-level cache keyed by request id (breaks L-013, L-096); (c) pass resolved OIDs down as section inputs (changes the sibling tools' inputs).
 - **Recommendation:** (a), built.
 - **Owner:** *(open; built as (a))*
+
+### D-143 — Portfolio roll-ups stay computed from the rows; the downcast aggregate is not used *(P6-15)*
+- **Context:** D-80 (a) computes roll-ups from the stories and defects read under the epics. P6-15 asked for a live check of
+  `Subs:Story[...]` aggregates (`@Count`, `Estimate.@Sum`, state conditions). The forms are accepted, but the values are lower than the
+  rows read with `Story.Super = epic` on every epic compared (RESEARCH, P6-15), so they are not exact.
+- **Options:** (a) keep the computed roll-ups and close P6-15 as "not supported", with the evidence; (b) use the aggregate anyway
+  and mark it approximate; (c) search other relation names for an aggregate that matches.
+- **Recommendation:** (a): an approximate roll-up that looks exact is worse than a bounded exact one (L-272). A search for another
+  relation is a new task if the call cost ever matters.
+- **Owner:** *(open; built as (a))*
+
