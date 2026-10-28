@@ -239,6 +239,25 @@ describe('number prefixes (L-141)', () => {
     expect(prefixes.has('Bogus')).toBe(false);
   });
 
+  it('applies the prefixes stored on the instance over discovery, per call, and ignores hostile values (P4-30)', async () => {
+    const { ctx, fake } = setup({ fake: { assets } });
+    const stored = (numberPrefixes: Record<string, unknown>) =>
+      ctx({ instance: { ...ctx().instance, numberPrefixes } });
+    const first = await metadataFor(
+      stored({ Story: 'B', Bogus: 'lower', 'Evil"Type': 'X', Defect: 5 }),
+    ).numberPrefixes();
+    expect(first.get('Story')).toBe('B');
+    expect(first.get('Defect')).toBe('D');
+    expect(first.has('Bogus')).toBe(false);
+    expect(first.has('Evil"Type')).toBe(false);
+    // An edit applies at once although the discovery is cached; the other types still come from Agility.
+    const second = await metadataFor(stored({ Story: 'Q' })).numberPrefixes();
+    expect(second.get('Story')).toBe('Q');
+    expect(second.get('Task')).toBe('TK');
+    expect((await metadataFor(ctx()).numberPrefixes()).get('Story')).toBe('S');
+    expect(fake.requests).toBe(1);
+  });
+
   it('falls back to the types the instance has when Agility refuses an unknown one', async () => {
     const { ctx, fake } = setup({
       fake: {

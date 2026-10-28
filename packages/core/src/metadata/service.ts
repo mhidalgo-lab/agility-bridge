@@ -420,6 +420,22 @@ export class InstanceMetadata {
    * per type the instance has (L-141). A hint only: resolution by number always confirms with a query (P1-06).
    */
   async numberPrefixes(): Promise<ReadonlyMap<string, string>> {
+    const discovered = await this.#discoveredPrefixes();
+    // Overrides are merged on every call, never cached: a prefix edited in the admin panel applies at once (P4-30).
+    // Stored values are re-validated here, the same shapes the panel's validator accepts.
+    const merged = new Map(discovered);
+    const overrides = [
+      this.#service.options.prefixOverrides?.[this.#ctx.instance.id] ?? {},
+      this.#ctx.instance.numberPrefixes ?? {},
+    ];
+    for (const o of overrides)
+      for (const [t, p] of Object.entries(o)) {
+        if (typeof p === 'string' && NUMBER_PREFIX_RE.test(p) && ASSET_TYPE_NAME_RE.test(t)) merged.set(t, p);
+      }
+    return merged;
+  }
+
+  async #discoveredPrefixes(): Promise<ReadonlyMap<string, string>> {
     if (this.#service.fresh(this.#cache.prefixes)) return this.#cache.prefixes.value;
     const found = new Map<string, string>();
     const sample = async (types: readonly string[]) => {
@@ -443,11 +459,6 @@ export class InstanceMetadata {
       for (const t of NUMBERED_TYPES)
         if ((await this.findAssetType(t))?.attributes.has('Number')) present.push(t);
       if (present.length > 0) await sample(present);
-    }
-    for (const [t, p] of Object.entries(
-      this.#service.options.prefixOverrides?.[this.#ctx.instance.id] ?? {},
-    )) {
-      if (NUMBER_PREFIX_RE.test(p) && ASSET_TYPE_NAME_RE.test(t)) found.set(t, p);
     }
     this.#cache.prefixes = { value: found, at: this.#service.now() };
     return found;

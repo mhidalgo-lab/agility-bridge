@@ -45,7 +45,7 @@ number prefixes, its credentials and its workspaces.
 - **Edit the prefixes** (owners and admins): the letters before the dash in an Agility number, one `Type=PREFIX` per line (for
   example `Story=S`). A type name is letters, digits and underscores; a prefix is one to four capital letters. An empty box clears
   them. The same rules apply to the admin API and the CLI, and a line the rules refuse is shown beside the form with nothing
-  saved. **They are stored but not yet applied**: number lookups still learn the prefixes from Agility (task P4-30).
+  saved. They apply to number lookups at once (a type you leave out is still learned from Agility, and a lookup always confirms the asset with a query).
 - **Change the origin** (owners): stored Agility tokens are sent to this address, so changing it or the CA file
   **revokes every credential of the instance and every grant that used them**. The page says so with the number of
   credentials in use, requires ticking a box, and needs a sign-in from the last 10 minutes.

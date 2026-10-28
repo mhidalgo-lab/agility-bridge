@@ -63,6 +63,12 @@ describe('resolveAccess: what a valid grant gets', () => {
     expect(Object.isFrozen(a)).toBe(true);
   });
 
+  it("carries the instance's stored number prefixes to the tool context (P4-30)", () => {
+    expect(allowed().instance.numberPrefixes).toBeNull();
+    const a = allowed(records({ instance: instance({ numberPrefixes: { Story: 'B' } }) }));
+    expect(a.instance.numberPrefixes).toEqual({ Story: 'B' });
+  });
+
   it('a service grant uses the workspace default (shared) credential', () => {
     const a = allowed(
       records({

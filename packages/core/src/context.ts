@@ -10,6 +10,8 @@ export interface InstanceRef {
   readonly id: string;
   /** Canonical base URL, e.g. https://www7.v1host.com/MyInstance (ADR-0014). */
   readonly baseUrl: string;
+  /** Number prefixes an owner stored for this instance (`{ Story: 'B' }`); untrusted shape, re-validated on use. */
+  readonly numberPrefixes?: Readonly<Record<string, unknown>>;
 }
 
 /** The Agility credential a request runs with. The token is only readable through `Secret.reveal()`. */

@@ -84,7 +84,13 @@ export type DenyReason = (typeof DENY_REASONS)[number];
 
 export interface EffectiveAccess {
   readonly workspace: { readonly id: string; readonly slug: string; readonly name: string };
-  readonly instance: { readonly id: string; readonly baseUrl: string; readonly tls: Instance['tls'] };
+  readonly instance: {
+    readonly id: string;
+    readonly baseUrl: string;
+    readonly tls: Instance['tls'];
+    /** Stored number prefixes (validated on write, re-validated by the metadata service). */
+    readonly numberPrefixes: Instance['numberPrefixes'];
+  };
   readonly grant: { readonly id: string; readonly userId: string | null; readonly label: string | null };
   /** The device token, or the OAuth device authorization (`oauth_…`), when the caller used one. */
   readonly tokenId: string | null;
@@ -268,7 +274,12 @@ export function resolveAccess(
     ok: true,
     access: Object.freeze({
       workspace: { id: workspace.id, slug: workspace.slug, name: workspace.name },
-      instance: { id: instance.id, baseUrl: instance.baseUrl, tls: instance.tls },
+      instance: {
+        id: instance.id,
+        baseUrl: instance.baseUrl,
+        tls: instance.tls,
+        numberPrefixes: instance.numberPrefixes,
+      },
       grant: { id: grant.id, userId: grant.userId, label: grant.label },
       tokenId: principal.kind === 'device_token' ? principal.token.id : principal.tokenId,
       clientId: principal.kind === 'oauth' ? principal.clientId : null,
@@ -332,7 +343,12 @@ export function resolvePassthroughAccess(
     ok: true,
     access: Object.freeze({
       workspace: { id: workspace.id, slug: workspace.slug, name: workspace.name },
-      instance: { id: instance.id, baseUrl: instance.baseUrl, tls: instance.tls },
+      instance: {
+        id: instance.id,
+        baseUrl: instance.baseUrl,
+        tls: instance.tls,
+        numberPrefixes: instance.numberPrefixes,
+      },
       grant: { id: `passthrough:${id}`, userId: null, label: 'pass-through' },
       tokenId: `pt:${id}`,
       clientId: null,

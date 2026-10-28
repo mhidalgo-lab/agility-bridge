@@ -204,7 +204,7 @@ except `group`, and adds `op` (POST only). *docs*
 - **Numbers**: work items carry a `Number` with a type prefix. Documentation examples show stories as `S-01054`; other
   instances use `B-` for stories (backlog items). Commonly seen: `E-` (Epic), `D-` (Defect), `TK-` (Task), `AT-` (Test),
   `I-` (Issue), `R-` (Request), `RP-` (RegressionPlan), `RS-` (RegressionSuite), `TS-` (TestSet). Prefixes for
-  `RegressionTest`, `Goal` and `Environment` are unverified. `meta.v1` does not expose prefixes. *docs + unverified* —
+  `RegressionTest`, `Goal` and `Environment` are unverified. `meta.v1` does not expose prefixes. An instance's stored prefixes (admin panel) override what is learned, per call, so an edit applies at once (P4-30). *docs + unverified* —
   *live (P0-06):* `B-`, `D-`, `TK-`, `AT-`, `E-`, `I-`, **`FG-` (Theme)**, **`G-` (Goal)**; a number resolves across
   types in one query with `from: "Workitem"` (or `PrimaryWorkitem`), which returns `AssetType`; `BaseAsset` is refused.
 - **Status vs AssetState vs rollup category**: `Status` is an admin-configurable list per type; `AssetState` is the

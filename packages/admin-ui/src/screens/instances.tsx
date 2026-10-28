@@ -116,8 +116,8 @@ function PrefixesPage(props: {
         type, written Type=PREFIX, for example Story=S. Leave the box empty to have them learned from Agility.
       </p>
       <p class="hint">
-        Stored with the instance. They are not applied to number lookups yet: until then every lookup still
-        learns the prefixes from Agility.
+        Stored with the instance and used for number lookups at once; types left out are still learned from
+        Agility.
       </p>
       <Form action={`${self}/prefixes`} csrf={viewer.csrf} label="Number prefixes">
         <TextAreaField
