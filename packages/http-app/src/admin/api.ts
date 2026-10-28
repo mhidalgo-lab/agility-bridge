@@ -665,6 +665,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
         storage: options.storage,
         tools: options.tools,
         ...(options.keyring === undefined ? {} : { keyring: options.keyring }),
+        now: () => options.clock.now(),
       },
       c.get('actor' as never) as Actor,
     );
@@ -952,11 +953,23 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       ...user,
       params: true,
       summary:
-        "Clear a user's sign-in identity so the next verified sign-in with their email binds again (owner, recent sign-in, never yourself through a session; the body repeats the user's email; ends their sessions)",
+        "Clear a user's sign-in identity so the next verified sign-in with their email binds again, optionally only at a named `provider` for `ttlMinutes` (owner, recent sign-in, never yourself through a session; the body repeats the user's email; ends their sessions)",
       body: z.strictObject({
         confirm: z.string().min(3).max(320).openapi({
           description:
             "The user's current email address, typed again. Anyone who then signs in with a provider that asserts this verified email takes over the account.",
+        }),
+        provider: z
+          .string()
+          .regex(/^[a-z0-9][a-z0-9:_.-]{0,63}$/i)
+          .optional()
+          .openapi({
+            description:
+              'Only this provider (google, github, cf-access or oidc:<name>) may bind the account next; a sign-in at another provider is refused while the claim lasts.',
+          }),
+        ttlMinutes: z.number().int().min(1).max(10_080).optional().openapi({
+          description:
+            'How long the provider claim lasts, in minutes (default 1440, at most 10080). Needs `provider`.',
         }),
       }),
       out: UserOut,
@@ -964,12 +977,24 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
     },
     async (c, { id, body }) => {
       // The guard decides first and changes nothing on a refusal (a denied audit row is written by the generic path).
-      const { user: cleared, previousIdp } = await services(c).users.unbind(
-        id,
-        (body as { confirm: string }).confirm,
+      const b = body as { confirm: string; provider?: string; ttlMinutes?: number };
+      const {
+        user: cleared,
+        previousIdp,
+        requiredIdp,
+        claimMinutes,
+      } = await services(c).users.unbind(id, b.confirm, {
+        ...(b.provider === undefined ? {} : { provider: b.provider }),
+        ...(b.ttlMinutes === undefined ? {} : { ttlMinutes: b.ttlMinutes }),
+      });
+      // Never the subject or the typed confirmation: the previous provider id and the provider asked for (P4-24).
+      c.set(
+        'auditDetails' as never,
+        {
+          previousIdp,
+          ...(requiredIdp === null ? {} : { requiredIdp, claimMinutes }),
+        } as never,
       );
-      // Never the subject or the typed confirmation: the previous provider id only.
-      c.set('auditDetails' as never, { previousIdp } as never);
       // After the compare-and-set: a session that existed at that moment is ended, and so is any created since.
       await endSessions(c, id, 'unbind');
       return cleared;

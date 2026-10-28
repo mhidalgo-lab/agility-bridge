@@ -210,11 +210,25 @@ export const COMMANDS: readonly CommandSpec[] = [
         required: true,
         help: "The user's current email address, typed again. Anyone who signs in with that verified email afterwards takes the account",
       },
+      {
+        name: 'to',
+        kind: 'string',
+        help: 'Only this provider may bind the account next (google, github, cf-access or oidc:<name>); a sign-in at another provider is refused',
+      },
+      {
+        name: 'ttl-minutes',
+        kind: 'int',
+        help: 'How long --to lasts, in minutes (default 1440, at most 10080)',
+      },
     ],
     api: async (_r, p) => ({
       method: 'POST',
       path: `/users/${enc(p.args[0] as string)}/unbind`,
-      body: { confirm: p.opts['confirm'] },
+      body: {
+        confirm: p.opts['confirm'],
+        ...(p.opts['to'] === undefined ? {} : { provider: p.opts['to'] }),
+        ...(p.opts['ttl-minutes'] === undefined ? {} : { ttlMinutes: p.opts['ttl-minutes'] }),
+      },
     }),
   },
   {

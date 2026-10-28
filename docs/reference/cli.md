@@ -110,13 +110,15 @@ Local or remote.
 Clear a user's sign-in identity so they can sign in with another provider (owner; the next verified sign-in with their email binds the account).
 
 ```text
-agility-bridge user unbind <user-id> --confirm <value>
+agility-bridge user unbind <user-id> --confirm <value> [--to <value>] [--ttl-minutes <n>]
 ```
 
 | Name | Kind | Meaning |
 |---|---|---|
 | `<user-id>` | argument | User id |
 | `--confirm` | string, required | The user's current email address, typed again. Anyone who signs in with that verified email afterwards takes the account |
+| `--to` | string | Only this provider may bind the account next (google, github, cf-access or oidc:<name>); a sign-in at another provider is refused |
+| `--ttl-minutes` | int | How long --to lasts, in minutes (default 1440, at most 10080) |
 
 Local or remote.
 

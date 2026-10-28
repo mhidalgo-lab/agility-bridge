@@ -2,7 +2,7 @@
 id: P4-24
 title: "Unbind to a named provider: narrow who can claim the account"
 phase: 4
-status: todo
+status: done
 priority: low
 depends_on: [P4-12]
 adr: ["0009"]
@@ -27,11 +27,15 @@ the move the owner intended.
   a sign-in on every adapter.
 
 ## Acceptance criteria
-- [ ] With a provider named, a verified sign-in at another provider cannot bind the account; without one, behaviour is as in P4-12.
-- [ ] Negative authorization tests for the new fields; documented in the identity-providers guide.
+- [x] With a provider named, a verified sign-in at another provider cannot bind the account; without one, behaviour is as in P4-12.
+- [x] Negative authorization tests for the new fields; documented in the identity-providers guide.
 
 ## Docs to update
 - docs/guide/identity-providers.md, docs/reference/admin-api.md, docs/reference/cli.md, docs/THREAT_MODEL.md
 
 ## Out of scope
 - Several identities per user (D-30).
+
+## Outcome
+- Built as scoped: `provider` and `ttlMinutes` in `POST /users/{id}/unbind`, `--to` and `--ttl-minutes` on `user unbind`, a provider field on the panel page, a pending claim in `kv` (`unbind-claim:<userId>`, expiring) that `resolveLoginUser` enforces and clears on the bind. D-129, D-130.
+- Tests run on the memory storage through the whole HTTP stack (the claim lives in `kv`, whose semantics SQLite and D1 share through the storage contract); no adapter-specific code was added.

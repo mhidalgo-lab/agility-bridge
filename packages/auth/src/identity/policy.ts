@@ -11,6 +11,7 @@
 //    allowlist but not 1-2's conflict and disabled checks.
 import {
   ConflictError,
+  type KvStore,
   type Role,
   type User,
   type UserBindPatch,
@@ -75,11 +76,32 @@ export type LoginDecision =
 
 const defaultId = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
 
+/** The pending claim an owner leaves when moving a user to a named provider (P4-24): `kv` key per user. */
+export const unbindClaimKey = (userId: string): string => `unbind-claim:${userId}`;
+
+/** The provider id (an identity's `idp`) an owner may name: `google`, `github`, `cf-access`, `oidc:<name>`. */
+export const IDP_NAME_RE = /^[a-z0-9][a-z0-9:_.-]{0,63}$/i;
+
 export interface ResolveLoginOptions {
+  /**
+   * The key-value store holding pending unbind claims (P4-24). With it, an unbound user can be bound only by the provider
+   * the claim names while the claim lasts; the bind clears the claim. A claim that cannot be read fails closed.
+   */
+  readonly kv?: KvStore;
   /** Ids of created users (tests); default `usr_<uuid>`, like the access services. */
   readonly newId?: (prefix: string) => string;
   /** The caller verified and consumed a setup link for this login. */
   readonly ownerBootstrap?: boolean;
+}
+
+/** The provider a claim names, or `null` for a value nobody can match (fails closed). */
+function claimedIdp(value: string): string | null {
+  try {
+    const idp = (JSON.parse(value) as { idp?: unknown }).idp;
+    return typeof idp === 'string' ? idp : null;
+  } catch {
+    return null;
+  }
 }
 
 const deny = (reason: LoginDenyReason): LoginDecision => ({ ok: false, reason });
@@ -116,9 +138,16 @@ export async function resolveLoginUser(
       if (bound === null) {
         // Compare-and-set (P4-16): only while the row is still unbound and enabled. A concurrent first sign-in with
         // another identity that bound it first wins; this one is refused, never a second binding.
+        // A pending claim narrows who may bind: another provider is refused as a conflict, whoever it asserts (P4-24).
+        // A setup link is the owner's own act and passes.
+        if (options.kv !== undefined && !options.ownerBootstrap) {
+          const claim = await options.kv.get(unbindClaimKey(user.id));
+          if (claim !== null && claimedIdp(claim) !== identity.idp) return deny('identity_conflict');
+        }
         const linked = await users.bind(user.id, identity.idp, identity.subject, patch);
         if (linked === null) return deny('identity_conflict');
         updated = linked;
+        if (options.kv !== undefined) await options.kv.delete(unbindClaimKey(user.id));
       } else {
         updated = Object.keys(patch).length > 0 ? await users.update(user.id, patch) : user;
       }

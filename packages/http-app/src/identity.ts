@@ -335,6 +335,7 @@ export function createIdentityRoutes(
     }
     const decision = await resolveLoginUser(storage.users, identity, policy, {
       ownerBootstrap: setup !== null,
+      kv: storage.kv,
     });
     if (!decision.ok) return fail(c, provider.id, provider.idp, decision.reason, extra, hash);
     audit(c, {

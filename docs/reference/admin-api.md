@@ -118,7 +118,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | `POST` | `/users/{id}/disable` | Disable a user | — | 200 User |
 | `POST` | `/users/{id}/enable` | Enable a disabled user again (owners for owners and admins, with a recent sign-in; admins for members; 409 when the user is not disabled). Restores nothing but the right to sign in: grants and device tokens that were not revoked work again | — | 200 User |
 | `POST` | `/users/{id}/sessions/revoke` | End all of a user's browser sessions (yourself; an owner anyone; an admin members; the break-glass token anyone) | — | 200 object |
-| `POST` | `/users/{id}/unbind` | Clear a user's sign-in identity so the next verified sign-in with their email binds again (owner, recent sign-in, never yourself through a session; the body repeats the user's email; ends their sessions) | `confirm`: string | 200 User |
+| `POST` | `/users/{id}/unbind` | Clear a user's sign-in identity so the next verified sign-in with their email binds again, optionally only at a named `provider` for `ttlMinutes` (owner, recent sign-in, never yourself through a session; the body repeats the user's email; ends their sessions) | `confirm`: string<br>`provider`?: string<br>`ttlMinutes`?: integer | 200 User |
 | `POST` | `/setup-links` | Issue a single-use owner setup link (owner; the link makes whoever signs in with it an owner; recorded in the audit log) | `ttlMinutes`?: integer | 201 SetupLink |
 
 ## workspaces
