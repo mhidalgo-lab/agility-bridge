@@ -198,6 +198,9 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   per backlog item ([P6-26](../tasks/phase-6-tool-breadth/P6-26-quality-typed-tool-revisit.md)).
 - **Built:** (a).
 - **Owner (2026-10-27):** Decided: as recommended, (a).
+- **Evidence (P6-26, 2026-10-28):** the release LLM eval runs answered the quality and defect questions in 12 of 14
+  answers through `search_work_items` or `query_assets` (allowing one lookup); both misses were a second lookup, not a wrong
+  tool. Recipes kept; no typed quality tool ([evals](../dev/evals.md)).
 
 ### D-96 — Two recipe resources, served through the generic query and metadata tools *(P6-03)*
 - **Context:** recipes are manifest entries that prompts (P6-08) can point at. One resource for everything would be long and

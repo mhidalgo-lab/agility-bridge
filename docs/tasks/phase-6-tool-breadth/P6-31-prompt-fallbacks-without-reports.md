@@ -2,7 +2,7 @@
 id: P6-31
 title: Prompt fallbacks without the reports group
 phase: 6
-status: todo
+status: dropped
 priority: low
 depends_on: [P6-08]
 adr: ["0015"]
@@ -11,6 +11,8 @@ owner: ""
 ---
 
 # P6-31 — Prompt fallbacks without the reports group
+
+> **Dropped 2026-10-28:** D-105 chose (a): prompts that use report tools exist only with the reports group. Reopen if the owner asks for fallbacks.
 
 ## Goal
 Offer `standup`, `triage_defects` and `review_backlog_item_quality` to workspaces that have not turned the `reports` group
