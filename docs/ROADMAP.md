@@ -224,7 +224,7 @@ Status lives in each task file.
 | P4-15 | [Panel follow-ups: enable a disabled user, list every device token, edit number prefixes](tasks/phase-4-identity-admin/P4-15-panel-follow-ups.md) | low | P4-04, P4-12 | done |
 | P4-24 | [Unbind to a named provider: narrow who can claim the account](tasks/phase-4-identity-admin/P4-24-unbind-to-named-provider.md) | low | P4-12 | todo |
 | P4-28 | [Panel list screens: cost grows with the number of users](tasks/phase-4-identity-admin/P4-28-panel-list-screen-cost.md) | low | P4-14 | todo |
-| P4-30 | [Apply an instance's stored number prefixes when resolving numbers](tasks/phase-4-identity-admin/P4-30-apply-stored-number-prefixes.md) | low | P4-15 | todo |
+| P4-30 | [Apply an instance's stored number prefixes when resolving numbers](tasks/phase-4-identity-admin/P4-30-apply-stored-number-prefixes.md) | low | P4-15 | done |
 | P4-31 | [Keyset paging for device tokens in storage](tasks/phase-4-identity-admin/P4-31-token-list-storage-keyset.md) | low | P4-15 | todo |
 | P4-34 | [Make adding an instance an owner-only action (if D-55 chooses it)](tasks/phase-4-identity-admin/P4-34-owner-only-instance-creation.md) | low | P4-09 | dropped |
 | P4-35 | [List and revoke unused owner setup links (if D-56 chooses it)](tasks/phase-4-identity-admin/P4-35-list-revoke-setup-links.md) | low | P4-09 | dropped |

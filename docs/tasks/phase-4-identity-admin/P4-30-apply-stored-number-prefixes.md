@@ -2,7 +2,7 @@
 id: P4-30
 title: "Apply an instance's stored number prefixes when resolving numbers"
 phase: 4
-status: todo
+status: done
 priority: low
 depends_on: [P4-15]
 adr: ["0012"]
@@ -22,13 +22,13 @@ Make the stored overrides take effect: a `B-` story prefix set by an owner is us
 - Carry the stored (already validated) prefixes on the resolved instance (`InstanceRef` and `EffectiveAccess.instance`; the stdio
   and CLI hosts pass none) and merge them over discovery in `MetadataService.numberPrefixes()`, re-validated on use with the same
   shared validator.
-- The prefix cache is per instance and lives about an hour: say so in the guide, or invalidate it on a change where the host can.
+- The prefix cache is per instance and lives about an hour: only discovery is cached; stored overrides are merged on every call, so an edit applies at once (D-124).
 - Tests: override wins over discovery, a hostile stored value is ignored, a resolution still confirms with a query (no string-built
   filters, ADR-0012), the Worker and the HTTP host both pass the value.
 
 ## Acceptance criteria
-- [ ] A stored prefix changes number resolution on the HTTP and Worker hosts; discovery still fills the other types.
-- [ ] The panel's note that prefixes are not applied yet is removed.
+- [x] A stored prefix changes number resolution on the HTTP and Worker hosts (both build the tool context in `http-app`); discovery still fills the other types. Unit-tested in core (override wins, hostile values ignored, applies at once) and in the access resolver; the Worker has no separate path.
+- [x] The panel's note that prefixes are not applied yet is removed.
 
 ## Docs to update
 - docs/guide/admin-panel.md, docs/RESEARCH.md (prefix behaviour)

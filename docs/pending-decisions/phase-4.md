@@ -244,3 +244,9 @@
   needs a real provider, and a provider defect shows up at the sign-in step whatever the order. Switch to (b) before the
   consent page task (the first one that signs a person in), and do the follow-ups by priority, not as a gate.
 - **Owner (2026-10-24):** Decided: (a), go for Phase 5 now.
+
+### D-124 — Stored number prefixes are merged per call, not cached *(P4-30)*
+- **Context:** The metadata prefix cache is per instance and lasts about an hour; the stored prefixes can change at any time in the panel.
+- **Options:** (a) cache discovery only and merge the stored overrides on every call; (b) cache the merged map and invalidate on a panel change; (c) cache the merged map and document the delay.
+- **Recommendation:** (a): no cross-request invalidation channel (the Worker has none), the merge is a few entries, and an edit applies at once.
+- **Owner:** *(open; built as (a))*

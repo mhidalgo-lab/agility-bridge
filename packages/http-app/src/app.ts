@@ -899,7 +899,13 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     const groups = [...new Set(tools.map((t) => t.group))];
     const ctx: ToolContext = {
       requestId,
-      instance: { id: resolved.instance.id, baseUrl: resolved.instance.baseUrl },
+      instance: {
+        id: resolved.instance.id,
+        baseUrl: resolved.instance.baseUrl,
+        ...(resolved.instance.numberPrefixes === null
+          ? {}
+          : { numberPrefixes: resolved.instance.numberPrefixes }),
+      },
       workspace: {
         id: resolved.workspace.id,
         name: resolved.workspace.name,
