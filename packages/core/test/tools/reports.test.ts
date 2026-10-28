@@ -645,3 +645,58 @@ describe('every report: poisoned text, scope and cost', () => {
     },
   );
 });
+
+describe('independent sections run together and share resolution (P6-40)', () => {
+  /** A rig whose upstream answers slowly and records how many requests were in flight at once. */
+  const slowRig = () => {
+    const live = { now: 0, max: 0 };
+    const r = rig({
+      override: async () => {
+        live.now += 1;
+        live.max = Math.max(live.max, live.now);
+        await new Promise((res) => setTimeout(res, 15));
+        live.now -= 1;
+        return undefined;
+      },
+    });
+    return { ...r, live };
+  };
+
+  it('overlaps the two sections of sprint_health and of standup_summary', async () => {
+    for (const report of ['sprint_health', 'standup_summary']) {
+      const { call, live } = slowRig();
+      const r = await call(report, ARGS[report] as Record<string, unknown>);
+      expect(r['isError'], text(r)).toBeUndefined();
+      expect(live.max, report).toBeGreaterThan(1);
+    }
+  });
+
+  it('keeps the section order and attributes each section its own requests', async () => {
+    const { call, fake } = slowRig();
+    const r = await call('sprint_health', { sprint: 'current' });
+    expect(sections(r).map((x) => x.key)).toEqual(['sprint', 'open_work']);
+    const per = (s(r).sections as Array<{ requests: number }>).map((x) => x.requests);
+    expect(per.every((n) => n > 0)).toBe(true);
+    // Every request the fake saw was counted by exactly one section.
+    expect(per.reduce((a, b) => a + b, 0)).toBe(fake.requests);
+  });
+
+  it('resolves the sprint once per request, not once per section', async () => {
+    const { call, bodies } = rig();
+    const r = await call('sprint_health', { sprint: 'Sprint 42' });
+    expect(r['isError'], text(r)).toBeUndefined();
+    // One name lookup of the sprint (the exact match); the second section reuses it.
+    const lookups = bodies.filter((b) => b.includes('"from":"Timebox"') && b.includes('Sprint 42'));
+    expect(lookups.length).toBe(1);
+  });
+
+  it('shares the member resolution of standup_summary between its sections, for this request only (L-096)', async () => {
+    const { call, bodies } = rig();
+    const members = () => bodies.filter((b) => b.includes('"from":"Member"')).length;
+    await call('standup_summary', ARGS['standup_summary'] as Record<string, unknown>);
+    expect(members()).toBe(1);
+    // A second request has a fresh memo and resolves again.
+    await call('standup_summary', ARGS['standup_summary'] as Record<string, unknown>);
+    expect(members()).toBe(2);
+  });
+});

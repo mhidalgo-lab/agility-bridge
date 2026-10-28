@@ -4,7 +4,7 @@
 // A section that was not granted, failed or ran out of budget is reported as such and contributes no numbers at all
 // (L-033); the report never calls a tool the caller was not granted and never repeats query code.
 import { z } from 'zod';
-import type { ToolContext } from '../../context.ts';
+import { childBudget, type ToolContext } from '../../context.ts';
 import { AbError, ErrorCode } from '../../errors.ts';
 import { RESULT_META_KEY } from '../../output/result.ts';
 import type { ToolDefinition } from '../../tool.ts';
@@ -51,16 +51,17 @@ export async function runSection(
       info: { ...base, status: 'not_run', requests: 0, errorCode: ErrorCode.BudgetExhausted },
       queries: [],
     };
-  const before = ctx.budget.used;
+  // Its own budget: sections may run at the same time, so a before/after reading of the shared one would mix them up.
+  const own = childBudget(ctx.budget);
   try {
     const parsed = tool.inputSchema.parse(input);
-    const out = await tool.handler(parsed, ctx);
+    const out = await tool.handler(parsed, { ...ctx, budget: own });
     const meta = out.meta?.[RESULT_META_KEY] as { queries?: unknown } | undefined;
     const queries = Array.isArray(meta?.queries)
       ? meta.queries.filter((q): q is string => typeof q === 'string')
       : [];
     return {
-      info: { ...base, status: 'ok', requests: ctx.budget.used - before },
+      info: { ...base, status: 'ok', requests: own.used },
       data: (out.structured ?? {}) as Record<string, unknown>,
       queries,
     };
@@ -70,7 +71,7 @@ export async function runSection(
       info: {
         ...base,
         status: code === ErrorCode.BudgetExhausted ? 'not_run' : 'failed',
-        requests: ctx.budget.used - before,
+        requests: own.used,
         errorCode: code,
       },
       queries: [],

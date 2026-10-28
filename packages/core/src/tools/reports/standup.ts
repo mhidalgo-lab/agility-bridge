@@ -2,7 +2,7 @@
 // standup_summary (P6-07): what a member moved or finished in a window and what is in progress, read through
 // search_work_items twice. Blockers are not read (no blocked flag), and the report says so instead of showing none.
 import { z } from 'zod';
-import { capBudget } from '../../context.ts';
+import { capBudget, withMemo } from '../../context.ts';
 import { shapeOutput } from '../../output/result.ts';
 import { parseTimeRange } from '../../query/time.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
@@ -47,7 +47,7 @@ export const standupSummary: ToolDefinition = defineTool({
     window: z.looseObject({ since: z.string(), until: z.string() }),
   }),
   handler: async (input, outer) => {
-    const ctx = { ...outer, budget: capBudget(outer.budget, COST) };
+    const ctx = withMemo({ ...outer, budget: capBudget(outer.budget, COST) });
     // The window is validated before any request (L-060).
     const window = parseTimeRange(
       input.time_range ?? DEFAULT_WINDOW,
@@ -60,15 +60,19 @@ export const standupSummary: ToolDefinition = defineTool({
       ...(input.project === undefined ? {} : { project: input.project }),
       limit: Math.min(PAGE, ctx.limits.maxRows),
     };
-    const changedRun = await runSection(ctx, 'changed', searchWorkItems, {
-      ...common,
-      include_closed: true,
-      sort_by: 'recently_changed',
-    });
-    const progressRun = await runSection(ctx, 'in_progress', searchWorkItems, {
-      ...common,
-      status_category: 'in_progress',
-    });
+    // The two sections are independent: they run together, share the member/team/project resolution through the
+    // request's memo, and keep their fixed order in the result (P6-40).
+    const [changedRun, progressRun] = await Promise.all([
+      runSection(ctx, 'changed', searchWorkItems, {
+        ...common,
+        include_closed: true,
+        sort_by: 'recently_changed',
+      }),
+      runSection(ctx, 'in_progress', searchWorkItems, {
+        ...common,
+        status_category: 'in_progress',
+      }),
+    ]);
     const runs: SectionRun[] = [changedRun, progressRun];
     rethrowIfNothingRead(runs);
     const notes = sectionNotes(runs, TITLES);

@@ -476,3 +476,8 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Recommendation:** (a), built. Parsed data (defaults applied) still reaches the handler.
 - **Owner:** *(open; built as (a))*
 
+### D-147 — Resolution memo lives on the request context; the standup change-date filter waits for a sandbox *(P6-40)*
+- **Context:** Report sections run together and each resolved the same member, team, project or sprint. The task also proposed filtering `standup_summary` on `ChangeDateUTC >= since`, to be done only if a sandbox confirms the filter on all four types.
+- **Options:** (a) an optional `memo` map on the per-request context, created by the report handler, with the resolvers memoising through it; the date filter is left for a sandbox check (follow-up P6-55); (b) a module-level cache keyed by request id (breaks L-013, L-096); (c) pass resolved OIDs down as section inputs (changes the sibling tools' inputs).
+- **Recommendation:** (a), built.
+- **Owner:** *(open; built as (a))*
