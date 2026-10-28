@@ -17,6 +17,12 @@ export interface CursorState {
   readonly window?: TimeWindow;
   /** The first call's "now" (ISO 8601 UTC), for lists whose filters depend on it (`list_sprints` timing). */
   readonly now?: string;
+  /** A running total carried between calls (`get_portfolio_tree`): compact text, never items or scope (P6-16). */
+  readonly sums?: string;
+  /** A short fingerprint of what the totals were taken over (`get_portfolio_tree`: the epics of the tree). */
+  readonly fingerprint?: string;
+  /** Something already cut the totals for a reason a later call cannot undo. */
+  readonly cut?: boolean;
 }
 
 /** What a cursor carries unchanged from the first call. */
@@ -50,6 +56,11 @@ export async function cursorBinding(ctx: ToolContext, tool: string, normalized: 
       query: normalized,
     }),
   );
+}
+
+/** The first 16 hex characters of the SHA-256 of `material`: a fingerprint a cursor can carry. */
+export async function fingerprintOf(material: string): Promise<string> {
+  return (await sha256(material)).slice(0, 16);
 }
 
 async function sha256(material: string): Promise<string> {
@@ -87,6 +98,9 @@ export function encodeCursor(binding: string, state: CursorState): string {
       ...(state.offsets === undefined ? {} : { t: state.offsets }),
       ...(state.window === undefined ? {} : { w: state.window }),
       ...(state.now === undefined ? {} : { n: state.now }),
+      ...(state.sums === undefined ? {} : { s: state.sums }),
+      ...(state.fingerprint === undefined ? {} : { f: state.fingerprint }),
+      ...(state.cut === true ? { x: 1 } : {}),
     }),
   );
 }
@@ -106,7 +120,17 @@ interface ParsedCursor {
 function parseCursor(ctx: ToolContext, cursor: string): ParsedCursor {
   if (typeof cursor !== 'string' || cursor.length > 2_000 || !/^[A-Za-z0-9_-]+$/.test(cursor))
     throw refused();
-  let parsed: { v?: unknown; b?: unknown; o?: unknown; t?: unknown; w?: unknown; n?: unknown };
+  let parsed: {
+    v?: unknown;
+    b?: unknown;
+    o?: unknown;
+    t?: unknown;
+    w?: unknown;
+    n?: unknown;
+    s?: unknown;
+    f?: unknown;
+    x?: unknown;
+  };
   try {
     parsed = JSON.parse(fromBase64Url(cursor)) as typeof parsed;
   } catch {
@@ -134,6 +158,12 @@ function parseCursor(ctx: ToolContext, cursor: string): ParsedCursor {
   }
   const window = parsed.w === undefined ? undefined : checkWindow(parsed.w, ctx.limits.maxTimeRangeDays);
   const now = parsed.n === undefined ? undefined : checkNow(parsed.n, ctx.clock.now());
+  // Carried totals: plain text of digits and separators only, bounded; never anything that could name an asset.
+  if (parsed.s !== undefined && (typeof parsed.s !== 'string' || !/^[0-9.;:,]{0,1600}$/.test(parsed.s)))
+    throw refused();
+  if (parsed.f !== undefined && (typeof parsed.f !== 'string' || !/^[0-9a-f]{16}$/.test(parsed.f)))
+    throw refused();
+  if (parsed.x !== undefined && parsed.x !== 1) throw refused();
   return {
     bound: parsed.b,
     state: {
@@ -141,6 +171,9 @@ function parseCursor(ctx: ToolContext, cursor: string): ParsedCursor {
       ...(offsets === undefined ? {} : { offsets }),
       ...(window === undefined ? {} : { window }),
       ...(now === undefined ? {} : { now }),
+      ...(parsed.s === undefined ? {} : { sums: parsed.s as string }),
+      ...(parsed.f === undefined ? {} : { fingerprint: parsed.f as string }),
+      ...(parsed.x === 1 ? { cut: true } : {}),
     },
   };
 }

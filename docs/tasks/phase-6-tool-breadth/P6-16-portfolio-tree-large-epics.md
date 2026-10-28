@@ -2,30 +2,32 @@
 id: P6-16
 title: Portfolio tree for very large epics (per-child roll-ups)
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-01]
 adr: ["0015"]
-lessons: [L-033, L-170, L-272]
+lessons: [L-033, L-170, L-272, L-360]
 owner: ""
 ---
 
 # P6-16 — Portfolio tree for very large epics (per-child roll-ups)
 
-> Later-phase task: **refine scope and acceptance criteria before starting** (tasks/README rule 7).
+> Refined 2026-10-28 (D-144): the continuation cursor is built; server-side aggregates were ruled out by P6-15 (D-143).
 
 ## Goal
 When an epic has more backlog items than `get_portfolio_tree` reads in one call (three pages per type), give an exact
 answer anyway instead of an `incomplete` one, without raising the per-call cost for everyone.
 
 ## Scope
-- Decide between a cursor that continues the item scan across calls (sums carried in a signed, workspace-bound cursor),
-  and a documented "get each sub-epic" walk; implement the cheaper one the tests can prove exact.
-- Cursor rules from tool conventions apply (bound to workspace, filters and tree; re-validated).
+- A cursor continues the item scan across calls (D-144): the totals per epic (compact text) and the item offsets travel in
+  a workspace-bound cursor; each step re-reads the tree and refuses the cursor when the epics changed (fingerprint).
+- Trees of more than 60 epics, or whose totals would not fit the cursor's length limit, keep the "get a sub-epic" answer.
+- Until the last step every roll-up is `incomplete` and the result `partial`; the last step has no `nextCursor` and is exact.
+- Cursor rules from tool conventions apply (bound to workspace, arguments and tree; re-validated; checked before any request).
 
 ## Acceptance criteria
-- [ ] A fixture with more items than one call reads gives the same roll-ups as the single-call result on a smaller one.
-- [ ] A forged or foreign cursor is refused before any request.
+- [x] A fixture with more items than one call reads gives the same roll-ups as the single-call result on a smaller one.
+- [x] A forged or foreign cursor is refused before any request.
 
 ## Security notes
 THREAT_MODEL A4: a continuation carries sums, never items or scope.

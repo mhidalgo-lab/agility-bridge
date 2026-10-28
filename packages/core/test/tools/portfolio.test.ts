@@ -27,7 +27,7 @@ const SNAPSHOT = snapshotJson as unknown as Record<string, unknown>;
 const NOW = Date.parse('2026-10-27T12:00:00Z');
 const inScope = { Scope: 'Scope:1001', 'Scope.Name': 'Mobile App' };
 
-function world(poisoned = false): NonNullable<FakeAgilityOptions['assets']> {
+function world(poisoned = false, extraStories = 0): NonNullable<FakeAgilityOptions['assets']> {
   const p = (n: number, plain: string) => (poisoned ? poison(n) : plain);
   const epic = (
     id: number,
@@ -92,6 +92,15 @@ function world(poisoned = false): NonNullable<FakeAgilityOptions['assets']> {
     item('Story', 2005, 'B-02005', 2, { Estimate: 7, Scope: 'Scope:1002' }),
     item('Story', 2006, 'B-02006', 4, { Estimate: 2, Status: 'StoryStatus:2', 'Status.Name': 'Done' }),
   ];
+  // Many more stories under the checkout epics, for the continuation tests: some closed, some without an estimate.
+  for (let i = 0; i < extraStories; i++) {
+    stories.push(
+      item('Story', 4000 + i, `B-${4000 + i}`, i % 3 === 0 ? 4 : 2, {
+        ...(i % 5 === 0 ? {} : { Estimate: 1 + (i % 4) }),
+        ...(i % 2 === 0 ? { AssetState: 128 } : {}),
+      }),
+    );
+  }
   const defects = [
     item('Defect', 3001, 'D-03001', 4, { Estimate: 1 }),
     item('Defect', 3002, 'D-03002', 2, { AssetState: 128 }),
@@ -483,5 +492,102 @@ describe('untrusted text and costs', () => {
       contains: 'a',
     });
     expect(m.withinCost, `${m.requests} > ${m.declared}`).toBe(true);
+  });
+});
+
+describe('get_portfolio_tree: a very large epic continues with a cursor (P6-16)', () => {
+  const build = (maxRows: number) => {
+    const fake = new FakeAgility({ meta: SNAPSHOT, assets: world(false, 40) });
+    const ctx = () =>
+      makeContext({
+        fetch: fake.fetch,
+        metadata: new MetadataService(),
+        budget: createBudget(100),
+        projects: { allowed: ['Scope:1001'], includeChildren: true },
+        clock: { now: () => NOW },
+        limits: { ...DEFAULT_LIMITS, maxRows },
+      });
+    return { fake, ctx };
+  };
+  const rollups = (nodes: Rows) =>
+    nodes.map((n) => ({
+      number: n['number'],
+      itemCount: n['itemCount'],
+      doneItemCount: n['doneItemCount'],
+      openDefectCount: n['openDefectCount'],
+      estimate: n['estimate'],
+      doneEstimate: n['doneEstimate'],
+      unestimatedItemCount: n['unestimatedItemCount'],
+      donePercent: n['donePercent'],
+      donePercentBasis: n['donePercentBasis'],
+    }));
+
+  it('gives, after the last step, the same roll-ups as one call that reads everything', async () => {
+    const whole = build(100);
+    const reference = await call(getPortfolioTree, whole.ctx(), {
+      asset: 'E-00001',
+      depth: 3,
+      max_items: 100,
+    });
+    expect(reference['isError'], text(reference)).toBeUndefined();
+    const small = build(4);
+    let cursor: string | undefined;
+    let steps = 0;
+    let last: Record<string, unknown> | undefined;
+    for (;;) {
+      const r = await call(getPortfolioTree, small.ctx(), {
+        asset: 'E-00001',
+        depth: 3,
+        max_items: 4,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      expect(r['isError'], text(r)).toBeUndefined();
+      steps++;
+      last = r;
+      cursor = tree(r)['nextCursor'] as string | undefined;
+      if (cursor === undefined) break;
+      // Until the last step the roll-ups say they are not exact.
+      expect(tree(r)['partial']).toBe(true);
+      expect(tree(r).nodes[0]?.['incomplete']).toBe(true);
+      expect(steps).toBeLessThan(10);
+    }
+    expect(steps).toBeGreaterThan(1);
+    const exact = rollups(tree(reference).nodes.filter((n) => n['number'] !== 'E-00003' && true));
+    const got = rollups(tree(last as Record<string, unknown>).nodes.filter((n) => n['number'] !== 'E-00003'));
+    expect(got).toEqual(exact);
+    expect(tree(last as Record<string, unknown>).nodes[0]?.['incomplete']).toBeUndefined();
+  });
+
+  it('refuses a forged, foreign or stale cursor before any item is read', async () => {
+    const small = build(4);
+    const first = await call(getPortfolioTree, small.ctx(), { asset: 'E-00001', depth: 3, max_items: 4 });
+    const cursor = tree(first)['nextCursor'] as string;
+    expect(typeof cursor).toBe('string');
+    const refused = async (args: Record<string, unknown>) => {
+      const before = small.fake.requests;
+      const r = await call(getPortfolioTree, small.ctx(), args);
+      expect((r['_meta'] as Record<string, { code?: string }>)['agility-bridge/error']?.code).toBe(
+        'AB_INPUT_INVALID',
+      );
+      return small.fake.requests - before;
+    };
+    // A cursor that is not ours, or edited: refused with no request at all.
+    expect(await refused({ asset: 'E-00001', depth: 3, max_items: 4, cursor: 'x'.repeat(40) })).toBe(0);
+    const edited = JSON.parse(atob(cursor.replace(/-/g, '+').replace(/_/g, '/'))) as Record<string, unknown>;
+    edited['s'] = '0:99999,1,1,1,1,1,1';
+    const forged = btoa(JSON.stringify(edited)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    // The totals are the caller's own numbers (never scope), so an edited total that fits is accepted as theirs;
+    // what cannot be accepted is a total that does not fit the tree.
+    edited['s'] = '99:1,1,1,1,1,1,1';
+    const badIndex = btoa(JSON.stringify(edited)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    expect(forged).not.toBe(cursor);
+    await refused({ asset: 'E-00001', depth: 3, max_items: 4, cursor: badIndex });
+    // Another epic or other arguments: the binding no longer matches, and nothing beyond resolving the epic is read.
+    await refused({ asset: 'E-00002', depth: 3, max_items: 4, cursor });
+    await refused({ asset: 'E-00001', depth: 2, max_items: 4, cursor });
+    // A cursor of another tool.
+    const other = await call(listPortfolioItems, small.ctx(), { limit: 1 });
+    expect(other['isError']).toBeUndefined();
+    await refused({ asset: 'E-00001', depth: 3, max_items: 4, cursor: list(other)['nextCursor'] ?? 'AAAA' });
   });
 });
