@@ -206,6 +206,8 @@ export interface OAuthDevice {
   readonly createdAt: number;
   /** Epoch ms, or null. */
   readonly expiresAt: number | null;
+  /** Epoch ms of the last token issuance or MCP request (to within about 5 minutes); null when not seen yet (P5-14). */
+  readonly lastUsedAt: number | null;
 }
 
 /** A device of any person, for the administrators' list (P5-08). */
@@ -355,6 +357,11 @@ export interface OAuthOptions {
    * window revokes the device (P5-05).
    */
   readonly refreshReuseWindowSeconds?: number;
+  /**
+   * Seconds without a token issuance or MCP request after which a device is refused at its next refresh (and so ends),
+   * 3600-31536000. Default: off (P5-14).
+   */
+  readonly idleTtlSeconds?: number;
 }
 
 export type OAuthAuthentication =
@@ -386,6 +393,14 @@ const PROVIDER_TOKEN_RE = /^([A-Za-z0-9_-]{1,128}):([A-Za-z0-9_-]{16}):([A-Za-z0
 export const MAX_OAUTH_TOKEN_CHARS = 200;
 const MAX_CACHED_SERVERS = 64;
 const CODE_MARKER_PREFIX = 'oauth-code:';
+/**
+ * When a device was last used, `oauth-used:<userId>:<grantId>` = epoch ms and nothing else (P5-14, T25). Written at a
+ * token issuance and at an MCP request, at most once per {@link USED_WRITE_INTERVAL_MS} per device and process.
+ */
+const USED_PREFIX = 'oauth-used:';
+const USED_WRITE_INTERVAL_MS = 5 * 60_000;
+/** Devices whose last write this process remembers; cleared when full (a repeat write is harmless). */
+const USED_THROTTLE_MAX = 2000;
 /**
  * Revoked device tombstones, `oauth-revoked:<userId>:<grantId>`: written before a device is revoked, so a token
  * request the provider was answering at that moment (it reads the grant, then writes it back) cannot bring the device
@@ -614,6 +629,10 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     throw new RangeError('oauth.refreshReuseWindowSeconds must not exceed the access token lifetime');
   }
   const reuseWindowMs = reuseWindow * 1000;
+  const idleTtlMs =
+    options.idleTtlSeconds === undefined
+      ? null
+      : checkInt('oauth.idleTtlSeconds', options.idleTtlSeconds, 3_600, 365 * 86_400) * 1000;
   if (typeof options.consent !== 'function') throw new TypeError('oauth.consent must be a function');
   const consent = options.consent;
   const onRevocation = deps.onRevocation ?? (() => undefined);
@@ -801,6 +820,31 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     return decision;
   };
 
+  const usedKey = (userId: string, grantId: string): string => `${USED_PREFIX}${userId}:${grantId}`;
+  /** Device -> when this process last wrote its row: the throttle that keeps the MCP hot path free of storage writes. */
+  const usedWritten = new Map<string, number>();
+  /** Records that a device is in use (throttled unless `force`; a failure never fails the request it rides on). */
+  const touchDevice = async (userId: string, grantId: string, force = false): Promise<void> => {
+    const key = usedKey(userId, grantId);
+    const at = clock.now();
+    const last = usedWritten.get(key);
+    if (!force && last !== undefined && at - last >= 0 && at - last < USED_WRITE_INTERVAL_MS) return;
+    if (usedWritten.size >= USED_THROTTLE_MAX) usedWritten.clear();
+    usedWritten.set(key, at);
+    try {
+      await storage.kv.set(key, String(at), { expiresAt: at + (refreshTtl + accessTtl) * 1000 });
+    } catch (error) {
+      usedWritten.delete(key);
+      logger.warn('oauth device use not recorded', { error: (error as Error).name });
+    }
+  };
+  /** When a device was last used; null when there is no row. */
+  const lastUsed = async (userId: string, grantId: string): Promise<number | null> => {
+    const raw = await storage.kv.get(usedKey(userId, grantId));
+    const n = raw !== null && /^\d{1,16}$/.test(raw) ? Number(raw) : Number.NaN;
+    return Number.isSafeInteger(n) ? n : null;
+  };
+
   /**
    * Every token issuance (code exchange, refresh) re-runs the access decision for the grant the device was approved
    * with. A final refusal is `invalid_grant`, on which the provider revokes the device's grant (its whole token family);
@@ -866,6 +910,14 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       { tokenId, clientId: o.clientId, expiresAt: null },
     );
     if (!decision.ok) return refuse(decision.reason, props.workspaceId);
+    // An idle device ends at its refresh, never at an authorization navigation (L-090); a device without a row is new
+    // to this check and starts counting now.
+    if (idleTtlMs !== null && !code) {
+      const used = await lastUsed(o.userId, o.grantId);
+      if (used !== null && clock.now() - used > idleTtlMs) return refuse('device_idle', props.workspaceId);
+    }
+    // A token request is not the hot path: it always records the use.
+    await touchDevice(o.userId, o.grantId, true);
     const grantEnd = decision.access.expiresAt;
     if (grantEnd === null) return undefined;
     const remaining = Math.floor((grantEnd - clock.now()) / 1000);
@@ -1226,6 +1278,8 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
   const revokeFamily = async (userId: string, grantId: string, helpers: OAuthHelpers): Promise<void> => {
     await storage.kv.set(tombstone(userId, grantId), '1', { expiresAt: clock.now() + tombstoneTtlMs });
     await helpers.revokeGrant(grantId, userId);
+    usedWritten.delete(usedKey(userId, grantId));
+    await storage.kv.delete(usedKey(userId, grantId)).catch(() => undefined);
   };
   /**
    * After the provider issued tokens for the code in `presented`: if its device was revoked meanwhile (a concurrent
@@ -1596,6 +1650,7 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     helpers: OAuthHelpers,
     g: GrantSummary,
     names?: Map<string, string | null>,
+    userId?: string,
   ): Promise<OAuthDevice> => {
     let name: string | null = names?.get(g.clientId) ?? null;
     if (names === undefined || !names.has(g.clientId)) {
@@ -1622,6 +1677,7 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       label: meta.label,
       createdAt: g.createdAt * 1000,
       expiresAt: g.expiresAt === undefined ? null : g.expiresAt * 1000,
+      lastUsedAt: userId === undefined ? null : await lastUsed(userId, g.id).catch(() => null),
     };
   };
 
@@ -1688,7 +1744,8 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       const grants = (await allGrants(helpers, userId))
         .sort((a, b) => byAge(b, a))
         .slice(0, MAX_OAUTH_DEVICES_PER_USER);
-      return Promise.all(grants.map((g) => toDevice(helpers, g)));
+      const names = new Map<string, string | null>();
+      return Promise.all(grants.map((g) => toDevice(helpers, g, names, userId)));
     },
 
     async revokeDevice(c, userId, deviceId) {
@@ -2428,6 +2485,7 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
         { tokenId, clientId: validated.clientId, expiresAt: validated.expiresAt * 1000 },
       );
       if (!decision.ok) return { ok: false, stage: 'access', tokenId, reason: decision.reason };
+      await touchDevice(props.userId, providerGrant);
       return { ok: true, access: decision.access };
     },
   };

@@ -143,7 +143,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 - **MyGrant**: `grant`: Grant, `workspace`: object \| null
 - **OAuthAdminDevice**: `id`: string, `userId`: string, `userEmail`: string \| null, `userName`: string \| null, `userRole`: "owner" \| "admin" \| "member" \| null, `clientName`: string \| null, `redirectHost`: string, `workspaceId`: string \| null, `workspaceName`: string \| null, `workspaceSlug`: string \| null, `label`: string \| null, `createdAt`: number, `expiresAt`: number \| null
 - **OAuthClient**: `clientId`: string, `kind`: "dynamic" \| "metadata_document", `name`: string \| null, `redirectHosts`: string[], `createdAt`: number \| null, `lastApprovedAt`: number \| null, `devices`: number \| null
-- **OAuthDevice**: `id`: string, `clientName`: string \| null, `redirectHost`: string, `workspaceId`: string \| null, `workspaceName`: string \| null, `workspaceSlug`: string \| null, `label`: string \| null, `createdAt`: number, `expiresAt`: number \| null
+- **OAuthDevice**: `id`: string, `clientName`: string \| null, `redirectHost`: string, `workspaceId`: string \| null, `workspaceName`: string \| null, `workspaceSlug`: string \| null, `label`: string \| null, `createdAt`: number, `expiresAt`: number \| null, `lastUsedAt`: number \| null
 - **Session**: `actor`: "session" \| "break_glass" \| "user", `user`: object \| null, `recentAuth`: boolean, `signedInAt`: number \| null, `idleExpiresAt`: number \| null, `expiresAt`: number \| null, `csrfToken`: string \| null
 - **SetupLink**: `id`: string, `url`: string, `expiresAt`: number
 - **Tool**: `name`: string, `kind`: "read" \| "write" \| "destructive", `group`: string, `cost`?: integer, `siblings`?: string[]

@@ -33,7 +33,7 @@ How to use it:
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280, L-304, L-316 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267, L-345 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -1200,6 +1200,15 @@ it discards its tokens. A metadata document that was unreachable for a moment, o
 `4xx` verdicts for what is wrong with the client, and do not count the passing ones as the client's failures. Decide the same way for
 every refusal a refresh makes (D-77).
 *Applied in:* P5-10, `server.ts` (`refusedClient`), `clients.ts`.
+
+**L-345 — A throttled "last used" record must say what a missing record means, and be written without the throttle where a decision reads it.**
+A last-used time that is written at most every few minutes is cheap on the hot path, but two things go wrong. The throttle lives in
+one process, so a request that decides something from the record (an idle expiry at a refresh) must not be the one the throttle
+skips: token requests write it every time. And a record that expires, was never written (devices approved before the feature) or is
+unreadable must not read as "idle for ever": a missing row means "start counting now", so switching the expiry on never
+disconnects everyone at once. Test the decision by moving the stored time, which works on every host, rather than the clock, which
+does not in workerd.
+*Applied in:* P5-14, `server.ts` (`touchDevice`, `checkIssuance`), `suite.ts` (`defineDeviceActivitySuite`).
 
 ## K. Admin UI
 

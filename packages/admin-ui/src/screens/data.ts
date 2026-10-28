@@ -331,6 +331,8 @@ export interface OAuthDevice {
   readonly label: string | null;
   readonly createdAt: number;
   readonly expiresAt: number | null;
+  /** Last token issuance or request, to within about 5 minutes; null when not seen yet. */
+  readonly lastUsedAt: number | null;
 }
 
 /** The id of an OAuth device: the provider's 16 URL-safe characters. */
@@ -348,6 +350,7 @@ export function parseOAuthDevice(r: Row): OAuthDevice | null {
     label: strOrNull(r['label']),
     createdAt: int(r['createdAt']),
     expiresAt: intOrNull(r['expiresAt']),
+    lastUsedAt: intOrNull(r['lastUsedAt']),
   };
 }
 

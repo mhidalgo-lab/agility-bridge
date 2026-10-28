@@ -72,6 +72,7 @@ export interface AdminOAuthDevices {
       readonly label: string | null;
       readonly createdAt: number;
       readonly expiresAt: number | null;
+      readonly lastUsedAt: number | null;
     }[]
   >;
   /** False when the id is not one of this person's devices. */
@@ -1435,6 +1436,10 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       label: z.string().nullable().openapi({ description: 'The device name typed on the consent screen.' }),
       createdAt: z.number(),
       expiresAt: z.number().nullable(),
+      lastUsedAt: z.number().nullable().openapi({
+        description:
+          'When a token was last issued or the app last made a request, to within about 5 minutes; null when not seen yet.',
+      }),
     })
     .openapi('OAuthDevice');
   /** The signed-in person's id for the OAuth device routes: a session only, never the break-glass token. */
