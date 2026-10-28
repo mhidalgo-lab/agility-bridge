@@ -7,7 +7,14 @@ import { z } from 'zod';
 import { agilityClient } from '../../agility/client.ts';
 import { capBudget, type ToolContext } from '../../context.ts';
 import { AbError, ErrorCode } from '../../errors.ts';
-import { resolveProject, resolveSprint, resolveTeam, runPage } from '../../identity/resolve.ts';
+import {
+  type Page,
+  pageOf,
+  resolveProject,
+  resolveSprint,
+  resolveTeam,
+  runPage,
+} from '../../identity/resolve.ts';
 import { inScope, oidsOf, sanitizeRow } from '../../identity/scope.ts';
 import { metadataFor, type StatusCategory } from '../../metadata/service.ts';
 import { assetState, shapeOutput, untrusted } from '../../output/result.ts';
@@ -29,6 +36,10 @@ const MAX_HISTORY_QUERIES = 60;
 const QUERIES_PER_REQUEST = 20;
 /** Rows one batched history request may ask for, so a large page size means fewer queries per request (P6-42). */
 const ROWS_PER_REQUEST = 2000;
+/** History requests in flight together, under the connection limit (P6-41). */
+const HISTORY_CONCURRENCY = 3;
+/** Up to this page size the first two pages of the sprint travel in one request (P6-41); bigger pages could pass the cap. */
+const BATCH_PAGES_UP_TO = 250;
 const ITEM_LIST_CAP = 100;
 const CATEGORIES = ['not_started', 'in_progress', 'completed', 'unknown'] as const;
 type Category = (typeof CATEGORIES)[number];
@@ -68,6 +79,13 @@ function instant(value: unknown): number | undefined {
     utcIso(v) ?? utcIso(`${v}Z`) ?? (/^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T00:00:00.000Z` : undefined);
   return iso === undefined ? undefined : Date.parse(iso);
 }
+
+/** The same compiled query on another page: only `offset` and the page start differ. */
+const atOffset = (c: CompiledQuery, offset: number): CompiledQuery => ({
+  ...c,
+  offset,
+  body: { ...c.body, page: { ...(c.body['page'] as Record<string, unknown>), start: offset } },
+});
 
 const zoneless = (value: unknown): boolean => typeof value === 'string' && utcIso(value) === undefined;
 
@@ -259,13 +277,25 @@ export const getSprint: ToolDefinition = defineTool({
     const current: Item[] = [];
     let hidden = 0;
     let capped = false;
+    const richCompiled = new Map<number, CompiledQuery>();
+    const richAt = async (page: number): Promise<CompiledQuery> => {
+      const known = richCompiled.get(page);
+      if (known !== undefined) return known;
+      const c = await compileItems(rich, page * pageSize, basis === 'end_of_sprint' ? basisAt : undefined);
+      richCompiled.set(page, c);
+      return c;
+    };
+    // Pages 0 and 1 go out in one request (the second is read ahead and dropped when the first is the last page).
+    const ahead = new Map<number, Page>();
+    if (pageSize <= BATCH_PAGES_UP_TO) {
+      const pair = [await richAt(0), await richAt(1)];
+      const res = await agilityClient(ctx).query<unknown[]>(pair.map((c) => c.body));
+      for (const [i, c] of pair.entries())
+        ahead.set(i, pageOf(ctx, c, Array.isArray(res.data) ? res.data[i] : undefined));
+    }
     for (let page = 0; page < MAX_PAGES; page++) {
-      const compiled = await compileItems(
-        rich,
-        page * pageSize,
-        basis === 'end_of_sprint' ? basisAt : undefined,
-      );
-      const result = await runPage(ctx, compiled);
+      const compiled = await richAt(page);
+      const result = ahead.get(page) ?? (await runPage(ctx, compiled));
       const { kept, hidden: h } = keep(ctx, compiled, result.rows);
       hidden += h + result.hidden;
       current.push(...kept.map(toItem));
@@ -330,40 +360,51 @@ export const getSprint: ToolDefinition = defineTool({
       // queries go out in a few batched requests that stay well under the response cap.
       const queries: Array<{ t: number; last: boolean; compiled: CompiledQuery }> = [];
       for (const t of wanted) {
+        // Compiled once per point (asof validated there); the later pages only move the offset (P6-41).
+        const first = await compileItems(light, 0, t);
         for (let page = 0; page < pagesPerPoint; page++)
           queries.push({
             t,
             last: page === pagesPerPoint - 1,
-            compiled: await compileItems(light, page * pageSize, t),
+            compiled: page === 0 ? first : atOffset(first, page * pageSize),
           });
       }
       const rowsAt = new Map<number, { rows: Row[]; complete: boolean; compiled: CompiledQuery[] }>();
       const perRequest = Math.max(1, Math.min(QUERIES_PER_REQUEST, Math.floor(ROWS_PER_REQUEST / pageSize)));
       const oversized = new Set<number>();
-      for (let from = 0; from < queries.length; from += perRequest) {
-        const chunk = queries.slice(from, from + perRequest);
-        let res: { data: unknown };
+      const chunks: Array<typeof queries> = [];
+      for (let from = 0; from < queries.length; from += perRequest)
+        chunks.push(queries.slice(from, from + perRequest));
+      // A few requests at a time; a chunk over the response cap leaves out its points, not the whole call (P6-42).
+      const answer = async (chunk: typeof queries): Promise<unknown> => {
         try {
-          res = await agilityClient(ctx).query<unknown[]>(chunk.map((q) => q.compiled.body));
+          return (await agilityClient(ctx).query<unknown[]>(chunk.map((q) => q.compiled.body))).data;
         } catch (error) {
-          // A chunk that passes the response cap leaves out its points, not the whole call (P6-42).
           if (error instanceof AbError && error.code === ErrorCode.LimitResponseTooLarge) {
             for (const q of chunk) oversized.add(q.t);
-            continue;
+            return undefined;
           }
           throw error;
         }
-        for (const [i, q] of chunk.entries()) {
-          const set = Array.isArray(res.data) ? res.data[i] : undefined;
-          const raw = Array.isArray(set)
-            ? set.filter((r): r is Row => r !== null && typeof r === 'object' && !Array.isArray(r))
-            : [];
-          const entry = rowsAt.get(q.t) ?? { rows: [], complete: true, compiled: [] };
-          entry.rows.push(...raw.slice(0, pageSize));
-          // The extra row (limit + 1) of the last page means the sprint had more items than the pages read.
-          if (q.last && raw.length > pageSize) entry.complete = false;
-          entry.compiled.push(q.compiled);
-          rowsAt.set(q.t, entry);
+      };
+      for (let from = 0; from < chunks.length; from += HISTORY_CONCURRENCY) {
+        const group = chunks.slice(from, from + HISTORY_CONCURRENCY);
+        const answers = await Promise.all(group.map(answer));
+        for (const [g, chunk] of group.entries()) {
+          const data = answers[g];
+          if (data === undefined) continue;
+          for (const [i, q] of chunk.entries()) {
+            const set = Array.isArray(data) ? data[i] : undefined;
+            const raw = Array.isArray(set)
+              ? set.filter((r): r is Row => r !== null && typeof r === 'object' && !Array.isArray(r))
+              : [];
+            const entry = rowsAt.get(q.t) ?? { rows: [], complete: true, compiled: [] };
+            entry.rows.push(...raw.slice(0, pageSize));
+            // The extra row (limit + 1) of the last page means the sprint had more items than the pages read.
+            if (q.last && raw.length > pageSize) entry.complete = false;
+            entry.compiled.push(q.compiled);
+            rowsAt.set(q.t, entry);
+          }
         }
       }
       const points = new Map<number, Item[]>();

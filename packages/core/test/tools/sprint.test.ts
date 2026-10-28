@@ -269,6 +269,48 @@ describe('a running sprint', () => {
     expect(bodies.every((b) => Date.parse(b.asof) < NOW)).toBe(true);
   });
 
+  it('reads the first two pages of the sprint in one request (P6-41)', async () => {
+    const { ctx, fake } = setup();
+    const r = await call(ctx(), { burndown: false });
+    expect(r['isError'], text(r)).toBeUndefined();
+    const reads = fake.calls.filter(
+      (c) =>
+        c.path === 'query.v1' &&
+        Array.isArray(c.body) &&
+        (c.body as Array<{ from?: string }>).every((b) => b.from === 'PrimaryWorkitem'),
+    );
+    expect(reads).toHaveLength(1);
+    const starts = ((reads[0]?.body ?? []) as Array<{ page: { start: number } }>).map((b) => b.page.start);
+    expect(starts).toEqual([0, 100]);
+    expect(s(r)['totals']).toMatchObject({ itemCount: 5 });
+  });
+
+  it('sends the history requests together, at most three at a time, within the L-279 bounds (P6-41)', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const { ctx, fake } = setup({
+      override: async (_req, c) => {
+        const bodies = Array.isArray(c.body) ? c.body : [c.body];
+        if (c.path !== 'query.v1' || !bodies.some((b) => (b as { asof?: string }).asof !== undefined))
+          return undefined;
+        peak = Math.max(peak, ++inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        inFlight--;
+        return undefined;
+      },
+    });
+    // 1000 rows per page: two queries per request, so the seven points need four requests.
+    const r = await call(ctx({ limits: { ...DEFAULT_LIMITS, maxRows: 1000 } }), {});
+    expect(r['isError'], text(r)).toBeUndefined();
+    const history = asofCalls(fake.calls);
+    expect(history).toHaveLength(4);
+    expect(peak).toBe(3);
+    const sizes = history.map((c) => (c.body as unknown[]).length);
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(20);
+    expect(sizes.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(60);
+    expect(s(r)['burndown']).toHaveLength(8);
+  });
+
   it('skips history entirely with burndown false', async () => {
     const { ctx, fake } = setup();
     const out = s(await call(ctx(), { burndown: false }));
@@ -299,8 +341,8 @@ describe('a finished sprint', () => {
     // The last point (the end of the sprint) equals the remaining estimate of the totals; the ideal reaches 0.
     expect(points.at(-1)).toMatchObject({ at: '2026-10-15T00:00:00.000Z', remaining: 7, ideal: 0 });
     expect(points.at(-1)?.remaining).toBe(out['totals'].remaining);
-    // Reads are bounded: the items at the end, then one batched request for the 14 earlier points.
-    expect(asofCalls(fake.calls).map((c) => (Array.isArray(c.body) ? c.body.length : 1))).toEqual([1, 14]);
+    // Reads are bounded: pages 0 and 1 of the items at the end in one request, then one batched request for the 14 earlier points.
+    expect(asofCalls(fake.calls).map((c) => (Array.isArray(c.body) ? c.body.length : 1))).toEqual([2, 14]);
   });
 
   it('widens the step so a long sprint never has more than 15 points', async () => {
