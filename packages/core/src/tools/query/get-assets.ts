@@ -10,7 +10,7 @@ import { compileQuery, type FilterInput } from '../../query/compiler.ts';
 import { limitError } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import { boundedListOutput, formatArg, minimalOutputArg } from '../common.ts';
-import { fieldInfo, IDENTITY_FIELDS, toItem } from './rows.ts';
+import { type FieldInfo, fieldInfo, IDENTITY_FIELDS, localTimeNote, toItem } from './rows.ts';
 
 const COST = 16;
 const MAX_TYPES = 8;
@@ -97,6 +97,7 @@ export const getAssets: ToolDefinition = defineTool({
     const items: Record<string, unknown>[] = [];
     const notes: string[] = [];
     const richText = new Set<string>();
+    const infos: FieldInfo[] = [];
     const columns = new Set<string>(['number', 'assetType', 'oid', 'state', 'project']);
     for (const [type, wanted] of byType) {
       if (!(await readable(ctx, type))) continue;
@@ -136,6 +137,7 @@ export const getAssets: ToolDefinition = defineTool({
       const info = await fieldInfo(ctx, type, compiled.fields);
       for (const f of info.richText) richText.add(f);
       for (const f of compiled.fields) columns.add(f);
+      infos.push(info);
       const numbers = new Set([...wanted.numbers].map((n) => n.toUpperCase()));
       for (const r of (await runQuery(ctx, compiled)).rows) {
         // Only the assets that were asked for: an upstream that ignores the filter must not add others (L-122).
@@ -143,6 +145,10 @@ export const getAssets: ToolDefinition = defineTool({
         const number = typeof item['number'] === 'string' ? item['number'].toUpperCase() : '';
         if (wanted.oids.has(item['oid'] as string) || numbers.has(number)) items.push(item);
       }
+    }
+    for (const info of infos) {
+      const note = localTimeNote(items, info);
+      if (note !== undefined && !notes.includes(note)) notes.push(note);
     }
     const found = new Set(
       items.flatMap((i) => [i['oid'], i['number']].filter((x): x is string => typeof x === 'string')),

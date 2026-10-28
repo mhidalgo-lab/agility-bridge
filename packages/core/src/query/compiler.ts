@@ -317,7 +317,7 @@ async function compileFilterToken(
       `Use one of ${FILTER_OPS.join(', ')}.`,
     );
   }
-  const resolved = await metadataFor(ctx).resolvePath(type, f.field);
+  const resolved = await utcVariant(ctx, type, await metadataFor(ctx).resolvePath(type, f.field));
   if (hops(resolved.path) > ctx.limits.maxNestingDepth) {
     throw limitError('maxNestingDepth', ctx.limits.maxNestingDepth, 'relation hops', hops(resolved.path));
   }
@@ -358,6 +358,23 @@ async function compileFilterToken(
  * relation's target type (`Children[AssetState!='Dead'].@Count`, `Actuals[IsDeleted='false'].Value.@Sum`), because
  * aggregations include them otherwise (L-143). Other paths are sent as validated.
  */
+/**
+ * A plain date attribute (`ChangeDate`) whose type has a `…UTC` sibling is read, filtered and sorted through the
+ * sibling: the plain one is a zone-less local time that looks like UTC but is not (P1-19, L-149). Values still come
+ * back under the key the caller asked for.
+ */
+async function utcVariant(ctx: ToolContext, type: string, resolved: ResolvedPath): Promise<ResolvedPath> {
+  if (resolved.kind !== 'Date' || resolved.aggregation !== undefined || resolved.path.endsWith('UTC'))
+    return resolved;
+  try {
+    const sibling = await metadataFor(ctx).resolvePath(type, `${resolved.path}UTC`);
+    return sibling.kind === 'Date' ? sibling : resolved;
+  } catch (error) {
+    if (error instanceof AbError && error.code === ErrorCode.InputInvalid) return resolved;
+    throw error;
+  }
+}
+
 async function sentPath(ctx: ToolContext, type: string, resolved: ResolvedPath): Promise<string> {
   if (resolved.aggregation === undefined) return resolved.path;
   const [relation = '', ...rest] = resolved.path.split('.');
@@ -473,13 +490,13 @@ export async function compileQuery(
   const guards: Array<{ key: string; guards: string[] }> = [];
   let aggregations = 0;
   for (const field of fields) {
-    const resolved = await md.resolvePath(type, field);
+    const resolved = await utcVariant(ctx, type, await md.resolvePath(type, field));
     if (hops(resolved.path) > limits.maxNestingDepth) {
       throw limitError('maxNestingDepth', limits.maxNestingDepth, 'relation hops', hops(resolved.path));
     }
     if (resolved.aggregation !== undefined) aggregations++;
     const sent = await sentPath(ctx, type, resolved);
-    select.push(sent);
+    if (!select.includes(sent)) select.push(sent);
     keys[field] = sent;
     const g = await pathGuards(ctx, strategy, resolved, false, restricted);
     if (g.length > 0) guards.push({ key: sent, guards: g });
@@ -554,7 +571,7 @@ export async function compileQuery(
     throw limitError('maxSortFields', MAX_SORT, 'sort fields', sortInput.length);
   const sort: string[] = [];
   for (const s of sortInput) {
-    const resolved = await md.resolvePath(type, s.field);
+    const resolved = await utcVariant(ctx, type, await md.resolvePath(type, s.field));
     // Sorting through a relation follows the same type and member rules (its order cannot be guarded per row).
     await pathGuards(ctx, strategy, resolved, false, restricted);
     if (resolved.multi || resolved.aggregation !== undefined || !SORTABLE_KINDS.has(resolved.kind)) {

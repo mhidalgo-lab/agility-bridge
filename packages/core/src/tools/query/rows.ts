@@ -75,3 +75,24 @@ export function toItem(
   }
   return item;
 }
+
+/**
+ * A note when a returned date has no zone (a date attribute without a `…UTC` sibling): it is local time with an
+ * unknown zone, kept raw because a zone is never guessed (P1-19, L-149).
+ */
+export function localTimeNote(
+  items: readonly Readonly<Record<string, unknown>>[],
+  info: FieldInfo,
+): string | undefined {
+  const local = new Set<string>();
+  for (const [field, kind] of info.kinds) {
+    if (kind !== 'Date') continue;
+    for (const item of items) {
+      const v = item[field];
+      if (typeof v === 'string' && utcIso(v) === undefined) local.add(field);
+    }
+  }
+  return local.size === 0
+    ? undefined
+    : `${[...local].join(', ')}: local time with an unknown zone (no UTC variant exists); do not read it as UTC.`;
+}

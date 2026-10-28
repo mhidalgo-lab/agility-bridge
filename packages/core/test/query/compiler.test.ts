@@ -52,6 +52,26 @@ const compile = (input: QueryInput, c = ctx(), allowGlobal = false) =>
   compileQuery(c, input, { allowGlobal });
 
 describe('compileQuery', () => {
+  it('reads, filters and sorts a plain date attribute through its UTC sibling (P1-19)', async () => {
+    const q = await compile({
+      assetType: 'Story',
+      fields: ['Number', 'ChangeDate'],
+      filters: [{ field: 'ChangeDate', op: 'ge', value: '2026-10-01T16:00:00Z' }],
+      sort: [{ field: 'ChangeDate', direction: 'desc' }],
+    });
+    const body = JSON.stringify(q.body);
+    expect(q.keys['ChangeDate']).toBe('ChangeDateUTC');
+    expect((q.body['select'] as string[]).includes('ChangeDate')).toBe(false);
+    expect(body).toContain('ChangeDateUTC>=');
+    expect(q.body['sort']).toContain('-ChangeDateUTC');
+    expect(Object.values(q.body['with'] as Record<string, unknown>)).toContain('2026-10-01T16:00:00.000Z');
+  });
+
+  it('selects one column when both date variants are asked for', async () => {
+    const q = await compile({ assetType: 'Story', fields: ['ChangeDate', 'ChangeDateUTC'] });
+    expect((q.body['select'] as string[]).filter((f) => f === 'ChangeDateUTC')).toHaveLength(1);
+  });
+
   it('compiles a typical read with bound values and server-owned predicates', async () => {
     const q = await compile({
       assetType: 'Story',

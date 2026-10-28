@@ -18,7 +18,7 @@ import {
   minimalOutputArg,
   projectArg,
 } from '../common.ts';
-import { fieldInfo, IDENTITY_FIELDS, toItem } from './rows.ts';
+import { fieldInfo, IDENTITY_FIELDS, localTimeNote, toItem } from './rows.ts';
 
 const NAME = 'query_assets';
 const COST = 12;
@@ -152,7 +152,10 @@ export const queryAssets: ToolDefinition = defineTool({
       .map((r) => toItem(r, type, compiled.fields, info, compiled.keys));
     return shapeList(ctx, {
       summary: `${items.length} ${type} row${items.length === 1 ? '' : 's'}${offset > 0 ? ` from row ${offset + 1}` : ''}, sorted by ${(compiled.body['sort'] as string[]).join(', ')}.`,
-      notes: projectNote === undefined ? [] : [`Only ${projectNote}`],
+      notes: [
+        ...(projectNote === undefined ? [] : [`Only ${projectNote}`]),
+        ...(localTimeNote(items, info) === undefined ? [] : [localTimeNote(items, info) as string]),
+      ],
       source: `${type} rows`,
       rows: items,
       columns: ['number', 'assetType', 'oid', 'state', 'project', ...compiled.fields],

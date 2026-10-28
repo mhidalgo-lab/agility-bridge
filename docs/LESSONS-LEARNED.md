@@ -43,7 +43,7 @@ How to use it:
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241 |
-| [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297 |
+| [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297, L-335 |
 | [Top 20](#top-20) | the lessons that save the most time |
 
 ---
@@ -2100,6 +2100,14 @@ rejects with its own message, which scores as "no tool": the eight silent answer
 that could hide a followed injection. Router runs are accepted as evidence with that caveat stated, and every report is read
 for router messages.
 *Applied in:* P6-33, `scripts/eval-llm.ts` (`ANTHROPIC_BASE_URL`), `docs/dev/evals.md`, L-332.
+
+**L-335 — Choosing the UTC variant belongs in the compiler, not in each tool.**
+L-149 was applied to the default tiers, so a caller who asked for `ChangeDate` or `CreateDate` by name got a zone-less
+local time that read like UTC (11 hours off on a live tenant). One rule in the query compiler now maps a plain date
+attribute to its `…UTC` sibling when the type has one, for selects, filters and sorts alike, and the value still comes back
+under the key the caller used; a date with no sibling stays raw and the result carries a note that it is local time with an
+unknown zone. A per-tool fix would have left every new tool one omission away from the same bug.
+*Applied in:* P1-19, `query/compiler.ts` (`utcVariant`), `tools/query/rows.ts` (`localTimeNote`), L-149.
 
 ---
 
