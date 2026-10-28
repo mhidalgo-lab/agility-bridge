@@ -111,7 +111,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 
 | Method | Path | What | Body | Response |
 |---|---|---|---|---|
-| `GET` | `/users` | List users | — | 200 User[] |
+| `GET` | `/users` | List users, oldest first. `limit` and `offset` return one page, `ids` (comma-separated, at most 50) only those users | — | 200 User[] |
 | `POST` | `/users` | Create a user | `email`: string<br>`role`: "owner" \| "admin" \| "member"<br>`displayName`?: string \| null | 201 User |
 | `GET` | `/users/{id}` | Get a user | — | 200 User |
 | `PATCH` | `/users/{id}` | Change a user | `email`?: string<br>`role`?: "owner" \| "admin" \| "member"<br>`displayName`?: string \| null | 200 User |

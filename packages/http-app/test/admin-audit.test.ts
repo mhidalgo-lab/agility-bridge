@@ -568,3 +568,54 @@ describe('audit pages read through the admin API, never storage directly', () =>
     expect(query.mock.calls[0]?.[0]).toMatchObject({ limit: 1_000 });
   });
 });
+
+describe('list screens cost does not grow with the number of users (P4-28)', () => {
+  const addUsers = async (s: S) => {
+    for (let i = 0; i < 130; i++)
+      await s.w.storage.users.create({
+        id: `usr_p${String(i).padStart(3, '0')}`,
+        email: `p${i}@example.test`,
+        role: 'member',
+      });
+  };
+
+  it('GET /users pages, narrows by id and keeps its authorization', async () => {
+    const { s, owner, alice, users } = await env();
+    await addUsers(s);
+    const ids = async (query: string, who: Session = owner) =>
+      ((await (await s.api('GET', `/users${query}`, who)).json()) as { id: string }[]).map((u) => u.id);
+    const everyone = await ids('');
+    expect(everyone.length).toBeGreaterThan(130);
+    expect(await ids('?limit=5&offset=2')).toEqual(everyone.slice(2, 7));
+    expect(await ids(`?ids=${users.bob},${users.alice},nope`)).toEqual(
+      everyone.filter((id) => id === users.bob || id === users.alice),
+    );
+    for (const bad of ['?limit=0', '?limit=201', '?offset=-1', '?limit=x']) {
+      expect((await s.api('GET', `/users${bad}`, owner)).status, bad).toBe(422);
+    }
+    // A member sees only themselves whatever the paging or ids say: nobody else's row is ever returned.
+    for (const q of ['', '?limit=5', '?offset=1', `?ids=${users.owner},${users.bob}`]) {
+      const own = (await (await s.api('GET', `/users${q}`, alice)).json()) as { id: string }[];
+      expect(
+        own.every((u) => u.id === users.alice),
+        q,
+      ).toBe(true);
+    }
+  });
+
+  it('the users screen pages on the server and the audit screen names users by id', async () => {
+    const { s, owner } = await env();
+    await addUsers(s);
+    const html = await (await page(s, '/admin/users?page=2', owner)).text();
+    expect(html).toContain('page=3');
+    expect(html).toContain('/admin/users');
+    const last = await (await page(s, '/admin/users?page=6', owner)).text();
+    expect(last).not.toContain('page=7');
+    // A user past the first 100 is named on the audit page and stays selectable as the filter.
+    const late = 'usr_p129';
+    await row(s, { userId: late, action: 'grant.create', kind: 'admin' });
+    const audit = await (await page(s, `/admin/audit?user=${late}`, owner)).text();
+    expect(audit).toContain('p129@example.test');
+    expect(audit).toMatch(new RegExp(`<option value="${late}"[^>]*selected`));
+  });
+});

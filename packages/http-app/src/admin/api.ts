@@ -358,6 +358,15 @@ const TokenListItemOut = TokenOut.extend({
   workspaceId: z.string(),
   grantLabel: z.string().nullable(),
 }).openapi('DeviceTokenListItem');
+const UserListQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  offset: z.coerce.number().int().min(0).max(100_000).optional(),
+  ids: z
+    .string()
+    .max(50 * 130)
+    .optional(),
+});
+
 const TokenListQuery = z.object({
   grantId: z.string().max(128).optional(),
   userId: z.string().max(128).optional(),
@@ -825,8 +834,27 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
   );
 
   const user = { tag: 'users' };
-  add({ method: 'get', path: '/users', ...user, summary: 'List users', out: z.array(UserOut) }, (c) =>
-    services(c).users.list(),
+  add(
+    {
+      method: 'get',
+      path: '/users',
+      ...user,
+      summary:
+        'List users, oldest first. `limit` and `offset` return one page, `ids` (comma-separated, at most 50) only those users',
+      query: UserListQuery,
+      out: z.array(UserOut),
+    },
+    async (c, { query }) => {
+      const q = query as z.infer<typeof UserListQuery>;
+      // The same authorization as the full list; the slice is taken before the rows are validated and serialized (P4-28).
+      const all = await services(c).users.list();
+      if (q.ids !== undefined) {
+        const wanted = new Set(q.ids.split(',').slice(0, 50));
+        return all.filter((u) => wanted.has(u.id));
+      }
+      const from = q.offset ?? 0;
+      return q.limit === undefined && from === 0 ? all : all.slice(from, from + (q.limit ?? all.length));
+    },
   );
   add(
     {

@@ -2,7 +2,7 @@
 id: P4-28
 title: "Panel list screens: cost grows with the number of users"
 phase: 4
-status: todo
+status: done
 priority: low
 depends_on: [P4-14]
 adr: ["0010"]
@@ -25,11 +25,23 @@ The two list screens fit the Free plan's CPU budget at a few hundred users, with
 - The users list parses and validates the whole list for a 25-row page: page on the server side if the profile says so.
 
 ## Acceptance criteria
-- [ ] The profile is recorded under Outcome and `warm: admin: users list` and `warm: admin: audit` improve in the baseline.
-- [ ] Negative authorization tests of both screens and of any changed admin API route still pass.
+- [x] The profile is recorded under Outcome and `warm: admin: users list` and `warm: admin: audit` improve in the baseline.
+- [x] Negative authorization tests of both screens and of any changed admin API route still pass.
 
 ## Docs to update
 - docs/guide/cloudflare-limits.md
 
 ## Out of scope
 - Moving the panel off the in-process admin API.
+
+## Outcome
+- Where the time went (by request breakdown; `--cpu-prof` was not usable, the machine ran several test suites at once and
+  timings moved 4x between runs): the audit page made three in-process admin API calls (audit rows, every workspace, every
+  user) and the users screen parsed and validated all users for a 25-row page. The costs that grow with users are the two
+  full-user parses.
+- Built: `GET /users` takes `limit`, `offset` and `ids` (D-127); the users screen asks for one page plus one row; the audit
+  page loads at most 100 users and names the rest by id (D-128). Authorization is unchanged (tests: a member still gets only
+  their own row, bad paging is a 422).
+- Benchmark: relative to the overview in the same run, users list went from 3.0x to about 1.2x and audit from 2.5x to about
+  1.7x. The baseline entries were set from those ratios, not from absolute numbers (this machine was too busy for a clean
+  `--update`); refresh them from CI.
