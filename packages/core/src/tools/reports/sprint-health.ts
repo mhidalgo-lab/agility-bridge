@@ -23,6 +23,7 @@ import {
   sectionNotes,
   strOf,
 } from './common.ts';
+import { classifySiblingNotes } from './sibling-notes.ts';
 
 const NAME = 'sprint_health';
 /** get_sprint (30) + search_work_items (24). */
@@ -90,10 +91,13 @@ export const sprintHealth: ToolDefinition = defineTool({
     const runs: SectionRun[] = [sprintRun, workRun];
     rethrowIfNothingRead(runs);
     const notes: Line[] = sectionNotes(runs, TITLES);
-    // The sibling's notes were already flattened to text; a note that carries an Agility name would otherwise reach the
-    // model outside the envelope. They are forwarded as untrusted data, never as our own text (P6-13).
-    for (const n of Array.isArray(sprintData?.['notes']) ? (sprintData['notes'] as unknown[]) : [])
-      if (typeof n === 'string') notes.push(['Sprint note: ', untrusted(n)]);
+    // The sibling's notes were flattened to text. A note that is one of our fixed templates is our own text with a code;
+    // anything else could carry an Agility name and is forwarded as untrusted data (P6-13, P6-48).
+    const siblingNotes = classifySiblingNotes(
+      Array.isArray(sprintData?.['notes']) ? (sprintData['notes'] as unknown[]) : [],
+    );
+    for (const n of siblingNotes.own) notes.push(`Sprint section: ${n.text}`);
+    for (const n of siblingNotes.untrusted) notes.push(['Sprint note: ', untrusted(n)]);
 
     // Pace.
     const timing = strOf(sprint?.['timing']);
@@ -248,6 +252,7 @@ export const sprintHealth: ToolDefinition = defineTool({
         workRun.data?.['hiddenOutsideScope'] === true,
       structured: {
         sections: sectionInfos(runs),
+        ...(siblingNotes.own.length === 0 ? {} : { sprintNoteCodes: siblingNotes.own.map((n) => n.code) }),
         ...(sprint === undefined ? {} : { sprint }),
         pace: {
           status,

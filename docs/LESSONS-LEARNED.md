@@ -27,7 +27,7 @@ How to use it:
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
-| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315, L-317 – L-320, L-324 – L-326, L-328, L-333 |
+| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315, L-317 – L-320, L-324 – L-326, L-328, L-333, L-366 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282, L-323 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280, L-304, L-316 |
@@ -472,6 +472,10 @@ compiler) against the committed snapshot; nothing is duplicated in the test, so 
 Examples use only attributes of the product model and synthetic values; statuses and custom fields are read with
 `describe_asset_type`, never written into a static recipe (A12).
 *Applied in:* P6-06, `test/recipes-other-assets.test.ts`.
+
+**L-366 — A sibling's note is the report's own text only when the whole text matches a fixed template; the rest stays in the envelope.**
+Notes cross a tool boundary as plain text, so a composite cannot tell wording of ours from text that carries an Agility name. `sprint_health` takes a `get_sprint` note over as its own (with a stable code in `sprintNoteCodes`) only when the entire note matches a template of fixed words and digits, which a name cannot satisfy; everything else is forwarded untrusted. A test runs `get_sprint` on the shared worlds and requires every note to match, so rewording a note fails the test instead of quietly moving it into the envelope.
+*Applied in:* P6-48, `tools/reports/sibling-notes.ts`, `test/tools/reports.test.ts`, L-038.
 
 ## E. The Agility API client
 

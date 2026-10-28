@@ -303,7 +303,7 @@ Status lives in each task file.
 | P6-45 | [Remove the duplicated tool helpers and the double meaning of `minimal_output`](tasks/phase-6-tool-breadth/P6-45-remove-the-duplicated-tool-helpers-and-the-double.md) | low | P6-13, P6-12 | todo |
 | P6-46 | [Settle the edge semantics of `work_item_quality`](tasks/phase-6-tool-breadth/P6-46-settle-the-edge-semantics-of-work-item-quality.md) | low | P6-13, P6-03 | todo |
 | P6-47 | [Polish defect triage, standup and get_sprint output details](tasks/phase-6-tool-breadth/P6-47-polish-defect-triage-standup-and-get-sprint-output.md) | low | P6-13 | todo |
-| P6-48 | [Forward sibling facts in composites as codes, with a lint](tasks/phase-6-tool-breadth/P6-48-forward-sibling-facts-in-composites-as-codes-with.md) | low | P6-13, P6-07 | todo |
+| P6-48 | [Forward sibling facts in composites as codes, with a lint](tasks/phase-6-tool-breadth/P6-48-forward-sibling-facts-in-composites-as-codes-with.md) | low | P6-13, P6-07 | done |
 | P6-55 | [Filter standup_summary on the change date instead of reading the newest page](tasks/phase-6-tool-breadth/P6-55-standup-change-date-filter.md) | low | P6-40, P6-27 | todo |
 | P6-58 | [Show the budget-hidden tools note for an inherited call budget in the panel](tasks/phase-6-tool-breadth/P6-58-panel-inherited-call-budget-note.md) | low | P6-36 | todo |
 
