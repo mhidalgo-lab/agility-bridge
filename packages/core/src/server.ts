@@ -229,6 +229,38 @@ export function withCachedJsonSchema(schema: StandardSchemaWithJSON): StandardSc
   return wrapped;
 }
 
+/**
+ * The same schema, advertised unchanged, whose validation lets everything through: the SDK would answer a refused
+ * argument with a plain "Input validation error" without a code (P6-37). The handler wrapper validates instead and
+ * answers `AB_INPUT_INVALID` like every other refused input.
+ */
+function deferValidation(schema: StandardSchemaWithJSON): StandardSchemaWithJSON {
+  const std = schema['~standard'];
+  return {
+    '~standard': { ...std, validate: (value: unknown) => ({ value }) },
+  } as StandardSchemaWithJSON;
+}
+
+const MAX_ISSUE_TEXT = 120;
+const clip = (text: string): string =>
+  text.length > MAX_ISSUE_TEXT ? `${text.slice(0, MAX_ISSUE_TEXT)}...` : text;
+
+/** Validates a call's arguments with the tool's schema; a refusal is `AB_INPUT_INVALID` naming the argument path. */
+function parseInput(def: ToolDefinition, input: unknown): never {
+  const parsed = def.inputSchema.safeParse(input ?? {});
+  if (parsed.success) return parsed.data as never;
+  const issue = parsed.error.issues[0];
+  const path = (issue?.path ?? []).map(String).join('.');
+  const where = path === '' ? 'the arguments' : `argument "${clip(path)}"`;
+  throw new AbError(
+    ErrorCode.InputInvalid,
+    `Invalid ${where} for ${def.name}: ${clip(issue?.message ?? 'does not match the input schema')}.`,
+    {
+      hint: `Check the argument against the input schema of ${def.name} (types, allowed values, minimum and maximum).`,
+    },
+  );
+}
+
 /** The MCP result for a handler's output. */
 export function toCallToolResult(out: ToolOutput): CallToolResult {
   return {
@@ -264,7 +296,7 @@ export function buildMcpServer({
       {
         title: def.title,
         description: def.description,
-        inputSchema: withCachedJsonSchema(def.inputSchema),
+        inputSchema: deferValidation(withCachedJsonSchema(def.inputSchema)),
         annotations: annotationsFor(def),
         ...(def.outputSchema ? { outputSchema: withCachedJsonSchema(def.outputSchema) } : {}),
       },
@@ -294,7 +326,7 @@ export function buildMcpServer({
           }
         };
         try {
-          const out = await def.handler(input as never, ctx);
+          const out = await def.handler(parseInput(def, input), ctx);
           logger.debug('tool ok', { ms: ctx.clock.now() - started, requests: ctx.budget.used });
           observe('ok', null, out);
           return toCallToolResult(out);

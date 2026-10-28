@@ -466,3 +466,13 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Recommendation:** (a), built; `Hist` was verified read-only on the tenant (P6-05). A test compares the list with the registry.
 - **Owner (2026-10-27):** Decided: as recommended, (a).
 
+### D-153 — Schema failures are answered by the server wrapper, not the SDK *(P6-37)*
+- **Context:** measured on SDK 2.3.1 (both protocol revisions share the `tools/call` path): an argument the input schema refuses
+  becomes an `isError` result whose text is `Input validation error: Invalid arguments for tool X: ...` with no `AB_*` code, no
+  hint and no `_meta`, while a value the handler refuses is `AB_INPUT_INVALID` with a hint.
+- **Options:** (a) register the schema with a pass-through validator (the advertised JSON Schema is unchanged) and validate in the
+  handler wrapper, once for every tool, answering `AB_INPUT_INVALID` with the argument path, a clipped issue text (never the
+  value) and a `Hint:`; (b) leave the SDK message; (c) validate in each tool.
+- **Recommendation:** (a), built. Parsed data (defaults applied) still reaches the handler.
+- **Owner:** *(open; built as (a))*
+
