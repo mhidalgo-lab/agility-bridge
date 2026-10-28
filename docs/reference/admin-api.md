@@ -82,6 +82,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | `GET` | `/oauth/devices` | Every person's connected OAuth apps, one page at a time in storage order (owners and admins; 404 when OAuth is off). Never a token | — | 200 object |
 | `POST` | `/oauth/devices/{id}/revoke` | Disconnect one person's app: its access and refresh tokens stop working at once (owners: anyone's; admins: a member's). An unknown device answers 404 | `userId`: string | 200 object |
 | `GET` | `/oauth/clients` | Registered OAuth clients (dynamic registrations and metadata documents) and revoked ones, a page at a time (owners; 404 when OAuth is off) | — | 200 object |
+| `GET` | `/oauth/abuse` | OAuth abuse controls (owners; 404 when OAuth is off): registration caps against their use, the configured limits, and the refusals of the last 24 hours by reason. No address, client or token is ever in it | — | 200 object |
 | `POST` | `/oauth/clients/revoke` | Revoke an OAuth client (owners): no new authorization, no refresh and no access token of it passes, its devices end and its registration is deleted. A new registration is a new client | `clientId`: string | 200 object |
 | `POST` | `/oauth/clients/restore` | Lift the revocation of a client (owners): a metadata-document client may be used again, a deleted dynamic registration does not come back | `clientId`: string | 200 object |
 

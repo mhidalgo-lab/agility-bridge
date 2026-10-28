@@ -259,3 +259,13 @@ Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.m
   late. A missing row (approved before the switch, or expired) starts counting at the next refresh instead of ending the device,
   so switching `AB_OAUTH_IDLE_TTL` on never disconnects people at once.
 - **Owner:** *(open; built as (a))*
+
+### D-132 — The operator view of OAuth abuse is owner-only and counts audit rows *(P5-20)*
+- **Context:** the task asked for "administrators only". Registration caps and per-surface refusals are deployment-level facts, and the
+  OAuth apps page that lists clients is already owner-only. A limit is audited once per window, so the audit is a count of windows
+  in which a limit was reached, not of refused requests; the exact counters expire with their window.
+- **Options:** (a) owners only, counts of audit rows, said plainly on the page; (b) owners and admins; (c) exact request counts from a
+  new durable counter per refusal (a write per refused request, the opposite of what the once-per-window audit avoids).
+- **Recommendation:** (a): same audience as the client list, no new writes. (b) is one line (`authorizeClients` becomes manager-level)
+  if the owner wants administrators to see it; (c) only if windows prove too coarse to tune from.
+- **Owner:** *(open; built as (a))*

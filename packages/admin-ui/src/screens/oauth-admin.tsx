@@ -139,6 +139,53 @@ export function parseOAuthClientPage(body: unknown): OAuthClientPage | null {
   };
 }
 
+/** One kind of limit refusal in the last day (`GET /oauth/abuse`): reasons and counts only, never an address or a client. */
+export interface OAuthRefusalCount {
+  readonly action: string;
+  readonly reason: string;
+  readonly surface: string | null;
+  readonly scope: string | null;
+  readonly kind: string | null;
+  readonly count: number;
+  readonly lastAt: number;
+}
+
+export interface OAuthAbuse {
+  readonly dynamic: { readonly enabled: boolean; readonly live: number; readonly cap: number };
+  readonly documents: { readonly enabled: boolean; readonly stored: number; readonly cap: number };
+  readonly limits: readonly (readonly [string, number])[];
+  readonly windowHours: number;
+  readonly refusals: readonly OAuthRefusalCount[];
+  readonly truncated: boolean;
+}
+
+export function parseOAuthAbuse(body: unknown): OAuthAbuse | null {
+  const b = obj(body);
+  const reg = obj(b['registrations']);
+  const dyn = obj(reg['dynamic']);
+  const doc = obj(reg['documents']);
+  const refusals = rows(b['refusals'], (r): OAuthRefusalCount | null => ({
+    action: str(r['action']),
+    reason: str(r['reason']),
+    surface: strOrNull(r['surface']),
+    scope: strOrNull(r['scope']),
+    kind: strOrNull(r['kind']),
+    count: int(r['count']),
+    lastAt: int(r['lastAt']),
+  }));
+  if (refusals === null || Object.keys(dyn).length === 0 || Object.keys(doc).length === 0) return null;
+  return {
+    dynamic: { enabled: dyn['enabled'] === true, live: int(dyn['live']), cap: int(dyn['cap']) },
+    documents: { enabled: doc['enabled'] === true, stored: int(doc['stored']), cap: int(doc['cap']) },
+    limits: Object.entries(obj(b['limits'])).flatMap(([k, v]) =>
+      typeof v === 'number' && Number.isSafeInteger(v) ? [[k, v] as const] : [],
+    ),
+    windowHours: int(b['windowHours']) || 24,
+    refusals,
+    truncated: b['refusalsTruncated'] === true,
+  };
+}
+
 const KIND_TEXT = { dynamic: 'Registered by the app', metadata_document: 'Metadata document' } as const;
 
 /** Untrusted text: plain, monospace so it reads as data and long words wrap (L-218). */
@@ -275,6 +322,8 @@ export function registerOAuthAdmin(ui: Hono, kit: UiKit): void {
         );
       }
       const result = got.value;
+      // The limits panel is extra: when it cannot be loaded the apps are still shown.
+      const abuse = await load(kit, c, principal, '/oauth/abuse', parseOAuthAbuse);
       return page.html(
         <Screen page={page} title="OAuth apps" current={OAUTH_CLIENTS}>
           <p>
@@ -341,6 +390,59 @@ export function registerOAuthAdmin(ui: Hono, kit: UiKit): void {
             label="Registered app pages"
             next={result.next === null ? null : withQuery(OAUTH_CLIENTS, { after: result.next })}
           />
+          {abuse.ok ? (
+            <section aria-labelledby="abuse-heading">
+              <h2 id="abuse-heading">Limits and caps</h2>
+              <DataTable
+                caption="Registration caps"
+                empty="None."
+                rows={[
+                  {
+                    name: 'Apps that registered themselves',
+                    on: abuse.value.dynamic.enabled,
+                    used: abuse.value.dynamic.live,
+                    cap: abuse.value.dynamic.cap,
+                  },
+                  {
+                    name: 'Apps known by a metadata document',
+                    on: abuse.value.documents.enabled,
+                    used: abuse.value.documents.stored,
+                    cap: abuse.value.documents.cap,
+                  },
+                ]}
+                columns={[
+                  { header: 'Kind', cell: (r) => r.name },
+                  { header: 'Switched on', cell: (r) => (r.on ? 'yes' : 'no') },
+                  { header: 'In use', cell: (r) => `${r.used} of ${r.cap}` },
+                ]}
+              />
+              <DataTable
+                caption={`Refusals in the last ${abuse.value.windowHours} hours`}
+                empty="No limit was reached."
+                rows={abuse.value.refusals}
+                columns={[
+                  { header: 'Limit', cell: (r) => <span class="mono">{r.reason}</span> },
+                  {
+                    header: 'Where',
+                    cell: (r) =>
+                      [r.surface, r.scope, r.kind].filter((x) => x !== null).join(' / ') || (
+                        <span class="muted">n/a</span>
+                      ),
+                  },
+                  { header: 'Windows', cell: (r) => String(r.count) },
+                  { header: 'Last', cell: (r) => <When at={r.lastAt} /> },
+                ]}
+              />
+              <p class="hint">
+                A limit is recorded once for each period it is reached in, so a count is the number of
+                periods, not of requests.
+                {abuse.value.truncated ? ' More rows exist than were read: the counts are lower bounds.' : ''}{' '}
+                A limit that real people reach is raised in the server settings; one a flood reaches is turned
+                off or blocked in front of the server. The limits in force:{' '}
+                <span class="mono">{abuse.value.limits.map(([k, v]) => `${k}=${v}`).join(', ')}</span>.
+              </p>
+            </section>
+          ) : null}
           {result.blocked.length === 0 ? null : (
             <section aria-labelledby="blocked-heading">
               <h2 id="blocked-heading">Revoked apps</h2>

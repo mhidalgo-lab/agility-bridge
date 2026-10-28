@@ -398,6 +398,9 @@ const CODE_MARKER_PREFIX = 'oauth-code:';
  * token issuance and at an MCP request, at most once per {@link USED_WRITE_INTERVAL_MS} per device and process.
  */
 const USED_PREFIX = 'oauth-used:';
+/** The operator's abuse view reads this window of refusal rows, at most this many of each kind (P5-20). */
+const ABUSE_VIEW_WINDOW_MS = 24 * 3_600_000;
+const ABUSE_VIEW_ROWS = 1000;
 const USED_WRITE_INTERVAL_MS = 5 * 60_000;
 /** Devices whose last write this process remembers; cleared when full (a repeat write is harmless). */
 const USED_THROTTLE_MAX = 2000;
@@ -582,6 +585,8 @@ export interface OAuthRuntime {
    * its devices and deletes its record. Null when no such client exists. Audited.
    */
   revokeClient(c: Context, clientId: string, by: string | null): Promise<OAuthClientRevocation | null>;
+  /** The abuse limits, the registration caps against their use and the last day's refusals (owners; the caller has authorized it). */
+  abuseOverview(): Promise<OAuthAbuseOverview>;
   /** Lifts a block (a metadata-document client may be used again); false when the client was not blocked. */
   restoreClient(c: Context, clientId: string, by: string | null): Promise<boolean>;
   /** Validate an OAuth bearer for `/w/{slug}/mcp` and resolve its access. Storage errors propagate (fail closed). */
@@ -590,6 +595,36 @@ export interface OAuthRuntime {
   readonly registrations: OAuthRegistrations;
   /** Whether URL client ids are resolved (a guarded fetcher is present and CIMD is not switched off). */
   readonly clientMetadataDocuments: boolean;
+}
+
+/** One kind of limit refusal in the last 24 hours (P5-20): what the audit rows say, grouped. Never an address, client or token. */
+export interface OAuthRefusalCount {
+  readonly action: 'oauth.request.refused' | 'oauth.client.refused';
+  /** The stable reason of the rows (`authorize_limit_address`, `client_cap`, ...). */
+  readonly reason: string;
+  /** The limit surface and scope for `oauth.request.refused`; null for the registration and fetch caps. */
+  readonly surface: string | null;
+  readonly scope: string | null;
+  /** `dynamic` or `metadata_document` where the row says so. */
+  readonly kind: string | null;
+  /** Audit rows: a limit is recorded once per window it is reached in, so this counts windows, not requests. */
+  readonly count: number;
+  /** Epoch ms of the newest row. */
+  readonly lastAt: number;
+}
+
+/** The OAuth abuse controls as configured, how full the registration caps are, and the refusals of the last 24 hours (P5-20). */
+export interface OAuthAbuseOverview {
+  readonly registrations: {
+    readonly dynamic: { readonly enabled: boolean; readonly live: number; readonly cap: number };
+    readonly documents: { readonly enabled: boolean; readonly stored: number; readonly cap: number };
+  };
+  /** The configured limits (numbers only). */
+  readonly limits: Readonly<Record<string, number>>;
+  readonly windowHours: number;
+  readonly refusals: readonly OAuthRefusalCount[];
+  /** More refusal rows exist than were read: the counts are lower bounds. */
+  readonly refusalsTruncated: boolean;
 }
 
 /** What is registered right now, and the cleanup that does not wait for the store's expiry purge. */
@@ -1750,6 +1785,67 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
 
     async revokeDevice(c, userId, deviceId) {
       return revokeOneDevice(c, userId, deviceId, { via: 'my_access' });
+    },
+
+    async abuseOverview() {
+      const now = clock.now();
+      const counted = await countClients();
+      const read = async (action: OAuthRefusalCount['action']) =>
+        storage.audit.query({
+          action,
+          from: now - ABUSE_VIEW_WINDOW_MS,
+          to: now + 1,
+          limit: ABUSE_VIEW_ROWS,
+        });
+      const [requests, clients] = await Promise.all([
+        read('oauth.request.refused'),
+        read('oauth.client.refused'),
+      ]);
+      const groups = new Map<string, { -readonly [K in keyof OAuthRefusalCount]: OAuthRefusalCount[K] }>();
+      for (const [action, entries] of [
+        ['oauth.request.refused', requests],
+        ['oauth.client.refused', clients],
+      ] as const) {
+        for (const e of entries) {
+          const detail = e.details ?? {};
+          // Allowlisted, shape-checked fields only: whatever else a row holds (a host, a client id) stays out.
+          const word = (v: unknown): string | null =>
+            typeof v === 'string' && /^[a-z0-9_]{1,64}$/.test(v) ? v : null;
+          const reason = word(e.errorCode) ?? 'other';
+          const surface = action === 'oauth.request.refused' ? word(detail['surface']) : null;
+          const scope = action === 'oauth.request.refused' ? word(detail['scope']) : null;
+          const kind = word(detail['kind']);
+          const key = `${action}|${reason}|${surface}|${scope}|${kind}`;
+          const group = groups.get(key);
+          if (group === undefined)
+            groups.set(key, { action, reason, surface, scope, kind, count: 1, lastAt: e.ts });
+          else {
+            group.count += 1;
+            group.lastAt = Math.max(group.lastAt, e.ts);
+          }
+        }
+      }
+      return {
+        registrations: {
+          dynamic: { enabled: registrationEnabled, live: counted.dynamic, cap: dcrMaxClients },
+          documents: { enabled: cimd !== undefined, stored: counted.documents, cap: cimdMaxClients },
+        },
+        limits: {
+          authorizeIp: authorizeIpLimit,
+          authorize: authorizeLimit,
+          consentIp: consentIpLimit,
+          consent: consentLimit,
+          tokenFailureIp: tokenFailureIpLimit,
+          tokenFailure: tokenFailureLimit,
+          registrationIp: dcrIpLimit,
+          registrationHourly: dcrHourlyLimit,
+          fetchIp: cimdFetchLimit,
+          fetchHourly: cimdHourlyLimit,
+        },
+        windowHours: 24,
+        refusals: [...groups.values()].sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason)),
+        refusalsTruncated: requests.length >= ABUSE_VIEW_ROWS || clients.length >= ABUSE_VIEW_ROWS,
+      };
     },
 
     async revokeDeviceFor(c, userId, deviceId, by) {

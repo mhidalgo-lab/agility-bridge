@@ -115,6 +115,12 @@ connect an app yourself ([claude.ai](oauth-phone.md), [Claude Code](oauth-ides.m
   list everyone's ([admin panel](admin-panel.md#connected-apps-and-oauth-apps-oauth-only)).
 - **Turning OAuth off** (`AB_OAUTH=off`) makes `/oauth/*` and `/.well-known/*` answer `404` and the MCP route's `401` a bare `WWW-Authenticate: Bearer`; device
   tokens keep working. Connected apps stay in the database and work again if you turn it back on.
+- **Limits and caps** (admin panel, **OAuth apps**, owners): how full the registration caps are and which limits were reached in the
+  last 24 hours. A limit reached by many ordinary people (several periods a day, at working hours, from many addresses on one
+  office network) is too low for your use: raise it (`AB_OAUTH_AUTHORIZE_IP_LIMIT` and its neighbours, [configuration](configuration.md)).
+  A limit reached in a burst at odd hours, or a registration cap that stays full, is a flood: set `AB_OAUTH_DCR=off` if you do not
+  need apps to register themselves (apps with a metadata document keep working), and block the source in front of the server (a
+  Cloudflare WAF rule or your proxy). The panel never shows an address; the proxy's log does.
 - **Idle expiry** (`AB_OAUTH_IDLE_TTL`, off by default): ends an app nobody has used for that long, at its next refresh. Use it where
   a forgotten or phished approval should not live for the whole refresh lifetime.
 - **Lifetimes** (`AB_OAUTH_ACCESS_TTL`, `AB_OAUTH_REFRESH_TTL`, `AB_OAUTH_REFRESH_REUSE_WINDOW`): [how it works](oauth-how-it-works.md#for-the-operator).

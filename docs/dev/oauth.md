@@ -217,6 +217,15 @@ A **device** is one provider grant: an app approved by one person for one worksp
 - Tests: `test/oauth/admin-suite.ts` on memory (both shapes), SQLite and workerd/D1 (the break-glass token as the owner);
   `admin-oauth.test.ts` (roles, CSRF, panel, hostile names); `e2e/oauth-consent.spec.ts` (1280 and 320 px).
 
+### Operator view of the abuse controls (P5-20, D-132)
+
+`OAuthRuntime.abuseOverview()` behind `GET /oauth/abuse` (owners, `authorizeClients`; 404 when OAuth is off) returns the registration
+caps against `countClients()`, the configured limits as numbers, and the `oauth.request.refused` and `oauth.client.refused` rows of
+the last 24 hours (at most 1,000 of each kind) grouped by reason, surface, scope and client kind. Output fields are rebuilt from
+shape-checked words (`[a-z0-9_]{1,64}`): the client id, host, request id and user of a row are never read. A limit is audited once per
+window (`auditCapOnce`, `refuseAbuse`), so a count means windows. The page section is on `/admin/oauth/clients` and does not hide the
+client list when the call fails.
+
 ## Client registration (P5-03)
 
 Two ways for a client to get a `client_id`; both end as an `oauth:client:<id>` record the provider reads, so redirect

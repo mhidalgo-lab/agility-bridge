@@ -73,6 +73,7 @@ export {
   OAUTH_RESOURCE_METADATA_PREFIX,
   OAUTH_SCOPES,
   OAUTH_TOKEN_PATH,
+  type OAuthAbuseOverview,
   type OAuthAdminDevice,
   type OAuthApproval,
   type OAuthAuthentication,

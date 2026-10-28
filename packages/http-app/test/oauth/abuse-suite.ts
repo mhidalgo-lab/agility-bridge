@@ -25,6 +25,10 @@ const AUTHORIZE_IP = 30;
 const TOKEN_FAILURE_IP = 20;
 const DCR_IP = 10;
 const CIMD_IP = 20;
+const sha256Hex = async (text: string): Promise<string> =>
+  [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 const docUrl = (n: number): string => `https://client${n}.example.org/meta.json`;
 
 export function defineOAuthAbuseSuite(name: string, makeHost: () => Promise<OAuthHost>): void {
@@ -108,6 +112,40 @@ export function defineOAuthAbuseSuite(name: string, makeHost: () => Promise<OAut
       // The default address (the legitimate user in the other suites) still works too.
       const c = await register(h);
       expect((await authorize(h, c)).code).not.toBeNull();
+    });
+
+    it('the operator view shows the caps, the limits and the refusals, and nothing that identifies a caller (P5-20)', async () => {
+      const h = await host();
+      if (h.adminApi === undefined) return;
+      for (let i = 0; i < AUTHORIZE_IP + 3; i++) {
+        const res = await h.call(authorizeUrl(h), { redirect: 'manual', headers: h.address(ATTACKER) });
+        await res.text();
+      }
+      await auditRows(h, (r) => r.action === 'oauth.request.refused');
+      const res = await h.adminApi('GET', '/oauth/abuse');
+      const text = await res.text();
+      expect(res.status).toBe(200);
+      const view = JSON.parse(text) as {
+        registrations: { dynamic: { live: number; cap: number; enabled: boolean } };
+        limits: Record<string, number>;
+        refusals: { reason: string; surface: string | null; scope: string | null; count: number }[];
+      };
+      expect(view.registrations.dynamic).toMatchObject({ enabled: true, cap: 200 });
+      expect(view.limits).toMatchObject({ authorizeIp: AUTHORIZE_IP, tokenFailureIp: TOKEN_FAILURE_IP });
+      expect(view.refusals).toContainEqual(
+        expect.objectContaining({
+          reason: 'authorize_limit_address',
+          surface: 'authorize',
+          scope: 'address',
+          count: 1,
+        }),
+      );
+      // No address, no hash of it, no request id, no client: only reasons and numbers.
+      const hash = (await sha256Hex(ATTACKER)).slice(0, 12);
+      expect(text).not.toContain(ATTACKER);
+      expect(text).not.toContain(hash);
+      expect(text).not.toContain('no-such-client');
+      expect(text).not.toMatch(/req_|requestId|clientId|"host"/);
     });
 
     it('token: failed exchanges are cut at the limit per address; a clean client of another address still gets its tokens', async () => {

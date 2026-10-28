@@ -121,6 +121,25 @@ export interface AdminOAuthAdmin {
     by: string | null,
   ): Promise<{ readonly devices: number; readonly complete: boolean } | null>;
   restoreClient(c: Context, clientId: string, by: string | null): Promise<boolean>;
+  /** The abuse limits, the registration caps against their use and the last day's refusals (P5-20). */
+  abuse(): Promise<{
+    readonly registrations: {
+      readonly dynamic: { readonly enabled: boolean; readonly live: number; readonly cap: number };
+      readonly documents: { readonly enabled: boolean; readonly stored: number; readonly cap: number };
+    };
+    readonly limits: Readonly<Record<string, number>>;
+    readonly windowHours: number;
+    readonly refusals: readonly {
+      readonly action: 'oauth.request.refused' | 'oauth.client.refused';
+      readonly reason: string;
+      readonly surface: string | null;
+      readonly scope: string | null;
+      readonly kind: string | null;
+      readonly count: number;
+      readonly lastAt: number;
+    }[];
+    readonly refusalsTruncated: boolean;
+  }>;
 }
 
 export interface AdminApiOptions {
@@ -1675,6 +1694,42 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
         next: page.next,
         devicesTruncated: page.devicesTruncated,
       };
+    },
+  );
+  add(
+    {
+      method: 'get',
+      path: '/oauth/abuse',
+      ...oauthTag,
+      summary:
+        'OAuth abuse controls (owners; 404 when OAuth is off): registration caps against their use, the configured limits, and the refusals of the last 24 hours by reason. No address, client or token is ever in it',
+      out: z.object({
+        registrations: z.object({
+          dynamic: z.object({ enabled: z.boolean(), live: z.number(), cap: z.number() }),
+          documents: z.object({ enabled: z.boolean(), stored: z.number(), cap: z.number() }),
+        }),
+        limits: z.record(z.string(), z.number()),
+        windowHours: z.number(),
+        refusals: z.array(
+          z.object({
+            action: z.enum(['oauth.request.refused', 'oauth.client.refused']),
+            reason: z.string(),
+            surface: z.string().nullable(),
+            scope: z.string().nullable(),
+            kind: z.string().nullable(),
+            count: z.number().openapi({
+              description:
+                'Audit rows. A limit is recorded once per window it is reached in, so this counts windows, not requests.',
+            }),
+            lastAt: z.number(),
+          }),
+        ),
+        refusalsTruncated: z.boolean(),
+      }),
+    },
+    async (c) => {
+      services(c).oauth.authorizeClients();
+      return oauthAdmin().abuse();
     },
   );
   add(
