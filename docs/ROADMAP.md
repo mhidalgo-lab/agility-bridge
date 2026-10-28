@@ -248,11 +248,12 @@ Status lives in each task file.
 | P5-13 | [Remembered read consent (opt-in)](tasks/phase-5-oauth/P5-13-remembered-consent.md) | low | P5-04, P5-05 | todo |
 | P5-14 | [Device last-used time and idle expiry](tasks/phase-5-oauth/P5-14-device-last-used.md) | low | P5-04, P5-05 | done |
 | P5-15 | [Private-use scheme redirects for desktop clients](tasks/phase-5-oauth/P5-15-private-use-redirects.md) | low | P5-06 | todo |
-| P5-16 | [Metadata document policy extras](tasks/phase-5-oauth/P5-16-client-document-policy.md) | low | P5-06 | todo |
+| P5-16 | [Metadata document policy extras](tasks/phase-5-oauth/P5-16-client-document-policy.md) | low | P5-06 | done |
 | P5-19 | [Edge rate limits for the OAuth routes on Workers](tasks/phase-5-oauth/P5-19-oauth-edge-rate-limits.md) | low | P5-09 | todo |
 | P5-20 | [Operator view of OAuth abuse refusals and caps](tasks/phase-5-oauth/P5-20-oauth-abuse-visibility.md) | low | P5-08, P5-09 | done |
 | P5-21 | [Keep the device when an issuance refusal can pass](tasks/phase-5-oauth/P5-21-recoverable-issuance-refusals.md) | low | P5-10 | done |
 | P5-22 | [Key the OAuth abuse counters with a secret](tasks/phase-5-oauth/P5-22-keyed-address-hash.md) | low | P5-10 | dropped |
+| P5-23 | [Metadata document clients with ports or key-based authentication](tasks/phase-5-oauth/P5-23-cimd-ports-and-key-clients.md) | low | P5-16 | todo |
 
 ### Phase 6
 
