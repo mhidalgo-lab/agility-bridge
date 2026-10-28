@@ -34,13 +34,14 @@ import {
   isOwner,
   load,
   loadFailed,
-  paged,
+  PAGE_SIZE,
   personText,
   problemOf,
   RowAction,
   Screen,
   StatusBadge,
   When,
+  withQuery,
 } from './shared.tsx';
 
 export const USERS = '/admin/users';
@@ -186,9 +187,21 @@ export function registerUsers(ui: Hono, kit: UiKit): void {
   ui.get(
     ROUTE,
     kit.page('admin', async (c, page) => {
-      const got = await load(kit, c, page.principal, '/users', (b) => rows(b, parseUser));
+      // One page from the server (one row more tells whether another follows): the cost does not grow with the number of
+      // users (P4-28). A page past the end is empty with a link back.
+      const raw = c.req.query('page');
+      const n = raw !== undefined && /^\d{1,6}$/.test(raw) ? Math.max(1, Number(raw)) : 1;
+      const got = await load(kit, c, page.principal, '/users', (b) => rows(b, parseUser), {
+        limit: String(PAGE_SIZE + 1),
+        offset: String((n - 1) * PAGE_SIZE),
+      });
       if (!got.ok) return loadFailed(c, got.result, page.principal);
-      const list = paged(got.value, c.req.query('page'), USERS);
+      const at = (p: number) => withQuery(USERS, { page: p === 1 ? undefined : String(p) });
+      const list = {
+        rows: got.value.slice(0, PAGE_SIZE),
+        prev: n > 1 ? at(n - 1) : null,
+        next: got.value.length > PAGE_SIZE ? at(n + 1) : null,
+      };
       return page.html(
         <Screen page={page} title="Users" current={USERS}>
           <p>

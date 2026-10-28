@@ -250,3 +250,15 @@
 - **Options:** (a) cache discovery only and merge the stored overrides on every call; (b) cache the merged map and invalidate on a panel change; (c) cache the merged map and document the delay.
 - **Recommendation:** (a): no cross-request invalidation channel (the Worker has none), the merge is a few entries, and an edit applies at once.
 - **Owner:** *(open; built as (a))*
+
+### D-127 — The users list is paged on the server with offset and limit *(P4-28)*
+- **Context:** `/admin/users` fetched, validated and parsed every user to show 25. Users are a bounded admin list (hundreds), unlike the audit log.
+- **Options:** (a) `limit` and `offset` (and `ids`) on `GET /users`, sliced before the rows are serialized; (b) a keyset cursor on `(created_at, id)`; (c) keep the full list and cache it per request.
+- **Recommendation:** (a): the panel's pager is page-numbered, the list is small, and authorization is unchanged (a member still sees only their own row). Revisit (b) if user counts reach the thousands.
+- **Owner:** *(open; built as (a))*
+
+### D-128 — The audit user filter lists at most 100 users *(P4-28)*
+- **Context:** the audit page loaded every workspace and every user for the filter dropdowns and to turn ids into names.
+- **Options:** (a) the first 100 users in the dropdown, the names of the page's users (and the filtered user) fetched by id; (b) a free-text user filter resolved by email; (c) keep loading everyone.
+- **Recommendation:** (a): bounded cost with no change for teams under 100 users; the filtered user stays selectable. Past 100 users a person is reached through the audit URL or by (b), a candidate follow-up.
+- **Owner:** *(open; built as (a))*

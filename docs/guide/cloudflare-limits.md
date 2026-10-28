@@ -113,10 +113,10 @@ CI, 6.5 times the calibration, on top of the boot, which a panel request also pa
 like the first MCP request it does not fit the Free plan's 10 ms, and the same tolerance and the Paid-plan answer apply
 (D-27). Only an operator opening the panel pays it, never an MCP call (`admin-panel-lazy.test.ts`). A second panel page in
 the same isolate costs about 1.1 times the calibration (about 3 ms). **Warm panel pages cost about 1 to 4 ms** and fit the
-Free plan's 10 ms: the overview 0.48 times the calibration, the users list 1.44, the audit viewer 1.18, an asset 0.03 and a
-form POST 0.3. The two list screens grow with the number of users (each makes admin API calls that parse the whole user
-list, and the audit page also loads every workspace and user to show names): the figures are for 100 users and 200 audit
-rows, and the follow-up is P4-28. The benchmark's baseline (`scripts/bench/worker-baseline.json`) compares ratios, not
+Free plan's 10 ms: the overview 0.48 times the calibration, the users list about 0.6, the audit viewer about 0.9, an asset 0.03 and a
+form POST 0.3. The list screens no longer grow with the number of users (P4-28): the users list asks the admin API for one
+page (`limit`, `offset`), and the audit page loads at most 100 users for its filter and the names on the page by id
+(`ids`, at most 50), so the cost is bounded at a few hundred users. The figures are for 100 users and 200 audit rows. The benchmark's baseline (`scripts/bench/worker-baseline.json`) compares ratios, not
 milliseconds, so a busy machine does not move it. No Cloudflare measurement of the panel was made (no deploy, L-182).
 
 A non-required CI job runs the benchmark on every pull request, keeps the numbers as an artifact and flags a path

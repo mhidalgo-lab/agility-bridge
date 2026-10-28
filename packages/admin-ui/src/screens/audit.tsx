@@ -190,19 +190,36 @@ function Result(props: { readonly row: AuditRow }): JSX.Element {
   );
 }
 
-async function loadNames(kit: UiKit, c: Context, principal: UiPrincipal) {
+/** The user filter lists at most this many users; every other name on the page is fetched by id (P4-28, D-128). */
+const USER_FILTER_MAX = 100;
+
+async function loadNames(kit: UiKit, c: Context, principal: UiPrincipal, wanted: readonly (string | null)[]) {
   const [workspaces, users] = await Promise.all([
     kit.callAdmin(c, principal, { method: 'GET', path: '/workspaces' }),
-    kit.callAdmin(c, principal, { method: 'GET', path: '/users' }),
+    kit.callAdmin(c, principal, { method: 'GET', path: '/users', query: { limit: String(USER_FILTER_MAX) } }),
   ]);
   const ws = isOk(workspaces) ? rows(workspaces.body, parseWorkspace) : null;
   const us = isOk(users) ? rows(users.body, parseUser) : null;
+  // The users on this page (and the one filtered on) that the first USER_FILTER_MAX did not include.
+  const known = new Set((us ?? []).map((u) => u.id));
+  const missing = [...new Set(wanted.filter((id): id is string => id !== null && !known.has(id)))].slice(
+    0,
+    50,
+  );
+  const extra =
+    us === null || missing.length === 0
+      ? []
+      : await kit
+          .callAdmin(c, principal, { method: 'GET', path: '/users', query: { ids: missing.join(',') } })
+          .then((r) => (isOk(r) ? (rows(r.body, parseUser) ?? []) : []));
+  const listed = us ?? [];
   return {
     workspaces: ws,
-    users: us,
+    // The filtered user stays selectable even past the first USER_FILTER_MAX.
+    users: [...listed, ...extra.filter((u) => u.id === wanted[0])],
     names: {
       workspaces: new Map((ws ?? []).map((w) => [w.id, w.slug])),
-      users: new Map((us ?? []).map((u) => [u.id, u.email])),
+      users: new Map([...listed, ...extra].map((u) => [u.id, u.email])),
     } satisfies Names,
   };
 }
@@ -232,7 +249,9 @@ export function registerAudit(ui: Hono, kit: UiKit): void {
       const shown = all.slice(0, AUDIT_PAGE_SIZE);
       const last = shown[shown.length - 1];
       const hasNext = all.length > AUDIT_PAGE_SIZE && last !== undefined;
-      const loaded = member ? null : await loadNames(kit, c, principal);
+      const loaded = member
+        ? null
+        : await loadNames(kit, c, principal, [f.userId || null, ...shown.map((r) => r.userId)]);
       const names = loaded?.names ?? NO_NAMES;
       const params = filterParams(member ? { ...f, userId: '' } : f);
       return page.html(
@@ -292,7 +311,7 @@ export function registerAudit(ui: Hono, kit: UiKit): void {
                   value={f.userId}
                   options={[
                     { value: '', label: 'All users' },
-                    ...(loaded.users ?? []).map((u) => ({ value: u.id, label: u.email })),
+                    ...loaded.users.map((u) => ({ value: u.id, label: u.email })),
                   ]}
                 />
               </>
