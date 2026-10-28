@@ -40,7 +40,7 @@ export const getVelocity: ToolDefinition = defineTool({
   name: 'get_velocity',
   title: 'Get velocity',
   description:
-    'Velocity: completed estimate of the last past sprints (at most 10) of a team or Agility project, each read as it ended, and the average over those read in full. Sprints that could not be read are named in notes. No capacity. Not paged. Cold call: up to 16 Agility requests.',
+    'Velocity: completed estimate of the last past sprints (at most 10) and the average over those read in full. Unreadable sprints are listed in notes. No capacity. Not paged. Cold call: up to 16 Agility requests.',
   kind: 'read',
   group: 'planning',
   // Capped at run time: team or project resolution, metadata and status lists, the sprint list, batched sprint reads.

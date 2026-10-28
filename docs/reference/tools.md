@@ -272,7 +272,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Get velocity** · group `planning` · read · cost 16 Agility requests at most
 
-Velocity: completed estimate of the last past sprints (at most 10) of a team or Agility project, each read as it ended, and the average over those read in full. Sprints that could not be read are named in notes. No capacity. Not paged. Cold call: up to 16 Agility requests.
+Velocity: completed estimate of the last past sprints (at most 10) and the average over those read in full. Unreadable sprints are listed in notes. No capacity. Not paged. Cold call: up to 16 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
