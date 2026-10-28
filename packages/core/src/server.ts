@@ -251,8 +251,20 @@ const clip = (text: string): string =>
   text.length > MAX_ISSUE_TEXT ? `${text.slice(0, MAX_ISSUE_TEXT)}...` : text;
 
 /** Validates a call's arguments with the tool's schema; a refusal is `AB_INPUT_INVALID` naming the argument path. */
-function parseInput(def: ToolDefinition, input: unknown): never {
-  const parsed = def.inputSchema.safeParse(input ?? {});
+function parseInput(def: ToolDefinition, input: unknown, used: string[]): never {
+  let raw = input ?? {};
+  // Deprecated aliases (one release): the new name wins when both are given.
+  if (def.deprecatedArguments !== undefined && typeof raw === 'object' && !Array.isArray(raw)) {
+    const mapped: Record<string, unknown> = { ...(raw as Record<string, unknown>) };
+    for (const [old, replacement] of Object.entries(def.deprecatedArguments)) {
+      if (!(old in mapped)) continue;
+      used.push(old);
+      if (mapped[replacement] === undefined) mapped[replacement] = mapped[old];
+      delete mapped[old];
+    }
+    raw = mapped;
+  }
+  const parsed = def.inputSchema.safeParse(raw);
   if (parsed.success) return parsed.data as never;
   const issue = parsed.error.issues[0];
   const path = (issue?.path ?? []).map(String).join('.');
@@ -264,6 +276,44 @@ function parseInput(def: ToolDefinition, input: unknown): never {
       hint: `Check the argument against the input schema of ${def.name} (types, allowed values, minimum and maximum).`,
     },
   );
+}
+
+const warned = new Set<string>();
+/** One warning per process and deprecated argument (tool names and fixed words only, never request data). */
+function warnOnce(logger: ToolContext['logger'], tool: string, argument: string): void {
+  const key = `${tool}.${argument}`;
+  if (warned.has(key)) return;
+  warned.add(key);
+  logger.warn('deprecated argument used', { tool, argument });
+}
+
+/** Adds one fixed note per deprecated argument the call used, to the text and to `structuredContent.notes`. */
+function withDeprecationNotes(
+  def: ToolDefinition,
+  used: readonly string[],
+  out: ToolOutput,
+  warn: (argument: string) => void,
+): ToolOutput {
+  if (used.length === 0) return out;
+  const notes = used.map((old) => {
+    warn(old);
+    return `Argument ${old} is deprecated; use ${def.deprecatedArguments?.[old]}. It is removed in a later release.`;
+  });
+  const structured =
+    out.structured !== null && typeof out.structured === 'object'
+      ? {
+          ...(out.structured as Record<string, unknown>),
+          notes: [
+            ...(((out.structured as { notes?: unknown }).notes as string[] | undefined) ?? []),
+            ...notes,
+          ],
+        }
+      : out.structured;
+  return {
+    ...out,
+    text: `${out.text}\n${notes.map((n) => `Note: ${n}`).join('\n')}`,
+    ...(structured === undefined ? {} : { structured }),
+  };
 }
 
 /** The MCP result for a handler's output. */
@@ -331,7 +381,13 @@ export function buildMcpServer({
           }
         };
         try {
-          const out = await def.handler(parseInput(def, input), ctx);
+          const aliases: string[] = [];
+          const out = withDeprecationNotes(
+            def,
+            aliases,
+            await def.handler(parseInput(def, input, aliases), ctx),
+            (name) => warnOnce(logger, def.name, name),
+          );
           logger.debug('tool ok', { ms: ctx.clock.now() - started, requests: ctx.budget.used });
           observe('ok', null, out);
           return toCallToolResult(out);

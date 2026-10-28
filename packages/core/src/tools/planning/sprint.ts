@@ -21,7 +21,7 @@ import { assetState, shapeOutput, untrusted } from '../../output/result.ts';
 import { utcIso } from '../../output/text.ts';
 import { type CompiledQuery, compileQuery } from '../../query/compiler.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { currentSprintArg, formatArg, projectArg, ref, rowOid, teamArg } from '../common.ts';
+import { currentSprintArg, formatArg, num, projectArg, ref, rowOid, teamArg } from '../common.ts';
 import { readableWorkTypes } from '../work/search.ts';
 
 const NAME = 'get_sprint';
@@ -65,12 +65,6 @@ interface Sums {
   readonly unestimatedItems: number;
 }
 
-const num = (v: unknown): number | undefined =>
-  typeof v === 'number' && Number.isFinite(v)
-    ? v
-    : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))
-      ? Number(v)
-      : undefined;
 const round = (n: number): number => Math.round(n * 100) / 100;
 
 /**

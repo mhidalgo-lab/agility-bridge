@@ -2,7 +2,7 @@
 id: P6-45
 title: Remove the duplicated tool helpers and the double meaning of `minimal_output`
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-13, P6-12]
 adr: []
@@ -19,8 +19,8 @@ owner: ""
 - Move `num`, `text` and `round1` to `tools/common.ts`; export one acceptance-attribute test; give the two `minimal_output` meanings two vocabulary entries (or rename one) so the lint keeps its no-exceptions rule.
 
 ## Acceptance criteria
-- [ ] One definition each; behaviour of every tool unchanged (existing tests).
-- [ ] The conventions lint passes with no exception.
+- [x] One definition each; behaviour of every tool unchanged (existing tests).
+- [x] The conventions lint passes with no exception.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md; a change to what is read or logged updates THREAT_MODEL in the same PR.

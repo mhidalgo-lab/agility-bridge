@@ -9,6 +9,7 @@ import { metadataFor } from '../../metadata/service.ts';
 import { assetState } from '../../output/result.ts';
 import { utcIso } from '../../output/text.ts';
 import type { CompiledQuery } from '../../query/compiler.ts';
+import { num, text } from '../common.ts';
 
 export const EPIC = 'Epic';
 
@@ -47,14 +48,6 @@ export async function epicFields(ctx: ToolContext, extra: readonly string[] = []
     ...extra,
   ].filter(has);
 }
-
-const num = (v: unknown) =>
-  typeof v === 'number' && Number.isFinite(v)
-    ? v
-    : typeof v === 'string' && v !== '' && Number.isFinite(Number(v))
-      ? Number(v)
-      : undefined;
-const text = (v: unknown) => (typeof v === 'string' && v !== '' ? v : undefined);
 
 /** One epic as a flat row (camelCase, identity first); absent values are omitted, never null. */
 export function epicRow(row: Readonly<Record<string, unknown>>): Record<string, unknown> {

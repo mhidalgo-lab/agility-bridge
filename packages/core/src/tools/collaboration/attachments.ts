@@ -16,7 +16,7 @@ import { compileQuery } from '../../query/compiler.ts';
 import { checkCursorShape, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { invalid } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { assetArg, cursorArg, formatArg, limitArg, rowOid } from '../common.ts';
+import { assetArg, cursorArg, formatArg, limitArg, num, rowOid, text } from '../common.ts';
 
 const LIST_NAME = 'list_attachments';
 const LIST_COST = 12;
@@ -26,10 +26,10 @@ const DEFAULT_CHARS = 20_000;
 const ATTACHMENT_ID = /^(?:Attachment:)?([1-9][0-9]{0,11})$/;
 
 type Row = Readonly<Record<string, unknown>>;
-const text = (v: unknown) => (typeof v === 'string' && v !== '' ? v : undefined);
-const num = (v: unknown) => {
-  const n = typeof v === 'number' ? v : typeof v === 'string' && v !== '' ? Number(v) : Number.NaN;
-  return Number.isFinite(n) && n >= 0 ? n : undefined;
+/** A size or count: a non-negative number. */
+const size = (v: unknown): number | undefined => {
+  const n = num(v);
+  return n !== undefined && n >= 0 ? n : undefined;
 };
 
 /** The types `get_attachment` may return: the deployment's list without the types that run or render (A8). */
@@ -61,7 +61,7 @@ const ATTACHMENT_FIELDS = [
 function attachmentItem(r: Row): Record<string, unknown> {
   const author = oidsOf(r['CreatedBy'])[0];
   const created = text(r['CreateDateUTC']) ?? text(r['CreateDate']);
-  const bytes = num(r['ContentLength']);
+  const bytes = size(r['ContentLength']);
   const type = text(r['ContentType']);
   return {
     oid: rowOid(r),
@@ -288,7 +288,7 @@ export const getAttachment: ToolDefinition = defineTool({
         ),
       );
     }
-    const declaredBytes = num(row['ContentLength']);
+    const declaredBytes = size(row['ContentLength']);
     if (declaredBytes !== undefined && declaredBytes > maxBytes) {
       known = { ...known, bytes: declaredBytes };
       fail(

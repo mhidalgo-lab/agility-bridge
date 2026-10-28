@@ -222,7 +222,14 @@ export function lintArgumentShapes(input: Json): string[] {
   for (const name of ['asset', 'project', 'team', 'sprint', 'member', 'time_range', 'cursor'])
     expectType(name, 'string');
   for (const name of ['assets', 'status', 'fields']) expectType(name, 'array');
-  for (const name of ['include_closed', 'minimal_output', 'include_child_projects', 'dry_run', 'confirm'])
+  for (const name of [
+    'include_closed',
+    'minimal_output',
+    'skip_related',
+    'include_child_projects',
+    'dry_run',
+    'confirm',
+  ])
     expectType(name, 'boolean');
   expectType('limit', 'integer');
   for (const [name, descriptions] of Object.entries(ARGUMENT_VOCABULARY)) {

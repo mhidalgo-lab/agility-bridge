@@ -41,6 +41,7 @@ carry `requestId`.
 | error | `boot failed` | `error` (class), `reason` (names a setting, never a value) (Worker; written directly, the logger may not exist yet) | [index.ts](../../apps/worker/src/index.ts) |
 | debug | `tool ok` | `tool`, `ms`, `requests` | [server.ts](../../packages/core/src/server.ts) |
 | warn | `tool error` | `tool`, `ms`, `code`, `error` (class, redacted message) | [server.ts](../../packages/core/src/server.ts) |
+| warn | `deprecated argument used` | `tool`, `argument` (fixed names, once per process) | [server.ts](../../packages/core/src/server.ts) |
 | info | `attachment downloaded` | `asset` (number), `attachment` (id), `bytes`, `contentType`; never the content | [attachments.ts](../../packages/core/src/tools/collaboration/attachments.ts) |
 | debug | `resource ok` | `resource`, `ms`, `requests` | [server.ts](../../packages/core/src/server.ts) |
 | warn | `resource error` | `resource`, `ms`, `error` (class, redacted message) | [server.ts](../../packages/core/src/server.ts) |

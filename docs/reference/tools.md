@@ -175,7 +175,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
-| `minimal_output` | boolean |  |  | Skip children, links and comments (cheaper). |
+| `skip_related` | boolean |  |  | Skip children, links and comments (cheaper). |
 | `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
 `structuredContent`: `item`, `children`, `links`, `partial`, `notes` (open: more fields may be added).

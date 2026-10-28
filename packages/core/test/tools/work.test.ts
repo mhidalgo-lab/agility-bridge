@@ -251,6 +251,41 @@ describe('get_work_item', () => {
     });
   });
 
+  it('skip_related leaves out children, links and comments; minimal_output is a deprecated alias with a note (P6-45)', async () => {
+    const { ctx } = setup();
+    const full = await call(getWorkItem, ctx(), { asset: 'B-01001' });
+    expect((s(full) as unknown as { children: unknown[] }).children.length).toBeGreaterThan(0);
+    for (const args of [
+      { asset: 'B-01001', skip_related: true },
+      { asset: 'B-01001', minimal_output: true },
+    ]) {
+      const r = await call(getWorkItem, ctx(), args);
+      expect(r['isError'], text(r)).toBeUndefined();
+      expect((s(r) as unknown as { children?: unknown[] }).children ?? []).toEqual([]);
+      expect(text(r)).toContain('Children, links and comments were skipped');
+    }
+    const old = await call(getWorkItem, ctx(), { asset: 'B-01001', minimal_output: true });
+    expect(text(old)).toContain('Argument minimal_output is deprecated; use skip_related.');
+    expect((s(old) as unknown as { notes: string[] }).notes.join('\n')).toContain(
+      'deprecated; use skip_related',
+    );
+    // The new name wins when both are given, the new name carries no note, and the old value is validated.
+    const both = await call(getWorkItem, ctx(), {
+      asset: 'B-01001',
+      skip_related: false,
+      minimal_output: true,
+    });
+    expect((s(both) as unknown as { children: unknown[] }).children.length).toBeGreaterThan(0);
+    expect(text(await call(getWorkItem, ctx(), { asset: 'B-01001', skip_related: true }))).not.toContain(
+      'deprecated',
+    );
+    const bad = await call(getWorkItem, ctx(), { asset: 'B-01001', minimal_output: 'yes' });
+    expect(bad['isError']).toBe(true);
+    expect((bad['_meta'] as Record<string, { code?: string }>)['agility-bridge/error']?.code).toBe(
+      'AB_INPUT_INVALID',
+    );
+  });
+
   it('marks the result partial when children are capped', async () => {
     const { ctx } = setup({ tasks: 25 });
     const r = await call(getWorkItem, ctx(), { asset: 'B-01001' });

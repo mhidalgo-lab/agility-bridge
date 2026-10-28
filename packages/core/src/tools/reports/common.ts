@@ -129,8 +129,7 @@ export const arr = (v: unknown): Json[] =>
     : [];
 export const numOf = (v: unknown): number | undefined =>
   typeof v === 'number' && Number.isFinite(v) ? v : undefined;
-export const strOf = (v: unknown): string | undefined => (typeof v === 'string' && v !== '' ? v : undefined);
-export const round1 = (n: number): number => Math.round(n * 10) / 10;
+export { round1, text as strOf } from '../common.ts';
 
 /** Open output schema of a report: the sections with their status, the notes and the partial flag. */
 export const reportOutput = (shape: z.ZodRawShape = {}): z.ZodType =>

@@ -14,7 +14,7 @@ import { compileQuery } from '../../query/compiler.ts';
 import { invalid } from '../../query/limits.ts';
 import { BACKLOG_ITEM_QUALITY_RUBRIC, type RubricCriterion } from '../../rubric.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { workItemArg } from '../common.ts';
+import { isAcceptanceAttribute, workItemArg } from '../common.ts';
 import { getWorkItem } from '../work/get-item.ts';
 import {
   allQueries,
@@ -232,7 +232,7 @@ export const workItemQuality: ToolDefinition = defineTool({
   }),
   handler: async (input, outer) => {
     const ctx = { ...outer, budget: capBudget(outer.budget, COST) };
-    const run = await runSection(ctx, 'item', getWorkItem, { asset: input.asset, minimal_output: true });
+    const run = await runSection(ctx, 'item', getWorkItem, { asset: input.asset, skip_related: true });
     const runs: SectionRun[] = [run];
     rethrowIfNothingRead(runs);
     const notes = sectionNotes(runs, TITLES);
@@ -249,7 +249,7 @@ export const workItemQuality: ToolDefinition = defineTool({
     if (item !== undefined && type !== undefined) {
       const meta = await metadataFor(ctx).assetType(type);
       const hasAcceptanceField = [...meta.attributes.values()].some(
-        (a) => /accept(?:ance)?_?crit/i.test(a.name) && a.kind === 'LongText',
+        (a) => isAcceptanceAttribute(a.name) && a.kind === 'LongText',
       );
       const hasPriority = await readPriority(ctx, type, String(item['oid']));
       const facts: Facts = {

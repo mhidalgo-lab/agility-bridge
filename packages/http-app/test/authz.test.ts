@@ -236,7 +236,7 @@ describe.each(['evaluate', 'ignore-filters'] as const)('isolation of data (upstr
       expect(text(r)).not.toContain('A-visible');
       const item = await a.callTool({
         name: 'get_work_item',
-        arguments: { asset: ref, minimal_output: true },
+        arguments: { asset: ref, skip_related: true },
       });
       expect(text(item), ref).toContain('AB_NOT_FOUND');
       expect(text(item)).not.toContain('A-visible');
