@@ -102,3 +102,76 @@ export function parseAssetType(json: unknown): AssetTypeMeta {
     ...(base === undefined ? {} : { base }),
   };
 }
+
+const ATTRIBUTE_KEYS = ['name', 'kind', 'multi', 'custom', 'readOnly', 'required', 'relatedType'] as const;
+
+/** The parsed asset type as plain JSON (for a store that outlives the isolate, P6-39). */
+export function serializeAssetType(meta: AssetTypeMeta): string {
+  return JSON.stringify({
+    name: meta.name,
+    abstract: meta.abstract,
+    ...(meta.base === undefined ? {} : { base: meta.base }),
+    attributes: [...meta.attributes.values()].map((a) => ATTRIBUTE_KEYS.map((k) => a[k] ?? null)),
+    operations: [...meta.operations],
+  });
+}
+
+/**
+ * Reads what `serializeAssetType` wrote, checking every identifier again (a store is not trusted more than Agility).
+ * Returns undefined for anything that does not fit, so the caller fetches from Agility instead.
+ */
+export function deserializeAssetType(text: string): AssetTypeMeta | undefined {
+  try {
+    const b = record(JSON.parse(text));
+    if (b === undefined || typeof b['name'] !== 'string' || !ASSET_TYPE_NAME_RE.test(b['name']))
+      return undefined;
+    if (
+      typeof b['abstract'] !== 'boolean' ||
+      !Array.isArray(b['attributes']) ||
+      !Array.isArray(b['operations'])
+    )
+      return undefined;
+    if (b['base'] !== undefined && (typeof b['base'] !== 'string' || !ASSET_TYPE_NAME_RE.test(b['base'])))
+      return undefined;
+    const attributes = new Map<string, AttributeMeta>();
+    for (const row of b['attributes'] as unknown[]) {
+      if (!Array.isArray(row)) return undefined;
+      const [name, kind, multi, custom, readOnly, required, relatedType] = row as unknown[];
+      if (
+        typeof name !== 'string' ||
+        !ATTRIBUTE_NAME_RE.test(name) ||
+        typeof kind !== 'string' ||
+        !(KINDS.has(kind) || kind === 'unknown') ||
+        typeof multi !== 'boolean' ||
+        typeof custom !== 'boolean' ||
+        typeof readOnly !== 'boolean' ||
+        typeof required !== 'boolean' ||
+        (relatedType !== null && (typeof relatedType !== 'string' || !ASSET_TYPE_NAME_RE.test(relatedType)))
+      )
+        return undefined;
+      attributes.set(name, {
+        name,
+        kind: kind as AttributeKind,
+        multi,
+        custom,
+        readOnly,
+        required,
+        ...(typeof relatedType === 'string' ? { relatedType } : {}),
+      });
+    }
+    const operations = new Set<string>();
+    for (const op of b['operations'] as unknown[]) {
+      if (typeof op !== 'string' || !ATTRIBUTE_NAME_RE.test(op)) return undefined;
+      operations.add(op);
+    }
+    return {
+      name: b['name'],
+      abstract: b['abstract'],
+      attributes,
+      operations,
+      ...(typeof b['base'] === 'string' ? { base: b['base'] } : {}),
+    };
+  } catch {
+    return undefined;
+  }
+}

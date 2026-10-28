@@ -474,6 +474,17 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   handler wrapper, once for every tool, answering `AB_INPUT_INVALID` with the argument path, a clipped issue text (never the
   value) and a `Hint:`; (b) leave the SDK message; (c) validate in each tool.
 - **Recommendation:** (a), built. Parsed data (defaults applied) still reaches the handler.
+
+### D-135 — Where asset-type metadata is kept across isolates *(P6-39)*
+- **Context:** a cold Worker isolate fetches one `meta.v1` document per asset type (9 to 17 for a Phase 6 tool). The task names
+  the Cache API, KV or D1. KV is a new binding (and a new Cloudflare resource, which this work may not create); the Cache API is
+  per data centre, keyed by URL, and its entries are not ours to purge or authorise.
+- **Options:** (a) the host's existing D1 `kv` table through a small `MetadataStore` interface in core (the core stays free of
+  storage and `node:*`), keyed `meta1/<instance>/<type>`, storing the parsed identifier-only model with its fingerprint and
+  expiry; (b) the Cache API; (c) KV; (d) in-isolate only (status quo).
+- **Recommendation:** (a), built; the Node hosts keep their process-wide cache and pass no store. Each stored type is one D1 read
+  on a cold isolate instead of one Agility request (D1 reads are not Agility subrequests, but their count against the Free
+  plan's subrequest limit is *unverified*). Statuses, prefixes and project trees stay in the isolate for now.
 - **Owner:** *(open; built as (a))*
 
 ### D-147 — Resolution memo lives on the request context; the standup change-date filter waits for a sandbox *(P6-40)*

@@ -12,7 +12,20 @@
     "warm: admin: users list": 4.832,
     "warm: admin: audit": 3.959,
     "warm: admin: asset": 0.091,
-    "warm: admin: form POST": 0.991
+    "warm: admin: form POST": 0.991,
+    "warm: prompts/list": 2.0599999999999454,
+    "cold-metadata: get_sprint": 11.25500000000011,
+    "stored-metadata: get_sprint": 6.685999999999694,
+    "warm-metadata: get_sprint": 5.042999999999665,
+    "cold-metadata: get_asset_history": 4.890000000000327,
+    "stored-metadata: get_asset_history": 2.7619999999997162,
+    "warm-metadata: get_asset_history": 2.464999999999236,
+    "cold-metadata: get_portfolio_tree": 6.673999999999978,
+    "stored-metadata: get_portfolio_tree": 8.106999999999971,
+    "warm-metadata: get_portfolio_tree": 3.3789999999999054,
+    "cold-metadata: sprint_health": 12.764000000000124,
+    "stored-metadata: sprint_health": 8.701999999999316,
+    "warm-metadata: sprint_health": 7.359000000000378
   },
   "relative": {
     "cold: boot": 20.981,
@@ -26,7 +39,20 @@
     "warm: admin: users list": 1.439,
     "warm: admin: audit": 1.179,
     "warm: admin: asset": 0.027,
-    "warm: admin: form POST": 0.295
+    "warm: admin: form POST": 0.295,
+    "warm: prompts/list": 0.518,
+    "cold-metadata: get_sprint": 2.833,
+    "stored-metadata: get_sprint": 1.683,
+    "warm-metadata: get_sprint": 1.269,
+    "cold-metadata: get_asset_history": 1.231,
+    "stored-metadata: get_asset_history": 0.695,
+    "warm-metadata: get_asset_history": 0.62,
+    "cold-metadata: get_portfolio_tree": 1.68,
+    "stored-metadata: get_portfolio_tree": 2.041,
+    "warm-metadata: get_portfolio_tree": 0.85,
+    "cold-metadata: sprint_health": 3.213,
+    "stored-metadata: sprint_health": 2.19,
+    "warm-metadata: sprint_health": 1.852
   },
   "requests": {
     "whoami": 1,
@@ -36,6 +62,18 @@
     "admin: users list": 0,
     "admin: audit": 0,
     "admin: asset": 0,
-    "admin: form POST": 0
+    "admin: form POST": 0,
+    "cold-metadata: get_sprint": 17,
+    "stored-metadata: get_sprint": 7,
+    "warm-metadata: get_sprint": 5,
+    "cold-metadata: get_asset_history": 13,
+    "stored-metadata: get_asset_history": 4,
+    "warm-metadata: get_asset_history": 2,
+    "cold-metadata: get_portfolio_tree": 16,
+    "stored-metadata: get_portfolio_tree": 7,
+    "warm-metadata: get_portfolio_tree": 4,
+    "cold-metadata: sprint_health": 24,
+    "stored-metadata: sprint_health": 8,
+    "warm-metadata: sprint_health": 6
   }
 }

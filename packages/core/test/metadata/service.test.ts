@@ -210,6 +210,111 @@ describe('cache and budget', () => {
   });
 });
 
+describe('a store that outlives the isolate (P6-39)', () => {
+  const memoryStore = () => {
+    const data = new Map<string, string>();
+    return {
+      data,
+      store: {
+        get: async (k: string) => data.get(k) ?? null,
+        set: async (k: string, v: string) => void data.set(k, v),
+      },
+    };
+  };
+  const stamped = (stamp: () => string) => ({
+    override: async (_req: Request, call: { path: string }) => {
+      if (!call.path.startsWith('meta.v1/')) return undefined;
+      return new Response(JSON.stringify(SNAPSHOT[call.path.slice(8)]), {
+        headers: { 'content-type': 'application/json', etag: `"26.0.3.2.${stamp()}"` },
+      });
+    },
+  });
+
+  it('a second service (a fresh isolate) reads the types the first one fetched: fewer upstream requests', async () => {
+    const { store } = memoryStore();
+    const one = setup({ service: { store } });
+    await metadataFor(one.ctx()).resolvePath('Story', 'Status.Name');
+    expect(one.fake.requests).toBe(2);
+    const two = setup({ service: { store } });
+    const c = two.ctx();
+    const story = await metadataFor(c).assetType('Story');
+    expect(story.attributes.get('Status')).toMatchObject({ kind: 'Relation', relatedType: 'StoryStatus' });
+    expect(two.fake.requests).toBe(0);
+    expect(c.budget.used).toBe(0);
+    expect(metadataFor(c).fingerprint).toBe('"26.0.3.2.1"');
+    // The revived type answers like the parsed one.
+    const parsed = parseAssetType(SNAPSHOT['Story']);
+    expect([...story.attributes]).toEqual([...parsed.attributes]);
+    expect([...story.operations]).toEqual([...parsed.operations]);
+    expect(story.base).toBe(parsed.base);
+  });
+
+  it('keeps nothing across instances', async () => {
+    const { store, data } = memoryStore();
+    const one = setup({ service: { store } });
+    await metadataFor(one.ctx()).assetType('Story');
+    const two = setup({ service: { store } });
+    const other = two.ctx({
+      instance: { id: 'other', baseUrl: 'https://agility.example.com/SyntheticInstance' },
+    });
+    await metadataFor(other).assetType('Story');
+    expect(two.fake.requests).toBe(1);
+    expect([...data.keys()].sort()).toEqual(['meta1/env/Story', 'meta1/other/Story']);
+  });
+
+  it('drops an entry whose fingerprint is not the one this isolate has seen', async () => {
+    const { store } = memoryStore();
+    let stamp = '1';
+    const one = setup({ service: { store }, fake: stamped(() => stamp) });
+    await metadataFor(one.ctx()).assetType('Story');
+    const two = setup({ service: { store }, fake: stamped(() => stamp) });
+    await metadataFor(two.ctx()).assetType('Task'); // not stored: fetched, fingerprint 1
+    stamp = '2';
+    const three = setup({ service: { store }, fake: stamped(() => stamp) });
+    const md = metadataFor(three.ctx());
+    await md.assetType('Task'); // stored under 1, nothing seen yet: adopted
+    expect(three.fake.requests).toBe(0);
+    await md.assetType('Epic'); // fetched under 2: the schema changed, what was derived goes
+    expect(md.fingerprint).toBe('"26.0.3.2.2"');
+    await md.assetType('Story'); // the entry of fingerprint 1 is refused
+    expect(three.fake.requests).toBe(2);
+  });
+
+  it('does not use an expired entry, and survives a store that fails or holds garbage', async () => {
+    let now = 0;
+    const { store, data } = memoryStore();
+    const clock = { now: () => now };
+    const one = setup({ service: { store, ttlMs: 1_000, clock } });
+    await metadataFor(one.ctx()).assetType('Story');
+    now = 2_000;
+    const two = setup({ service: { store, ttlMs: 1_000, clock } });
+    await metadataFor(two.ctx()).assetType('Story');
+    expect(two.fake.requests).toBe(1);
+    data.set('meta1/env/Story', '{"fp":"x","at":1999,"m":"not json"}');
+    const three = setup({ service: { store, ttlMs: 1_000, clock } });
+    await metadataFor(three.ctx()).assetType('Story');
+    expect(three.fake.requests).toBe(1);
+    const broken = {
+      get: async () => {
+        throw new Error('down');
+      },
+      set: async () => {
+        throw new Error('down');
+      },
+    };
+    const four = setup({ service: { store: broken } });
+    await metadataFor(four.ctx()).assetType('Story');
+    expect(four.fake.requests).toBe(1);
+  });
+
+  it('does not store a type the instance lacks', async () => {
+    const { store, data } = memoryStore();
+    const one = setup({ service: { store } });
+    await failure(metadataFor(one.ctx()).assetType('Nope'));
+    expect(data.size).toBe(0);
+  });
+});
+
 describe('number prefixes (L-141)', () => {
   const assets = {
     Story: [{ _oid: 'Story:1054', Number: 'S-01054' }],
