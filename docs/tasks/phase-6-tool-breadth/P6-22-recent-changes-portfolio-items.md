@@ -2,7 +2,7 @@
 id: P6-22
 title: Portfolio items in list_recent_changes
 phase: 6
-status: review
+status: done
 priority: low
 depends_on: [P6-05, P6-01]
 adr: ["0011"]

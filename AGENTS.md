@@ -2,8 +2,8 @@
 
 These instructions apply to every AI coding agent (and human) working in this repository.
 
-> Status: **Phase 0**. The monorepo is bootstrapped (P0-01) and `pnpm lint`, `pnpm typecheck`, `pnpm test` and
-> `pnpm build` run; packages are still placeholders. `pnpm tasks` drives the plan (P0-05).
+> Status: **Phase 6 built and reviewed**; v0.5.0 is published and v0.6 waits on owner steps. The current state is in
+> [`docs/ROADMAP.md`](docs/ROADMAP.md); `pnpm tasks` drives the plan (P0-05).
 
 ## Start here
 

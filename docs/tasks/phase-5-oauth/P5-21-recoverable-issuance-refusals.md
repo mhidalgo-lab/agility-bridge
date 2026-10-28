@@ -2,7 +2,7 @@
 id: P5-21
 title: Keep the device when an issuance refusal can pass
 phase: 5
-status: review
+status: done
 priority: low
 depends_on: [P5-10]
 adr: ["0009"]
