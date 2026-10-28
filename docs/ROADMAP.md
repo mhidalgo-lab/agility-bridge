@@ -225,9 +225,9 @@ Status lives in each task file.
 | P4-28 | [Panel list screens: cost grows with the number of users](tasks/phase-4-identity-admin/P4-28-panel-list-screen-cost.md) | low | P4-14 | todo |
 | P4-30 | [Apply an instance's stored number prefixes when resolving numbers](tasks/phase-4-identity-admin/P4-30-apply-stored-number-prefixes.md) | low | P4-15 | todo |
 | P4-31 | [Keyset paging for device tokens in storage](tasks/phase-4-identity-admin/P4-31-token-list-storage-keyset.md) | low | P4-15 | todo |
-| P4-34 | [Make adding an instance an owner-only action (if D-55 chooses it)](tasks/phase-4-identity-admin/P4-34-owner-only-instance-creation.md) | low | P4-09 | todo |
-| P4-35 | [List and revoke unused owner setup links (if D-56 chooses it)](tasks/phase-4-identity-admin/P4-35-list-revoke-setup-links.md) | low | P4-09 | todo |
-| P4-36 | [Write the audit row before an admin change and refuse the change without it (if D-57 chooses it)](tasks/phase-4-identity-admin/P4-36-audit-before-admin-changes.md) | low | P4-09 | todo |
+| P4-34 | [Make adding an instance an owner-only action (if D-55 chooses it)](tasks/phase-4-identity-admin/P4-34-owner-only-instance-creation.md) | low | P4-09 | dropped |
+| P4-35 | [List and revoke unused owner setup links (if D-56 chooses it)](tasks/phase-4-identity-admin/P4-35-list-revoke-setup-links.md) | low | P4-09 | dropped |
+| P4-36 | [Write the audit row before an admin change and refuse the change without it (if D-57 chooses it)](tasks/phase-4-identity-admin/P4-36-audit-before-admin-changes.md) | low | P4-09 | dropped |
 | P4-37 | [Record a credential validation only while the sealed token is the one that was checked](tasks/phase-4-identity-admin/P4-37-validation-compare-and-swap.md) | low | P4-09 | todo |
 
 ### Phase 5
@@ -251,7 +251,7 @@ Status lives in each task file.
 | P5-19 | [Edge rate limits for the OAuth routes on Workers](tasks/phase-5-oauth/P5-19-oauth-edge-rate-limits.md) | low | P5-09 | todo |
 | P5-20 | [Operator view of OAuth abuse refusals and caps](tasks/phase-5-oauth/P5-20-oauth-abuse-visibility.md) | low | P5-08, P5-09 | todo |
 | P5-21 | [Keep the device when an issuance refusal can pass](tasks/phase-5-oauth/P5-21-recoverable-issuance-refusals.md) | low | P5-10 | done |
-| P5-22 | [Key the OAuth abuse counters with a secret](tasks/phase-5-oauth/P5-22-keyed-address-hash.md) | low | P5-10 | todo |
+| P5-22 | [Key the OAuth abuse counters with a secret](tasks/phase-5-oauth/P5-22-keyed-address-hash.md) | low | P5-10 | dropped |
 
 ### Phase 6
 
@@ -280,12 +280,12 @@ Status lives in each task file.
 | P6-21 | [Verify history against known edits on the writable sandbox](tasks/phase-6-tool-breadth/P6-21-history-sandbox-verification.md) | medium | P6-05, P7-07 | todo |
 | P6-22 | [Portfolio items in list_recent_changes](tasks/phase-6-tool-breadth/P6-22-recent-changes-portfolio-items.md) | low | P6-05, P6-01 | done |
 | P6-25 | [Verify the regression and test-set recipes on the writable sandbox](tasks/phase-6-tool-breadth/P6-25-verify-regression-recipes-sandbox.md) | low | P6-03, P7-07 | todo |
-| P6-26 | [Revisit a typed quality tool after the tool evals](tasks/phase-6-tool-breadth/P6-26-quality-typed-tool-revisit.md) | low | P6-03, P6-10 | todo |
+| P6-26 | [Revisit a typed quality tool after the tool evals](tasks/phase-6-tool-breadth/P6-26-quality-typed-tool-revisit.md) | low | P6-03, P6-10 | done |
 | P6-27 | [Verify requests and empty asset types on a writable sandbox](tasks/phase-6-tool-breadth/P6-27-verify-requests-on-sandbox.md) | low | P6-06 | todo |
 | P6-28 | [Decide on typed tools for issues and requests from usage and evals](tasks/phase-6-tool-breadth/P6-28-typed-tools-for-other-types.md) | low | P6-06, P6-10 | todo |
 | P6-29 | [Quality scan over a sprint or epic](tasks/phase-6-tool-breadth/P6-29-quality-batch-scan.md) | low | P6-07 | todo |
 | P6-30 | [Priority and severity in defect triage](tasks/phase-6-tool-breadth/P6-30-defect-priority-severity-triage.md) | low | P6-07 | todo |
-| P6-31 | [Prompt fallbacks without the reports group](tasks/phase-6-tool-breadth/P6-31-prompt-fallbacks-without-reports.md) | low | P6-08 | todo |
+| P6-31 | [Prompt fallbacks without the reports group](tasks/phase-6-tool-breadth/P6-31-prompt-fallbacks-without-reports.md) | low | P6-08 | dropped |
 | P6-32 | [Prompt argument completion](tasks/phase-6-tool-breadth/P6-32-prompt-argument-completion.md) | low | P6-08 | todo |
 | P6-33 | [First LLM tool-eval run and triage](tasks/phase-6-tool-breadth/P6-33-first-llm-eval-run.md) | medium | P6-10 | done |
 | P6-34 | [Tune tool descriptions from the eval misses](tasks/phase-6-tool-breadth/P6-34-description-tuning-from-evals.md) | low | P6-33 | todo |

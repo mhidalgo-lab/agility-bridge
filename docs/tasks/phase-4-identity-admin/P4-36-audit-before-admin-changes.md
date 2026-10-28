@@ -2,7 +2,7 @@
 id: P4-36
 title: Write the audit row before an admin change and refuse the change without it (if D-57 chooses it)
 phase: 4
-status: todo
+status: dropped
 priority: low
 depends_on: [P4-09]
 adr: ["0013"]
@@ -11,6 +11,8 @@ owner: ""
 ---
 
 # P4-36 — Write the audit row before an admin change and refuse the change without it (if D-57 chooses it)
+
+> **Dropped 2026-10-28:** D-57 chose (a): audit rows stay after the change. Reopen if storage failures that lose audit rows are seen in practice.
 
 > Found by the Phase 4 admin security review (P4-09, decision D-57). Not started.
 

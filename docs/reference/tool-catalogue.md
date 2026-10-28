@@ -161,7 +161,7 @@ themes, and retrospectives (P6-06), below.
 | `agility-bridge://instance/asset-types/{asset_type}` | Attributes, operations and statuses of one type |
 | `agility-bridge://workspace/projects` | The Agility projects this workspace allows, as a tree |
 | `agility-bridge://rubrics/backlog-item-quality` | The versioned quality rubric (JSON) used by `work_item_quality` |
-| `agility-bridge://recipes/tests-and-defects` | Worked `query_assets` calls: tests of a backlog item, failing and never-run tests, open, unowned, by-priority, recently closed and per-sprint defects |
+| `agility-bridge://recipes/tests-and-defects` | Worked `query_assets` calls: tests of a backlog item, failing and never-run tests, open, unowned, by-priority, recently closed and per-sprint defects (no typed quality tool: D-95, confirmed by the evals in P6-26) |
 | `agility-bridge://recipes/regression-assets` | Worked `query_assets` calls: regression tests, test sets and the tests inside one; plans and suites by the same pattern after `list_asset_types` |
 | `agility-bridge://recipes/issues`, `recipes/requests`, `recipes/goals-and-themes`, `recipes/retrospectives` | What the type is for, its default fields and example `query_assets` / `get_assets` inputs (P6-06; no typed tools, D-98) |
 

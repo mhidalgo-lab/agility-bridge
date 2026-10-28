@@ -2,7 +2,7 @@
 id: P4-35
 title: List and revoke unused owner setup links (if D-56 chooses it)
 phase: 4
-status: todo
+status: dropped
 priority: low
 depends_on: [P4-09]
 adr: ["0009"]
@@ -11,6 +11,8 @@ owner: ""
 ---
 
 # P4-35 — List and revoke unused owner setup links (if D-56 chooses it)
+
+> **Dropped 2026-10-28:** D-56 chose (a): setup links are rare and expire in an hour. Reopen before links are issued routinely or the 7-day maximum is used.
 
 > Found by the Phase 4 admin security review (P4-09, decision D-56). Not started.
 

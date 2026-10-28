@@ -2,7 +2,7 @@
 id: P6-26
 title: Revisit a typed quality tool after the tool evals
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-03, P6-10]
 adr: ["0012"]
@@ -27,8 +27,8 @@ Q020, Q061 – Q063) passed in 12 of 14 answers allowing one lookup, through `se
 were a second lookup, not a wrong tool. Points to "keep recipes"; the decision is this task's.
 
 ## Acceptance criteria
-- [ ] Decision recorded in the tool catalogue and D-95 answered, with the eval evidence.
-- [ ] If a tool is added: conventions, negative authorization tests, catalogue size test within budget.
+- [x] Decision recorded in the tool catalogue and D-95 answered, with the eval evidence: keep recipes, no typed quality tool.
+- [x] If a tool is added: conventions, negative authorization tests, catalogue size test within budget (no tool added).
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.

@@ -2,7 +2,7 @@
 id: P4-34
 title: Make adding an instance an owner-only action (if D-55 chooses it)
 phase: 4
-status: todo
+status: dropped
 priority: low
 depends_on: [P4-09]
 adr: ["0008"]
@@ -11,6 +11,8 @@ owner: ""
 ---
 
 # P4-34 — Make adding an instance an owner-only action (if D-55 chooses it)
+
+> **Dropped 2026-10-28:** D-55 chose (a): administrators are trusted as much as owners. Reopen if D-55 changes to (b).
 
 > Found by the Phase 4 admin security review (P4-09, decision D-55). Not started: it contradicts a sentence of ADR-0008
 > ("an Agility base URL defined by an owner or admin"), so it needs the owner's answer and an ADR that supersedes it.

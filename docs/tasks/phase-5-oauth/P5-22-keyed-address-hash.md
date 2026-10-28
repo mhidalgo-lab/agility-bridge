@@ -2,7 +2,7 @@
 id: P5-22
 title: Key the OAuth abuse counters with a secret
 phase: 5
-status: todo
+status: dropped
 priority: low
 depends_on: [P5-10]
 adr: ["0007"]
@@ -11,6 +11,8 @@ owner: ""
 ---
 
 # P5-22 — Key the OAuth abuse counters with a secret
+
+> **Dropped 2026-10-28:** D-78 chose (a): pseudonymous, short-lived counters, documented. Reopen if a deployment's privacy position needs a keyed hash.
 
 > Later-phase task: **refine scope and acceptance criteria before starting** (tasks/README rule 7), after the owner answers
 > [D-78](../../pending-decisions/phase-5.md). Created by the Phase 5 review (P5-10).
