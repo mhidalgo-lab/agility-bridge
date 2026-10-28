@@ -105,8 +105,10 @@ export {
   ATTRIBUTE_NAME_RE,
   type AttributeKind,
   type AttributeMeta,
+  deserializeAssetType,
   NUMBER_PREFIX_RE,
   parseAssetType,
+  serializeAssetType,
 } from './metadata/model.ts';
 export {
   type Aggregation,
@@ -116,6 +118,7 @@ export {
   MAX_PATH_SEGMENTS,
   MetadataService,
   type MetadataServiceOptions,
+  type MetadataStore,
   metadataFor,
   NUMBERED_TYPES,
   type ResolvedPath,

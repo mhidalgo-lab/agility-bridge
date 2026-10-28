@@ -186,7 +186,7 @@ function openSchema(schema: unknown): unknown {
 const SDK_SCHEMA_TARGET = 'draft-2020-12';
 
 /**
- * Converts every tool's schemas now, into the cache `tools/list` reads (L-020). Workers call it at module scope, so the
+ * Converts every tool's (and prompt's) schemas now, into the cache `tools/list` reads (L-020). Workers call it at module scope, so the
  * first request of an isolate does not pay for the conversion (P3-14).
  */
 export function prewarmToolSchemas(tools: readonly ToolDefinition[]): void {
@@ -195,6 +195,10 @@ export function prewarmToolSchemas(tools: readonly ToolDefinition[]): void {
     if (def.outputSchema !== undefined) {
       withCachedJsonSchema(def.outputSchema)['~standard'].jsonSchema.output({ target: SDK_SCHEMA_TARGET });
     }
+  }
+  // The prompts' argument schemas too: the first `prompts/list` cost 75 ms of CPU cold (P6-39).
+  for (const prompt of PROMPT_MANIFEST) {
+    withCachedJsonSchema(prompt.arguments)['~standard'].jsonSchema.input({ target: SDK_SCHEMA_TARGET });
   }
 }
 

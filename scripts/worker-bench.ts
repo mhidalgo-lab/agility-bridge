@@ -5,12 +5,16 @@
 // a path whose relative cost grows past 2× its baseline is flagged.
 // The panel (P4-14): the first signed-in /admin request of a fresh process (lazy import and build, P3-14) and warm pages
 // with a session (overview, a list, the audit page, an asset, a form POST through the in-process admin API).
+// Phase 6 tools (P6-39): get_sprint, get_asset_history, get_portfolio_tree and sprint_health on a cold isolate (a new
+// MetadataService: one metadata request per asset type), on a cold isolate whose types another isolate stored (the D1
+// store the Worker uses), and warm. Requests per call are recorded beside the CPU.
 //   pnpm bench:worker            measure and compare with scripts/bench/worker-baseline.json
 //   pnpm bench:worker --update   rewrite the baseline
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { register } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import type { MetadataStore } from '../packages/core/src/index.ts';
 
 const BASELINE = fileURLToPath(new URL('./bench/worker-baseline.json', import.meta.url));
 const THRESHOLD = 2;
@@ -117,6 +121,7 @@ async function coldBoot(): Promise<number> {
 
 const CALLS: Record<string, unknown> = {
   'tools/list': { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} },
+  'prompts/list': { jsonrpc: '2.0', id: 5, method: 'prompts/list', params: {} },
   whoami: { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'whoami', arguments: {} } },
   search_work_items: {
     jsonrpc: '2.0',
@@ -149,6 +154,74 @@ async function warmCalls(): Promise<{ ms: Record<string, number>; requests: Reco
       if (call !== undefined) requests[name] = call.requestsUsed;
     }
     ms[name] = median(samples);
+  }
+  return { ms, requests };
+}
+
+/** The Phase 6 tools measured on the metadata paths: the worst-case fixtures of the cost test give the arguments. */
+const PHASE_6_TOOLS = ['get_sprint', 'get_asset_history', 'get_portfolio_tree', 'sprint_health'] as const;
+
+async function metadataPaths(): Promise<{ ms: Record<string, number>; requests: Record<string, number> }> {
+  const core = await import('../packages/core/src/index.ts');
+  const { costFakeOptions } = await import('../packages/core/test/tools/cost-world.ts');
+  const { NOW, toolByName } = await import('../packages/core/test/tools/reports-world.ts');
+  const { WORST_CASES } = await import('../packages/core/test/tools/worst-case.ts');
+  const { makeContext, FakeAgility } = await import('../packages/core/test/harness/index.ts');
+  const { rpc } = await import('../packages/core/test/helpers/mcp.ts');
+  const memoryStore = (): MetadataStore => {
+    const data = new Map<string, string>();
+    return {
+      get: async (k) => data.get(k) ?? null,
+      set: async (k, v) => void data.set(k, v),
+    };
+  };
+  const ms: Record<string, number> = {};
+  const requests: Record<string, number> = {};
+  const clock = { now: () => NOW };
+  for (const name of PHASE_6_TOOLS) {
+    const tool = toolByName(name);
+    const siblings = (core.COMPOSITE_SIBLINGS[name] ?? []).map(toolByName);
+    const fake = new FakeAgility(costFakeOptions());
+    const call = async (service: InstanceType<typeof core.MetadataService>) => {
+      const ctx = makeContext({
+        fetch: fake.fetch,
+        metadata: service,
+        clock,
+        budget: core.createBudget(1_000),
+        projects: { allowed: ['Scope:1001'], includeChildren: true },
+        limits: { ...core.DEFAULT_LIMITS, reports: true },
+      });
+      const before = fake.requests;
+      const t = cpu();
+      const out = await rpc(() => core.buildMcpServer({ tools: [tool, ...siblings], ctx }), 'tools/call', {
+        name,
+        arguments: WORST_CASES[name]?.args ?? {},
+      });
+      const spent = cpu() - t;
+      if ((out as { isError?: boolean }).isError === true) throw new Error(`${name} failed in the bench`);
+      return { spent, requests: fake.requests - before };
+    };
+    const primed = new core.MetadataService({ shareInflight: false });
+    await call(primed);
+    const store = memoryStore();
+    await call(new core.MetadataService({ shareInflight: false, store }));
+    const scenarios: Record<string, () => Promise<{ spent: number; requests: number }>> = {
+      [`cold-metadata: ${name}`]: () => call(new core.MetadataService({ shareInflight: false })),
+      [`stored-metadata: ${name}`]: () => call(new core.MetadataService({ shareInflight: false, store })),
+      [`warm-metadata: ${name}`]: () => call(primed),
+    };
+    for (const [path, run] of Object.entries(scenarios)) {
+      await run();
+      const samples: number[] = [];
+      let n = 0;
+      for (let i = 0; i < 9; i++) {
+        const r = await run();
+        samples.push(r.spent);
+        n = r.requests;
+      }
+      ms[path] = median(samples);
+      requests[path] = n;
+    }
   }
   return { ms, requests };
 }
@@ -267,12 +340,14 @@ async function main(argv: readonly string[]): Promise<number> {
   const calibrationMs = calibrate();
   const warm = await warmCalls();
   const panel = await warmPanel();
+  const phase6 = await metadataPaths();
   const ms: Record<string, number> = {
     'cold: boot': Math.min(...cold.map((c) => c.boot)),
     ...Object.fromEntries(Object.entries(warm.ms).map(([k, v]) => [`warm: ${k}`, v])),
     'cold: first /admin': Math.min(...coldPanels.map((c) => c.first)),
     'cold: second /admin': Math.min(...coldPanels.map((c) => c.second)),
     ...Object.fromEntries(Object.entries(panel.ms).map(([k, v]) => [`warm: ${k}`, v])),
+    ...phase6.ms,
   };
   const relative = Object.fromEntries(
     Object.entries(ms).map(([k, v]) => [k, Number((v / calibrationMs).toFixed(3))]),
@@ -281,7 +356,7 @@ async function main(argv: readonly string[]): Promise<number> {
     calibrationMs,
     ms,
     relative,
-    requests: { ...warm.requests, ...panel.requests },
+    requests: { ...warm.requests, ...panel.requests, ...phase6.requests },
   };
   console.log(JSON.stringify(result, null, 2));
   if (argv.includes('--update')) {

@@ -12,8 +12,10 @@ import {
   ATTRIBUTE_NAME_RE,
   type AttributeKind,
   type AttributeMeta,
+  deserializeAssetType,
   NUMBER_PREFIX_RE,
   parseAssetType,
+  serializeAssetType,
 } from './model.ts';
 
 /** The rollup category of a status (reporting only, L-142). */
@@ -161,6 +163,27 @@ export interface MetadataServiceOptions {
    * not be awaited by another (L-096); completed values are still shared.
    */
   readonly shareInflight?: boolean;
+  /**
+   * A store that outlives the isolate (P6-39): a fresh isolate reads asset types another one fetched instead of asking
+   * Agility again. Optional; failures of the store are ignored (the type is then fetched).
+   */
+  readonly store?: MetadataStore;
+}
+
+/**
+ * Where asset types are kept between isolates. Values are opaque text; a host maps this to its key-value table (D1 on
+ * Workers). Keys are per instance, so nothing crosses instances (L-096, L-113).
+ */
+export interface MetadataStore {
+  get(key: string): Promise<string | null>;
+  /** `expiresAt` is epoch milliseconds. */
+  set(key: string, value: string, expiresAt: number): Promise<void>;
+}
+
+/** The stored entry: the schema fingerprint (ETag) it was read under, when, and the parsed type. */
+function storeKey(instanceId: string, name: string): string | undefined {
+  const key = `meta1/${encodeURIComponent(instanceId)}/${name}`;
+  return key.length <= 512 ? key : undefined;
 }
 
 interface Cached<T> {
@@ -251,6 +274,11 @@ export class MetadataService {
   }
 
   /** @internal */
+  get ttlMs(): number {
+    return this.#ttlMs;
+  }
+
+  /** @internal */
   now(): number {
     return this.#clock.now();
   }
@@ -302,12 +330,61 @@ export class InstanceMetadata {
     if (this.#absentInCall >= MAX_ABSENT_PER_CALL && !KNOWN_TYPES.has(name)) return undefined;
     let pending = this.#inflight.get(name);
     if (pending === undefined) {
-      pending = this.#load(name).finally(() => this.#inflight.delete(name));
+      pending = this.#loadShared(name).finally(() => this.#inflight.delete(name));
       this.#inflight.set(name, pending);
     }
     const meta = await pending;
     if (meta === null) this.#absentInCall++;
     return meta ?? undefined;
+  }
+
+  /** Another isolate's copy first (P6-39), then Agility. */
+  async #loadShared(name: string): Promise<AssetTypeMeta | null> {
+    const stored = await this.#fromStore(name);
+    if (stored !== undefined) {
+      this.#cache.types.set(name, stored);
+      return stored.value;
+    }
+    const meta = await this.#load(name);
+    await this.#toStore(name, meta);
+    return meta;
+  }
+
+  async #fromStore(name: string): Promise<Cached<AssetTypeMeta> | undefined> {
+    const store = this.#service.options.store;
+    const key = storeKey(this.#ctx.instance.id, name);
+    if (store === undefined || key === undefined) return undefined;
+    try {
+      const raw = await store.get(key);
+      if (raw === null) return undefined;
+      const entry = JSON.parse(raw) as { fp?: unknown; at?: unknown; m?: unknown };
+      if (typeof entry.fp !== 'string' || typeof entry.at !== 'number' || typeof entry.m !== 'string')
+        return undefined;
+      const cached: Cached<string> = { value: entry.m, at: entry.at };
+      // Past its TTL, or written under another schema than the one this isolate has seen: fetch again.
+      if (!this.#service.fresh(cached)) return undefined;
+      if (this.#cache.fingerprint !== undefined && this.#cache.fingerprint !== entry.fp) return undefined;
+      const value = deserializeAssetType(entry.m);
+      if (value === undefined || value.name !== name) return undefined;
+      this.#cache.fingerprint ??= entry.fp;
+      return { value, at: entry.at };
+    } catch {
+      return undefined;
+    }
+  }
+
+  async #toStore(name: string, meta: AssetTypeMeta | null): Promise<void> {
+    const store = this.#service.options.store;
+    const key = storeKey(this.#ctx.instance.id, name);
+    const fp = this.#cache.fingerprint;
+    // Absent types are not kept (a type added later must show up at once); no fingerprint, no way to invalidate.
+    if (store === undefined || key === undefined || meta === null || fp === undefined) return;
+    try {
+      const at = this.#service.now();
+      await store.set(key, JSON.stringify({ fp, at, m: serializeAssetType(meta) }), at + this.#service.ttlMs);
+    } catch {
+      // A store that fails costs only the sharing.
+    }
   }
 
   async #load(name: string): Promise<AssetTypeMeta | null> {

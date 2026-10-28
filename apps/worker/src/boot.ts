@@ -166,7 +166,14 @@ export async function boot(
     fetchFor: () => (request: Request) => fetch(request),
     limiters: new CredentialLimiters({ concurrency: 6, perCall: true }),
     breakers: new CircuitBreakers(),
-    metadata: new MetadataService({ shareInflight: false }),
+    // Asset types outlive the isolate in D1 (P6-39): a cold isolate reads them instead of asking Agility again.
+    metadata: new MetadataService({
+      shareInflight: false,
+      store: {
+        get: (key) => storage.kv.get(key),
+        set: (key, value, expiresAt) => storage.kv.set(key, value, { expiresAt }),
+      },
+    }),
     logger,
     clock: systemClock,
     random: webCryptoRandom,

@@ -38,7 +38,7 @@ How to use it:
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237 |
-| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-365 |
+| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
@@ -2121,6 +2121,15 @@ attribute to its `…UTC` sibling when the type has one, for selects, filters an
 under the key the caller used; a date with no sibling stays raw and the result carries a note that it is local time with an
 unknown zone. A per-tool fix would have left every new tool one omission away from the same bug.
 *Applied in:* P1-19, `query/compiler.ts` (`utcVariant`), `tools/query/rows.ts` (`localTimeNote`), L-149.
+
+**L-350 — A cache that outlives the isolate stores what we parsed, per instance, under the fingerprint it was read with.**
+A cold isolate paid one metadata request per asset type (9 to 17 per Phase 6 tool). The shared copy lives in the table
+the host already has (D1's `kv`, no new Cloudflare resource), keyed by instance, holds the identifier-only model (never
+the raw body, which can carry administrator text, A12) and is re-validated on read like input; an entry is used only when
+it is inside the TTL and its schema fingerprint matches the one the isolate has seen. Absent types are never stored (a
+type added later must show up), and a failing store costs only the sharing.
+*Applied in:* P6-39, `metadata/service.ts` (`MetadataStore`), `metadata/model.ts`, `apps/worker/src/boot.ts`, L-096, L-113.
+
 
 ---
 

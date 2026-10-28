@@ -77,10 +77,24 @@ isolation as on Workers, Agility-shaped fake responses. *Staging*: `agility-brid
 | `/admin/audit` (200 rows, 50 shown), warm | about 3.1 ms (1.18×) ¹ | — | 0 |
 | `/admin/assets/<css>`, warm | < 0.1 ms (0.03×) ¹ | — | 0 |
 | Form POST (create a user through the in-process admin API), warm | about 0.8 ms (0.3×) ¹ | — | 0 |
+| `prompts/list`, warm | about 2 ms (0.5×) | — | 0 |
+| `get_sprint` (worst-case fixture), cold isolate / types from D1 / warm ² | 11 / 7 / 5 ms (2.8× / 1.7× / 1.3×) | — | 17 / 7 / 5 |
+| `get_asset_history`, cold / from D1 / warm ² | 4.9 / 2.8 / 2.5 ms (1.2× / 0.7× / 0.6×) | — | 13 / 4 / 2 |
+| `get_portfolio_tree`, cold / from D1 / warm ² | 6.7 / 8.1 / 3.4 ms (1.7× / 2.0× / 0.85×) | — | 16 / 7 / 4 |
+| `sprint_health`, cold / from D1 / warm ² | 12.8 / 8.7 / 7.4 ms (3.2× / 2.2× / 1.9×) | — | 24 / 8 / 6 |
 
 ¹ Panel rows: CPU as measured by the benchmark job on CI (2026-10-23), the same workload on a GitHub-hosted runner, in
 milliseconds from the ratio to the run's calibration workload (about 2.6 ms) in brackets. Not the local column: the first
 local panel numbers (P4-14) were taken on a loaded machine and overstated the warm pages about threefold.
+
+² Phase 6 tools (P6-39), `pnpm bench:worker`, taken on a machine shared with seven other test runs (load average above 40), so the milliseconds are skewed upward and only the request counts are firm: the worst-case fixtures of the cost test, modules warm, a new `MetadataService`
+per call for *cold* (one `meta.v1` request per asset type), the same with the types another isolate stored for *from D1*
+(the Worker keeps parsed asset types in D1's `kv` table, D-135), and one service for *warm*. The remaining requests are
+not metadata (status lists, the queries themselves). The fixture's metadata is smaller than a real instance's (the
+committed snapshot is 228 KB for all types; a live type list parses 1.9 MB), so cold figures understate a real cold call,
+and the saving is the requests (here 17 to 7, 13 to 4, 16 to 7, 24 to 8), not only CPU: against D1 the saving in CPU is
+smaller and, for `get_portfolio_tree`, within noise. D1 reads are not Agility requests; whether they count toward the Free
+plan's 50 subrequests is *unverified*. No Cloudflare measurement of these paths was made (no staging call reaches Agility, D-01).
 
 Warm calls fit the Free plan's 10 ms. **The first request of every new isolate does not.** P3-14 moved what does not
 depend on the environment to module scope (Workers run it at startup, under a separate limit; startup is about
