@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { generateMasterKey, Keyring, verifyKeyring } from '../../packages/auth/src/index.ts';
+import { MIGRATIONS } from '../../packages/storage/src/index.ts';
 import { openSqliteStorage } from '../../packages/storage-sqlite/src/index.ts';
 import { migrate, sqlLiteral } from '../cf-migrate.ts';
 import type { Wrangler } from '../cf-setup.ts';
@@ -77,7 +78,7 @@ const run = (from: string, wrangler: Wrangler, dir = workerDir()) =>
 describe('cf:migrate', () => {
   it('imports into an empty, migrated target with the same key, then deletes the SQL file', async () => {
     const b = await backup();
-    const d1 = fakeD1({ version: 1, rows: 0, kcv: { 'crypto:kcv:v1': b.kcv } });
+    const d1 = fakeD1({ version: MIGRATIONS.length, rows: 0, kcv: { 'crypto:kcv:v1': b.kcv } });
     expect(await run(b.path, d1.wrangler)).toMatchObject({ users: 1, instances: 1, credentials: 1 });
     expect(d1.files).toHaveLength(1);
     expect(d1.files[0]?.sql).toContain('INSERT INTO "credentials"');
@@ -89,10 +90,10 @@ describe('cf:migrate', () => {
   it('refuses before writing: not empty, not migrated, another schema, another key', async () => {
     const b = await backup();
     const cases = [
-      [{ version: 1, rows: 4, kcv: { 'crypto:kcv:v1': b.kcv } }, /not empty/],
+      [{ version: MIGRATIONS.length, rows: 4, kcv: { 'crypto:kcv:v1': b.kcv } }, /not empty/],
       [{ version: null, rows: 0, kcv: {} }, /not migrated/],
-      [{ version: 2, rows: 0, kcv: { 'crypto:kcv:v1': b.kcv } }, /schema 2/],
-      [{ version: 1, rows: 0, kcv: { 'crypto:kcv:v1': 'different' } }, /master key/],
+      [{ version: MIGRATIONS.length + 1, rows: 0, kcv: { 'crypto:kcv:v1': b.kcv } }, /schema \d+/],
+      [{ version: MIGRATIONS.length, rows: 0, kcv: { 'crypto:kcv:v1': 'different' } }, /master key/],
     ] as const;
     for (const [state, error] of cases) {
       const d1 = fakeD1({ ...state, kcv: { ...state.kcv } });
@@ -103,7 +104,7 @@ describe('cf:migrate', () => {
 
   it('refuses a failed count or key-check read, a bad name, and a config of another deployment (P3-11 review)', async () => {
     const b = await backup();
-    const d1 = fakeD1({ version: 1, rows: 0, kcv: { 'crypto:kcv:v1': b.kcv } });
+    const d1 = fakeD1({ version: MIGRATIONS.length, rows: 0, kcv: { 'crypto:kcv:v1': b.kcv } });
     const flaky: Wrangler = (args, o) => {
       const sql = args[args.indexOf('--command') + 1] ?? '';
       if (args.includes('--command') && sql.includes('count(*)'))
@@ -135,7 +136,7 @@ describe('cf:migrate', () => {
 
   it('reports an import that landed fewer rows than it exported', async () => {
     const b = await backup();
-    const d1 = fakeD1({ version: 1, rows: 0, kcv: { 'crypto:kcv:v1': b.kcv } }, 1);
+    const d1 = fakeD1({ version: MIGRATIONS.length, rows: 0, kcv: { 'crypto:kcv:v1': b.kcv } }, 1);
     await expect(run(b.path, d1.wrangler)).rejects.toThrow(/Imported 1 rows, expected 3/);
   });
 

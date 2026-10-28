@@ -302,6 +302,16 @@ export interface AccessTokenRepository extends Repository<AccessToken, NewAccess
   /** The token by hash and every record its access depends on, in one round trip on SQL (one `batch()`, P3-02). */
   bundleByHash(tokenHash: string): Promise<AccessBundle>;
   list(filter?: { grantId?: string }): Promise<AccessToken[]>;
+  /**
+   * One page of tokens, newest first by `(createdAt, id)`: the `limit` rows after the cursor `after` (exclusive),
+   * optionally only those of `grantIds` (an empty list matches nothing). The cursor is the last row of the previous
+   * page (P4-31).
+   */
+  page(query: {
+    grantIds?: readonly string[];
+    after?: { createdAt: number; id: string };
+    limit: number;
+  }): Promise<AccessToken[]>;
   /** Sets `lastUsedAt` to now unless it was set less than `minIntervalMs` ago; `true` when it wrote. */
   touch(id: string, minIntervalMs: number): Promise<boolean>;
 }

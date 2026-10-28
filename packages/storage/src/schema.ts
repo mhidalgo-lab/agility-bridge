@@ -140,7 +140,7 @@ export const accessTokens = sqliteTable(
     lastUsedAt: integer('last_used_at'),
     revokedAt: integer('revoked_at'),
   },
-  (t) => [index('access_tokens_grant').on(t.grantId)],
+  (t) => [index('access_tokens_grant').on(t.grantId), index('access_tokens_created').on(t.createdAt, t.id)],
 );
 
 export const auditLog = sqliteTable(

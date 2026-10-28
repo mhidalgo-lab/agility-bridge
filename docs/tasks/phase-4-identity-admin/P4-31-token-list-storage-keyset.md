@@ -2,7 +2,7 @@
 id: P4-31
 title: "Keyset paging for device tokens in storage"
 phase: 4
-status: todo
+status: done
 priority: low
 depends_on: [P4-15]
 lessons: [L-071]
@@ -23,7 +23,7 @@ Let the storage return one page of tokens by `(created_at, id)` so the admin API
 - `GET /tokens` and the guards use it; the output and the cursor format do not change.
 
 ## Acceptance criteria
-- [ ] The same contract test passes on memory, SQLite and D1; the admin API suite is unchanged.
+- [x] The same contract test passes on memory, SQLite and D1; the admin API suite is unchanged.
 
 ## Docs to update
 - None beyond the storage notes in docs/ARCHITECTURE.md if they list the repository methods.

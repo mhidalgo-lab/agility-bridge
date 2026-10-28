@@ -657,6 +657,54 @@ export function storageContract(name: string, factory: StorageFactory): void {
         expect((await s.grants.list({ credentialId: 'c-alice' })).map((g) => g.id)).toEqual(['g-a']);
       });
 
+      it('pages device tokens newest first by (createdAt, id), optionally of some grants (P4-31)', async () => {
+        await seed(s);
+        await s.grants.create({ id: 'g1', workspaceId: 'w-1', userId: 'u-alice' });
+        await s.grants.create({ id: 'g2', workspaceId: 'w-1', userId: 'u-bob' });
+        // Ids out of order and two tokens in the same millisecond: the id breaks the tie.
+        const plan: [string, string, number][] = [
+          ['t-a', 'g1', 0],
+          ['t-c', 'g2', 1],
+          ['t-b', 'g1', 1],
+          ['t-d', 'g2', 2],
+          ['t-e', 'g1', 3],
+        ];
+        for (const [id, grantId, at] of plan) {
+          clock.set(1_760_000_000_000 + at);
+          await s.accessTokens.create({
+            id,
+            grantId,
+            prefix: 'ab_live_Ab12',
+            tokenHash: id.charCodeAt(2).toString(16).padStart(2, '0').repeat(32),
+            label: id,
+          });
+        }
+        const ids = (rows: { id: string }[]) => rows.map((r) => r.id);
+        expect(ids(await s.accessTokens.page({ limit: 10 }))).toEqual(['t-e', 't-d', 't-c', 't-b', 't-a']);
+        const walked: string[] = [];
+        let after: { createdAt: number; id: string } | undefined;
+        for (let i = 0; i < 5; i++) {
+          const rows = await s.accessTokens.page({ limit: 2, ...(after === undefined ? {} : { after }) });
+          walked.push(...ids(rows));
+          const last = rows.at(-1);
+          if (last === undefined) break;
+          after = { createdAt: last.createdAt, id: last.id };
+        }
+        expect(walked).toEqual(['t-e', 't-d', 't-c', 't-b', 't-a']);
+        expect(ids(await s.accessTokens.page({ grantIds: ['g1'], limit: 10 }))).toEqual([
+          't-e',
+          't-b',
+          't-a',
+        ]);
+        expect(ids(await s.accessTokens.page({ grantIds: ['g1', 'g2'], limit: 2 }))).toEqual(['t-e', 't-d']);
+        expect(await s.accessTokens.page({ grantIds: [], limit: 10 })).toEqual([]);
+        // More grants than one SQL statement can bind still page correctly.
+        const many = [...Array.from({ length: 120 }, (_, i) => `g-none-${i}`), 'g2'];
+        expect(ids(await s.accessTokens.page({ grantIds: many, limit: 10 }))).toEqual(['t-d', 't-c']);
+        expect(ids(await s.accessTokens.page({ grantIds: many, limit: 1 }))).toEqual(['t-d']);
+        await expect(s.accessTokens.page({ limit: 0 })).rejects.toThrow(InvalidInputError);
+      });
+
       it('stores token hashes only, unique, and finds tokens by hash', async () => {
         await seed(s);
         await s.grants.create({ id: 'g', workspaceId: 'w-1', userId: 'u-alice' });
