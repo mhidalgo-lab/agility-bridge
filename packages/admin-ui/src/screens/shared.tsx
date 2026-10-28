@@ -365,7 +365,27 @@ export function ToolChecklist(props: ToolChecklistProps): JSX.Element {
           </fieldset>
         ))
       )}
+      <ToolListNotes values={props.values} tools={props.tools} />
+      <div class="actions">
+        <Button variant="secondary" name="check" value="1" formnovalidate>
+          Check these tools
+        </Button>
+      </div>
     </fieldset>
+  );
+}
+
+/** The composite warnings for the list as ticked, under the checklist (P6-35). "All" has every sibling. */
+function ToolListNotes(props: { readonly values: URLSearchParams; readonly tools: readonly Tool[] }) {
+  const list = props.values.has('tools_all') ? null : [...new Set(props.values.getAll('tools'))];
+  const notes = compositeNotes(list, props.tools);
+  if (notes.length === 0) return null;
+  return (
+    <div role="status" class="notes-inline" id="tool-notes">
+      {notes.map((n) => (
+        <p class="hint">{n}</p>
+      ))}
+    </div>
   );
 }
 

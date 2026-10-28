@@ -246,3 +246,13 @@ garbage collection) and warm pages (overview, users list with 100 users, audit p
 POST that creates a user through the in-process admin API), in the Workers configuration, and counts Agility requests (0).
 The panel is JSX, so the script builds `packages/admin-ui` first and resolves the package to its bundle with a resolution
 hook (`scripts/bench/admin-ui-dist-hook.mjs`); everything else runs from source. Numbers: [Cloudflare limits](../guide/cloudflare-limits.md#measured-cost).
+
+## Tool checklist notes (P6-35)
+
+The tool checklist of the workspace and grant forms ends with a "Check these tools" button. It posts the form with
+`check=1` and `formnovalidate`; every create and edit handler answers it (before validating or saving anything) by
+rendering the same form again, status 200, with the fixed composite sentences (`compositeNotes`) for the list as ticked
+under the checklist. It needs no script, saves nothing, and is behind the same CSRF and role checks as the save. The
+sentences come from the catalogue the admin API serves (L-314, L-316) and are escaped text. A list that is "every read
+tool" or has every sibling shows nothing. The detail pages show the same notes for what is stored (P6-11).
+

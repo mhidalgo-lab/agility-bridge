@@ -537,7 +537,7 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
         credentialsOf(c, principal, workspace.instanceId),
         usersOf(c, principal),
       ]);
-      const again = (errors: Record<string, string>, message?: string) =>
+      const again = (errors: Record<string, string>, message?: string, status = 422) =>
         htmlResponse(
           <GrantForm
             viewer={principal}
@@ -553,8 +553,10 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
             users={users}
             current={null}
           />,
-          422,
+          status,
         );
+      // The no-script "check" step: re-render with the notes for the list as ticked, change nothing (P6-35).
+      if (form.fields.has('check')) return again({}, undefined, 200);
       const who = field(form, 'who');
       const errors: Record<string, string> = {};
       if (who !== null && !isId(who)) errors['who'] = 'Choose a person from the list.';
@@ -769,7 +771,7 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
         credentialsOf(c, principal, ws.instanceId),
         usersOf(c, principal),
       ]);
-      const again = (errors: Record<string, string>, message?: string) =>
+      const again = (errors: Record<string, string>, message?: string, status = 422) =>
         htmlResponse(
           <GrantForm
             viewer={principal}
@@ -785,8 +787,10 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
             users={users}
             current={g}
           />,
-          422,
+          status,
         );
+      // The no-script "check" step: re-render with the notes for the list as ticked, change nothing (P6-35).
+      if (form.fields.has('check')) return again({}, undefined, 200);
       const built = bodyFrom(form, principal, ws, tools, g);
       if ('errors' in built) return again(built.errors);
       const res = await kit.callAdmin(

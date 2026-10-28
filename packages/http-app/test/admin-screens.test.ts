@@ -1447,6 +1447,41 @@ describe('composite grants (P6-11)', () => {
     expect(html).toContain('sprint_health is granted without search_work_items');
   });
 
+  it('the "check" step re-renders the workspace and grant forms with the notes for the list as ticked, saving nothing (P6-35)', async () => {
+    const e = await env();
+    const { s, owner, admin } = e;
+    const before = JSON.stringify(await s.w.storage.workspaces.get(e.ids.workspaceA));
+    const wsEdit = `/admin/workspaces/${e.ids.workspaceA}/edit`;
+    const ticked = { check: '1', name: 'x', tools: ['whoami', REPORT, 'get_sprint'] };
+    // Edit form of a workspace.
+    const edit = await submit(s, wsEdit, admin, ticked);
+    expect(edit.status).toBe(200);
+    const html = await edit.text();
+    expect(html).toContain('sprint_health is granted without search_work_items');
+    expect(html).not.toContain('without get_sprint');
+    // Nothing was saved.
+    expect(JSON.stringify(await s.w.storage.workspaces.get(e.ids.workspaceA))).toBe(before);
+    // A complete list, "every read tool" and a list without a composite say nothing.
+    for (const fields of [
+      { check: '1', tools: ['whoami', REPORT, 'get_sprint', 'search_work_items'] },
+      { check: '1', tools_all: '1' },
+      { check: '1', tools: ['whoami'] },
+    ]) {
+      const res = await submit(s, wsEdit, owner, fields);
+      expect(res.status).toBe(200);
+      expect(await res.text()).not.toContain('is granted without');
+    }
+    // The grant edit form too, and the hostile or unknown names the post carries are not shown as notes.
+    const grantEdit = `/admin/grants/${e.ids.aliceGrant}/edit`;
+    const g = await submit(s, grantEdit, admin, { check: '1', tools: ['whoami', REPORT] });
+    expect(g.status).toBe(200);
+    expect(await g.text()).toContain('sprint_health is granted without get_sprint, search_work_items');
+    const evil = await submit(s, grantEdit, admin, { check: '1', tools: ['<img src=x onerror=alert(1)>'] });
+    expect(await evil.text()).not.toContain('<img src=x');
+    // A member cannot use the step.
+    expect((await submit(s, grantEdit, e.alice, ticked)).status).not.toBe(200);
+  });
+
   it('shows the warning to owners and admins only: members and strangers get no page', async () => {
     const e = await env();
     await e.s.api('PATCH', `/workspaces/${e.ids.workspaceA}`, e.owner, { enabledTools: ['whoami', REPORT] });

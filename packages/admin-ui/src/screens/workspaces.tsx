@@ -452,7 +452,7 @@ export function registerWorkspaces(ui: Hono, kit: UiKit): void {
         catalogue(c, principal),
         credentialsOf(c, principal, instanceId),
       ]);
-      const again = (errors: Record<string, string>, message?: string) =>
+      const again = (errors: Record<string, string>, message?: string, status = 422) =>
         htmlResponse(
           <WorkspaceForm
             viewer={principal}
@@ -468,8 +468,10 @@ export function registerWorkspaces(ui: Hono, kit: UiKit): void {
             knownScopes={knownScopes(creds)}
             current={null}
           />,
-          422,
+          status,
         );
+      // The no-script "check" step: re-render with the notes for the list as ticked, change nothing (P6-35).
+      if (form.fields.has('check')) return again({}, undefined, 200);
       const slug = field(form, 'slug');
       const built = bodyFrom(form, principal, tools, null);
       const errors = 'errors' in built ? { ...built.errors } : {};
@@ -695,7 +697,7 @@ export function registerWorkspaces(ui: Hono, kit: UiKit): void {
         credentialsOf(c, principal, ws.instanceId),
         load(kit, c, principal, adminPath`/instances/${ws.instanceId}`, (b) => one(b, parseInstance)),
       ]);
-      const again = (errors: Record<string, string>, message?: string) =>
+      const again = (errors: Record<string, string>, message?: string, status = 422) =>
         htmlResponse(
           <WorkspaceForm
             viewer={principal}
@@ -711,8 +713,10 @@ export function registerWorkspaces(ui: Hono, kit: UiKit): void {
             knownScopes={knownScopes(creds)}
             current={ws}
           />,
-          422,
+          status,
         );
+      // The no-script "check" step: re-render with the notes for the list as ticked, change nothing (P6-35).
+      if (form.fields.has('check')) return again({}, undefined, 200);
       const built = bodyFrom(form, principal, tools, ws);
       if ('errors' in built) return again(built.errors);
       const res = await kit.callAdmin(

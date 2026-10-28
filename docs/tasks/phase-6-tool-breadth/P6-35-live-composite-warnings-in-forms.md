@@ -2,7 +2,7 @@
 id: P6-35
 title: Live composite warnings in the workspace and grant forms
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-11]
 adr: ["0010"]
@@ -23,9 +23,9 @@ is saved (P6-11 shows the warning on the detail pages).
 - Optionally an enhancement in `assets/admin.js` that toggles the notes while ticking boxes (no inline script, L-095).
 
 ## Acceptance criteria
-- [ ] The edit and create forms of workspaces and grants show the notes for the list being posted, escaped, with no
+- [x] The edit and create forms of workspaces and grants show the notes for the list being posted, escaped, with no
   change to what is stored.
-- [ ] Browser (Playwright) spec covers the form with a composite ticked without a sibling.
+- [x] Browser (Playwright) spec covers the form with a composite ticked without a sibling.
 
 ## Security notes
 THREAT_MODEL T13: fixed sentences, tool names from the catalogue only.
