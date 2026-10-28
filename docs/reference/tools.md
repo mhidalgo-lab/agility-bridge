@@ -401,7 +401,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Get a portfolio tree** · group `portfolio` · read · cost 20 Agility requests at most
 
-Get an epic with its descendant epics down to a depth (at most 4) and roll-ups per epic over the backlog items below it: item counts, done items, open defects, estimate and done percentage. Roll-ups touched by a depth, size or permission cut are marked incomplete and the result is partial. Not paged. Cold call: up to 20 Agility requests.
+Get an epic with its descendant epics down to a depth (at most 4) and roll-ups per epic over the backlog items below it: item counts, done items, open defects, estimate and done percentage. Roll-ups touched by a depth, size or permission cut are marked incomplete and the result is partial. Paged: pass nextCursor back as cursor. Only the last step of a large epic is exact. Cold call: up to 20 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
@@ -411,9 +411,10 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 | `depth` | integer (≥ 1, ≤ 4) |  | `2` | Levels of sub-epics below the epic to read. |
 | `include_items` | boolean |  | `false` | Also list the backlog items under the epics (capped). |
 | `max_items` | integer (≥ 1, ≤ 1000) |  |  | Most epics per level and backlog items listed; the workspace maximum when omitted. |
+| `cursor` | string |  |  | nextCursor of the previous call, same arguments. |
 | `format` | `auto` \| `table` \| `csv` \| `json` |  | `"auto"` | auto (a table up to 8 columns, else CSV), table, csv or json. |
 
-`structuredContent`: `root`, `nodes`, `backlogItems`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
+`structuredContent`: `root`, `nodes`, `backlogItems`, `nextCursor`, `partial`, `notes`, `hiddenOutsideScope` (open: more fields may be added).
 
 ## `sprint_health`
 

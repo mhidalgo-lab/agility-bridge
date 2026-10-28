@@ -10,9 +10,16 @@ import { oidsOf } from '../../identity/scope.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { assetState, shapeOutput, untrusted } from '../../output/result.ts';
 import { type CompiledQuery, compileQuery, type FilterInput } from '../../query/compiler.ts';
+import {
+  checkCursorShape,
+  cursorBinding,
+  decodeCursor,
+  encodeCursor,
+  fingerprintOf,
+} from '../../query/cursor.ts';
 import { invalid } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { epicArg, formatArg } from '../common.ts';
+import { cursorArg, epicArg, formatArg } from '../common.ts';
 import { identityFor } from '../work/items.ts';
 import { EPIC, epicFields, epicRow, isReadable, requireReadable, runBatch } from './epics.ts';
 
@@ -22,6 +29,9 @@ const MAX_DEPTH = 4;
 /** Pages of backlog items read per type for the roll-ups (each page is at most the workspace's row maximum). */
 const ITEM_PAGES = 3;
 const ITEM_TYPES = ['Story', 'Defect'] as const;
+/** The most epics a continuation cursor carries running totals for (the cursor stays under its length limit). */
+const MAX_CURSOR_NODES = 60;
+const MAX_CURSOR_CHARS = 1_900;
 
 type Row = Record<string, unknown>;
 
@@ -56,11 +66,57 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 const MAX_EPICS_IN_ITEM_QUERY = 2_000;
 const budgetOut = (e: unknown) => e instanceof AbError && e.code === ErrorCode.BudgetExhausted;
 
+/** Running totals per epic as compact text: `index:items,done,open,estimate,doneEstimate,unestimated,estimated;`. */
+function packSums(list: readonly Node[]): string {
+  return list
+    .flatMap((n, i) =>
+      n.items === 0
+        ? []
+        : [
+            `${i}:${[n.items, n.doneItems, n.openDefects, n.estimate, n.doneEstimate, n.unestimated, n.estimated ? 1 : 0].join(',')}`,
+          ],
+    )
+    .join(';');
+}
+
+/** Puts carried totals back on the epics; false when the text does not fit this tree (a forged or stale cursor). */
+function restoreSums(list: readonly Node[], text: string): boolean {
+  if (text === '') return true;
+  const seen = new Set<number>();
+  for (const part of text.split(';')) {
+    const [index, values] = part.split(':');
+    const i = Number(index);
+    const v = (values ?? '').split(',').map(Number);
+    const node = list[i];
+    if (!Number.isInteger(i) || node === undefined || seen.has(i) || v.length !== 7) return false;
+    if (v.some((x) => !Number.isFinite(x) || x < 0) || (v[6] !== 0 && v[6] !== 1)) return false;
+    const [items, done, open, estimate, doneEstimate, unestimated, estimated] = v as [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+    ];
+    if (done > items || open > items || unestimated > items || !Number.isInteger(items)) return false;
+    seen.add(i);
+    node.items = items;
+    node.doneItems = done;
+    node.openDefects = open;
+    node.estimate = estimate;
+    node.doneEstimate = doneEstimate;
+    node.unestimated = unestimated;
+    node.estimated = estimated === 1;
+  }
+  return true;
+}
+
 export const getPortfolioTree: ToolDefinition = defineTool({
   name: NAME,
   title: 'Get a portfolio tree',
   description:
-    'Get an epic with its descendant epics down to a depth (at most 4) and roll-ups per epic over the backlog items below it: item counts, done items, open defects, estimate and done percentage. Roll-ups touched by a depth, size or permission cut are marked incomplete and the result is partial. Not paged. Cold call: up to 20 Agility requests.',
+    'Get an epic with its descendant epics down to a depth (at most 4) and roll-ups per epic over the backlog items below it: item counts, done items, open defects, estimate and done percentage. Roll-ups touched by a depth, size or permission cut are marked incomplete and the result is partial. Paged: pass nextCursor back as cursor. Only the last step of a large epic is exact. Cold call: up to 20 Agility requests.',
   kind: 'read',
   group: 'portfolio',
   // Capped at run time: Epic, Story and Defect metadata and status lists, resolution, one request per level (four at most), up to three item pages.
@@ -85,18 +141,21 @@ export const getPortfolioTree: ToolDefinition = defineTool({
       .max(1_000)
       .optional()
       .describe('Most epics per level and backlog items listed; the workspace maximum when omitted.'),
+    cursor: cursorArg,
     format: formatArg,
   }),
   outputSchema: z.looseObject({
     root: z.string(),
     nodes: z.array(z.looseObject({ assetType: z.string(), oid: z.string() })),
     backlogItems: z.array(z.looseObject({ assetType: z.string(), oid: z.string() })).optional(),
+    nextCursor: z.string().optional(),
     partial: z.boolean().optional(),
     notes: z.array(z.string()).optional(),
     hiddenOutsideScope: z.boolean().optional(),
   }),
   handler: async (input, outer) => {
     const ctx = { ...outer, budget: capBudget(outer.budget, COST) };
+    checkCursorShape(ctx, input.cursor); // a malformed cursor is refused first and costs no request (L-318)
     requireReadable(ctx, EPIC);
     const md = metadataFor(ctx);
     const depth = input.depth ?? 2;
@@ -115,6 +174,21 @@ export const getPortfolioTree: ToolDefinition = defineTool({
         'Pass an epic number or OID token; use get_work_item for other work items.',
       );
     }
+    const binding = await cursorBinding(ctx, NAME, {
+      asset: target.oid,
+      depth,
+      maxItems,
+      includeItems: input.include_items === true,
+    });
+    const carried = input.cursor === undefined ? undefined : await decodeCursor(ctx, input.cursor, binding);
+    if (
+      carried !== undefined &&
+      (carried.sums === undefined || carried.fingerprint === undefined || carried.offsets === undefined)
+    )
+      throw invalid(
+        'The cursor does not belong to this request.',
+        'Pass nextCursor back unchanged, with the same arguments.',
+      );
     const fields = await epicFields(ctx);
     const identity = await identityFor(EPIC, ctx);
     const compileEpics = (filters: readonly FilterInput[], limit: number) =>
@@ -234,7 +308,28 @@ export const getPortfolioTree: ToolDefinition = defineTool({
     const pageSize = ctx.limits.maxRows;
     const items: ItemRow[] = [];
     let itemsCut = false;
-    let active = [...itemTypes];
+    const startAt = (type: string) => carried?.offsets?.[type] ?? 0;
+    const resumeAt: Record<string, number> = {};
+    // A continuation: the same epics, then the running totals of the items already read (P6-16).
+    const treeFingerprint = await fingerprintOf(allOids.join(','));
+    let carriedCut = false;
+    if (carried !== undefined) {
+      if (
+        carried.fingerprint !== treeFingerprint ||
+        !restoreSums(
+          allOids.map((o) => nodes.get(o) as Node),
+          carried.sums ?? '',
+        )
+      ) {
+        throw invalid(
+          'The tree changed since that cursor was issued.',
+          'Start again without a cursor: the epics under this one are not the same.',
+        );
+      }
+      carriedCut = carried.cut === true;
+    }
+    let active =
+      carried === undefined ? [...itemTypes] : itemTypes.filter((t) => carried.offsets?.[t] !== undefined);
     try {
       for (let page = 0; page < ITEM_PAGES && (active.length > 0 || (page === 0 && deeper)); page++) {
         const compiled: CompiledQuery[] = [];
@@ -269,7 +364,7 @@ export const getPortfolioTree: ToolDefinition = defineTool({
                 fields: await itemFields(type),
                 filters: [{ field: 'Super', op: 'in', value: epicOids, trusted: true }],
                 limit: pageSize,
-                offset: page * pageSize,
+                offset: startAt(type) + page * pageSize,
                 includeClosed: true,
               },
               { identityFields: await identityFor(type, ctx) },
@@ -303,7 +398,10 @@ export const getPortfolioTree: ToolDefinition = defineTool({
           }
           if (res.more) {
             if (page + 1 < ITEM_PAGES) still.push(type);
-            else itemsCut = true;
+            else {
+              itemsCut = true;
+              resumeAt[type] = startAt(type) + ITEM_PAGES * pageSize;
+            }
           }
         }
         active = still;
@@ -315,18 +413,15 @@ export const getPortfolioTree: ToolDefinition = defineTool({
         'The request budget ran out while reading backlog items; the roll-ups cover only what was read.',
       );
     }
-    if (itemsCut) {
-      cut = true;
-      notes.push(
-        `More than ${ITEM_PAGES * pageSize} items of one type sit under this epic; the roll-ups cover the first ${ITEM_PAGES * pageSize}. Get a sub-epic for exact numbers.`,
-      );
-    }
     if (hidden > 0) {
       cut = true;
       notes.push(
         'Some rows outside the workspace’s Agility projects were hidden and are not in the roll-ups.',
       );
     }
+    if (carriedCut) cut = true;
+    // What cut the totals for good (everything above) travels in the cursor; a later step cannot undo it.
+    const cutForGood = cut;
 
     // Roll-ups: each item counts for its epic and every ancestor within the tree.
     const isDone = (row: Row): boolean => {
@@ -351,6 +446,28 @@ export const getPortfolioTree: ToolDefinition = defineTool({
         }
         at = at.parent === undefined ? undefined : nodes.get(at.parent);
       }
+    }
+    // More items remain and the tree is small enough for the totals to travel: a cursor continues the read (P6-16).
+    let nextCursor: string | undefined;
+    if (itemsCut) {
+      const sums =
+        nodes.size <= MAX_CURSOR_NODES ? packSums(allOids.map((o) => nodes.get(o) as Node)) : undefined;
+      if (sums !== undefined) {
+        const candidate = encodeCursor(binding, {
+          offset: 0,
+          offsets: resumeAt,
+          sums,
+          fingerprint: treeFingerprint,
+          ...(cutForGood ? { cut: true } : {}),
+        });
+        if (candidate.length <= MAX_CURSOR_CHARS) nextCursor = candidate;
+      }
+      cut = true; // until the last step the roll-ups cover only what was read so far
+      notes.push(
+        nextCursor === undefined
+          ? `More than ${ITEM_PAGES * pageSize} items of one type sit under this epic and the tree is too large to continue; the roll-ups cover the items read so far. Get a sub-epic for exact numbers.`
+          : `More than ${ITEM_PAGES * pageSize} items of one type sit under this epic; the roll-ups cover the items read so far. Pass nextCursor back as cursor to read on: the last step is exact.`,
+      );
     }
     for (const oid of incompleteNodes) {
       let at: Node | undefined = nodes.get(oid);
@@ -424,7 +541,7 @@ export const getPortfolioTree: ToolDefinition = defineTool({
       summary: [
         `Portfolio tree of ${String(rootNode.row['Number'] ?? target.oid)}: `,
         untrusted(rootNode.row['Name']),
-        ` — ${ordered.length} epic${ordered.length === 1 ? '' : 's'} over ${depthReached} level${depthReached === 1 ? '' : 's'}, ${items.length} backlog item${items.length === 1 ? '' : 's'} counted.`,
+        ` — ${ordered.length} epic${ordered.length === 1 ? '' : 's'} over ${depthReached} level${depthReached === 1 ? '' : 's'}, ${rootNode.items} backlog item${rootNode.items === 1 ? '' : 's'} counted.`,
       ],
       notes: [
         ...notes,
@@ -497,6 +614,7 @@ export const getPortfolioTree: ToolDefinition = defineTool({
         ? {}
         : { backlogItems: backlogItems as Array<{ assetType: string; oid: string }> }),
       ...(hidden > 0 ? { hiddenOutsideScope: true } : {}),
+      ...(nextCursor === undefined ? {} : { nextCursor }),
       ...(droppedRows ? { partial: true } : {}),
     };
     return { ...output, structured };

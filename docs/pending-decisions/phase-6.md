@@ -516,5 +516,13 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   has fewer points; (b) aggregations now, unmeasured; (c) leave the bound.
 - **Recommendation:** (a): it stays inside tested bounds (60 history queries, 20 per request, the P6-42 response-cap guard)
   and needs no new query shape beyond more pages; the live check is P6-51 (L-330).
+
+### D-144 — A very large epic continues with a cursor that carries the totals *(P6-16)*
+- **Context:** `get_portfolio_tree` reads three item pages per type and marks the roll-ups `incomplete` beyond that. P6-15 found
+  no exact server-side aggregate (D-143).
+- **Options:** (a) a continuation cursor carrying per-epic totals and item offsets, the tree re-read on every step and bound by a
+  fingerprint; (b) only the documented "get each sub-epic" walk; (c) raise the page cap for everyone.
+- **Recommendation:** (a), built, limited to trees of 60 epics or fewer (the cursor stays under its length limit); larger trees keep (b).
+  The totals are the caller's own numbers and never carry scope or items; a changed tree refuses the cursor.
 - **Owner:** *(open; built as (a))*
 
