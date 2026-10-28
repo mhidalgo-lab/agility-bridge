@@ -19,7 +19,7 @@ import {
 } from '../../query/cursor.ts';
 import { invalid } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { cursorArg, epicArg, formatArg } from '../common.ts';
+import { cursorArg, epicArg, formatArg, num, round1 } from '../common.ts';
 import { identityFor } from '../work/items.ts';
 import { EPIC, epicFields, epicRow, isReadable, requireReadable, runBatch } from './epics.ts';
 
@@ -57,11 +57,6 @@ interface ItemRow {
   readonly row: Row;
 }
 
-const num = (v: unknown): number | undefined => {
-  const n = typeof v === 'string' && v === '' ? Number.NaN : Number(v);
-  return v === null || v === undefined || !Number.isFinite(n) ? undefined : n;
-};
-const round1 = (n: number) => Math.round(n * 10) / 10;
 /** The most epics one item query names (the compiler's limit for a server-built `in` list). */
 const MAX_EPICS_IN_ITEM_QUERY = 2_000;
 const budgetOut = (e: unknown) => e instanceof AbError && e.code === ErrorCode.BudgetExhausted;

@@ -23,6 +23,7 @@ const DESC = {
   includeClosed: 'Include closed items.',
   format: 'auto (a table up to 8 columns, else CSV), table, csv or json.',
   minimalOutput: 'Only the identity columns and name.',
+  skipRelated: 'Skip children, links and comments (cheaper).',
 } as const;
 
 /** The advertised descriptions a shared argument name may start with; the argument lint reads it. */
@@ -40,7 +41,8 @@ export const ARGUMENT_VOCABULARY: Readonly<Record<string, readonly string[]>> = 
   cursor: [DESC.cursor],
   include_closed: [DESC.includeClosed],
   format: [DESC.format],
-  minimal_output: [DESC.minimalOutput, 'Skip children, links and comments (cheaper).'],
+  minimal_output: [DESC.minimalOutput],
+  skip_related: [DESC.skipRelated],
 });
 
 const name200 = (): z.ZodString => z.string().min(1).max(200);
@@ -77,6 +79,8 @@ export const minimalOutputArg: z.ZodOptional<z.ZodBoolean> = z
   .boolean()
   .optional()
   .describe(DESC.minimalOutput);
+/** `get_work_item`: leave out the related assets. A different thing from `minimal_output` (fewer columns per row). */
+export const skipRelatedArg: z.ZodOptional<z.ZodBoolean> = z.boolean().optional().describe(DESC.skipRelated);
 export const limitArg: z.ZodOptional<z.ZodNumber> = z
   .number()
   .int()
@@ -133,3 +137,24 @@ export const listOutput = (item: z.ZodType): z.ZodType =>
     notes: z.array(z.string()).optional(),
     hiddenOutsideScope: z.boolean().optional(),
   });
+
+// ---------------------------------------------------------------------------------------------------------------
+// Small readers of Agility values, one definition each (P6-45, L-317). Agility sends numbers as numbers or strings.
+// ---------------------------------------------------------------------------------------------------------------
+
+/** A finite number from a number or a numeric string; nothing for anything else (booleans, null, blanks, objects). */
+export const num = (v: unknown): number | undefined =>
+  typeof v === 'number' && Number.isFinite(v)
+    ? v
+    : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))
+      ? Number(v)
+      : undefined;
+
+/** A non-empty string; nothing for anything else. */
+export const text = (v: unknown): string | undefined => (typeof v === 'string' && v !== '' ? v : undefined);
+
+/** One decimal place. */
+export const round1 = (n: number): number => Math.round(n * 10) / 10;
+
+/** Is this attribute name the acceptance-criteria field of a work item (custom names differ by instance)? */
+export const isAcceptanceAttribute = (name: string): boolean => /accept(?:ance)?_?crit/i.test(name);

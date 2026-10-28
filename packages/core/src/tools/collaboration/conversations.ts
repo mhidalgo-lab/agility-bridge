@@ -9,12 +9,10 @@ import { utcIso } from '../../output/text.ts';
 import { compileQuery } from '../../query/compiler.ts';
 import { checkCursorShape, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { assetArg, cursorArg, formatArg, limitArg, listOutput, rowOid } from '../common.ts';
+import { assetArg, cursorArg, formatArg, limitArg, listOutput, rowOid, text } from '../common.ts';
 
 const NAME = 'get_conversations';
 const COST = 10;
-
-const text = (v: unknown) => (typeof v === 'string' && v !== '' ? v : undefined);
 
 export const getConversations: ToolDefinition = defineTool({
   name: NAME,

@@ -5,6 +5,7 @@ import { oidsOf } from '../../identity/scope.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { assetState } from '../../output/result.ts';
 import { utcIso } from '../../output/text.ts';
+import { num, text } from '../common.ts';
 
 export const WORK_ITEM_TYPES = ['Story', 'Defect', 'Task', 'Test'] as const;
 export type WorkItemType = (typeof WORK_ITEM_TYPES)[number];
@@ -37,13 +38,6 @@ export const identityFor = (type: string, ctx: ToolContext): Promise<string[]> =
       ),
     );
 
-const num = (v: unknown) =>
-  typeof v === 'number' && Number.isFinite(v)
-    ? v
-    : typeof v === 'string' && v !== '' && Number.isFinite(Number(v))
-      ? Number(v)
-      : undefined;
-const text = (v: unknown) => (typeof v === 'string' && v !== '' ? v : undefined);
 const texts = (v: unknown) =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : typeof v === 'string' ? [v] : [];
 

@@ -72,7 +72,8 @@ asset type name), never an exception. A tool with a natural default says so in t
 | Include closed items | `include_closed` | boolean | Default `false`. |
 | Most rows | `limit` | integer | Rows of the main list. A cap on something else is `max_<things>` (an integer). |
 | Next page | `cursor` | string | The `nextCursor` of the previous call with the same filters. A tool takes `cursor` only if it returns `nextCursor`. |
-| Fewer fields per row | `minimal_output` | boolean | |
+| Fewer fields per row | `minimal_output` | boolean | Identity columns and name only. |
+| Leave out related assets | `skip_related` | boolean | `get_work_item`: no children, links or comments. A different thing from `minimal_output`, so a different name (P6-45). |
 | Output format | `format` | enum | `auto` \| `table` \| `csv` \| `json`. |
 | Order (typed tools) | `sort_by` | enum | Tool-specific values; the default is the cheap, stable order (by `ID`, L-163). A value that sorts by change date says its cost in the description. |
 | Order (generic tools) | `sort` | object[] | `{ field, direction: asc \| desc }`; fields validated against metadata. |
@@ -351,3 +352,5 @@ window), never widen it; any value above a configured limit is clamped and repor
   `Deprecated:`, log one warning per process, and list it in the deprecation registry (tool arguments, output fields and
   environment variables alike), which `doctor` and the docs read (L-045). Aliases count against the catalogue budget
   only while their deprecation runs (prior-art follow-up 2).
+
+- The small readers of Agility values (`num`, `text`, `round1`, `isAcceptanceAttribute`) live once in `tools/common.ts` (P6-45, L-317); a tool does not define its own.

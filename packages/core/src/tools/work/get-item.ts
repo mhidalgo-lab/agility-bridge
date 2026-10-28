@@ -9,14 +9,13 @@ import { shapeOutput, untrusted } from '../../output/result.ts';
 import { type CompiledQuery, compileQuery } from '../../query/compiler.ts';
 import { invalid } from '../../query/limits.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
-import { assetArg, formatArg } from '../common.ts';
+import { assetArg, formatArg, isAcceptanceAttribute, skipRelatedArg } from '../common.ts';
 import { identityFor, workItem, workItemFields } from './items.ts';
 
 const COST = 24;
 const MAX_CHILDREN = 20;
 const MAX_LINKS = 20;
 const MAX_COMMENTS = 50;
-const ACCEPTANCE_RE = /accept(?:ance)?_?crit/i;
 
 type Row = Record<string, unknown>;
 
@@ -31,7 +30,7 @@ export const getWorkItem: ToolDefinition = defineTool({
   cost: COST,
   inputSchema: z.object({
     asset: assetArg,
-    minimal_output: z.boolean().optional().describe('Skip children, links and comments (cheaper).'),
+    skip_related: skipRelatedArg,
     format: formatArg,
   }),
   outputSchema: z.looseObject({
@@ -51,7 +50,7 @@ export const getWorkItem: ToolDefinition = defineTool({
     const meta = await md.assetType(target.assetType);
     const has = (a: string) => meta.attributes.has(a.split('.')[0] as string);
     const acceptance = [...meta.attributes.values()].find(
-      (a) => ACCEPTANCE_RE.test(a.name) && a.kind === 'LongText',
+      (a) => isAcceptanceAttribute(a.name) && a.kind === 'LongText',
     )?.name;
     const fields = [
       ...(await workItemFields(ctx, target.assetType)),
@@ -95,7 +94,7 @@ export const getWorkItem: ToolDefinition = defineTool({
       });
     };
     await add('item', target.assetType, fields, 'ID', 1);
-    if (input.minimal_output !== true) {
+    if (input.skip_related !== true) {
       if (await md.isA(target.assetType, 'PrimaryWorkitem')) {
         await add('tasks', 'Task', await workItemFields(ctx, 'Task'), 'Parent', MAX_CHILDREN);
         await add('tests', 'Test', await workItemFields(ctx, 'Test'), 'Parent', MAX_CHILDREN);
@@ -160,8 +159,7 @@ export const getWorkItem: ToolDefinition = defineTool({
     if (acceptance === undefined)
       notes.push('This instance has no acceptance-criteria attribute on this type.');
     if (skipped.length > 0) notes.push(`Not shown, not allowed in this workspace: ${skipped.join(', ')}.`);
-    if (input.minimal_output === true)
-      notes.push('Children, links and comments were skipped (minimal_output).');
+    if (input.skip_related === true) notes.push('Children, links and comments were skipped (skip_related).');
     const commentCount = comments === undefined ? undefined : comments.rows.length;
     const details = Object.entries(item)
       .filter(([k]) => k !== 'description' && k !== 'acceptanceCriteria')
