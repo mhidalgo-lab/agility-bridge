@@ -28,3 +28,9 @@
 - **Options:** go now; go after v0.1 is published and the clients are verified.
 - **Recommendation:** go after v0.1 is published and the four client runs are recorded.
 - **Owner (2026-10-21):** Decided: go. v0.1.0 is published; the client runs (P1-14) follow after the release.
+
+### D-123 — Where a plain date attribute is answered *(P1-19)*
+- **Context:** `ChangeDate` and `CreateDate` are zone-less local time; the `…UTC` siblings are UTC (live, 2026-10-26).
+- **Options:** (a) read the `…UTC` sibling and return it under the key the caller asked for; (b) answer under the `…UTC` key with a note; (c) leave the raw value and only note it.
+- **Recommendation:** (a): the caller gets what they asked for, in the contract format, and filters and sorts follow the same rule.
+- **Owner:** *(open; built as (a))*

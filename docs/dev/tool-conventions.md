@@ -104,7 +104,7 @@ unknown`), not by `null`.
 | Status | `status` | string (optional) | The configured name; omitted when the asset has none. |
 | Agility project | `project` | `{ oid, name }` | |
 | Owners | `owners` | `{ oid, name, username, email? }[]` | `email` only when the workspace enables it. |
-| Timestamps | `createdAt`, `changedAt`, `closedAt` | string | ISO 8601 UTC (L-149). |
+| Timestamps | `createdAt`, `changedAt`, `closedAt` | string | ISO 8601 UTC (L-149). A plain date attribute a caller selects, filters or sorts by (`ChangeDate`) is read through its `…UTC` sibling and keeps the requested key (L-335); a date with no sibling is returned raw with a note that it is local time of an unknown zone. |
 | Effort | `estimate`, `detailEstimateHours`, `toDoHours`, `actualHours` | number (optional) | Omitted when not set; `estimate` keeps the instance's estimate unit, reported once in `_meta`. |
 | UI link | `url` | string | Built from the pinned instance origin (`assetdetail.v1`). |
 | More pages | `nextCursor` | string (optional) | Present only when more rows exist (the tool fetches `limit + 1`); pass back as `cursor`. |

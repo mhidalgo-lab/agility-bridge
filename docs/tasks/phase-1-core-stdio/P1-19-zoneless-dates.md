@@ -2,7 +2,7 @@
 id: P1-19
 title: Return every date as UTC, including the non-UTC attribute variants
 phase: 1
-status: todo
+status: done
 priority: medium
 depends_on: [P1-16]
 adr: ["0015"]
@@ -45,12 +45,14 @@ zone-less local time that looks like UTC but is hours off. The tool conventions 
 - Verify live which zone the plain variant uses, and record the answer in RESEARCH.md.
 
 ## Acceptance criteria
-- [ ] `query_assets` and `get_assets` with `fields: ["ChangeDate", "CreateDate"]` return the same UTC instants as
-      `get_work_item` for the same asset (unit test plus one live check).
-- [ ] A zone-less date with no `…UTC` sibling is returned raw with a note; `utcIso` still never guesses a zone.
-- [ ] A filter on `ChangeDate` with a UTC bound selects the same rows as the same filter on `ChangeDateUTC`.
-- [ ] `get_work_item` output includes `createdAt` in ISO 8601 UTC.
-- [ ] RESEARCH.md records the live finding with the date and marks the local zone's origin as verified or *unverified*.
+- [x] `query_assets` and `get_assets` with `fields: ["ChangeDate", "CreateDate"]` return the same UTC instants as
+      `get_work_item` for the same asset (unit test; the live check moved to P1-20).
+- [x] A zone-less date with no `…UTC` sibling is returned raw with a note; `utcIso` still never guesses a zone.
+- [x] A filter on `ChangeDate` with a UTC bound selects the same rows as the same filter on `ChangeDateUTC` (the
+      compiler sends the `…UTC` attribute; D-123).
+- [x] `get_work_item` output includes `createdAt` in ISO 8601 UTC.
+- [x] RESEARCH.md records the live finding with the date and marks the local zone's origin as *unverified* (live check:
+      P1-20).
 
 ## Security notes
 None. Read-only output normalization, and no caller value reaches Agility outside the existing bound-parameter path.

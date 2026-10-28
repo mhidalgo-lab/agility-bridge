@@ -51,6 +51,7 @@ export function workItem(type: string, row: Readonly<Record<string, unknown>>): 
   const project = oidsOf(row['Scope'])[0];
   const sprint = oidsOf(row['Timebox'])[0];
   const changed = text(row['ChangeDateUTC']) ?? text(row['ChangeDate']);
+  const created = text(row['CreateDateUTC']);
   const fields: Array<[string, unknown]> = [
     ['number', text(row['Number'])],
     ['assetType', type],
@@ -76,6 +77,7 @@ export function workItem(type: string, row: Readonly<Record<string, unknown>>): 
     ['detailEstimateHours', num(row['DetailEstimate'])],
     ['toDoHours', num(row['ToDo'])],
     ['changedAt', changed === undefined ? undefined : (utcIso(changed) ?? changed)],
+    ['createdAt', created === undefined ? undefined : (utcIso(created) ?? created)],
   ];
   return Object.fromEntries(fields.filter(([, v]) => v !== undefined));
 }

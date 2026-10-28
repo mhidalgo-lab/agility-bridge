@@ -129,7 +129,10 @@ except `group`, and adds `op` (POST only). *docs*
   `Story` and 1.9 s on `Task`; `Scope=$list` with the project's `ChildrenMeAndDown` took 0.22–0.43 s, and the tree query
   itself about 0.2 s. `IsSelf` exists on `Member` (also on the public example instance). — *live*
 - **Dates**: ISO 8601 with `Z` and up to 7 fractional digits (e.g. `2018-08-24T15:06:53.1347214Z`); date-only values are
-  accepted; `ChangeDate`/`ChangeDateUTC`-style pairs exist, and the semantic difference is not documented. *docs*
+  accepted; `ChangeDate`/`ChangeDateUTC`-style pairs exist, and the semantic difference is not documented. *docs* — **live, 2026-10-26 (P1-19):** the plain variant is a zone-less
+  local time (`2026-10-01T05:00:00.0000000`) and the `…UTC` one carries `Z`; on one asset they differed by 11 hours. The
+  zone of the plain variant (server, instance or member) is *unverified* (P1-20). Tools read the `…UTC` sibling whenever
+  a caller selects, filters or sorts by the plain attribute.
 - **Binding**: `with` substitutes named constants into the same filter grammar; it is not a prepared-statement channel,
   and no escaping rule is documented for values containing `,`, `|` or quotes on the `rest-1.v1` side. *docs* —
   **corrected (live, P0-06):** on `query.v1`, quotes, `|`, `;`, parentheses, brackets, `$`, newlines, Unicode and
