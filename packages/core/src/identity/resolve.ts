@@ -69,7 +69,11 @@ export interface Page {
  */
 export async function runPage(ctx: ToolContext, compiled: CompiledQuery): Promise<Page> {
   const res = await agilityClient(ctx).query<unknown[]>(compiled.body);
-  const set = Array.isArray(res.data) ? res.data[0] : undefined;
+  return pageOf(ctx, compiled, Array.isArray(res.data) ? res.data[0] : undefined);
+}
+
+/** The page a result set of `compiled` holds (the part of `runPage` after the request, for batched requests). */
+export function pageOf(ctx: ToolContext, compiled: CompiledQuery, set: unknown): Page {
   const raw = Array.isArray(set)
     ? set.filter((r): r is Row => r !== null && typeof r === 'object' && !Array.isArray(r))
     : [];
