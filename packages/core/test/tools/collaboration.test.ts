@@ -319,7 +319,60 @@ describe('get_attachment: the download', () => {
     // The text is in the enveloped block only, never repeated in structuredContent (L-321).
     expect(s(r)['content']).toBeUndefined();
     expect(s(r)['truncated']).toBe(true);
-    expect(text(r)).toContain('cut at 100 of 5000 characters');
+    expect(s(r)['nextOffset']).toBe(100);
+    expect(text(r)).toContain('offset_characters 100');
+  });
+
+  it('reads a long text in steps: every character once, the last step has no nextOffset', async () => {
+    const body = Array.from({ length: 1_000 }, (_, i) =>
+      String.fromCodePoint(i % 7 === 0 ? 0x1f600 : 97 + (i % 26)),
+    ).join('');
+    const { on, contentRequests } = setup({
+      content: () => ({ body, headers: { 'content-type': 'text/plain' } }),
+    });
+    let offset: number | undefined;
+    let got = '';
+    let steps = 0;
+    for (;;) {
+      const r = await call(getAttachment, on(), {
+        asset: 'B-01001',
+        attachment: 'Attachment:1',
+        max_characters: 101,
+        ...(offset === undefined ? {} : { offset_characters: offset }),
+      });
+      expect(r['isError'], text(r)).toBeUndefined();
+      const m =
+        /<untrusted-data id="[0-9a-f]{16}" source="attachment content">\n?([\s\S]*?)\n?<\/untrusted-data/.exec(
+          text(r),
+        );
+      got += m?.[1] ?? '';
+      steps++;
+      const next = s(r)['nextOffset'];
+      if (next === undefined) break;
+      expect(next).toBeGreaterThan(offset ?? 0);
+      offset = next as number;
+    }
+    expect(got).toBe(body);
+    expect(steps).toBeGreaterThan(5);
+    expect(contentRequests()).toBe(steps);
+  });
+
+  it('refuses an offset past the end or inside a character', async () => {
+    const { on } = setup({ content: () => ({ body: 'a😀b', headers: { 'content-type': 'text/plain' } }) });
+    for (const offset of [4, 5, 2]) {
+      const r = await call(getAttachment, on(), {
+        asset: 'B-01001',
+        attachment: 'Attachment:1',
+        offset_characters: offset,
+      });
+      expect(code(r), String(offset)).toBe('AB_INPUT_INVALID');
+    }
+    const ok = await call(getAttachment, on(), {
+      asset: 'B-01001',
+      attachment: 'Attachment:1',
+      offset_characters: 3,
+    });
+    expect(ok['isError']).toBeUndefined();
   });
 
   it('refuses a disallowed type on the metadata without requesting content', async () => {

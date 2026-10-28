@@ -361,7 +361,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Get the text of an attachment** · group `attachments` · read · cost 12 Agility requests at most
 
-Get the text of one attachment (an id from list_attachments) when the workspace allows download: allowed text types within the size limit, returned as untrusted data, never rendered or executed. Not paged. Long text is cut. Cold call: up to 12 Agility requests.
+Get the text of one attachment (an id from list_attachments) when the workspace allows download: allowed text types within the size limit, returned as untrusted data, never rendered or executed. Not paged. Long text is read in steps: pass nextOffset back as offset_characters; each step downloads it again, budgeted and audited. Cold call: up to 12 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
@@ -369,9 +369,10 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 |---|---|---|---|---|
 | `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
 | `attachment` | string | yes |  | Attachment id (Attachment:1234) from list_attachments. |
-| `max_characters` | integer (≥ 1, ≤ 100000) |  |  | Most characters of text to return; the rest is cut and the note says so. |
+| `max_characters` | integer (≥ 1, ≤ 100000) |  |  | Most characters of text to return in this step; nextOffset says where the rest starts. |
+| `offset_characters` | integer (≥ 0) |  |  | Character to start at: pass nextOffset from the previous step. Each step is a download. |
 
-`structuredContent`: `attachment`, `truncated` (open: more fields may be added).
+`structuredContent`: `attachment`, `truncated`, `nextOffset` (open: more fields may be added).
 
 ## `list_portfolio_items`
 
