@@ -349,7 +349,9 @@ describe('defect_triage', () => {
     ]);
     expect(out.likelyDuplicates[0].similarity).toBe(0.8);
     expect(text(r)).not.toContain('another project');
-    expect(text(r)).toContain('Priority and severity are not read');
+    // The world's defects carry no priority: the read happened and says so (P6-30).
+    expect(text(r)).toContain('Priority is shown for 0 of 3 defects read');
+    expect(text(r)).not.toContain('are not read');
   });
 
   it('reads a real zero from an empty project and says nothing was flagged', async () => {
@@ -876,5 +878,71 @@ describe('work_item_quality edge semantics (P6-46)', () => {
     const r = await call('work_item_quality', { asset: 'B-01002' });
     expect(text(r)).not.toContain('The description was cut');
     expect(s(r)).not.toHaveProperty('descriptionCut');
+  });
+});
+
+describe('defect_triage priority and severity (P6-30)', () => {
+  /** The shared world with priorities (and a severity text) on two of its defects. */
+  const withPriorities = () => {
+    const w = world();
+    const set = (number: string, extra: Record<string, unknown>) => {
+      const row = (w['Defect'] ?? []).find((r) => r['Number'] === number);
+      if (row === undefined) throw new Error(`no ${number}`);
+      Object.assign(row, extra);
+    };
+    set('D-01102', {
+      Priority: 'WorkitemPriority:3',
+      'Priority.Name': 'Low',
+      'Priority.Order': 3,
+      Custom_SyntheticSeverity: 'Minor',
+    });
+    set('D-01103', {
+      Priority: 'WorkitemPriority:1',
+      'Priority.Name': 'High',
+      'Priority.Order': 1,
+      Custom_SyntheticSeverity: 'Critical',
+    });
+    return w;
+  };
+
+  it('shows priority and severity and orders the flagged list by the list’s own rank, unprioritised last', async () => {
+    const { call } = rig({ fake: { assets: withPriorities() } });
+    const r = await call('defect_triage', {});
+    expect(r['isError'], text(r)).toBeUndefined();
+    const out = s(r);
+    expect(out.flagged.map((d: { number: string }) => d.number)).toEqual(['D-01103', 'D-01102', 'D-01101']);
+    expect(out.flagged[0]).toMatchObject({ priority: 'High', severity: 'Critical' });
+    expect(out.flagged[1]).toMatchObject({ priority: 'Low', severity: 'Minor' });
+    expect(out.flagged[2]).not.toHaveProperty('priority');
+    expect(text(r)).toContain('Priority is shown for 2 of 3 defects read');
+    // The instance's attribute name stays out of the output (A12).
+    expect(text(r)).not.toContain('Custom_SyntheticSeverity');
+    expect(JSON.stringify(out)).not.toContain('Custom_SyntheticSeverity');
+  });
+
+  it('keeps the old order when no defect has a priority', async () => {
+    const { call } = rig();
+    const r = await call('defect_triage', {});
+    expect(s(r).flagged[0]).toMatchObject({ number: 'D-01102' });
+    expect(s(r).flagged.every((d: Record<string, unknown>) => !('priority' in d))).toBe(true);
+  });
+
+  it('names a budget failure of the extra read as such and still reports the rest', async () => {
+    const probe = rig();
+    await probe.call('defect_triage', {});
+    const used = probe.fake.requests;
+    const { call } = rig();
+    const r = await call('defect_triage', {}, { ctx: { budget: createBudget(used - 1) } });
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect(text(r)).toContain('Priority and severity were not read: the request budget of this call ran out');
+    expect(s(r).counts.openRead).toBe(3);
+  });
+
+  it('reads priority only for defects of the workspace (a foreign defect never reaches the read)', async () => {
+    const { call, bodies } = rig({ fake: { assets: withPriorities() } });
+    await call('defect_triage', {});
+    const reads = bodies.filter((b) => b.includes('Priority.Name'));
+    expect(reads.length).toBeGreaterThan(0);
+    expect(reads.every((b) => !b.includes('Defect:2101'))).toBe(true);
   });
 });
