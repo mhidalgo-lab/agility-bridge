@@ -443,6 +443,25 @@ export function clampLimit(limit: number | undefined, fallback: number, max: num
   return Math.min(limit, max);
 }
 
+const VALIDATION_FIELDS: readonly string[] = [
+  'validationStatus',
+  'validationErrorCode',
+  'validatedAt',
+  'memberOid',
+  'memberName',
+  'memberUsername',
+  'reachableScopeIds',
+];
+
+/** A `credentials.recordValidation` patch may set the validation fields and nothing else (a token, a label, a revocation). */
+export function checkValidationPatch(patch: object): object {
+  for (const key of Object.keys(patch)) {
+    if (!VALIDATION_FIELDS.includes(key))
+      throw bad('credentials', key, 'cannot be set by a validation result');
+  }
+  return patch;
+}
+
 /** A sealed token handed to `credentials.replaceSecret`. */
 export function checkSealedToken(value: unknown): void {
   const v = value as Record<string, unknown> | null;

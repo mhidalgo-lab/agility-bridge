@@ -229,7 +229,7 @@ Status lives in each task file.
 | P4-34 | [Make adding an instance an owner-only action (if D-55 chooses it)](tasks/phase-4-identity-admin/P4-34-owner-only-instance-creation.md) | low | P4-09 | dropped |
 | P4-35 | [List and revoke unused owner setup links (if D-56 chooses it)](tasks/phase-4-identity-admin/P4-35-list-revoke-setup-links.md) | low | P4-09 | dropped |
 | P4-36 | [Write the audit row before an admin change and refuse the change without it (if D-57 chooses it)](tasks/phase-4-identity-admin/P4-36-audit-before-admin-changes.md) | low | P4-09 | dropped |
-| P4-37 | [Record a credential validation only while the sealed token is the one that was checked](tasks/phase-4-identity-admin/P4-37-validation-compare-and-swap.md) | low | P4-09 | todo |
+| P4-37 | [Record a credential validation only while the sealed token is the one that was checked](tasks/phase-4-identity-admin/P4-37-validation-compare-and-swap.md) | low | P4-09 | done |
 
 ### Phase 5
 

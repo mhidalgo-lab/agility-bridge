@@ -430,6 +430,53 @@ export function storageContract(name: string, factory: StorageFactory): void {
         expect(v).toMatchObject({ validationStatus: 'valid', reachableScopeIds: ['Scope:1001'] });
       });
 
+      it('records a validation only while the row holds the sealed token that was checked (P4-37)', async () => {
+        await seed(s);
+        const before = (await s.credentials.get('c-alice')) as NonNullable<
+          Awaited<ReturnType<typeof s.credentials.get>>
+        >;
+        const checked = {
+          tokenCiphertext: before.tokenCiphertext,
+          tokenIv: before.tokenIv,
+          keyVersion: before.keyVersion,
+        };
+        const patch = {
+          validationStatus: 'valid' as const,
+          validationErrorCode: null,
+          validatedAt: clock.now(),
+          memberOid: 'Member:20',
+          reachableScopeIds: ['Scope:1001'],
+        };
+        // A replacement between the read and the record: the late result is not written.
+        const next = { tokenCiphertext: 'bmV3', tokenIv: 'bmV3aXY', keyVersion: 1 };
+        expect(await s.credentials.replaceSecret('c-alice', checked, next)).toBe(true);
+        const replaced = await s.credentials.get('c-alice');
+        expect(await s.credentials.recordValidation('c-alice', checked, patch)).toBe(false);
+        expect(await s.credentials.get('c-alice')).toEqual(replaced);
+        // The token that is stored is the one that was checked: written, and only the validation fields change.
+        clock.advance(5);
+        expect(await s.credentials.recordValidation('c-alice', next, patch)).toBe(true);
+        expect(await s.credentials.get('c-alice')).toMatchObject({
+          ...next,
+          validationStatus: 'valid',
+          memberOid: 'Member:20',
+          reachableScopeIds: ['Scope:1001'],
+          label: before.label,
+          updatedAt: clock.now(),
+        });
+        // A stale IV or key version, a missing row and a patch that is not a validation do nothing.
+        expect(await s.credentials.recordValidation('c-alice', { ...next, tokenIv: 'x' }, patch)).toBe(false);
+        expect(await s.credentials.recordValidation('c-alice', { ...next, keyVersion: 9 }, patch)).toBe(
+          false,
+        );
+        expect(await s.credentials.recordValidation('c-404', next, patch)).toBe(false);
+        for (const bad of [{ label: 'x' }, { tokenCiphertext: 'x' }, { revokedAt: 1 }]) {
+          await expect(s.credentials.recordValidation('c-alice', next, bad as never)).rejects.toThrow(
+            InvalidInputError,
+          );
+        }
+      });
+
       it('replaces a sealed token only while the row still holds the expected one (rotation CAS)', async () => {
         await seed(s);
         clock.advance(10);

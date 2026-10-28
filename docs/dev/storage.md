@@ -58,6 +58,10 @@ Enforced by triggers in SQL, so raw SQL writers are held to them too, and mirror
   (the SQL adapters query it in chunks of 50 because D1 binds at most 100 values per statement and merge the chunks); the
   admin API asks for `limit + 1` rows to know whether a next page exists and loads only the grants on the page.
 
+- A credential validation is recorded with `credentials.recordValidation(id, expectedSealedToken, patch)`: one conditional
+  `UPDATE ... WHERE id = ? AND token_ciphertext = ? AND token_iv = ? AND key_version = ?`, `false` when the token was
+  replaced or re-encrypted since it was checked (P4-37, THREAT_MODEL T14, A5). Only the validation fields can be set.
+
 ### Deletion rules
 
 | Delete | Effect |
