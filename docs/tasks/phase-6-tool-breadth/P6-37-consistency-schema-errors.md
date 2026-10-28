@@ -2,7 +2,7 @@
 id: P6-37
 title: Report schema-validation failures as AB_INPUT_INVALID tool errors
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-12]
 adr: ["0015"]
@@ -24,8 +24,8 @@ an unknown asset type name) is `AB_INPUT_INVALID` with a hint (P6-12 consistency
 - If it can, do it once in the server wrapper (no per-tool code) and extend the consistency test with the schema cases.
 
 ## Acceptance criteria
-- [ ] Decision recorded (ADR note or decision entry) with the SDK behaviour that was measured.
-- [ ] If done: one test per mistake class (below minimum, wrong enum value, missing required, wrong type) over every tool.
+- [x] Decision recorded (ADR note or decision entry) with the SDK behaviour that was measured.
+- [x] If done: one test per mistake class (below minimum, wrong enum value, missing required, wrong type) over every tool.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md; the message must not echo a long or hostile value (truncate, envelope names).

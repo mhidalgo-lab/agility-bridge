@@ -156,8 +156,9 @@ described in [Output formats](../guide/output-formats.md).
   project, member or sprint is `AB_NOT_FOUND` (a project outside the workspace too: not found or not visible are the same
   answer, L-140); text that is not an asset number or OID token, a cursor that is not ours, a time range nobody understands
   and an unknown asset type name are `AB_INPUT_INVALID`; several close sprint, team or project names are `AB_AMBIGUOUS`
-  with candidates. A value the input schema itself refuses (`limit: 0`, a value outside an enum) is rejected by the SDK
-  before the handler runs ([P6-37](../tasks/phase-6-tool-breadth/P6-37-consistency-schema-errors.md)).
+  with candidates. A value the input schema itself refuses (`limit: 0`, a value outside an enum, a missing or mistyped
+  argument) is `AB_INPUT_INVALID` too, with the argument path and a `Hint:`; the server wrapper validates (the SDK's own
+  check is a pass-through) and never echoes the value ([P6-37](../tasks/phase-6-tool-breadth/P6-37-consistency-schema-errors.md), D-153).
 - Messages are actionable for the agent and never contain secrets, tokens or raw Agility bodies; names and candidates
   inside an error are enveloped.
 - Non-tool methods (prompts, resources) use JSON-RPC errors: `-32602` for invalid parameters, `-32603` with
