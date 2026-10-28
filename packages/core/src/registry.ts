@@ -132,4 +132,15 @@ export class ToolRegistry {
         (options.maxCost === undefined || t.cost <= options.maxCost),
     );
   }
+
+  /**
+   * The tools the caller is granted (`allowed`, `groups`, `kinds` as in `select`) that `maxCost` hides: their declared
+   * cost is above the per-call budget (P6-36, L-115). Sorted by name.
+   */
+  hiddenByBudget(options: SelectOptions & { readonly maxCost: number }): ToolDefinition[] {
+    const { maxCost, ...rest } = options;
+    return this.select(rest)
+      .filter((t) => t.cost > maxCost)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
 }

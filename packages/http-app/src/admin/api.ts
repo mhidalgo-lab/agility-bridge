@@ -16,7 +16,7 @@ import {
   type TokenListItem,
   type ToolInfo,
 } from '@agility-bridge/auth';
-import { type Clock, COMPOSITE_SIBLINGS, type Logger } from '@agility-bridge/core';
+import { type Clock, COMPOSITE_SIBLINGS, CORE_TOOLS, type Logger } from '@agility-bridge/core';
 import type { AccessToken, AuditKind, AuditStatus, Credential, Storage } from '@agility-bridge/storage';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
@@ -59,6 +59,9 @@ async function readCapped(request: Request, max: number): Promise<string | null>
 }
 
 /** The signed-in person's OAuth devices (P5-04): what `GET /me/oauth-devices` and its revoke routes use. */
+/** Declared request cost of every tool, from the same definitions the server registers (L-314). */
+const DECLARED_COST: ReadonlyMap<string, number> = new Map(CORE_TOOLS.map((t) => [t.name, t.cost]));
+
 export interface AdminOAuthDevices {
   list(userId: string): Promise<
     readonly {
@@ -1787,7 +1790,13 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
   );
 
   const ToolOut = z
-    .object({ name: z.string(), kind: z.enum(['read', 'write', 'destructive']), group: z.string() })
+    .object({
+      name: z.string(),
+      kind: z.enum(['read', 'write', 'destructive']),
+      group: z.string(),
+      cost: z.number().int().min(0).optional(),
+      siblings: z.array(z.string()).optional(),
+    })
     .openapi('Tool');
   add(
     {
@@ -1809,6 +1818,8 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
           group: info.group,
           // The tools a composite reads: the panel warns when it is granted without them (P6-11).
           siblings: [...(COMPOSITE_SIBLINGS[name] ?? [])],
+          // The declared worst-case request cost: the panel notes a tool a lower callBudget hides (P6-36).
+          cost: DECLARED_COST.get(name) ?? 0,
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
     },

@@ -2,7 +2,7 @@
 id: P6-36
 title: Name the tools hidden by the per-call budget
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-11]
 adr: ["0010"]
@@ -23,8 +23,8 @@ not listed, instead of a silent gap (L-115 hides it; nothing says so).
   of a tool in the effective list.
 
 ## Acceptance criteria
-- [ ] `whoami` names the hidden tools and the budget; nothing is added when none is hidden.
-- [ ] The panel notes match, with negative tests; `tools/list` size unchanged (open output schema).
+- [x] `whoami` names the hidden tools and the budget; nothing is added when none is hidden.
+- [x] The panel notes match, with negative tests; `tools/list` size unchanged (open output schema).
 
 ## Security notes
 None beyond the shared rules in AGENTS.md (our own tool names and numbers only).
@@ -35,6 +35,9 @@ None beyond the shared rules in AGENTS.md (our own tool names and numbers only).
 
 ## Docs to update
 - docs/dev/tool-conventions.md
+
+## Notes
+The panel notes cover an explicit `callBudget` on the workspace or grant; a budget inherited from the host default is [P6-58](P6-58-panel-inherited-call-budget-note.md).
 
 ## Out of scope
 - Changing which tools the budget hides.

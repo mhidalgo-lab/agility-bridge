@@ -1385,6 +1385,7 @@ describe('the tool catalogue endpoint', () => {
         kind: 'write',
         group: 'work',
         siblings: [],
+        cost: 0,
       });
       expect(tools.length).toBe(TOOLS.size);
     }

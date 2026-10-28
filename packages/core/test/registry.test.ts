@@ -97,6 +97,14 @@ describe('ToolRegistry.select', () => {
     const costly = new ToolRegistry().register(base()).register(base({ name: 'walk_tree', cost: 40 }));
     expect(costly.select({ maxCost: 20 }).map((t) => t.name)).toEqual(['list_things']);
   });
+
+  it('names the granted tools the budget hides, and only those (P6-36)', () => {
+    const costly = new ToolRegistry().register(base()).register(base({ name: 'walk_tree', cost: 40 }));
+    expect(costly.hiddenByBudget({ maxCost: 20 }).map((t) => t.name)).toEqual(['walk_tree']);
+    expect(costly.hiddenByBudget({ maxCost: 40 })).toEqual([]);
+    // A tool that is not granted is not "hidden by the budget".
+    expect(costly.hiddenByBudget({ maxCost: 20, allowed: ['list_things'] })).toEqual([]);
+  });
 });
 
 describe('annotationsFor', () => {

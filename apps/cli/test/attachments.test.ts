@@ -5,7 +5,7 @@
 import { CORE_TOOLS } from '@agility-bridge/core';
 import { describe, expect, it } from 'vitest';
 import { loadConfig, type StdioConfig } from '../src/config.ts';
-import { contextFactory, STDIO_GROUPS, selectTools } from '../src/stdio.ts';
+import { contextFactory, hiddenTools, STDIO_GROUPS, selectTools } from '../src/stdio.ts';
 
 const URL = 'https://agility.example.com/SyntheticInstance';
 const base = { AB_AGILITY_URL: URL, AB_AGILITY_TOKEN: 'FAKE-token' };
@@ -38,6 +38,14 @@ describe('stdio composite reports (P6-07, D-101)', () => {
   it('does not offer them in setup mode, and an allowlist naming one cannot bring it back', () => {
     expect(selectTools(loadConfig({})).map((t) => t.name)).not.toContain('sprint_health');
     expect(names(config({ AB_TOOLS: 'whoami,sprint_health' }))).toEqual(['whoami']);
+  });
+
+  it('names the reports a low AB_CALL_BUDGET hides, and nothing at the default (P6-36)', () => {
+    const low = hiddenTools(config({ AB_REPORTS: 'on', AB_CALL_BUDGET: '10' })).map((t) => t.name);
+    expect(low).toContain('sprint_health');
+    expect(names(config({ AB_REPORTS: 'on', AB_CALL_BUDGET: '10' }))).not.toContain('sprint_health');
+    expect(hiddenTools(config({ AB_REPORTS: 'on' }))).toEqual([]);
+    expect(hiddenTools(loadConfig({}))).toEqual([]);
   });
 
   it('puts the switch into every call context', () => {

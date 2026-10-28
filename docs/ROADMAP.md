@@ -291,7 +291,7 @@ Status lives in each task file.
 | P6-33 | [First LLM tool-eval run and triage](tasks/phase-6-tool-breadth/P6-33-first-llm-eval-run.md) | medium | P6-10 | done |
 | P6-34 | [Tune tool descriptions from the eval misses](tasks/phase-6-tool-breadth/P6-34-description-tuning-from-evals.md) | low | P6-33 | todo |
 | P6-35 | [Live composite warnings in the workspace and grant forms](tasks/phase-6-tool-breadth/P6-35-live-composite-warnings-in-forms.md) | low | P6-11 | todo |
-| P6-36 | [Name the tools hidden by the per-call budget](tasks/phase-6-tool-breadth/P6-36-budget-hidden-tools-in-whoami.md) | low | P6-11 | todo |
+| P6-36 | [Name the tools hidden by the per-call budget](tasks/phase-6-tool-breadth/P6-36-budget-hidden-tools-in-whoami.md) | low | P6-11 | done |
 | P6-37 | [Report schema-validation failures as AB_INPUT_INVALID tool errors](tasks/phase-6-tool-breadth/P6-37-consistency-schema-errors.md) | low | P6-12 | done |
 | P6-38 | [Run the consistency checks on an empty and a denied world](tasks/phase-6-tool-breadth/P6-38-consistency-empty-world.md) | low | P6-12 | done |
 | P6-39 | [Keep instance metadata across isolates and measure Phase 6 tools on the Worker bench](tasks/phase-6-tool-breadth/P6-39-keep-instance-metadata-across-isolates-and-measure.md) | medium | P6-13 | todo |
@@ -305,6 +305,7 @@ Status lives in each task file.
 | P6-47 | [Polish defect triage, standup and get_sprint output details](tasks/phase-6-tool-breadth/P6-47-polish-defect-triage-standup-and-get-sprint-output.md) | low | P6-13 | todo |
 | P6-48 | [Forward sibling facts in composites as codes, with a lint](tasks/phase-6-tool-breadth/P6-48-forward-sibling-facts-in-composites-as-codes-with.md) | low | P6-13, P6-07 | todo |
 | P6-55 | [Filter standup_summary on the change date instead of reading the newest page](tasks/phase-6-tool-breadth/P6-55-standup-change-date-filter.md) | low | P6-40, P6-27 | todo |
+| P6-58 | [Show the budget-hidden tools note for an inherited call budget in the panel](tasks/phase-6-tool-breadth/P6-58-panel-inherited-call-budget-note.md) | low | P6-36 | todo |
 
 ### Phase 7
 

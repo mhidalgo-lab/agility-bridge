@@ -251,3 +251,34 @@ describe('whoami composite warnings (P6-11)', () => {
     }
   });
 });
+
+describe('whoami names the tools the per-call budget hides (P6-36)', () => {
+  const asServer = (ctx: ToolContext) =>
+    rpc(() => buildMcpServer({ tools: [whoami], ctx }), 'tools/call', { name: 'whoami', arguments: {} });
+  const hidden = [
+    { name: 'sprint_health', cost: 54 },
+    { name: 'standup_summary', cost: 20 },
+  ];
+
+  it('lists them in a note and a structured field, with the budget', async () => {
+    const { ctx } = setup();
+    const r = await asServer(ctx({ hiddenByBudget: hidden, budget: createBudget(10) }));
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect((r['structuredContent'] as { hiddenByBudget?: string[] }).hiddenByBudget).toEqual([
+      'sprint_health',
+      'standup_summary',
+    ]);
+    expect(text(r)).toContain(
+      'per-call budget is 10 requests: sprint_health (needs 54), standup_summary (needs 20)',
+    );
+  });
+
+  it('adds nothing when no tool is hidden', async () => {
+    const { ctx } = setup();
+    for (const over of [{}, { hiddenByBudget: [] }]) {
+      const r = await asServer(ctx(over));
+      expect(r['structuredContent']).not.toHaveProperty('hiddenByBudget');
+      expect(text(r)).not.toContain('per-call budget');
+    }
+  });
+});

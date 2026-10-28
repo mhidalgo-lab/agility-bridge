@@ -46,6 +46,7 @@ import {
   AssetTypeFields,
   assetTypesFrom,
   assetTypeValues,
+  budgetNotes,
   compositeNotes,
   confirmed,
   confirmPage,
@@ -569,7 +570,17 @@ export function registerWorkspaces(ui: Hono, kit: UiKit): void {
                 ['Created', <When at={ws.createdAt} />],
               ]}
             />
-            <Notes title="Notes" items={compositeNotes(ws.enabledTools, tools.ok ? tools.value : [])} />
+            <Notes
+              title="Notes"
+              items={[
+                ...compositeNotes(ws.enabledTools, tools.ok ? tools.value : []),
+                ...budgetNotes(
+                  ws.enabledTools,
+                  typeof ws.limits['callBudget'] === 'number' ? ws.limits['callBudget'] : undefined,
+                  tools.ok ? tools.value : [],
+                ),
+              ]}
+            />
             <div class="actions">
               <LinkButton href={`${self}/edit`}>Edit</LinkButton>
             </div>

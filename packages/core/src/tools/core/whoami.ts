@@ -33,6 +33,7 @@ export const whoami: ToolDefinition = defineTool({
     const { workspace, projects, assetTypes, limits, budget } = ctx;
     const username = typeof member.row['Username'] === 'string' ? member.row['Username'] : undefined;
     const warnings = compositeWarnings(ctx.grantedTools ?? []);
+    const hidden = ctx.hiddenByBudget ?? [];
     const structured = {
       member: { oid: member.oid, name: member.name, ...(username === undefined ? {} : { username }) },
       instance: {
@@ -50,9 +51,15 @@ export const whoami: ToolDefinition = defineTool({
       budget: { requestsPerCall: budget.limit, requestsUsed: budget.used },
       writes: { ...workspace.writes },
       ...(warnings.length === 0 ? {} : { warnings }),
+      ...(hidden.length === 0 ? {} : { hiddenByBudget: hidden.map((t) => t.name) }),
     };
     const notes = [
       ...warnings.map((w) => w.message),
+      ...(hidden.length === 0
+        ? []
+        : [
+            `Not listed because the per-call budget is ${budget.limit} requests: ${hidden.map((t) => `${t.name} (needs ${t.cost})`).join(', ')}. Raise callBudget to list them.`,
+          ]),
       projects.allowed.length === 0
         ? 'Every Agility project the member can see is in scope (no project restriction).'
         : `${projects.allowed.length} allowed Agility project(s)${projects.includeChildren ? ' and their sub-projects' : ''}; list_projects shows their names.`,

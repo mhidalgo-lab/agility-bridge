@@ -416,6 +416,24 @@ export function compositeNotes(list: readonly string[] | null, tools: readonly T
   return notes;
 }
 
+/**
+ * One fixed sentence naming the tools in `list` whose declared cost is above `budget` (the per-call request budget that
+ * applies), which are therefore not listed to the caller (P6-36, L-115). Nothing when the list is "every tool" (null),
+ * no budget is set here (the server's default applies, which the panel does not know) or nothing is hidden.
+ */
+export function budgetNotes(
+  list: readonly string[] | null,
+  budget: number | undefined,
+  tools: readonly Tool[],
+): string[] {
+  if (list === null || budget === undefined) return [];
+  const hidden = tools.filter((t) => list.includes(t.name) && t.cost > budget);
+  if (hidden.length === 0) return [];
+  return [
+    `Not listed because the per-call budget is ${budget} requests: ${hidden.map((t) => `${t.name} (needs ${t.cost})`).join(', ')}. Raise callBudget to list them.`,
+  ];
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Limits
 // ---------------------------------------------------------------------------------------------------------------

@@ -381,6 +381,8 @@ export interface Tool {
   readonly group: string;
   /** The tools a composite reads (empty for any other tool). */
   readonly siblings: readonly string[];
+  /** Declared request cost per call (0 when the API did not say). */
+  readonly cost: number;
 }
 
 const TOOL_NAME = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
@@ -399,6 +401,7 @@ export function parseTool(r: Row): Tool | null {
     kind: kind === 'write' || kind === 'destructive' ? kind : 'read',
     group: str(r['group']),
     siblings,
+    cost: typeof r['cost'] === 'number' && Number.isInteger(r['cost']) && r['cost'] >= 0 ? r['cost'] : 0,
   };
 }
 

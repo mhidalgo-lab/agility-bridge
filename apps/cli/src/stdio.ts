@@ -16,6 +16,7 @@ import {
   type Logger,
   MetadataService,
   Secret,
+  type SelectOptions,
   silentLogger,
   stderrSink,
   systemClock,
@@ -47,10 +48,27 @@ const SETUP_HINT =
 
 /** The tools this configuration serves; an unknown name in the allowlist fails startup and lists the valid ones. */
 export function selectTools(config: LoadedConfig): ToolDefinition[] {
+  const { registry, options } = selection(config);
+  return registry.select(options);
+}
+
+/** The tools this configuration grants that the per-call budget hides (declared cost above it), for `whoami` (P6-36). */
+export function hiddenTools(config: LoadedConfig): Array<{ name: string; cost: number }> {
+  if (config.kind === 'setup') return [];
+  const { registry, options } = selection(config);
+  return registry
+    .hiddenByBudget({ ...options, maxCost: config.callBudget })
+    .map((t) => ({ name: t.name, cost: t.cost }));
+}
+
+function selection(config: LoadedConfig): { registry: ToolRegistry; options: SelectOptions } {
   const registry = new ToolRegistry();
   for (const tool of CORE_TOOLS) registry.register(tool);
   if (config.kind === 'setup')
-    return registry.select({ groups: STDIO_GROUPS.filter((g) => g !== 'attachments' && g !== 'reports') });
+    return {
+      registry,
+      options: { groups: STDIO_GROUPS.filter((g) => g !== 'attachments' && g !== 'reports') },
+    };
   const valid = registry.list().map((t) => t.name);
   const unknown = (config.tools ?? []).filter((t) => !valid.includes(t));
   if (unknown.length > 0) {
@@ -64,11 +82,14 @@ export function selectTools(config: LoadedConfig): ToolDefinition[] {
       (g !== 'attachments' || config.attachmentDownload) &&
       (g !== 'reports' || config.reports),
   );
-  return registry.select({
-    groups,
-    maxCost: config.callBudget,
-    ...(config.tools === undefined ? {} : { allowed: config.tools }),
-  });
+  return {
+    registry,
+    options: {
+      groups,
+      maxCost: config.callBudget,
+      ...(config.tools === undefined ? {} : { allowed: config.tools }),
+    },
+  };
 }
 
 export interface StdioServices {
@@ -81,6 +102,7 @@ export function contextFactory(
   config: StdioConfig,
   services: StdioServices,
   tools: readonly ToolDefinition[],
+  hiddenByBudget: ReadonlyArray<{ name: string; cost: number }> = [],
 ): () => ToolContext {
   const limiters = new CredentialLimiters({ concurrency: 5 });
   const breakers = new CircuitBreakers();
@@ -120,6 +142,7 @@ export function contextFactory(
     logger: services.logger,
     clock: systemClock,
     random: webCryptoRandom,
+    ...(hiddenByBudget.length === 0 ? {} : { hiddenByBudget }),
   });
 }
 
@@ -187,7 +210,7 @@ export function startStdio(config: LoadedConfig, options: StartOptions): { close
   }
   const fetch =
     options.fetch ?? createNodeFetch(config.caFile === undefined ? {} : { caFile: config.caFile });
-  const ctx = contextFactory(config, { fetch, logger }, tools);
+  const ctx = contextFactory(config, { fetch, logger }, tools, hiddenTools(config));
   logger.info('serving', {
     tools: tools.length,
     source: config.source,
