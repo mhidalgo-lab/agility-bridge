@@ -326,6 +326,8 @@ export interface OAuthOptions {
   readonly clientMetadataDocuments?: boolean;
   /** Stored document clients at once. Default {@link OAUTH_DEFAULT_CIMD_MAX_CLIENTS}; 1-500. */
   readonly clientMetadataMaxClients?: number;
+  /** When set, a metadata-document client id must have exactly one of these hosts (P5-16); anything else is refused before any fetch. */
+  readonly clientMetadataHosts?: readonly string[];
   /** Fetches one address may cause per hour. Default {@link OAUTH_DEFAULT_CIMD_FETCH_LIMIT}. */
   readonly clientMetadataFetchLimit?: number;
   /** Fetches the whole deployment may make per hour. Default {@link OAUTH_DEFAULT_CIMD_HOURLY_LIMIT}. */
@@ -738,6 +740,12 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     1,
     10_000,
   );
+  const cimdHosts = options.clientMetadataHosts?.map((h) => {
+    const host = h.trim().toLowerCase();
+    if (!/^[a-z0-9.-]{1,253}$/.test(host))
+      throw new TypeError('oauth.clientMetadataHosts must be host names');
+    return host;
+  });
   const cimd =
     options.clientMetadataDocuments === false || options.clientMetadataFetch === undefined
       ? undefined
@@ -1139,7 +1147,7 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     if (await isBlocked(clientId)) return 'client_revoked';
     if (!looksLikeClientIdUrl(clientId)) return null;
     if (cimd === undefined) return 'cimd_disabled';
-    const problem = clientIdUrlProblem(clientId, issuerHost);
+    const problem = clientIdUrlProblem(clientId, issuerHost, cimdHosts);
     if (problem !== null) return problem;
     if ((await env.OAUTH_KV.get(`client:${clientId}`)) !== null) return null;
     // Anonymous callers can make us fetch (T11, T20): bound the stored document clients, then the fetches one address

@@ -13,7 +13,11 @@ import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { defineOAuthAbuseSuite } from '../../../packages/http-app/test/oauth/abuse-suite.ts';
 import { defineOAuthAdminSuite } from '../../../packages/http-app/test/oauth/admin-suite.ts';
-import { defineOAuthClientSuite } from '../../../packages/http-app/test/oauth/clients-suite.ts';
+import {
+  type DocumentHostsShape,
+  defineDocumentHostsSuite,
+  defineOAuthClientSuite,
+} from '../../../packages/http-app/test/oauth/clients-suite.ts';
 import { createFakeDocuments } from '../../../packages/http-app/test/oauth/documents.ts';
 import {
   type ActivityHostShape,
@@ -59,7 +63,9 @@ async function buffered(res: Response): Promise<Response> {
   });
 }
 
-async function workerHost(shape?: Partial<RefreshHostShape> & ActivityHostShape): Promise<OAuthHost> {
+async function workerHost(
+  shape?: Partial<RefreshHostShape> & ActivityHostShape & Partial<DocumentHostsShape>,
+): Promise<OAuthHost> {
   const key = generateMasterKey(1);
   const adminToken = generateAdminToken();
   const documents = createFakeDocuments({ observesRedirectMode: false });
@@ -97,6 +103,7 @@ async function workerHost(shape?: Partial<RefreshHostShape> & ActivityHostShape)
           ? {}
           : { AB_OAUTH_REFRESH_REUSE_WINDOW: String(shape.reuseWindowSeconds) }),
         ...(shape?.idleTtlSeconds === undefined ? {} : { AB_OAUTH_IDLE_TTL: String(shape.idleTtlSeconds) }),
+        ...(shape?.cimdHosts === undefined ? {} : { AB_OAUTH_CIMD_HOSTS: shape.cimdHosts.join(',') }),
         AB_ACCESS_CACHE_TTL: '0',
         // One Worker serves a whole test (dozens of requests from one address); limits have their own tests.
         AB_RATE_LIMIT_AUTH_FAILURES: '1000',
@@ -197,6 +204,7 @@ defineOAuthSuite('workerd with D1 (Worker)', () => workerHost());
 defineRefreshFamilySuite('workerd with D1 (Worker)', workerHost);
 defineDeviceActivitySuite('workerd with D1 (Worker)', workerHost);
 defineOAuthClientSuite('workerd with D1 (Worker)', workerHost, { matrix: false });
+defineDocumentHostsSuite('workerd with D1 (Worker)', workerHost);
 defineOAuthAdminSuite('workerd with D1 (Worker)', workerHost);
 defineOAuthAbuseSuite('workerd with D1 (Worker)', workerHost);
 

@@ -103,9 +103,14 @@ export function looksLikeClientIdUrl(clientId: string): boolean {
 
 /**
  * Why a CIMD `client_id` is refused before anything is fetched, or null when it may be fetched. `issuerHost` is our own
- * host name (a document on it would be fetched from ourselves).
+ * host name (a document on it would be fetched from ourselves). `allowedHosts`, when given, is the only set of hosts a document
+ * client may have (exact names, `AB_OAUTH_CIMD_HOSTS`, P5-16).
  */
-export function clientIdUrlProblem(clientId: string, issuerHost: string): string | null {
+export function clientIdUrlProblem(
+  clientId: string,
+  issuerHost: string,
+  allowedHosts?: readonly string[],
+): string | null {
   if (clientId.length > MAX_CLIENT_ID_URL_CHARS) return 'client_id_too_long';
   let url: URL;
   try {
@@ -127,6 +132,7 @@ export function clientIdUrlProblem(clientId: string, issuerHost: string): string
   const tld = host.slice(host.lastIndexOf('.') + 1);
   if (INTERNAL_SUFFIXES.includes(tld)) return 'client_id_internal_name';
   if (host === issuerHost) return 'client_id_self';
+  if (allowedHosts !== undefined && !allowedHosts.includes(host)) return 'client_host_not_allowed';
   return null;
 }
 
