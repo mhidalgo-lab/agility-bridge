@@ -121,7 +121,10 @@ With [OAuth](oauth-phone.md) on, two more screens show what people connected. Wi
   its access tokens stop. A dynamic app that registers again is a new app (revoke it too, or switch dynamic registration off);
   a metadata-document app is listed under **Revoked apps** with **Allow again**, because its address is public. Device counts
   read at most a hundred devices (a Cloudflare Free plan request has 50 database queries), so on a busy server they say "at
-  least".
+  least". Under the list, **Limits and caps** shows how full the registration caps are (apps that registered themselves, and
+  stored metadata documents, each "in use of cap"), and the limit refusals of the last 24 hours by reason. A limit is recorded
+  once for each period (10 minutes or an hour) it is reached in, so a count is the number of periods, not of requests. No
+  address or app is shown.
 
 Disconnecting takes effect at once for the refresh token and for the access token on the server that did it; on another
 server process (a second node, a Worker isolate) the access token may work until its cached decision ends, at most

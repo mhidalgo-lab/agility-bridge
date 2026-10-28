@@ -190,7 +190,7 @@ describe('connected apps of everyone and registered clients: who may do what (P5
     const w = await world();
     const { t, alice } = w;
     const before = await allDevices(t);
-    for (const path of ['/oauth/devices', '/oauth/clients']) {
+    for (const path of ['/oauth/devices', '/oauth/clients', '/oauth/abuse']) {
       const res = await t.api('GET', path, alice);
       expect(res.status, path).toBe(403);
       const text = await res.text();
@@ -222,6 +222,7 @@ describe('connected apps of everyone and registered clients: who may do what (P5
     for (const [method, path, body] of [
       ['GET', '/oauth/devices', undefined],
       ['GET', '/oauth/clients', undefined],
+      ['GET', '/oauth/abuse', undefined],
       ['POST', `/oauth/devices/${w.device.alice}/revoke`, { userId: t.w.ids.alice }],
       ['POST', '/oauth/clients/revoke', { clientId: w.apps.a.clientId }],
       ['POST', '/oauth/clients/restore', { clientId: w.apps.a.clientId }],
@@ -246,6 +247,10 @@ describe('connected apps of everyone and registered clients: who may do what (P5
     expect(await works(t, w.apps.ow.access)).toBe(true);
     // Clients are the owners'.
     expect((await t.api('GET', '/oauth/clients', admin)).status).toBe(403);
+    // The abuse view is the owners' too (P5-20).
+    const abuse = await t.api('GET', '/oauth/abuse', admin);
+    expect(abuse.status).toBe(403);
+    expect(await abuse.text()).not.toContain('refusals');
     expect(
       (await t.api('POST', '/oauth/clients/revoke', admin, { clientId: w.apps.a.clientId })).status,
     ).toBe(403);
@@ -444,5 +449,35 @@ describe('connected apps of everyone and registered clients: who may do what (P5
     expect((await off.api('GET', '/oauth/clients', o)).status).toBe(404);
     const a = await login(off, 'alice@example.test');
     expect((await off.api('GET', '/oauth/devices', a)).status).toBe(403);
+  });
+});
+
+describe('the operator view of OAuth abuse controls (P5-20)', () => {
+  it('an owner sees the caps and the limits on the API and on the OAuth apps page, with nothing that names a caller', async () => {
+    const w = await world();
+    const { t, owner } = w;
+    const res = await t.api('GET', '/oauth/abuse', owner);
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(JSON.parse(text)).toMatchObject({
+      registrations: { dynamic: { enabled: true }, documents: { cap: 200 } },
+      windowHours: 24,
+    });
+    expect(text).not.toMatch(/usr_|@example|oauth_/);
+    const page = await t.send('GET', '/admin/oauth/clients', { cookie: owner.cookie });
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    expect(html).toContain('Limits and caps');
+    expect(html).toContain('Registration caps');
+    expect(html).toContain('authorizeIp=');
+  });
+
+  it('members and administrators get no page data either', async () => {
+    const w = await world();
+    for (const who of [w.alice, w.admin]) {
+      const page = await w.t.send('GET', '/admin/oauth/clients', { cookie: who.cookie });
+      expect(page.status).toBe(403);
+      expect(await page.text()).not.toContain('Limits and caps');
+    }
   });
 });

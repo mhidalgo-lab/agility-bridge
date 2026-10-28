@@ -511,6 +511,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
                 clients: (page) => oauthRuntime.clients(page),
                 revokeClient: (ic, clientId, by) => oauthRuntime.revokeClient(ic, clientId, by),
                 restoreClient: (ic, clientId, by) => oauthRuntime.restoreClient(ic, clientId, by),
+                abuse: () => oauthRuntime.abuseOverview(),
               },
             }),
         ...(perRequest ? { lightweightRouter: true } : {}),

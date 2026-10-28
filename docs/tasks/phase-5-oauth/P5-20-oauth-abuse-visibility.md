@@ -2,12 +2,12 @@
 id: P5-20
 title: Operator view of OAuth abuse refusals and caps
 phase: 5
-status: todo
+status: done
 priority: low
 depends_on: [P5-08, P5-09]
 adr: ["0009"]
 lessons: [L-079, L-251]
-owner: ""
+owner: "agent"
 ---
 
 # P5-20 — Operator view of OAuth abuse refusals and caps
@@ -32,9 +32,9 @@ registration caps are, so a limit is tuned from evidence and a flooded deploymen
 - Not here: administrators who are not owners (the registration numbers are an owner view, D-132); alerting; changing limits.
 
 ## Acceptance criteria
-- [ ] The page and the API show the caps, the usage, the limits and the refusal counts for the window, for owners only.
-- [ ] No address, hash of an address, token or client secret appears in the page or the API (asserted).
-- [ ] Negative authorization: members, administrators and anonymous callers get no data (memory, SQLite and workerd/D1 for the
+- [x] The page and the API show the caps, the usage, the limits and the refusal counts for the window, for owners only.
+- [x] No address, hash of an address, token or client secret appears in the page or the API (asserted).
+- [x] Negative authorization: members, administrators and anonymous callers get no data (memory, SQLite and workerd/D1 for the
   API; role tests with sessions for the page).
 
 ## Security notes
