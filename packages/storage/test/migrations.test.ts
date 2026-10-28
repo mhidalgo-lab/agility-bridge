@@ -7,6 +7,7 @@ import { MIGRATIONS, migrationChecksum } from '../src/index.ts';
 // change, together with this value and the database fixture (packages/storage-sqlite/test/fixtures/databases).
 const FROZEN: Record<number, string> = {
   1: '9179ce1e9c7e44bf0c9ff9efc7b532f200e5065f696ee3380bdeeee3c754aa9f',
+  2: 'ecfc4fc4f4a7defb37e80fa586cb8aa7c77498b6a058109728d25bbb70dc7c4f',
 };
 
 describe('embedded migrations', () => {

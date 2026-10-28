@@ -354,6 +354,21 @@ export function createMemoryStorage(options: MemoryStorageOptions = {}): Storage
       return { token, grant, workspace, user, instance, credential };
     },
     list: (f = {}) => tokenRepo.list((t) => f.grantId === undefined || t.grantId === f.grantId),
+    async page({ grantIds, after, limit }) {
+      const n = clampLimit(limit, 100, 1_000);
+      const ids = grantIds === undefined ? null : new Set(grantIds);
+      return [...tables.access_tokens.values()]
+        .filter((t) => ids === null || ids.has(t.grantId))
+        .filter(
+          (t) =>
+            after === undefined ||
+            t.createdAt < after.createdAt ||
+            (t.createdAt === after.createdAt && t.id < after.id),
+        )
+        .sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
+        .slice(0, n)
+        .map(clone);
+    },
     async touch(id, minIntervalMs) {
       checkId('access_tokens', id);
       if (!Number.isSafeInteger(minIntervalMs) || minIntervalMs < 0) {

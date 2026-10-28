@@ -126,6 +126,9 @@ function idRepository<T, New, Patch>(
 }
 
 /** Creates the storage over a migrated database (see `openSqlStorage`). */
+/** Bound values per `inArray` chunk (D1 limits a statement to 100). */
+const GRANT_CHUNK = 50;
+
 export function createSqlStorage(driver: SqlDriver, options: SqlStorageOptions = {}): Storage {
   const now = options.now ?? Date.now;
   const db: Db = drizzle(
@@ -339,6 +342,25 @@ export function createSqlStorage(driver: SqlDriver, options: SqlStorageOptions =
       return tokenRepo.list(
         filter.grantId === undefined ? undefined : eq(schema.accessTokens.grantId, filter.grantId),
       );
+    },
+    async page({ grantIds, after, limit }) {
+      const n = clampLimit(limit, 100, 1_000);
+      const a = schema.accessTokens;
+      const cursor =
+        after === undefined
+          ? undefined
+          : or(lt(a.createdAt, after.createdAt), and(eq(a.createdAt, after.createdAt), lt(a.id, after.id)));
+      const newest = (where: SQL | undefined) =>
+        db.select().from(a).where(where).orderBy(desc(a.createdAt), desc(a.id)).limit(n);
+      if (grantIds === undefined) return newest(cursor);
+      // D1 allows 100 bound values per statement: a long grant list goes out in chunks whose pages are merged.
+      const rows: AccessToken[] = [];
+      for (let i = 0; i < grantIds.length; i += GRANT_CHUNK) {
+        rows.push(...(await newest(and(inArray(a.grantId, grantIds.slice(i, i + GRANT_CHUNK)), cursor))));
+      }
+      return rows
+        .sort((x, y) => y.createdAt - x.createdAt || (x.id < y.id ? 1 : x.id > y.id ? -1 : 0))
+        .slice(0, n);
     },
     async touch(id, minIntervalMs) {
       checkId('access_tokens', id);

@@ -498,38 +498,46 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
         if (m === null) throw new InvalidInputError('after: not a cursor from a previous page.');
         cursor = { createdAt: Number(m[1]), id: m[2] as string };
       }
-      // The grants the actor may read, narrowed by the filters; the tokens of exactly these grants are listed.
-      let visible: Grant[];
+      // The grants the actor may read, narrowed by the filters. Everyone-sees-all (a manager with no filter) reads no
+      // grant list at all: the storage pages the tokens and only the grants on the page are loaded (P4-31).
+      let grantIds: string[] | undefined;
+      const known = new Map<string, Grant>();
       if (query.grantId !== undefined) {
-        visible = [await ownGrant(query.grantId)];
+        const own = await ownGrant(query.grantId);
+        known.set(own.id, own);
+        grantIds = [own.id];
+        if (query.userId !== undefined && own.userId !== query.userId) grantIds = [];
       } else if (isManager(actor)) {
-        visible = await storage.grants.list();
+        if (query.userId !== undefined)
+          grantIds = (await storage.grants.list({ userId: query.userId })).map((g) => g.id);
       } else {
-        visible = self === null ? [] : await storage.grants.list({ userId: self });
+        const mine = self === null ? [] : await storage.grants.list({ userId: self });
+        grantIds = mine
+          .filter((g) => query.userId === undefined || g.userId === query.userId)
+          .map((g) => g.id);
+        for (const g of mine) known.set(g.id, g);
       }
-      if (query.userId !== undefined) visible = visible.filter((g) => g.userId === query.userId);
-      const byGrant = new Map(visible.map((g) => [g.id, g]));
-      let found: AccessToken[] = [];
-      if (byGrant.size > 0) {
-        found = await storage.accessTokens.list(
-          query.grantId === undefined ? {} : { grantId: query.grantId },
-        );
-      }
-      const newestFirst = found
-        .filter((t) => byGrant.has(t.grantId))
-        .sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
-      const after =
-        cursor === null
-          ? newestFirst
-          : newestFirst.filter(
-              (t) => t.createdAt < cursor.createdAt || (t.createdAt === cursor.createdAt && t.id < cursor.id),
-            );
-      const page = after.slice(0, limit);
+      // One more row than the page shows tells whether another page follows.
+      const rows = await storage.accessTokens.page({
+        ...(grantIds === undefined ? {} : { grantIds }),
+        ...(cursor === null ? {} : { after: cursor }),
+        limit: limit + 1,
+      });
+      const page = rows.slice(0, limit);
       const last = page.at(-1);
-      const next = after.length > limit && last !== undefined ? `${last.createdAt}:${last.id}` : null;
-      const data = page.map((t) => {
-        const g = byGrant.get(t.grantId) as Grant;
-        return { ...t, userId: g.userId, workspaceId: g.workspaceId, grantLabel: g.label };
+      const next = rows.length > limit && last !== undefined ? `${last.createdAt}:${last.id}` : null;
+      for (const t of page) {
+        if (!known.has(t.grantId)) {
+          const g = await storage.grants.get(t.grantId);
+          if (g !== null) known.set(g.id, g);
+        }
+      }
+      const data = page.flatMap((t) => {
+        const g = known.get(t.grantId);
+        // A grant deleted between the two reads takes its tokens with it.
+        return g === undefined
+          ? []
+          : [{ ...t, userId: g.userId, workspaceId: g.workspaceId, grantLabel: g.label }];
       });
       return { data, next };
     },

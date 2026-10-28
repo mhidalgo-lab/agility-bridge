@@ -53,6 +53,11 @@ Enforced by triggers in SQL, so raw SQL writers are held to them too, and mirror
   (10,000) `tool_call` rows of a window (L-097; no OFFSET, no index beyond `(ts, id)` and `(workspace_id, ts, id)`: an
   index costs a written row per audit append, D-37).
 
+- Device tokens are read in keyset pages too: `accessTokens.page({ grantIds?, after?, limit })`, newest first by
+  `(createdAt, id)` over the `access_tokens_created` index (migration 0002, P4-31). `grantIds` narrows to some grants
+  (the SQL adapters query it in chunks of 50 because D1 binds at most 100 values per statement and merge the chunks); the
+  admin API asks for `limit + 1` rows to know whether a next page exists and loads only the grants on the page.
+
 ### Deletion rules
 
 | Delete | Effect |
