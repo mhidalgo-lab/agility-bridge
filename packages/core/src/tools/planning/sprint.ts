@@ -27,6 +27,8 @@ const MAX_PAGES = 5;
 /** History queries per call (points times pages) and per batched request (response cap, L-049). */
 const MAX_HISTORY_QUERIES = 60;
 const QUERIES_PER_REQUEST = 20;
+/** Rows one batched history request may ask for, so a large page size means fewer queries per request (P6-42). */
+const ROWS_PER_REQUEST = 2000;
 const ITEM_LIST_CAP = 100;
 const CATEGORIES = ['not_started', 'in_progress', 'completed', 'unknown'] as const;
 type Category = (typeof CATEGORIES)[number];
@@ -336,9 +338,21 @@ export const getSprint: ToolDefinition = defineTool({
           });
       }
       const rowsAt = new Map<number, { rows: Row[]; complete: boolean; compiled: CompiledQuery[] }>();
-      for (let from = 0; from < queries.length; from += QUERIES_PER_REQUEST) {
-        const chunk = queries.slice(from, from + QUERIES_PER_REQUEST);
-        const res = await agilityClient(ctx).query<unknown[]>(chunk.map((q) => q.compiled.body));
+      const perRequest = Math.max(1, Math.min(QUERIES_PER_REQUEST, Math.floor(ROWS_PER_REQUEST / pageSize)));
+      const oversized = new Set<number>();
+      for (let from = 0; from < queries.length; from += perRequest) {
+        const chunk = queries.slice(from, from + perRequest);
+        let res: { data: unknown };
+        try {
+          res = await agilityClient(ctx).query<unknown[]>(chunk.map((q) => q.compiled.body));
+        } catch (error) {
+          // A chunk that passes the response cap leaves out its points, not the whole call (P6-42).
+          if (error instanceof AbError && error.code === ErrorCode.LimitResponseTooLarge) {
+            for (const q of chunk) oversized.add(q.t);
+            continue;
+          }
+          throw error;
+        }
         for (const [i, q] of chunk.entries()) {
           const set = Array.isArray(res.data) ? res.data[i] : undefined;
           const raw = Array.isArray(set)
@@ -355,6 +369,7 @@ export const getSprint: ToolDefinition = defineTool({
       const points = new Map<number, Item[]>();
       let incomplete = 0;
       for (const [t, entry] of rowsAt) {
+        if (oversized.has(t)) continue;
         if (!entry.complete) {
           incomplete++;
           continue;
@@ -365,6 +380,12 @@ export const getSprint: ToolDefinition = defineTool({
         partial = true;
         notes.push(
           `${incomplete} history point${incomplete === 1 ? ' is' : 's are'} left out: the sprint had more than ${pagesPerPoint * pageSize} items then.`,
+        );
+      }
+      if (oversized.size > 0) {
+        partial = true;
+        notes.push(
+          `${oversized.size} history point${oversized.size === 1 ? ' is' : 's are'} left out: the answer for ${oversized.size === 1 ? 'it' : 'them'} was larger than the response limit (${Math.round(ctx.limits.maxResponseBytes / 1024)} KiB).`,
         );
       }
       points.set(last, current);
