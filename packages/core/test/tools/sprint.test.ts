@@ -421,6 +421,36 @@ describe('missing data is never turned into zeros (L-033)', () => {
     expect(points.at(-1)?.remaining).toBe(out['totals'].remaining);
   });
 
+  it('leaves out the points of a chunk over the response cap and keeps the others (P6-42)', async () => {
+    let asofRequests = 0;
+    const { ctx, fake } = setup({
+      override: (_req, c) => {
+        const bodies = Array.isArray(c.body) ? c.body : [c.body];
+        if (c.path !== 'query.v1' || !bodies.some((b) => (b as { asof?: string }).asof !== undefined))
+          return undefined;
+        // The first batched history request is too large for the cap; the rest answer normally.
+        return ++asofRequests === 1
+          ? new Response('[]', { status: 200, headers: { 'content-length': '99999999' } })
+          : undefined;
+      },
+    });
+    const r = await call(ctx({ limits: { ...DEFAULT_LIMITS, maxRows: 500 } }), {});
+    expect(r['isError'], text(r)).toBeUndefined();
+    const out = s(r);
+    expect(out['partial']).toBe(true);
+    // 2000 rows per request / 500 per page = 4 queries per request, so the seven points travel in two requests.
+    const history = asofCalls(fake.calls);
+    expect(history).toHaveLength(2);
+    expect((history[0]?.body as unknown[] | undefined)?.length).toBe(4);
+    expect(out['notes']).toEqual(
+      expect.arrayContaining([expect.stringContaining('4 history points are left out')]),
+    );
+    const points = out['burndown'] as Array<{ at: string }>;
+    // The three points of the second request and the live last point remain.
+    expect(points).toHaveLength(4);
+    expect(out['totals']).toMatchObject({ itemCount: 5 });
+  });
+
   it('reports lower bounds and no history for a sprint with more items than the pages read', async () => {
     const w = world();
     const many = Array.from({ length: 6 }, (_, i) => item(200 + i, 'Story', 42, 2, 1));
