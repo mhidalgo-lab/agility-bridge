@@ -200,6 +200,7 @@ export {
   inputJsonSchema,
   RegistryError,
   SECRET_FIELD_RE,
+  type SelectOptions,
   ToolRegistry,
 } from './registry.ts';
 export {

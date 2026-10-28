@@ -45,6 +45,7 @@ import {
   AssetTypeFields,
   assetTypesFrom,
   assetTypeValues,
+  budgetNotes,
   compositeNotes,
   confirmed,
   confirmPage,
@@ -296,6 +297,11 @@ export function grantNotes(g: Grant, ws: Workspace, tools: readonly Tool[] = [])
         ? g.tools
         : g.tools.filter((t) => ws.enabledTools?.includes(t));
   notes.push(...compositeNotes(effective, tools));
+  // The tighter of the two budgets applies (a grant can only lower the workspace's, L-056).
+  const budgets = [g.limits['callBudget'], ws.limits['callBudget']].filter(
+    (n): n is number => typeof n === 'number',
+  );
+  notes.push(...budgetNotes(effective, budgets.length === 0 ? undefined : Math.min(...budgets), tools));
   const outside = (g.tools ?? []).filter((t) =>
     ws.enabledTools === null ? false : !ws.enabledTools.includes(t),
   );

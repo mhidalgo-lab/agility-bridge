@@ -210,7 +210,11 @@ Annotations are derived from `kind` by the registry, never written by hand. Non-
 
 - Each tool declares `cost`: the worst-case number of Agility requests in one call, including retries, paging and
   resolution (L-114). The registry hides a tool whose cost exceeds the deployment's per-call budget (`select({ maxCost })`, L-115; see
-  [core contracts](core.md)).
+  [core contracts](core.md)). The hidden tools are not silent (P6-36): the host sets `ctx.hiddenByBudget` from
+  `registry.hiddenByBudget(...)` and `whoami` names them with their cost in a note and a `hiddenByBudget` field (only when
+  non-empty; the output schema stays open, so `tools/list` does not grow). The admin panel shows the same note on a
+  workspace or grant whose explicit `callBudget` is below the cost of a tool in its explicit list; a budget inherited from
+  the server's default is not known to the panel (see P6-58).
 - One test (`packages/core/test/tools/cost.test.ts`) walks `CORE_TOOLS` and measures each tool's worst-case call on a cold
   cache against its declared cost (L-313). **A new tool needs an entry in `test/tools/worst-case.ts`** (arguments of its most
   expensive call over the shared world, composites measured with their siblings), or the test fails; a fixture whose call

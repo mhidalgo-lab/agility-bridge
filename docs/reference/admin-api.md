@@ -146,6 +146,6 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 - **OAuthDevice**: `id`: string, `clientName`: string \| null, `redirectHost`: string, `workspaceId`: string \| null, `workspaceName`: string \| null, `workspaceSlug`: string \| null, `label`: string \| null, `createdAt`: number, `expiresAt`: number \| null
 - **Session**: `actor`: "session" \| "break_glass" \| "user", `user`: object \| null, `recentAuth`: boolean, `signedInAt`: number \| null, `idleExpiresAt`: number \| null, `expiresAt`: number \| null, `csrfToken`: string \| null
 - **SetupLink**: `id`: string, `url`: string, `expiresAt`: number
-- **Tool**: `name`: string, `kind`: "read" \| "write" \| "destructive", `group`: string
+- **Tool**: `name`: string, `kind`: "read" \| "write" \| "destructive", `group`: string, `cost`?: integer, `siblings`?: string[]
 - **User**: `id`: string, `email`: string, `displayName`: string \| null, `idp`: string \| null, `idpSubject`: string \| null, `role`: "owner" \| "admin" \| "member", `createdAt`: number, `updatedAt`: number, `disabledAt`: number \| null
 - **Workspace**: `id`: string, `slug`: string, `name`: string, `instanceId`: string, `allowedScopeIds`: string[], `includeChildScopes`: boolean, `assetTypes`: object \| null, `enabledTools`: array \| null, `limits`: object, `defaultCredentialId`: string \| null, `writePolicy`: object, `credentialSource`: "stored" \| "passthrough", `createdAt`: number, `updatedAt`: number, `disabledAt`: number \| null

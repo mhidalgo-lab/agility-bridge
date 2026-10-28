@@ -896,6 +896,9 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     }
     const resolved = access;
     const tools = registry.select({ allowed: [...resolved.tools], maxCost: resolved.limits.callBudget });
+    const hiddenByBudget = registry
+      .hiddenByBudget({ allowed: [...resolved.tools], maxCost: resolved.limits.callBudget })
+      .map((t) => ({ name: t.name, cost: t.cost }));
     const groups = [...new Set(tools.map((t) => t.group))];
     const ctx: ToolContext = {
       requestId,
@@ -934,6 +937,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       logger: services.logger,
       clock: services.clock,
       random: services.random,
+      ...(hiddenByBudget.length === 0 ? {} : { hiddenByBudget }),
     };
     const prepared: PreparedRequest = {
       tools,

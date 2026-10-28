@@ -248,6 +248,11 @@ export interface ToolContext {
    * reads a section only through a tool listed here (L-037); absent means none (fail closed).
    */
   readonly grantedTools?: readonly string[];
+  /**
+   * Granted tools the per-call budget hides (declared cost above it), as name and cost, set by the host that filtered
+   * them; `whoami` says so instead of leaving a silent gap (P6-36, L-115).
+   */
+  readonly hiddenByBudget?: ReadonlyArray<{ readonly name: string; readonly cost: number }>;
   /** The host's metadata service (P1-03); tools use `metadataFor(ctx)`. */
   readonly metadata?: MetadataService;
   readonly logger: Logger;

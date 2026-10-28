@@ -9,9 +9,11 @@ import { TextField } from '../src/components.tsx';
 import { createUiKit, ONCE_FIELD, ONCE_MAX_OUTSTANDING } from '../src/kit.ts';
 import { renderDocument } from '../src/pages.tsx';
 import { parseTokenPage, parseTool, parseUser, type User } from '../src/screens/data.ts';
+import { grantNotes } from '../src/screens/grants.tsx';
 import { parsePrefixText, prefixText } from '../src/screens/instances.tsx';
 import {
   assetTypesFrom,
+  budgetNotes,
   compositeNotes,
   formMessage,
   limitFieldOf,
@@ -118,9 +120,9 @@ describe('shared form helpers', () => {
     expect(wholeNumber(f({ n: '1e3' }), 'n', 1, 2000)).toBeNull();
     expect(wholeNumber(f({}), 'n', 1, 20)).toBeUndefined();
     const tools = [
-      { name: 'whoami', kind: 'read', group: 'a', siblings: [] },
-      { name: 'get_assets', kind: 'read', group: 'a', siblings: [] },
-      { name: 'update_work_item', kind: 'write', group: 'b', siblings: [] },
+      { name: 'whoami', kind: 'read', group: 'a', siblings: [], cost: 2 },
+      { name: 'get_assets', kind: 'read', group: 'a', siblings: [], cost: 2 },
+      { name: 'update_work_item', kind: 'write', group: 'b', siblings: [], cost: 2 },
     ] as const;
     expect(toolsFrom(f({ tools_all: '1' }), tools)).toEqual({ value: null });
     expect(toolsFrom(f({ tools_all: '1', tools: 'update_work_item' }), tools)).toEqual({
@@ -633,10 +635,16 @@ describe('P4-15 helpers and screens', () => {
 
 describe('composite grant notes (P6-11)', () => {
   const tools = [
-    { name: 'whoami', kind: 'read', group: 'core', siblings: [] },
-    { name: 'sprint_health', kind: 'read', group: 'reports', siblings: ['get_sprint', 'search_work_items'] },
-    { name: 'get_sprint', kind: 'read', group: 'planning', siblings: [] },
-    { name: 'search_work_items', kind: 'read', group: 'work', siblings: [] },
+    { name: 'whoami', kind: 'read', group: 'core', siblings: [], cost: 2 },
+    {
+      name: 'sprint_health',
+      kind: 'read',
+      group: 'reports',
+      siblings: ['get_sprint', 'search_work_items'],
+      cost: 54,
+    },
+    { name: 'get_sprint', kind: 'read', group: 'planning', siblings: [], cost: 2 },
+    { name: 'search_work_items', kind: 'read', group: 'work', siblings: [], cost: 2 },
   ] as const;
 
   it('names each granted composite with the siblings missing from the list', () => {
@@ -650,6 +658,32 @@ describe('composite grant notes (P6-11)', () => {
     expect(compositeNotes(['sprint_health', 'get_sprint', 'search_work_items'], tools)).toEqual([]);
     expect(compositeNotes(['whoami', 'get_sprint'], tools)).toEqual([]);
     expect(compositeNotes(null, tools)).toEqual([]);
+  });
+
+  it('names the listed tools a lower per-call budget hides (P6-36)', () => {
+    const t = [...tools];
+    expect(budgetNotes(['whoami', 'sprint_health'], 10, t)).toEqual([
+      'Not listed because the per-call budget is 10 requests: sprint_health (needs 54). Raise callBudget to list them.',
+    ]);
+    expect(budgetNotes(['whoami', 'sprint_health'], 54, t)).toEqual([]);
+    expect(budgetNotes(['whoami'], 2, t)).toEqual([]);
+    expect(budgetNotes(['whoami', 'sprint_health'], undefined, t)).toEqual([]);
+    expect(budgetNotes(null, 1, t)).toEqual([]);
+    expect(parseTool({ name: 'whoami', kind: 'read', group: 'core', cost: '<b>' })?.cost).toBe(0);
+    expect(parseTool({ name: 'whoami', kind: 'read', group: 'core', cost: 54 })?.cost).toBe(54);
+  });
+
+  it('a grant is judged against the tighter of its own and the workspace budget (P6-36)', () => {
+    const ws = { enabledTools: ['whoami', 'sprint_health'], limits: { callBudget: 100 } } as never;
+    const note = (grantBudget: number | undefined) =>
+      grantNotes(
+        { tools: null, limits: grantBudget === undefined ? {} : { callBudget: grantBudget } } as never,
+        ws,
+        [...tools],
+      ).filter((n) => n.startsWith('Not listed'));
+    expect(note(undefined)).toEqual([]);
+    expect(note(10)).toHaveLength(1);
+    expect(note(10)[0]).toContain('sprint_health (needs 54)');
   });
 
   it('parses only well-formed sibling names from the API, whatever else it sends', () => {
