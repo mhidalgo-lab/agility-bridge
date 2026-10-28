@@ -71,12 +71,14 @@ export {
   type AllowlistMatch,
   type AutoProvision,
   EMPTY_LOGIN_POLICY,
+  IDP_NAME_RE,
   type LoginDecision,
   type LoginDenyReason,
   type LoginOutcome,
   type LoginPolicy,
   matchAllowlist,
   resolveLoginUser,
+  unbindClaimKey,
 } from './policy.ts';
 export {
   type ActiveSession,

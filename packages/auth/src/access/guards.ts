@@ -17,6 +17,7 @@ import {
   type Workspace,
 } from '@agility-bridge/storage';
 import { createSetupLink, type SetupLink } from '../identity/login.ts';
+import { IDP_NAME_RE, unbindClaimKey } from '../identity/policy.ts';
 import { type KeyVersionStatus, keyStatus, retireKeyVersion } from '../secrets/credentials.ts';
 import type { Keyring } from '../secrets/keyring.ts';
 import { DEFAULT_TOKEN_DAYS } from '../tokens/device.ts';
@@ -114,11 +115,17 @@ const CURSOR = /^(\d{1,16}):([A-Za-z0-9_-]{1,128})$/;
 /** One line of "my recent changes" (P4-07). */
 export type MyAuditRow = Pick<AuditEntry, 'id' | 'ts' | 'action' | 'status' | 'targetType' | 'targetId'>;
 
+/** How long a named-provider claim lasts when the owner gives no time, and the longest they may ask for (P4-24, D-129). */
+const CLAIM_DEFAULT_MINUTES = 24 * 60;
+const CLAIM_MAX_MINUTES = 7 * 24 * 60;
+
 export interface GuardContext {
   readonly storage: Storage;
   readonly tools: ReadonlyMap<string, ToolInfo>;
   /** For the master-key operations (P3-13); without it they are unavailable. */
   readonly keyring?: Keyring;
+  /** The clock for expiring claims (P4-24); default the system clock. */
+  readonly now?: () => number;
 }
 
 /** The services, each call checked against the actor's role (and, for members, ownership). */
@@ -191,7 +198,11 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
      * another owner or use the admin token; this also keeps the last owner from locking themselves out), and the caller
      * repeats the user's current email. The write is one compare-and-set on the binding read here. Ends nothing itself.
      */
-    async unbind(id: string, confirmEmail: string): Promise<{ user: User; previousIdp: string }> {
+    async unbind(
+      id: string,
+      confirmEmail: string,
+      claim: { provider?: string; ttlMinutes?: number } = {},
+    ): Promise<{ user: User; previousIdp: string; requiredIdp: string | null; claimMinutes: number | null }> {
       needOwner(actor, "clear a user's sign-in identity");
       needRecent(actor, "clearing a user's sign-in identity");
       if (self !== null && id === self) {
@@ -207,8 +218,44 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
       if (typeof confirmEmail !== 'string' || confirmEmail.trim().toLowerCase() !== target.email) {
         throw new InvalidInputError("confirm: must repeat the user's email address");
       }
-      const user = await services.users.unbind(id, { idp: target.idp, idpSubject: target.idpSubject });
-      return { user, previousIdp: target.idp };
+      // The provider the next binding must come from, for a while (P4-24). Checked before anything is written.
+      const provider = claim.provider;
+      if (provider === undefined && claim.ttlMinutes !== undefined) {
+        throw new InvalidInputError('ttlMinutes: needs a provider');
+      }
+      if (provider !== undefined && (typeof provider !== 'string' || !IDP_NAME_RE.test(provider))) {
+        throw new InvalidInputError('provider: must be a provider id such as google, github or oidc:<name>');
+      }
+      const minutes = provider === undefined ? null : (claim.ttlMinutes ?? CLAIM_DEFAULT_MINUTES);
+      if (
+        minutes !== null &&
+        (!Number.isSafeInteger(minutes) || minutes < 1 || minutes > CLAIM_MAX_MINUTES)
+      ) {
+        throw new InvalidInputError(
+          `ttlMinutes: must be a whole number of minutes from 1 to ${CLAIM_MAX_MINUTES}`,
+        );
+      }
+      // The claim is written before the binding is cleared, so no sign-in can bind the account in between; any older
+      // claim goes either way, and a failed unbind takes this one back.
+      const key = unbindClaimKey(id);
+      if (provider === undefined || minutes === null) {
+        await storage.kv.delete(key);
+      } else {
+        const expiresAt = (ctx.now ?? Date.now)() + minutes * 60_000;
+        await storage.kv.set(key, JSON.stringify({ idp: provider.toLowerCase() }), { expiresAt });
+      }
+      try {
+        const user = await services.users.unbind(id, { idp: target.idp, idpSubject: target.idpSubject });
+        return {
+          user,
+          previousIdp: target.idp,
+          requiredIdp: provider === undefined ? null : provider.toLowerCase(),
+          claimMinutes: minutes,
+        };
+      } catch (error) {
+        await storage.kv.delete(key);
+        throw error;
+      }
     },
     /**
      * Lets a disabled user sign in again (P4-15, THREAT_MODEL T14): everything they still hold (grants and device tokens not

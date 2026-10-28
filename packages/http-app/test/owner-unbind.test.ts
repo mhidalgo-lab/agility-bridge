@@ -257,3 +257,106 @@ describe('the panel: Move to another provider', () => {
     expect((await unbindRows(s)).filter((r) => r.status === 'ok')).toHaveLength(1);
   });
 });
+
+describe('POST /users/{id}/unbind with a named provider (P4-24, THREAT_MODEL T14)', () => {
+  const claimOf = (s: S, id: string) => s.w.storage.kv.get(`unbind-claim:${id}`);
+
+  it('with a provider named, a verified sign-in at another provider cannot bind; the named one can, and the claim is spent', async () => {
+    const { s, owner, ids } = await env();
+    const res = await s.api('POST', `/users/${ids.alice}/unbind`, owner, {
+      confirm: ALICE,
+      provider: 'github',
+      ttlMinutes: 30,
+    });
+    expect(res.status).toBe(200);
+    expect(await claimOf(s, ids.alice)).toContain('github');
+    // The configured provider here is oidc:corp: refused, nothing bound, no session, the claim stays.
+    const refused = await s.signIn(ALICE, { claims: { sub: 'someone-else' } });
+    expect(refused.status).not.toBe(200);
+    expect(s.cookieOf(refused)).toBeUndefined();
+    expect(await s.w.storage.users.get(ids.alice)).toMatchObject({ idp: null, idpSubject: null });
+    expect(await claimOf(s, ids.alice)).not.toBeNull();
+    // The audit row names the provider asked for, never the subject.
+    const row = (await unbindRows(s)).find((r) => r.status === 'ok');
+    expect(row?.details).toMatchObject({ requiredIdp: 'github', claimMinutes: 30 });
+  });
+
+  it('the named provider binds and clears the claim', async () => {
+    const { s, owner, ids } = await env();
+    expect(
+      (await s.api('POST', `/users/${ids.alice}/unbind`, owner, { confirm: ALICE, provider: 'OIDC:corp' }))
+        .status,
+    ).toBe(200);
+    const ok = await s.signIn(ALICE, { claims: { sub: 'new-subject' } });
+    expect(ok.status).toBe(303);
+    expect(await s.w.storage.users.get(ids.alice)).toMatchObject({ idpSubject: 'new-subject' });
+    expect(await claimOf(s, ids.alice)).toBeNull();
+  });
+
+  it('without a provider the behaviour is as before, and a plain unbind clears an older claim', async () => {
+    const { s, owner, ids } = await env();
+    await s.api('POST', `/users/${ids.alice}/unbind`, owner, { confirm: ALICE, provider: 'github' });
+    await s.w.storage.users.bind(ids.alice, 'oidc:corp', 'sub-again', {});
+    expect((await s.api('POST', `/users/${ids.alice}/unbind`, owner, { confirm: ALICE })).status).toBe(200);
+    expect(await claimOf(s, ids.alice)).toBeNull();
+    expect((await s.signIn(ALICE, { claims: { sub: 'free' } })).status).toBe(303);
+  });
+
+  it('the claim expires', async () => {
+    const { s, owner, ids } = await env();
+    await s.api('POST', `/users/${ids.alice}/unbind`, owner, {
+      confirm: ALICE,
+      provider: 'github',
+      ttlMinutes: 5,
+    });
+    expect((await s.signIn(ALICE, { claims: { sub: 'early' } })).status).not.toBe(303);
+    s.w.now.t += 6 * MIN;
+    expect((await s.signIn(ALICE, { claims: { sub: 'late' } })).status).toBe(303);
+    expect(await s.w.storage.users.get(ids.alice)).toMatchObject({ idpSubject: 'late' });
+  });
+
+  it('refuses a bad provider or time, ttl without a provider, and writes nothing', async () => {
+    const { s, owner, admin, ids } = await env();
+    const post = (who: Session, body: Record<string, unknown>) =>
+      s.api('POST', `/users/${ids.alice}/unbind`, who, { confirm: ALICE, ...body });
+    const before = await state(s);
+    for (const bad of [
+      { provider: 'a b' },
+      { provider: '' },
+      { provider: 'x'.repeat(65) },
+      { provider: 'github', ttlMinutes: 0 },
+      { provider: 'github', ttlMinutes: 10_081 },
+      { provider: 'github', ttlMinutes: 1.5 },
+      { ttlMinutes: 10 },
+    ]) {
+      expect((await post(owner, bad)).status, JSON.stringify(bad)).toBe(422);
+    }
+    // Negative authorization: an admin cannot name a provider (or anything else) and no claim is left behind.
+    expect((await post(admin, { provider: 'github' })).status).toBe(403);
+    expect(await state(s)).toBe(before);
+    expect(await claimOf(s, ids.alice)).toBeNull();
+  });
+
+  it('a failed unbind (already unbound) leaves no claim behind', async () => {
+    const { s, owner, ids } = await env();
+    await s.api('POST', `/users/${ids.alice}/unbind`, owner, { confirm: ALICE });
+    await s.w.storage.kv.delete(`unbind-claim:${ids.alice}`);
+    const again = await s.api('POST', `/users/${ids.alice}/unbind`, owner, {
+      confirm: ALICE,
+      provider: 'github',
+    });
+    expect(again.status).toBe(409);
+    expect(await claimOf(s, ids.alice)).toBeNull();
+  });
+
+  it('the panel form passes the provider', async () => {
+    const { s, owner, ids } = await env();
+    const res = await submit(s, `/admin/users/${ids.alice}/unbind`, owner, {
+      confirm: 'yes',
+      email: ALICE,
+      provider: 'github',
+    });
+    expect(res.status).toBe(303);
+    expect(await claimOf(s, ids.alice)).toContain('github');
+  });
+});

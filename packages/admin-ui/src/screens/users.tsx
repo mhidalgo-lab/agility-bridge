@@ -164,6 +164,14 @@ function UnbindPage(props: {
           maxlength={MAX_EMAIL}
           spellcheck={false}
         />
+        <TextField
+          name="provider"
+          label="Only this provider may bind next (optional)"
+          hint="google, github, cf-access or oidc:name. Leave empty to allow any configured provider. A sign-in at another provider is refused for 24 hours."
+          autocomplete="off"
+          maxlength={64}
+          spellcheck={false}
+        />
         <div class="actions">
           <Button variant="danger">Clear the identity</Button>
           <LinkButton href={self} variant="secondary">
@@ -580,10 +588,15 @@ export function registerUsers(ui: Hono, kit: UiKit): void {
           422,
         );
       }
+      const provider = field(form, 'provider');
       const res = await kit.callAdmin(
         c,
         principal,
-        { method: 'POST', path: adminPath`/users/${id}/unbind`, body: { confirm: email } },
+        {
+          method: 'POST',
+          path: adminPath`/users/${id}/unbind`,
+          body: { confirm: email, ...(provider === null ? {} : { provider }) },
+        },
         form,
       );
       if (isOk(res)) return kit.redirect(self, 'identity_cleared');

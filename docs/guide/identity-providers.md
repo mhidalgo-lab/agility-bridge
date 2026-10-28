@@ -114,6 +114,20 @@ account-takeover risk: anyone who controls that email address at a provider you 
 only after checking with them, and keep the configured providers to ones whose email verification you trust (a generic
 OIDC provider can assert any address).
 
+**Narrow the window to one provider.** Name the provider the next binding must come from and the account can be claimed
+only there, for a limited time:
+
+```sh
+agility-bridge user unbind usr_abc123 --confirm ana@example.com --to github --ttl-minutes 60
+# or: POST /api/admin/v1/users/usr_abc123/unbind  {"confirm": "...", "provider": "github", "ttlMinutes": 60}
+```
+
+`--to` takes the provider id a user is bound with (`google`, `github`, `cf-access` or `oidc:<name>`); the panel has the
+same field. While the claim lasts (default 24 hours, at most 7 days) a verified sign-in at any other provider is refused
+like a conflict, whatever email it asserts; the first bind by the named provider, or the expiry, ends the claim. A later
+unbind without `--to` removes an older claim. The provider name is not checked against the configured providers: a name
+nobody configured simply blocks the account until it expires. Without `--to` the behaviour is as described above.
+
 Rules:
 
 - Owners only (an admin or member gets `403`); the break-glass admin token counts as an owner.
@@ -122,7 +136,7 @@ Rules:
   cannot lock themselves out.
 - The request repeats the user's current email, compared after trim and lowercase (`422` otherwise, never echoed back); a
   user with no binding is `409`; two owners unbinding at once get one `200` and one `409`.
-- It is audited as `user.unbind` with the previous provider id (never the subject or the typed email) and the sessions as
+- It is audited as `user.unbind` with the previous provider id and, when named, the provider asked for and its minutes (never the subject or the typed email) and the sessions as
   `session.revoke_all` with reason `unbind`. A refusal writes a `denied` row and changes nothing.
 
 ## Create the applications
