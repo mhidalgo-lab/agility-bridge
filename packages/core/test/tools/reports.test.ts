@@ -807,3 +807,74 @@ describe('defect_triage output details (P6-47)', () => {
     expect(nameSimilarity('crash save network drops', 'crash save network again')).toBeGreaterThan(0.5);
   });
 });
+
+describe('work_item_quality edge semantics (P6-46)', () => {
+  const quality = (over: Partial<Facts>) => {
+    const size = BACKLOG_ITEM_QUALITY_RUBRIC.criteria.find((c) => c.id === 'size');
+    if (size === undefined) throw new Error('no size criterion');
+    return assess(size, {
+      name: 'Sign in with a saved password',
+      description: 'As a user I want to sign in so that I see my account.',
+      acceptance: undefined,
+      hasAcceptanceField: true,
+      estimate: 3,
+      hasEstimateField: true,
+      hasEpic: true,
+      hasProject: true,
+      hasOwnerOrTeam: true,
+      hasPriority: true,
+      ...over,
+    });
+  };
+
+  it('counts an estimate of 0 as not estimated, and says so', () => {
+    expect(quality({ estimate: 0 })).toMatchObject({ score: 0, evidence: expect.stringContaining('0') });
+    expect(quality({ estimate: 0 }).evidence).toContain('not estimated');
+    expect(quality({ estimate: 0.5 }).score).toBe(2);
+    // A type without an estimate field is still not assessed, whatever the value.
+    expect(quality({ estimate: 0, hasEstimateField: false }).score).toBeNull();
+  });
+
+  it('states the zero-estimate rule in the rubric and bumps its version', () => {
+    const size = BACKLOG_ITEM_QUALITY_RUBRIC.criteria.find((c) => c.id === 'size');
+    expect(size?.scale[0]).toContain('estimate of 0');
+    expect(BACKLOG_ITEM_QUALITY_RUBRIC.version).not.toBe('1.0.0');
+  });
+
+  it('reports a budget failure on the priority read as such, not as unreadable', async () => {
+    const probe = rig();
+    await probe.call('work_item_quality', { asset: 'B-01002' });
+    const used = probe.fake.requests;
+    const { call } = rig();
+    const r = await call(
+      'work_item_quality',
+      { asset: 'B-01002' },
+      { ctx: { budget: createBudget(used - 1) } },
+    );
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect(text(r)).toContain('request budget of this call ran out');
+    expect(text(r)).not.toContain('could not be read on this item');
+    expect(s(r).priorityNotRead).toBe('budget');
+    expect(s(r).partial).toBe(true);
+  });
+
+  it('says when the description was cut by the shaper', async () => {
+    const w = world();
+    const story = (w['Story'] ?? []).find((r) => r['Number'] === 'B-01002');
+    if (story === undefined) throw new Error('no story');
+    (story as Record<string, unknown>)['Description'] = `<p>${'word '.repeat(1_200)}TBD</p>`;
+    const { call } = rig({ fake: { assets: w } });
+    const r = await call('work_item_quality', { asset: 'B-01002' });
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect(text(r)).toContain('The description was cut at 4,000 characters');
+    expect(s(r).descriptionCut).toBe(true);
+    expect(s(r).partial).toBe(true);
+  });
+
+  it('does not claim a cut for a normal description', async () => {
+    const { call } = rig();
+    const r = await call('work_item_quality', { asset: 'B-01002' });
+    expect(text(r)).not.toContain('The description was cut');
+    expect(s(r)).not.toHaveProperty('descriptionCut');
+  });
+});

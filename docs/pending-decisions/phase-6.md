@@ -279,6 +279,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   thresholds (a title of at least four words, an estimate above 8 is large, three testable criteria) are a starting point
   for the owner to tune together with the rubric.
 - **Owner (2026-10-27):** Decided: as recommended, (a).
+- **Update (P6-46, 2026-10-28):** an estimate of 0 scores as not estimated (`size` 0, with the evidence saying so; rubric 1.1.0 states it). A priority that was not read says why (budget, permission, no such field or failed) instead of one generic line, and a description cut by the shaper at 4,000 characters is named and makes the report partial.
 
 ### D-104 — Report thresholds: pace bands, staleness and duplicate similarity *(P6-07)*
 - **Context:** `sprint_health` needs a status, `defect_triage` a "stale" and a "likely duplicate".

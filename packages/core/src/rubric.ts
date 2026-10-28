@@ -29,7 +29,7 @@ const criterion = (c: RubricCriterion): RubricCriterion => Object.freeze(c);
 
 export const BACKLOG_ITEM_QUALITY_RUBRIC: QualityRubric = Object.freeze({
   id: 'backlog-item-quality',
-  version: '1.0.0',
+  version: '1.1.0',
   appliesTo: ['Story', 'Defect'],
   description:
     'Scores one backlog item from 0 to 100 on six criteria, each 0 to 2, weighted. A rubric result is a prompt for a conversation, not a verdict.',
@@ -64,7 +64,11 @@ export const BACKLOG_ITEM_QUALITY_RUBRIC: QualityRubric = Object.freeze({
       title: 'Size and splitting',
       weight: 20,
       question: 'Is it estimated and small enough to finish in one sprint?',
-      scale: { 0: 'No estimate or clearly too large', 1: 'Estimated but large', 2: 'Estimated and small' },
+      scale: {
+        0: 'No estimate (an estimate of 0 counts as none) or clearly too large',
+        1: 'Estimated but large',
+        2: 'Estimated and small',
+      },
       reads: ['Estimate', 'ToDo'],
     }),
     criterion({

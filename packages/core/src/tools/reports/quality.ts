@@ -5,7 +5,7 @@
 // `null`, the score becomes a range and a level is named only when the whole range lies in one (L-033).
 import { z } from 'zod';
 import { capBudget, type ToolContext } from '../../context.ts';
-import { AbError } from '../../errors.ts';
+import { AbError, ErrorCode } from '../../errors.ts';
 import { runPage } from '../../identity/resolve.ts';
 import { oidsOf } from '../../identity/scope.ts';
 import { metadataFor } from '../../metadata/service.ts';
@@ -50,6 +50,20 @@ export interface Facts {
   /** Whether a priority is set; undefined when it could not be read. */
   readonly hasPriority: boolean | undefined;
 }
+
+/** Why the priority was not read (P6-46): each has its own note, none is shown as "set" or "unset". */
+export type PriorityUnread = 'no_field' | 'budget' | 'forbidden' | 'failed';
+
+export interface PriorityRead {
+  readonly has?: boolean;
+  readonly unread?: PriorityUnread;
+}
+
+/** The characters from which the item shaper cuts a description (ADR-0015 hard maximum for one value). */
+export const DESCRIPTION_CUT_AT = 4_000;
+/** True when a description reached the shaper's cap and was cut (the cut is marked with an ellipsis). */
+export const descriptionWasCut = (description: string): boolean =>
+  description.length >= DESCRIPTION_CUT_AT && description.endsWith('…');
 
 export interface CriterionResult {
   readonly id: string;
@@ -129,9 +143,10 @@ export function assess(c: RubricCriterion, f: Facts): CriterionResult {
         : result(c, 1, `${lines.length} criteria${testable ? '' : ', no testable wording'}`);
     }
     case 'size': {
-      if (f.estimate === undefined)
+      // A zero estimate is not an estimate: it says "not sized yet", so it scores like none (D-103, P6-46).
+      if (f.estimate === undefined || f.estimate === 0)
         return f.hasEstimateField
-          ? result(c, 0, 'no estimate')
+          ? result(c, 0, f.estimate === 0 ? 'estimate 0 counts as not estimated' : 'no estimate')
           : result(c, null, 'this type has no estimate on this instance');
       return f.estimate > LARGE_ESTIMATE
         ? result(c, 1, `estimate ${f.estimate} is above ${LARGE_ESTIMATE}`)
@@ -194,11 +209,14 @@ export function summarise(results: readonly CriterionResult[]): {
   };
 }
 
-/** Whether the item has a priority: one guarded read; undefined when it cannot be read (never assumed). */
-async function readPriority(ctx: ToolContext, type: string, oid: string): Promise<boolean | undefined> {
+/**
+ * Whether the item has a priority: one guarded read. A priority that was not read is never assumed; the reason is kept
+ * so the report can say a budget or permission failure as such (P6-46).
+ */
+async function readPriority(ctx: ToolContext, type: string, oid: string): Promise<PriorityRead> {
   try {
     const meta = await metadataFor(ctx).assetType(type);
-    if (!meta.attributes.has('Priority')) return undefined;
+    if (!meta.attributes.has('Priority')) return { unread: 'no_field' };
     const compiled = await compileQuery(ctx, {
       assetType: type,
       fields: ['Priority'],
@@ -207,12 +225,24 @@ async function readPriority(ctx: ToolContext, type: string, oid: string): Promis
       limit: 1,
     });
     const row = (await runPage(ctx, compiled)).rows[0];
-    return row === undefined ? undefined : oidsOf(row['Priority'])[0] !== undefined;
+    return row === undefined ? { unread: 'failed' } : { has: oidsOf(row['Priority'])[0] !== undefined };
   } catch (error) {
-    if (error instanceof AbError) return undefined;
-    throw error;
+    if (!(error instanceof AbError)) throw error;
+    if (error.code === ErrorCode.BudgetExhausted) return { unread: 'budget' };
+    if (error.code === ErrorCode.AuthForbidden) return { unread: 'forbidden' };
+    return { unread: 'failed' };
   }
 }
+
+const PRIORITY_NOTES: Readonly<Record<PriorityUnread, string>> = {
+  no_field:
+    'Priority is not read: this type has no priority on this instance, so the readiness criterion may be unassessed.',
+  budget:
+    'Priority was not read: the request budget of this call ran out. Repeat the call; the readiness criterion may be unassessed.',
+  forbidden:
+    'Priority was not read: this token or workspace may not read it, so the readiness criterion may be unassessed.',
+  failed: 'Priority could not be read on this item, so the readiness criterion may be unassessed.',
+};
 
 export const workItemQuality: ToolDefinition = defineTool({
   name: NAME,
@@ -245,13 +275,16 @@ export const workItemQuality: ToolDefinition = defineTool({
         'Pass a backlog item or defect.',
       );
     let results: CriterionResult[] = [];
+    let priorityRead: PriorityRead | undefined;
+    let descriptionCut = false;
     let summary: ReturnType<typeof summarise> | undefined;
     if (item !== undefined && type !== undefined) {
       const meta = await metadataFor(ctx).assetType(type);
       const hasAcceptanceField = [...meta.attributes.values()].some(
         (a) => isAcceptanceAttribute(a.name) && a.kind === 'LongText',
       );
-      const hasPriority = await readPriority(ctx, type, String(item['oid']));
+      const priority = await readPriority(ctx, type, String(item['oid']));
+      const hasPriority = priority.has;
       const facts: Facts = {
         name: strOf(item['name']) ?? '',
         description: strOf(item['description']) ?? '',
@@ -265,10 +298,15 @@ export const workItemQuality: ToolDefinition = defineTool({
           (Array.isArray(item['owners']) && item['owners'].length > 0) || strOf(item['team']) !== undefined,
         hasPriority,
       };
+      priorityRead = priority;
+      descriptionCut = descriptionWasCut(facts.description);
       results = rubric.criteria.map((c) => assess(c, facts));
       summary = summarise(results);
-      if (hasPriority === undefined)
-        notes.push('Priority could not be read on this item, so the readiness criterion may be unassessed.');
+      if (priority.unread !== undefined) notes.push(PRIORITY_NOTES[priority.unread]);
+      if (descriptionWasCut(facts.description))
+        notes.push(
+          `The description was cut at ${DESCRIPTION_CUT_AT.toLocaleString('en-US')} characters: the checks on it (stated value, open questions, acceptance text) read the part shown only.`,
+        );
       if (summary.unassessed.length > 0)
         notes.push(
           `Not assessed: ${summary.unassessed.join(', ')}. The score is a range${summary.level === undefined ? ' and no level is named' : ''}.`,
@@ -306,7 +344,7 @@ export const workItemQuality: ToolDefinition = defineTool({
           ? []
           : [{ title: 'To check', source: 'quality checks', rows: suggestions }]),
       ],
-      partial: incomplete(runs) || (summary?.unassessed.length ?? 0) > 0,
+      partial: incomplete(runs) || (summary?.unassessed.length ?? 0) > 0 || descriptionCut,
       structured: {
         sections: sectionInfos(runs),
         rubric: { id: rubric.id, version: rubric.version },
@@ -330,6 +368,8 @@ export const workItemQuality: ToolDefinition = defineTool({
               ...(summary.level === undefined ? {} : { level: summary.level }),
             }),
         suggestions,
+        ...(priorityRead?.unread === undefined ? {} : { priorityNotRead: priorityRead.unread }),
+        ...(descriptionCut ? { descriptionCut: true } : {}),
       },
       meta: { queries: allQueries(runs) },
     });
