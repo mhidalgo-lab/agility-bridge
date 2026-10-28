@@ -185,7 +185,7 @@ described in [Output formats](../guide/output-formats.md).
 | `AB_AGILITY_TIMEOUT` / `AB_AGILITY_UNAVAILABLE` | Timeout / 5xx or network failure |
 | `AB_AGILITY_TLS` | The instance's certificate is not trusted (Workers: HTTP 526 or an opaque fetch error, L-160); the hint points to `AB_CA_FILE` on Node and to the Node/Docker deployment for private CAs |
 | `AB_AGILITY_WRONG_INSTANCE` | Redirect, login page or non-Agility response: check the instance URL |
-| `AB_AGILITY_ERROR` | Other unexpected Agility response (Agility's 400 `{error, exceptions}` body is never returned raw) |
+| `AB_AGILITY_ERROR` | Other unexpected Agility response. Agility's `{error, exceptions}` text is withheld from the result entirely (it goes to the server log, `agility refused the request`); the agent gets our message and a trusted next-step hint (P6-33, L-333) |
 | `AB_WRITE_APPROVAL_PENDING` | Approval requested out of band: open the returned link, approve, then repeat the call |
 | `AB_WRITE_APPROVAL_UNAVAILABLE` | Approval required but neither elicitation nor the approval page is available to this client |
 | `AB_WRITE_APPROVAL_DECLINED` | The user declined or did not answer |
@@ -222,8 +222,10 @@ Annotations are derived from `kind` by the registry, never written by hand. Non-
 
 ## Untrusted data
 
-Every value that came from Agility (names, descriptions, comments, custom fields, status names, error texts) goes
-through the output shaper. The probe test feeds every tool and every output path (summary, notes, candidates, errors,
+Every value that came from Agility (names, descriptions, comments, custom fields, status names, ambiguous-name candidates)
+goes through the output shaper. Agility's own error messages are not shown at all: the first LLM eval showed models
+following an instruction planted in error text even inside the envelope, so an error carries only our message, a trusted
+hint that names a working next step, and enveloped candidates where the agent must choose (P6-33, L-333). The probe test feeds every tool and every output path (summary, notes, candidates, errors,
 structured content, composite sections) with poisoned strings: envelope look-alikes, instructions, HTML with scripts,
 bidi controls and very long values (L-038).
 

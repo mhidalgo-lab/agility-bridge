@@ -176,7 +176,16 @@ function retryAfterMs(res: Response, body: string, now: number): number | undefi
   return undefined;
 }
 
-/** `{ error, exceptions: [{ type, message }] }` (P0-06) as untrusted details: Agility text, possibly echoing input. */
+/**
+ * The trusted next step for a request Agility refused. Agility's own message is never shown to the model, so this hint is
+ * the only guidance in the result and must name a route that works.
+ */
+export const UPSTREAM_REFUSAL_HINT: string =
+  "Agility's own message is not shown here (it is in the server log). Check asset numbers, attribute names and values " +
+  'with describe_asset_type; read one item by number with get_work_item or get_assets, or find items by words in the name ' +
+  'with search_work_items.';
+
+/** `{ error, exceptions: [{ type, message }] }` (P0-06) for the server log only: Agility text, possibly echoing input. */
 function agilityErrorDetails(body: string): Record<string, unknown> | undefined {
   try {
     const parsed = JSON.parse(body) as { error?: unknown; exceptions?: unknown };
@@ -526,13 +535,16 @@ export class AgilityClient {
         if (looksLikeHtml(res.headers.get('content-type') ?? '', text)) {
           return { ok: false, retryable: false, error: wrongInstance(`an HTML page with HTTP ${status}`) };
         }
+        // Agility's own message is withheld from the result (P6-33, L-333): it can echo input or carry an instruction,
+        // and models followed one even inside the envelope. The operator reads it in the log; the agent gets our hint.
         const details = agilityErrorDetails(text);
+        if (details !== undefined)
+          this.#ctx.logger.warn('agility refused the request', { status, ...details });
         return {
           ok: false,
           retryable: false,
           error: new AbError(ErrorCode.AgilityError, `Agility refused the request (HTTP ${status}).`, {
-            hint: 'The request may name an attribute or value this instance does not have; check the metadata.',
-            ...(details === undefined ? {} : { details }),
+            hint: UPSTREAM_REFUSAL_HINT,
           }),
         };
       }
