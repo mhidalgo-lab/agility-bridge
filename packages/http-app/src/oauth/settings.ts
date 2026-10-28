@@ -19,6 +19,7 @@
 //   AB_OAUTH_DCR_UNUSED_TTL     how long a registration that never exchanged a code lives (default 24h; 1h-7d)
 //   AB_OAUTH_REFRESH_REUSE_WINDOW  how long a spent refresh token is answered with the same successor (default 30s;
 //                            0-120s, 0 = strict single use, not longer than the access lifetime); later reuse revokes
+//   AB_OAUTH_IDLE_TTL        a device unused this long is refused at its next refresh (default off; 1h-365d) (P5-14)
 // Durations: a number of seconds, or a number with s, m, h or d (`90m`, `12h`, `30d`).
 
 /** A refused `AB_OAUTH*` value; `variable` names it for the host's error message. */
@@ -54,6 +55,7 @@ export interface OAuthSettings {
   readonly tokenFailureIpLimit?: number;
   readonly tokenFailureLimit?: number;
   readonly refreshReuseWindowSeconds?: number;
+  readonly idleTtlSeconds?: number;
 }
 
 export type OAuthEnv = Readonly<Record<string, string | undefined>>;
@@ -80,6 +82,7 @@ export const OAUTH_SETTING_NAMES: readonly string[] = Object.freeze([
   'AB_OAUTH_TOKEN_FAILURE_IP_LIMIT',
   'AB_OAUTH_TOKEN_FAILURE_LIMIT',
   'AB_OAUTH_REFRESH_REUSE_WINDOW',
+  'AB_OAUTH_IDLE_TTL',
 ]);
 
 const DURATION_RE = /^(\d{1,8})([smhd]?)$/;
@@ -194,6 +197,7 @@ export function oauthSettingsFromEnv(env: OAuthEnv, publicUrl: boolean): OAuthSe
       'AB_OAUTH_REFRESH_REUSE_WINDOW must not be longer than AB_OAUTH_ACCESS_TTL.',
     );
   }
+  const idleTtlSeconds = duration(env, 'AB_OAUTH_IDLE_TTL', 3_600, 365 * 86_400, '1h and 365d');
   if (flag !== 'on') return null;
   if (!publicUrl) {
     throw new OAuthConfigError(
@@ -221,5 +225,6 @@ export function oauthSettingsFromEnv(env: OAuthEnv, publicUrl: boolean): OAuthSe
     ...(tokenFailureIpLimit === undefined ? {} : { tokenFailureIpLimit }),
     ...(tokenFailureLimit === undefined ? {} : { tokenFailureLimit }),
     ...(refreshReuseWindowSeconds === undefined ? {} : { refreshReuseWindowSeconds }),
+    ...(idleTtlSeconds === undefined ? {} : { idleTtlSeconds }),
   };
 }

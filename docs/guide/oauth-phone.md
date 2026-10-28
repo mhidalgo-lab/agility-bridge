@@ -56,7 +56,9 @@ The page works on a phone: it fits a 320 px screen, long names wrap, and nothing
 ## See and disconnect your apps
 
 **My access** (`/admin/me`) lists **Connected apps**: the app's name, the device name you gave, the workspace, where it sends
-its answers, when you connected it and when its access ends.
+its answers, when you connected it, when it was **last used** (to within a few minutes; "not yet" for an app connected
+before this was recorded) and when its access ends. An app you no longer use is worth disconnecting; the operator can also
+set it to end on its own after a time without use.
 
 - **Disconnect** ends that app's access and refresh tokens at once.
 - **Disconnect all apps** does it for every one.

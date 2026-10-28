@@ -3,7 +3,12 @@
 import { defineOAuthAdminSuite } from './admin-suite.ts';
 import { defineOAuthClientSuite } from './clients-suite.ts';
 import { memoryHost } from './memory-host.ts';
-import { defineOAuthCacheSuite, defineOAuthSuite, defineRefreshFamilySuite } from './suite.ts';
+import {
+  defineDeviceActivitySuite,
+  defineOAuthCacheSuite,
+  defineOAuthSuite,
+  defineRefreshFamilySuite,
+} from './suite.ts';
 
 defineOAuthSuite('memory storage', () => memoryHost());
 defineOAuthClientSuite('memory storage', () => memoryHost());
@@ -23,4 +28,16 @@ defineRefreshFamilySuite('memory storage', (shape) =>
 );
 defineRefreshFamilySuite('memory storage, per-request isolation (the Workers shape)', (shape) =>
   memoryHost({ request: true, oauth: { refreshReuseWindowSeconds: shape.reuseWindowSeconds } }),
+);
+defineDeviceActivitySuite(
+  'memory storage',
+  (shape) =>
+    memoryHost({ oauth: shape.idleTtlSeconds === undefined ? {} : { idleTtlSeconds: shape.idleTtlSeconds } }),
+  { throttle: true },
+);
+defineDeviceActivitySuite('memory storage, per-request isolation (the Workers shape)', (shape) =>
+  memoryHost({
+    request: true,
+    oauth: shape.idleTtlSeconds === undefined ? {} : { idleTtlSeconds: shape.idleTtlSeconds },
+  }),
 );

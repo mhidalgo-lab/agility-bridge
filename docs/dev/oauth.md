@@ -41,6 +41,7 @@ to the shim (the provider uses `WorkerEntrypoint` for `instanceof` only), Worker
 | `oauth-rotated:<sha256(spent refresh token)>` | rotation marker `{"at": ms}`: the token was spent (P5-05); kept for the refresh lifetime so a late replay is recognised | none (a hash of a spent token and a time) |
 | `oauth-successor:<sha256(spent refresh token)>` | the answer the spent token got (new access and refresh token, expiry, scope, resource, client), **sealed**; kept for the reuse window only | AES-GCM under a key derived from the spent token (D-70) |
 | `oauth-refresh-claim:<sha256(refresh token)>` | the request that is spending this token, 15 s | none |
+| `oauth-used:<user>:<grant>` | when the device was last used: epoch ms, nothing else (P5-14); written at most every 5 minutes per device and process, deleted when the device is revoked, expires with the longest token it could hold | none (a time) |
 | `oauth-consent:<user>:<expiry>-<random>` | consent form handle, 15 min: the SHA-256 of the exact authorization request the page showed | none (a hash of public request values) |
 
 Tokens are `<user id>:<grant id>:<secret>` (user id is ours, `usr_…`; no email anywhere, T25). Props are
@@ -172,6 +173,19 @@ A **device** is one provider grant: an app approved by one person for one worksp
   `404`); My access renders them (`/admin/me`). Revoking writes the tombstone, deletes the grant and every token of it,
   clears the access cache and writes `oauth.device.revoke` (`via: my_access`). A refresh token or access token of a
   disconnected device is refused at once (tests).
+
+### Last use and idle expiry (P5-14, D-131)
+
+- `touchDevice` writes `oauth-used:<user>:<grant>` at a token issuance (code exchange, refresh) and after a successful MCP
+  authentication. A per-process map of the last write time (bounded, cleared when full) keeps the hot path free of storage
+  reads and writes inside the 5-minute interval; the row is a `kv` row, not grant metadata, because the provider rewrites
+  the grant on every refresh. Failures are logged and never fail the request.
+- `GET /me/oauth-devices` returns `lastUsedAt` (epoch ms, or `null` when the device has no row yet: approved before the
+  feature, or the row expired). My access shows it as "Last used". The administrators' list does not (P5-08 is unchanged).
+- `AB_OAUTH_IDLE_TTL` (`idleTtlSeconds`, 1 h to 365 d, default off): at a **refresh**, `checkIssuance` refuses a device whose
+  row is older than that as `device_idle`, a final reason, so the provider revokes the grant and the refusal is audited as
+  `oauth.token.refused` (`revoked: true`). A missing row is not idle. The authorization step and the code exchange never
+  check it (L-090: nothing an attacker can navigate to ends a device). An idle time longer than the refresh lifetime has no effect.
 
 ## Administrators: connected apps and registered clients (P5-08)
 

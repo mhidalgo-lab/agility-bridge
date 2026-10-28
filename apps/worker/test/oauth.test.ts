@@ -16,6 +16,8 @@ import { defineOAuthAdminSuite } from '../../../packages/http-app/test/oauth/adm
 import { defineOAuthClientSuite } from '../../../packages/http-app/test/oauth/clients-suite.ts';
 import { createFakeDocuments } from '../../../packages/http-app/test/oauth/documents.ts';
 import {
+  type ActivityHostShape,
+  defineDeviceActivitySuite,
   defineOAuthSuite,
   defineRefreshFamilySuite,
   type OAuthHost,
@@ -57,7 +59,7 @@ async function buffered(res: Response): Promise<Response> {
   });
 }
 
-async function workerHost(shape?: RefreshHostShape): Promise<OAuthHost> {
+async function workerHost(shape?: Partial<RefreshHostShape> & ActivityHostShape): Promise<OAuthHost> {
   const key = generateMasterKey(1);
   const adminToken = generateAdminToken();
   const documents = createFakeDocuments({ observesRedirectMode: false });
@@ -91,7 +93,10 @@ async function workerHost(shape?: RefreshHostShape): Promise<OAuthHost> {
         AB_ALLOW_HTTP_INSTANCES: 'on',
         AB_PUBLIC_URL: ORIGIN,
         AB_OAUTH: 'on',
-        ...(shape === undefined ? {} : { AB_OAUTH_REFRESH_REUSE_WINDOW: String(shape.reuseWindowSeconds) }),
+        ...(shape?.reuseWindowSeconds === undefined
+          ? {}
+          : { AB_OAUTH_REFRESH_REUSE_WINDOW: String(shape.reuseWindowSeconds) }),
+        ...(shape?.idleTtlSeconds === undefined ? {} : { AB_OAUTH_IDLE_TTL: String(shape.idleTtlSeconds) }),
         AB_ACCESS_CACHE_TTL: '0',
         // One Worker serves a whole test (dozens of requests from one address); limits have their own tests.
         AB_RATE_LIMIT_AUTH_FAILURES: '1000',
@@ -190,6 +195,7 @@ async function workerHost(shape?: RefreshHostShape): Promise<OAuthHost> {
 
 defineOAuthSuite('workerd with D1 (Worker)', () => workerHost());
 defineRefreshFamilySuite('workerd with D1 (Worker)', workerHost);
+defineDeviceActivitySuite('workerd with D1 (Worker)', workerHost);
 defineOAuthClientSuite('workerd with D1 (Worker)', workerHost, { matrix: false });
 defineOAuthAdminSuite('workerd with D1 (Worker)', workerHost);
 defineOAuthAbuseSuite('workerd with D1 (Worker)', workerHost);

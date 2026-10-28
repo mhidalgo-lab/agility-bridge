@@ -115,4 +115,6 @@ connect an app yourself ([claude.ai](oauth-phone.md), [Claude Code](oauth-ides.m
   list everyone's ([admin panel](admin-panel.md#connected-apps-and-oauth-apps-oauth-only)).
 - **Turning OAuth off** (`AB_OAUTH=off`) makes `/oauth/*` and `/.well-known/*` answer `404` and the MCP route's `401` a bare `WWW-Authenticate: Bearer`; device
   tokens keep working. Connected apps stay in the database and work again if you turn it back on.
+- **Idle expiry** (`AB_OAUTH_IDLE_TTL`, off by default): ends an app nobody has used for that long, at its next refresh. Use it where
+  a forgotten or phished approval should not live for the whole refresh lifetime.
 - **Lifetimes** (`AB_OAUTH_ACCESS_TTL`, `AB_OAUTH_REFRESH_TTL`, `AB_OAUTH_REFRESH_REUSE_WINDOW`): [how it works](oauth-how-it-works.md#for-the-operator).

@@ -14,6 +14,8 @@ import { defineOAuthClientSuite } from '../../../packages/http-app/test/oauth/cl
 import { testConsent } from '../../../packages/http-app/test/oauth/consent.ts';
 import { createFakeDocuments } from '../../../packages/http-app/test/oauth/documents.ts';
 import {
+  type ActivityHostShape,
+  defineDeviceActivitySuite,
   defineOAuthSuite,
   defineRefreshFamilySuite,
   type OAuthHost,
@@ -30,7 +32,7 @@ beforeAll(async () => {
 });
 afterAll(() => agility.close());
 
-async function sqliteHost(shape?: RefreshHostShape): Promise<OAuthHost> {
+async function sqliteHost(shape?: Partial<RefreshHostShape> & ActivityHostShape): Promise<OAuthHost> {
   const dir = mkdtempSync(join(tmpdir(), 'ab-oauth-'));
   const key = generateMasterKey(1);
   writeFileSync(join(dir, 'master.key'), key, { mode: 0o600 });
@@ -45,7 +47,10 @@ async function sqliteHost(shape?: RefreshHostShape): Promise<OAuthHost> {
       AB_PUBLIC_URL: ORIGIN,
       AB_OAUTH: 'on',
       AB_ADMIN_TOKEN: adminToken,
-      ...(shape === undefined ? {} : { AB_OAUTH_REFRESH_REUSE_WINDOW: String(shape.reuseWindowSeconds) }),
+      ...(shape?.reuseWindowSeconds === undefined
+        ? {}
+        : { AB_OAUTH_REFRESH_REUSE_WINDOW: String(shape.reuseWindowSeconds) }),
+      ...(shape?.idleTtlSeconds === undefined ? {} : { AB_OAUTH_IDLE_TTL: String(shape.idleTtlSeconds) }),
       AB_ACCESS_CACHE_TTL: '0',
       AB_ALLOW_HTTP_INSTANCES: 'on',
       AB_ENVIRONMENT: 'production',
@@ -159,6 +164,7 @@ async function sqliteHost(shape?: RefreshHostShape): Promise<OAuthHost> {
 
 defineOAuthSuite('SQLite storage (agility-bridge serve)', () => sqliteHost());
 defineRefreshFamilySuite('SQLite storage (agility-bridge serve)', sqliteHost);
+defineDeviceActivitySuite('SQLite storage (agility-bridge serve)', sqliteHost);
 defineOAuthClientSuite('SQLite storage (agility-bridge serve)', sqliteHost);
 defineOAuthAdminSuite('SQLite storage (agility-bridge serve)', sqliteHost);
 defineOAuthAbuseSuite('SQLite storage (agility-bridge serve)', sqliteHost);

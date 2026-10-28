@@ -1972,3 +1972,154 @@ export function defineRefreshFamilySuite(
     });
   });
 }
+
+/** What a host is built with for the device activity suite. */
+export interface ActivityHostShape {
+  /** `AB_OAUTH_IDLE_TTL` in seconds; absent = off. */
+  readonly idleTtlSeconds?: number;
+}
+
+const USED = 'oauth-used:';
+
+/**
+ * Device last-used time and idle expiry (P5-14, THREAT_MODEL T9, T15, T25): the row holds a timestamp and nothing else,
+ * a device idle for longer than `AB_OAUTH_IDLE_TTL` is refused at its refresh (and ends), a device that is in use is not,
+ * the authorization step never checks idleness, and without the switch nothing ends. Time cannot move in every host, so
+ * the tests move the stored time instead (`oauth-used:` rows), which is exactly what a long idle period does.
+ */
+export function defineDeviceActivitySuite(
+  name: string,
+  makeHost: (shape: ActivityHostShape) => Promise<OAuthHost>,
+  options: { readonly throttle?: boolean } = {},
+): void {
+  describe(`OAuth device activity: ${name}`, () => {
+    const open: OAuthHost[] = [];
+    afterEach(async () => {
+      vi.useRealTimers();
+      await Promise.all(open.splice(0).map((h) => h.close()));
+    });
+    const hostWith = async (shape: ActivityHostShape): Promise<OAuthHost> => {
+      const h = await makeHost(shape);
+      open.push(h);
+      return h;
+    };
+    const rowKey = (refreshToken: string): string => {
+      const [userId, grantId] = refreshToken.split(':');
+      return `${USED}${userId}:${grantId}`;
+    };
+    const refresh = (h: OAuthHost, client: OAuthClientInformationFull, token: string) =>
+      tokenEndpoint(h, { grant_type: 'refresh_token', refresh_token: token, client_id: client.client_id });
+    const setUsed = (h: OAuthHost, key: string, at: number) =>
+      h.storage.kv.set(key, String(at), { expiresAt: Date.now() + 3_600_000 });
+    const IDLE = 3 * 86_400;
+
+    it('records the time of the code exchange and of an MCP request as a bare timestamp', async () => {
+      const h = await hostWith({ idleTtlSeconds: IDLE });
+      const before = Date.now();
+      const { tokens } = await connectWorkspace(h);
+      const key = rowKey(tokens.refresh_token as string);
+      const stored = await h.storage.kv.get(key);
+      expect(stored).toMatch(/^\d{13}$/);
+      expect(Number(stored)).toBeGreaterThanOrEqual(before - 1000);
+      expect(Number(stored)).toBeLessThanOrEqual(Date.now() + 1000);
+      expect((await mcp(h, 'team-a', tokens.access_token)).status).toBe(200);
+      // Only the timestamp, under one key per device.
+      expect(await h.storage.kv.list(USED)).toEqual([key]);
+    });
+
+    it('refuses a refresh after the idle time, ends the device, and audits the reason', async () => {
+      const h = await hostWith({ idleTtlSeconds: IDLE });
+      const { tokens, client } = await connectWorkspace(h);
+      await setUsed(h, rowKey(tokens.refresh_token as string), Date.now() - (IDLE + 60) * 1000);
+      const res = await refresh(h, client, tokens.refresh_token as string);
+      const body = (await res.json()) as { error: string };
+      expect(res.status).toBe(400);
+      expect(body.error).toBe('invalid_grant');
+      const rows = await auditRows(
+        h,
+        (r) =>
+          r.action === 'oauth.token.refused' && (r as { errorCode?: string }).errorCode === 'device_idle',
+      );
+      expect(rows.length).toBe(1);
+      // The device is gone: its refresh token is dead.
+      const again = await refresh(h, client, tokens.refresh_token as string);
+      await again.text();
+      expect(again.status).toBe(400);
+    });
+
+    it('does not refuse a refresh inside the idle time, and the refresh counts as use', async () => {
+      const h = await hostWith({ idleTtlSeconds: IDLE });
+      const { tokens, client } = await connectWorkspace(h);
+      const key = rowKey(tokens.refresh_token as string);
+      const old = Date.now() - (IDLE - 3_600) * 1000;
+      await setUsed(h, key, old);
+      const res = await refresh(h, client, tokens.refresh_token as string);
+      const next = (await res.json()) as { access_token: string };
+      expect(res.status).toBe(200);
+      expect((await mcp(h, 'team-a', next.access_token)).status).toBe(200);
+      expect(Number(await h.storage.kv.get(key))).toBeGreaterThan(old);
+    });
+
+    it('a device without a row (approved before the switch) is not idle, and gets its row', async () => {
+      const h = await hostWith({ idleTtlSeconds: IDLE });
+      const { tokens, client } = await connectWorkspace(h);
+      const key = rowKey(tokens.refresh_token as string);
+      await h.storage.kv.delete(key);
+      const res = await refresh(h, client, tokens.refresh_token as string);
+      await res.text();
+      expect(res.status).toBe(200);
+      expect(await h.storage.kv.get(key)).toMatch(/^\d{13}$/);
+    });
+
+    it('never refuses for idleness when the switch is off', async () => {
+      const h = await hostWith({});
+      const { tokens, client } = await connectWorkspace(h);
+      await setUsed(h, rowKey(tokens.refresh_token as string), Date.now() - 400 * 86_400_000);
+      const res = await refresh(h, client, tokens.refresh_token as string);
+      await res.text();
+      expect(res.status).toBe(200);
+    });
+
+    it('a new authorization by an idle app is not refused: the check is at the refresh only (L-090)', async () => {
+      const h = await hostWith({ idleTtlSeconds: IDLE });
+      const first = await connectWorkspace(h);
+      await setUsed(h, rowKey(first.tokens.refresh_token as string), Date.now() - 2 * IDLE * 1000);
+      const again = await authorize(h, first.client, { slug: 'team-a' });
+      expect(again.code).not.toBeNull();
+    });
+
+    it('revoking a device removes its row', async () => {
+      const h = await hostWith({ idleTtlSeconds: IDLE });
+      if (h.adminApi === undefined) return;
+      const { tokens } = await connectWorkspace(h);
+      const [userId, grantId] = (tokens.refresh_token as string).split(':');
+      const key = rowKey(tokens.refresh_token as string);
+      expect(await h.storage.kv.get(key)).not.toBeNull();
+      const res = await h.adminApi('POST', `/oauth/devices/${grantId}/revoke`, { userId });
+      await res.text();
+      expect(res.status).toBe(200);
+      expect(await h.storage.kv.get(key)).toBeNull();
+    });
+
+    if (options.throttle === true) {
+      it('rewrites the row at most every five minutes, however many requests arrive', async () => {
+        const h = await hostWith({});
+        if (h.advance === undefined) return;
+        const { tokens } = await connectWorkspace(h);
+        const key = rowKey(tokens.refresh_token as string);
+        const first = await h.storage.kv.get(key);
+        h.advance(2_000);
+        for (let i = 0; i < 5; i++) {
+          const res = await mcp(h, 'team-a', tokens.access_token);
+          await res.text();
+          expect(res.status).toBe(200);
+        }
+        expect(await h.storage.kv.get(key)).toBe(first);
+        h.advance(5 * 60_000);
+        const res = await mcp(h, 'team-a', tokens.access_token);
+        await res.text();
+        expect(Number(await h.storage.kv.get(key))).toBeGreaterThan(Number(first));
+      });
+    }
+  });
+}

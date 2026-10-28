@@ -246,3 +246,16 @@ Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.m
   shows up at the run whatever the order. Treat the follow-ups as priority work, not a gate. Take Phase 7 in whichever order
   suits: it needs P5-10 merged, not Phase 6.
 - **Owner (2026-10-27):** Decided: as recommended, (a), go for Phase 6 now (built and reviewed in P6-01 … P6-13).
+
+### D-131 — Device last-used time is a throttled `kv` row, and a device without one is not idle *(P5-14)*
+- **Context:** a person cannot tell which connected app is still used, and a forgotten or phished approval lives for the whole
+  refresh lifetime. The provider rewrites grant metadata on every refresh, and a write per MCP request would put storage on
+  the hot path.
+- **Options:** (a) a `kv` row per device (`oauth-used:<user>:<grant>`, a timestamp only), written at token issuance and at most
+  every 5 minutes per device and process on MCP requests, deleted with the device; a device with no row is treated as not idle;
+  (b) keep it in grant metadata (rewritten by the provider, races with refresh rotation); (c) a column on a new table (a
+  migration and a table for a value that expires with the device).
+- **Recommendation:** (a). The cost is one write per device per isolate per interval, and a last-used time that can be 5 minutes
+  late. A missing row (approved before the switch, or expired) starts counting at the next refresh instead of ending the device,
+  so switching `AB_OAUTH_IDLE_TTL` on never disconnects people at once.
+- **Owner:** *(open; built as (a))*

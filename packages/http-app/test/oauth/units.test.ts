@@ -157,6 +157,22 @@ describe('AB_OAUTH settings', () => {
     ).toEqual({ accessTokenTtlSeconds: 60, refreshReuseWindowSeconds: 60 });
   });
 
+  it('reads the idle expiry (off by default; 1 h to 365 d)', () => {
+    const on = { AB_OAUTH: 'on' };
+    expect(oauthSettingsFromEnv(on, PUBLIC)).toEqual({});
+    expect(oauthSettingsFromEnv({ ...on, AB_OAUTH_IDLE_TTL: '14d' }, PUBLIC)).toEqual({
+      idleTtlSeconds: 14 * 86_400,
+    });
+    expect(oauthSettingsFromEnv({ ...on, AB_OAUTH_IDLE_TTL: '1h' }, PUBLIC)).toEqual({
+      idleTtlSeconds: 3600,
+    });
+    for (const value of ['59m', '366d', '0', 'never', '-1d']) {
+      expect(() => oauthSettingsFromEnv({ ...on, AB_OAUTH_IDLE_TTL: value }, PUBLIC), value).toThrow(
+        OAuthConfigError,
+      );
+    }
+  });
+
   it('the shared parser names the variable, never the value, and is registered for both hosts', () => {
     const defaults = { callBudget: 1000, maxResponseBytes: 8_388_608 };
     expect(SERVER_SETTING_NAMES).toEqual(
@@ -165,6 +181,7 @@ describe('AB_OAUTH settings', () => {
         'AB_OAUTH_ACCESS_TTL',
         'AB_OAUTH_REFRESH_TTL',
         'AB_OAUTH_REFRESH_REUSE_WINDOW',
+        'AB_OAUTH_IDLE_TTL',
       ]),
     );
     const secretish = 'hunter2-not-a-duration';

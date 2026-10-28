@@ -245,6 +245,9 @@ describe('sign-in and consent (P5-04)', () => {
       workspaceName: 'Team A',
       label: 'Pixel phone',
     });
+    // The last use is the time of the request above (P5-14): a number, to within the five minute throttle.
+    expect(typeof list[0]?.lastUsedAt).toBe('number');
+    expect(Math.abs(Date.now() - (list[0]?.lastUsedAt as number))).toBeLessThan(5 * 60_000);
     expect(await issued(t)).toHaveLength(1);
   });
 

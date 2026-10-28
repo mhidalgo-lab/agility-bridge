@@ -2,12 +2,12 @@
 id: P5-14
 title: Device last-used time and idle expiry
 phase: 5
-status: todo
+status: done
 priority: low
 depends_on: [P5-04, P5-05]
 adr: ["0009"]
 lessons: [L-090]
-owner: ""
+owner: "agent"
 ---
 
 # P5-14 — Device last-used time and idle expiry
@@ -34,11 +34,11 @@ A person can tell which connected app is still in use, and an app nobody has use
 - Settings are validated like the other durations; the CLI and Worker pick the variable up through the shared settings.
 
 ## Acceptance criteria
-- [ ] The device list shows last-used; an idle device is refused at refresh when the switch is on (tested with a moved
+- [x] The device list shows last-used; an idle device is refused at refresh when the switch is on (tested with a moved
   stored time, on memory, SQLite and workerd/D1).
-- [ ] No write on the MCP hot path beyond the existing throttle (tested: repeated requests inside the interval do not
+- [x] No write on the MCP hot path beyond the existing throttle (tested: repeated requests inside the interval do not
   rewrite the row).
-- [ ] The record holds a timestamp only; revoking a device deletes it (asserted).
+- [x] The record holds a timestamp only; revoking a device deletes it (asserted).
 
 ## Security notes
 THREAT_MODEL T9, T15 (T25: no personal data in the record).
