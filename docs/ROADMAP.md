@@ -295,7 +295,7 @@ Status lives in each task file.
 | P6-37 | [Report schema-validation failures as AB_INPUT_INVALID tool errors](tasks/phase-6-tool-breadth/P6-37-consistency-schema-errors.md) | low | P6-12 | done |
 | P6-38 | [Run the consistency checks on an empty and a denied world](tasks/phase-6-tool-breadth/P6-38-consistency-empty-world.md) | low | P6-12 | done |
 | P6-39 | [Keep instance metadata across isolates and measure Phase 6 tools on the Worker bench](tasks/phase-6-tool-breadth/P6-39-keep-instance-metadata-across-isolates-and-measure.md) | medium | P6-13 | todo |
-| P6-40 | [Run independent report sections together and share resolution within a request](tasks/phase-6-tool-breadth/P6-40-run-independent-report-sections-together-and-share.md) | medium | P6-13, P6-07 | todo |
+| P6-40 | [Run independent report sections together and share resolution within a request](tasks/phase-6-tool-breadth/P6-40-run-independent-report-sections-together-and-share.md) | medium | P6-13, P6-07 | done |
 | P6-41 | [Read sprint pages and burndown history concurrently](tasks/phase-6-tool-breadth/P6-41-read-sprint-pages-and-burndown-history-concurrentl.md) | low | P6-13, P6-02 | todo |
 | P6-42 | [Let a burndown chunk that is too large mark its points incomplete](tasks/phase-6-tool-breadth/P6-42-let-a-burndown-chunk-that-is-too-large-mark-its-po.md) | low | P6-13, P6-02 | todo |
 | P6-43 | [Read long asset histories within the response cap](tasks/phase-6-tool-breadth/P6-43-read-long-asset-histories-within-the-response-cap.md) | medium | P6-13, P6-21 | todo |
@@ -304,6 +304,7 @@ Status lives in each task file.
 | P6-46 | [Settle the edge semantics of `work_item_quality`](tasks/phase-6-tool-breadth/P6-46-settle-the-edge-semantics-of-work-item-quality.md) | low | P6-13, P6-03 | todo |
 | P6-47 | [Polish defect triage, standup and get_sprint output details](tasks/phase-6-tool-breadth/P6-47-polish-defect-triage-standup-and-get-sprint-output.md) | low | P6-13 | todo |
 | P6-48 | [Forward sibling facts in composites as codes, with a lint](tasks/phase-6-tool-breadth/P6-48-forward-sibling-facts-in-composites-as-codes-with.md) | low | P6-13, P6-07 | todo |
+| P6-55 | [Filter standup_summary on the change date instead of reading the newest page](tasks/phase-6-tool-breadth/P6-55-standup-change-date-filter.md) | low | P6-40, P6-27 | todo |
 
 ### Phase 7
 

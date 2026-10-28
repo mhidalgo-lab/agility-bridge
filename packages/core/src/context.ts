@@ -163,6 +163,31 @@ export function capBudget(parent: Budget, max: number): Budget {
   };
 }
 
+/**
+ * A budget for one section of a composite: it spends from the parent (so the call's total stays bounded) and counts
+ * its own spend, so sections that run at the same time are each attributed exactly their own requests (P6-40; a
+ * before/after reading of the parent would mix them up). The section's tool caps itself on top of this.
+ */
+export function childBudget(parent: Budget): Budget & { readonly used: number } {
+  let used = 0;
+  return {
+    get limit() {
+      return parent.limit;
+    },
+    get used() {
+      return used;
+    },
+    get remaining() {
+      return parent.remaining;
+    },
+    canSpend: (n = 1) => parent.canSpend(n),
+    spend(n = 1, what = 'an Agility request') {
+      parent.spend(n, what);
+      used += n;
+    },
+  };
+}
+
 /** Bounds concurrent Agility calls for one credential (ADR-0010: per-credential semaphore). */
 export interface Limiter {
   run<T>(task: () => Promise<T>): Promise<T>;
@@ -228,6 +253,17 @@ export interface ToolContext {
   readonly logger: Logger;
   readonly clock: Clock;
   readonly random: Random;
+  /**
+   * Resolutions (member, team, project, sprint) already made by this request, so the sections of a composite do not
+   * repeat them (P6-40). Created by `withMemo` inside one request's handler, never by a host and never shared across
+   * requests (L-096): a second request resolves again.
+   */
+  readonly memo?: Map<string, Promise<unknown>>;
+}
+
+/** The context with a fresh resolution memo (one per request; an existing memo is kept). */
+export function withMemo<T extends ToolContext>(ctx: T): T {
+  return ctx.memo === undefined ? { ...ctx, memo: new Map() } : ctx;
 }
 
 /** A counting budget. One instance per request. */

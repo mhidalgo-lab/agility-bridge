@@ -246,14 +246,39 @@ export async function resolveByName(ctx: ToolContext, q: NameQuery): Promise<Nam
   throw noSingleMatch(q.what, text, result);
 }
 
+/**
+ * Runs `fn` once per key within one request when the context carries a memo (composite reports, P6-40). The promise is
+ * shared only inside the request that created the memo (L-096); a failure is dropped so the next caller tries again.
+ */
+function memoized<T>(ctx: ToolContext, key: string, fn: () => Promise<T>): Promise<T> {
+  const memo = ctx.memo;
+  if (memo === undefined) return fn();
+  const hit = memo.get(key);
+  if (hit !== undefined) return hit as Promise<T>;
+  const p = fn();
+  memo.set(key, p);
+  p.catch(() => {
+    if (memo.get(key) === p) memo.delete(key);
+  });
+  return p;
+}
+
 export const resolveProject = (ctx: ToolContext, text: string): Promise<Named & { readonly row: Row }> =>
-  resolveByName(ctx, { what: 'Agility project', assetType: 'Scope', text });
+  memoized(ctx, `project\u0000${text.trim()}`, () =>
+    resolveByName(ctx, { what: 'Agility project', assetType: 'Scope', text }),
+  );
 
 export const resolveTeam = (ctx: ToolContext, text: string): Promise<Named & { readonly row: Row }> =>
-  resolveByName(ctx, { what: 'team', assetType: 'Team', text, allowGlobal: true });
+  memoized(ctx, `team\u0000${text.trim()}`, () =>
+    resolveByName(ctx, { what: 'team', assetType: 'Team', text, allowGlobal: true }),
+  );
 
 /** A member by OID token, `me` (the token's own member), username, or name. */
-export async function resolveMember(ctx: ToolContext, text: string): Promise<Named & { readonly row: Row }> {
+export function resolveMember(ctx: ToolContext, text: string): Promise<Named & { readonly row: Row }> {
+  return memoized(ctx, `member\u0000${text.trim()}`, () => resolveMemberUncached(ctx, text));
+}
+
+async function resolveMemberUncached(ctx: ToolContext, text: string): Promise<Named & { readonly row: Row }> {
   const t = text.trim();
   const fields = ['Name', 'Username'];
   if (t.toLowerCase() === 'me') {
@@ -294,10 +319,19 @@ export interface SprintOptions {
  * A sprint by OID token, name, or `current` / `previous` / `next` (by dates, UTC). Sprints of different schedules can
  * overlap: when the relative sprint differs per schedule the answer is AB_AMBIGUOUS, never a guess.
  */
-export async function resolveSprint(
+export function resolveSprint(
   ctx: ToolContext,
   text: string,
   options: SprintOptions = {},
+): Promise<Named & { readonly row: Row }> {
+  const key = `sprint\u0000${text.trim()}\u0000${options.team ?? ''}\u0000${options.project ?? ''}`;
+  return memoized(ctx, key, () => resolveSprintUncached(ctx, text, options));
+}
+
+async function resolveSprintUncached(
+  ctx: ToolContext,
+  text: string,
+  options: SprintOptions,
 ): Promise<Named & { readonly row: Row }> {
   const t = text.trim().toLowerCase();
   const filters: FilterInput[] = [

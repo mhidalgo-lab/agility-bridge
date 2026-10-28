@@ -2,7 +2,7 @@
 // sprint_health (P6-07): get_sprint plus the sprint's open work items, read through search_work_items. Every figure is
 // derived from what the sections returned; a figure that cannot be computed is absent, never zero (L-033).
 import { z } from 'zod';
-import { capBudget } from '../../context.ts';
+import { capBudget, withMemo } from '../../context.ts';
 import { type Line, shapeOutput, untrusted } from '../../output/result.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import { currentSprintArg, projectArg, teamArg } from '../common.ts';
@@ -68,27 +68,25 @@ export const sprintHealth: ToolDefinition = defineTool({
     pace: z.looseObject({ status: z.string() }),
   }),
   handler: async (input, outer) => {
-    const ctx = { ...outer, budget: capBudget(outer.budget, COST) };
+    const ctx = withMemo({ ...outer, budget: capBudget(outer.budget, COST) });
     const now = ctx.clock.now();
     const scope = {
       ...(input.team === undefined ? {} : { team: input.team }),
       ...(input.project === undefined ? {} : { project: input.project }),
     };
-    const sprintRun = await runSection(ctx, 'sprint', getSprint, {
-      sprint: input.sprint,
-      ...scope,
-      burndown: true,
-    });
+    // Both sections get the sprint as the caller named it and run together; the request's memo resolves it once (P6-40).
+    const [sprintRun, workRun] = await Promise.all([
+      runSection(ctx, 'sprint', getSprint, { sprint: input.sprint, ...scope, burndown: true }),
+      runSection(ctx, 'open_work', searchWorkItems, {
+        sprint: input.sprint,
+        ...scope,
+        include_closed: false,
+        sort_by: 'recently_changed',
+        limit: Math.min(100, ctx.limits.maxRows),
+      }),
+    ]);
     const sprintData = sprintRun.data;
     const sprint = obj(sprintData?.['sprint']);
-    const oid = strOf(sprint?.['oid']);
-    const workRun = await runSection(ctx, 'open_work', searchWorkItems, {
-      sprint: oid ?? input.sprint,
-      ...scope,
-      include_closed: false,
-      sort_by: 'recently_changed',
-      limit: Math.min(100, ctx.limits.maxRows),
-    });
     const runs: SectionRun[] = [sprintRun, workRun];
     rethrowIfNothingRead(runs);
     const notes: Line[] = sectionNotes(runs, TITLES);
