@@ -102,6 +102,7 @@ guard that changes without this page (or the other way round) fails CI (L-133). 
   its existing device tokens.
 - **Admins and owners.** Admins manage members only; owners manage everyone. Nobody can demote or disable the last active
   owner. Through a session you cannot move your own account to another provider.
+- **Composite reports** (`sprint_health`, `standup_summary`, ...) read their sections through other tools. If you tick one without those tools, press **Check these tools** under the list: the form shows which sections would be skipped, and nothing is saved.
 - **Write tools** are off by default, need an owner, a recent sign-in and an explicit name on both workspace and grant, and
   never apply to a shared or someone else's personal token ([access model](access-model.md#the-token-policy)). Once an
   owner has enabled them, the owners also decide where they may land: an administrator can narrow a workspace or grant that

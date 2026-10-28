@@ -110,6 +110,25 @@ test('owner: instance, credential, workspace and grant', async ({ page }) => {
   w.assertClean();
 });
 
+test('owner: the check step names a composite ticked without its siblings and saves nothing (P6-35)', async ({
+  page,
+}) => {
+  const w = await watch(page);
+  await signIn(page, server);
+  await visit(page, server, '/admin/workspaces');
+  await page.getByRole('link', { name: 'Synthetic workspace' }).click();
+  await page.getByRole('link', { name: 'Edit' }).click();
+  await page.getByLabel('Every read tool', { exact: true }).uncheck();
+  await page.locator('#tool-sprint_health').check();
+  await page.getByRole('button', { name: 'Check these tools' }).click();
+  await expect(page.locator('#tool-notes')).toContainText('sprint_health is granted without');
+  await expectNoHorizontalScroll(page);
+  // Nothing was saved: the workspace still enables every read tool.
+  await page.getByRole('link', { name: 'Cancel' }).click();
+  await expect(page.getByText('every read tool').first()).toBeVisible();
+  w.assertClean();
+});
+
 test('owner: device tokens are shown once and work against the synthetic Agility', async ({
   page,
   context,

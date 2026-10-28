@@ -380,11 +380,19 @@ export function Button(props: {
   readonly children?: Child;
   readonly variant?: 'primary' | 'secondary' | 'danger';
   readonly type?: 'submit' | 'button';
+  /** Name and value this button posts (a secondary action of the same form, handled before saving). */
+  readonly name?: string;
+  readonly value?: string;
+  /** Skip the browser's required-field checks: the button saves nothing. */
+  readonly formnovalidate?: boolean;
 }): JSX.Element {
   const variant = props.variant ?? 'primary';
   return (
     <button
       type={props.type ?? 'submit'}
+      {...(props.name === undefined ? {} : { name: props.name })}
+      {...(props.value === undefined ? {} : { value: props.value })}
+      {...(props.formnovalidate === true ? { formnovalidate: true } : {})}
       class={variant === 'primary' ? 'button' : `button button-${variant}`}
     >
       {props.children}
