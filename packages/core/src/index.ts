@@ -19,6 +19,7 @@ export {
 } from './agility/instance.ts';
 export { CredentialLimiters, Semaphore } from './agility/limiter.ts';
 export { parseXml, type XmlElement } from './agility/xml.ts';
+export { COMPLETION_SOURCES, MAX_COMPLETIONS } from './completion.ts';
 export {
   ACTIVE_ATTACHMENT_TYPES,
   type ApprovalChannel,

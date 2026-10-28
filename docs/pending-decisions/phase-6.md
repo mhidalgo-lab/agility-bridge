@@ -503,3 +503,9 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   relation is a new task if the call cost ever matters.
 - **Owner:** *(open; built as (a))*
 
+### D-154 — Prompt completion reuses the list tools and offers fixed sprint words *(P6-32)*
+- **Context:** `completion/complete` for `team`, `project` and `sprint` needs candidate names the caller may see.
+- **Options:** (a) call the granted list tool (`list_teams`, `list_projects`, `list_sprints`) with the typed text through its handler: same scope, budget and shaping, one call per completion, nothing when that tool is not granted; (b) read the metadata cache; (c) no completion.
+- **Recommendation:** (a), built; `sprint` also offers `current`, `previous`, `next` first, and every value must pass the prompt's argument schema. Completion is not audited as a tool call of its own beyond an observer event named `completion:<prompt>.<argument>`.
+- **Owner:** *(open; built as (a))*
+

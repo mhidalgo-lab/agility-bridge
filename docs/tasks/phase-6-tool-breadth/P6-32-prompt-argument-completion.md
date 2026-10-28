@@ -2,7 +2,7 @@
 id: P6-32
 title: Prompt argument completion
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-08]
 adr: ["0015"]
@@ -22,10 +22,10 @@ allows.
 - Completions are plain values passing the same argument rules as the prompts (L-305); anything else is dropped.
 
 ## Acceptance criteria
-- [ ] Completion offers only names the caller may see, none for a prompt that is not offered, and no upstream request on a
+- [x] Completion offers only names the caller may see, none for a prompt that is not offered, and no upstream request on a
   denied prompt.
-- [ ] Every completed value is accepted by the prompt's argument schema.
-- [ ] Cost is bounded and stated in the prompt reference.
+- [x] Every completed value is accepted by the prompt's argument schema.
+- [x] Cost is bounded and stated in the prompt reference.
 
 ## Security notes
 THREAT_MODEL T3: completion must not reveal projects, teams or sprints outside the workspace.

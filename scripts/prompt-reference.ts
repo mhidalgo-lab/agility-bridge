@@ -2,7 +2,12 @@
 // P6-08 (L-133, L-153): docs/reference/prompts.md generated from the prompt manifest, so the reference never drifts from
 // what the server registers. Run: pnpm docs:prompts   Check (CI): node scripts/prompt-reference.ts --check
 import { readFileSync, writeFileSync } from 'node:fs';
-import { PROMPT_MANIFEST } from '../packages/core/src/index.ts';
+import {
+  COMPLETION_SOURCES,
+  CORE_TOOLS,
+  MAX_COMPLETIONS,
+  PROMPT_MANIFEST,
+} from '../packages/core/src/index.ts';
 
 const OUT = new URL('../docs/reference/prompts.md', import.meta.url);
 
@@ -47,10 +52,24 @@ export function render(): string {
     '',
     `${PROMPT_MANIFEST.length} prompts. Ready-made agile workflows (\`prompts/list\`, \`prompts/get\`). A prompt is static text that tells`,
     'the model which tools to call and how to treat what they return (Agility text is untrusted data, the workflow is read-only);',
-    'it never calls Agility itself, so getting one costs no request. Arguments are strings, validated like tool arguments (plain text',
+    'it never calls Agility itself, so getting one costs no request (completing an argument does, see below). Arguments are strings, validated like tool arguments (plain text',
     'on one line, bounded) and quoted into the text as values for the tools. A prompt whose tools are not all allowed for the',
     'workspace or grant does not exist: it is not listed and getting it fails. The three that use report tools need the opt-in',
     '`reports` group. The plan: [tool catalogue](tool-catalogue.md#prompts-phase-6).',
+    '',
+    '## Argument completion',
+    '',
+    `\`completion/complete\` suggests values (at most ${MAX_COMPLETIONS}) for these arguments of an offered prompt, through the list tool named`,
+    "here, so the workspace's projects, asset types, budget and output rules apply as for a call. It makes one call of that tool, so",
+    "it costs at most the tool's declared requests, and nothing when the tool is not allowed or the prompt is not offered. A",
+    "suggestion is dropped unless the prompt's argument rules accept it (plain text on one line).",
+    '',
+    '| Argument | Tool | Cost (requests) | Also suggests |',
+    '|---|---|---|---|',
+    ...Object.entries(COMPLETION_SOURCES).map(
+      ([arg, src]) =>
+        `| \`${arg}\` | \`${src.tool}\` | ${CORE_TOOLS.find((t) => t.name === src.tool)?.cost ?? '?'} | ${(src.words ?? []).map((w) => `\`${w}\``).join(', ') || '-'} |`,
+    ),
     '',
     '| Prompt | Purpose | Uses |',
     '|---|---|---|',

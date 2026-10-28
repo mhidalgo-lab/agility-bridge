@@ -6,6 +6,7 @@ import {
   ResourceTemplate,
   type StandardSchemaWithJSON,
 } from '@modelcontextprotocol/server';
+import { type CompletionEvent, completionShape } from './completion.ts';
 import { freezeContext, type ToolContext } from './context.ts';
 import {
   AbError,
@@ -361,19 +362,49 @@ export function buildMcpServer({
     prompts,
     tools.map((t) => t.name),
   )) {
-    registerPrompt(server, def);
+    registerPrompt(server, def, { tools, contextFor, onToolCall });
   }
   return server;
 }
 
 /** Registers one available prompt: arguments validated by its schema, then its static text built from them. */
-function registerPrompt(server: McpServer, def: PromptDefinition): void {
+function registerPrompt(
+  server: McpServer,
+  def: PromptDefinition,
+  host: {
+    readonly tools: readonly ToolDefinition[];
+    readonly contextFor: () => ToolContext;
+    readonly onToolCall: BuildServerOptions['onToolCall'];
+  },
+): void {
+  // Completion (P6-32): the same schema with the completable arguments discoverable by the SDK.
+  const shape = completionShape(def, {
+    tools: host.tools,
+    contextFor: host.contextFor,
+    onToolCall: (event: CompletionEvent) => {
+      try {
+        host.onToolCall?.({
+          tool: event.tool,
+          status: event.status,
+          errorCode: null,
+          durationMs: 0,
+          requestsUsed: event.requestsUsed,
+          ...auditFacts(event.out),
+        });
+      } catch {
+        // An observer never changes a completion.
+      }
+    },
+  });
   server.registerPrompt(
     def.id,
     {
       title: def.title,
       description: def.description,
-      argsSchema: withCachedJsonSchema(def.arguments) as never,
+      argsSchema: {
+        ...withCachedJsonSchema(def.arguments),
+        ...(shape === undefined ? {} : { shape }),
+      } as never,
     },
     ((args: Record<string, string | undefined>) => {
       let text: string;
