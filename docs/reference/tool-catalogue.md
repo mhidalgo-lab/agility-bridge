@@ -43,7 +43,7 @@ Measured by the contract test (`packages/core/test/contract.test.ts`) on the reg
 
 | Catalogue | Tools | `tools/list` bytes | Budget | Before P6-12 |
 |---|---|---|---|---|
-| Default (no opt-in group): `core` 4, `query` 2, `work` 3, `planning` 5, `people` 1, `portfolio` 2, `collaboration` 2, `history` 2 | 21 | **37,207** (35,892 after P6-12, +1,315 for `get_velocity`) | 40,000 (test target 37,300) | 39,179 |
+| Default (no opt-in group): `core` 4, `query` 2, `work` 3, `planning` 5, `people` 1, `portfolio` 2, `collaboration` 2, `history` 2 | 21 | **37,498** (35,892 after P6-12, +1,315 for `get_velocity`, the rest from other Phase 6 tasks) | 40,000 (test target 37,600) | 39,179 |
 | `attachments` (opt-in) | +1 | +1,335 | | |
 | `reports` (opt-in) | +5 | +6,952 | | |
 | Every read group | 27 | about **45,500** (44,157 + 1,315) | 72,000 | 47,946 |
@@ -52,7 +52,7 @@ Measured by the contract test (`packages/core/test/contract.test.ts`) on the reg
 Tool count with everything on: 21 default + 1 attachments + 5 reports = 27 read tools, plus the 9 planned write tools
 (`add_comment`, `update_status`, `log_effort`, `assign_owners`, `move_to_sprint`, `create_work_item`, `update_fields`,
 `close_asset`, `reopen_asset`) = **36, four below the cap of 40** (L-155). The largest entry is `query_assets` (3.8 KB, the
-generic tool with filters and sort); a test caps one tool at 4,000 bytes and the default catalogue at 37,300 (raised from 36,500 for `get_velocity`, D-140), so a tool
+generic tool with filters and sort); a test caps one tool at 4,000 bytes and the default catalogue at 37,600 (raised from 36,500 for `get_velocity`, D-140), so a tool
 that does not fit is redesigned or pays for it in the same PR (D-116).
 
 ## Read tools

@@ -22,7 +22,7 @@ Answer "how much can the team take" and "how fast do they go" next to `get_sprin
 Refined 2026-10-28 (no writable sandbox and no live access in this change; capacity has no data on the read-only tenant, D-83):
 - Built: velocity, the new read tool `get_velocity` (planning group): the completed estimate of the last N (at most 10) past sprints of a
   team or Agility project, each read as it ended in one batched request, bounded by `maxAsOfAgeDays`, with the sprints that
-  could not be read named in `notes` (D-139 style bounds, L-060, L-279, P6-42). The default catalogue target moves to 37.3 KB (D-140).
+  could not be read named in `notes` (D-139 style bounds, L-060, L-279, P6-42). The default catalogue target moves to 37.6 KB (D-140).
 - Hour-based burndown: `Task` has `ToDo`, `DetailEstimate` and `Timebox` in the metadata snapshot, so it can be built, but it adds a
   second family of per-point `asof` queries (L-330: a live check first). Not built here; needs a follow-up task id.
 - Capacity: not built, as D-83 decided; becomes a sandbox follow-up when an instance with capacity data is available.
