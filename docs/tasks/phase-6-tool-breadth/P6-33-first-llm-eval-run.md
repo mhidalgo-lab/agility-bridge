@@ -2,7 +2,7 @@
 id: P6-33
 title: First LLM tool-eval run and triage
 phase: 6
-status: review
+status: done
 priority: medium
 depends_on: [P6-10]
 adr: ["0015"]

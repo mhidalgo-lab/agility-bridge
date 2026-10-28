@@ -4,11 +4,12 @@
 > (every asset type, read and opt-in write) with each member's own access token. Runs locally (stdio), self-hosted
 > (Node / Docker) or as a **Cloudflare Worker** reachable from every device.
 
-Status: **Phase 2 in progress** (2026-10-21) — v0.1.0 is published and the owner gave the go for Phase 2
-([Phase 1 review](reviews/phase-1-review.md)). Architecture:
+Status: **Phase 6 built and reviewed** (2026-10-28) — v0.5.0 is published; v0.6 waits on the owner's OAuth client runs
+(P6-14) and the Version Packages PR ([Phase 6 review](reviews/phase-6-review.md)). Phase 7 can start: it needs Phases 2,
+4 and 5. Architecture:
 [ARCHITECTURE.md](ARCHITECTURE.md) · Decisions: [adr/](adr/) · Facts & limits: [RESEARCH.md](RESEARCH.md) · Security:
 [THREAT_MODEL.md](THREAT_MODEL.md) · Lessons: [LESSONS-LEARNED.md](LESSONS-LEARNED.md) · Task rules:
-[tasks/README.md](tasks/README.md) · Open questions: [pending-decisions/phase-1.md](pending-decisions/phase-1.md)
+[tasks/README.md](tasks/README.md) · Open questions and owner steps: [pending-decisions/phase-6.md](pending-decisions/phase-6.md)
 
 ## Guiding principles
 
@@ -249,7 +250,7 @@ Status lives in each task file.
 | P5-16 | [Metadata document policy extras](tasks/phase-5-oauth/P5-16-client-document-policy.md) | low | P5-06 | todo |
 | P5-19 | [Edge rate limits for the OAuth routes on Workers](tasks/phase-5-oauth/P5-19-oauth-edge-rate-limits.md) | low | P5-09 | todo |
 | P5-20 | [Operator view of OAuth abuse refusals and caps](tasks/phase-5-oauth/P5-20-oauth-abuse-visibility.md) | low | P5-08, P5-09 | todo |
-| P5-21 | [Keep the device when an issuance refusal can pass](tasks/phase-5-oauth/P5-21-recoverable-issuance-refusals.md) | low | P5-10 | review |
+| P5-21 | [Keep the device when an issuance refusal can pass](tasks/phase-5-oauth/P5-21-recoverable-issuance-refusals.md) | low | P5-10 | done |
 | P5-22 | [Key the OAuth abuse counters with a secret](tasks/phase-5-oauth/P5-22-keyed-address-hash.md) | low | P5-10 | todo |
 
 ### Phase 6
@@ -277,7 +278,7 @@ Status lives in each task file.
 | P6-19 | [Verify the attachment download on a writable sandbox](tasks/phase-6-tool-breadth/P6-19-verify-attachment-download.md) | medium | P6-04 | todo |
 | P6-20 | [Ranged reads of long attachment text](tasks/phase-6-tool-breadth/P6-20-attachment-ranged-reads.md) | low | P6-04 | todo |
 | P6-21 | [Verify history against known edits on the writable sandbox](tasks/phase-6-tool-breadth/P6-21-history-sandbox-verification.md) | medium | P6-05, P7-07 | todo |
-| P6-22 | [Portfolio items in list_recent_changes](tasks/phase-6-tool-breadth/P6-22-recent-changes-portfolio-items.md) | low | P6-05, P6-01 | review |
+| P6-22 | [Portfolio items in list_recent_changes](tasks/phase-6-tool-breadth/P6-22-recent-changes-portfolio-items.md) | low | P6-05, P6-01 | done |
 | P6-25 | [Verify the regression and test-set recipes on the writable sandbox](tasks/phase-6-tool-breadth/P6-25-verify-regression-recipes-sandbox.md) | low | P6-03, P7-07 | todo |
 | P6-26 | [Revisit a typed quality tool after the tool evals](tasks/phase-6-tool-breadth/P6-26-quality-typed-tool-revisit.md) | low | P6-03, P6-10 | todo |
 | P6-27 | [Verify requests and empty asset types on a writable sandbox](tasks/phase-6-tool-breadth/P6-27-verify-requests-on-sandbox.md) | low | P6-06 | todo |
@@ -286,7 +287,7 @@ Status lives in each task file.
 | P6-30 | [Priority and severity in defect triage](tasks/phase-6-tool-breadth/P6-30-defect-priority-severity-triage.md) | low | P6-07 | todo |
 | P6-31 | [Prompt fallbacks without the reports group](tasks/phase-6-tool-breadth/P6-31-prompt-fallbacks-without-reports.md) | low | P6-08 | todo |
 | P6-32 | [Prompt argument completion](tasks/phase-6-tool-breadth/P6-32-prompt-argument-completion.md) | low | P6-08 | todo |
-| P6-33 | [First LLM tool-eval run and triage](tasks/phase-6-tool-breadth/P6-33-first-llm-eval-run.md) | medium | P6-10 | review |
+| P6-33 | [First LLM tool-eval run and triage](tasks/phase-6-tool-breadth/P6-33-first-llm-eval-run.md) | medium | P6-10 | done |
 | P6-34 | [Tune tool descriptions from the eval misses](tasks/phase-6-tool-breadth/P6-34-description-tuning-from-evals.md) | low | P6-33 | todo |
 | P6-35 | [Live composite warnings in the workspace and grant forms](tasks/phase-6-tool-breadth/P6-35-live-composite-warnings-in-forms.md) | low | P6-11 | todo |
 | P6-36 | [Name the tools hidden by the per-call budget](tasks/phase-6-tool-breadth/P6-36-budget-hidden-tools-in-whoami.md) | low | P6-11 | todo |
