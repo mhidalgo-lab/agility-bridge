@@ -35,6 +35,12 @@ export interface ToolDefinition<I extends InputSchema = InputSchema, O = unknown
   /** Worst-case Agility requests per call, retries and paging included (L-114). */
   readonly cost: number;
   readonly inputSchema: I;
+  /**
+   * Arguments kept as deprecated aliases for one release (old name -> its replacement), listed in `DEPRECATIONS`. They
+   * are not advertised in the input schema (so `tools/list` and the argument lint are unchanged): the server maps the
+   * old name to the new one before validating and adds a deprecation note to the result.
+   */
+  readonly deprecatedArguments?: Readonly<Record<string, string>>;
   /** Open output schema (extra properties allowed, ADR-0015). */
   readonly outputSchema?: z.ZodType<O>;
   /** For `write` / `destructive` tools: repeating the same call has no further effect. Reads are always idempotent. */

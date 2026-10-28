@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // The deprecation registry (L-045, tool conventions "Deprecations"): every deprecated tool, argument, output field and
 // environment variable, with its replacement and the version that removes it. Machine-readable, so docs, warnings and
-// the removal check all come from this one list. Empty until something is deprecated.
+// the removal check all come from this one list. A tool lists its own deprecated arguments in `deprecatedArguments`; a test ties the two together.
 
 export interface Deprecation {
   readonly kind: 'tool' | 'argument' | 'output' | 'env';
@@ -15,7 +15,16 @@ export interface Deprecation {
   readonly note?: string;
 }
 
-export const DEPRECATIONS: readonly Deprecation[] = Object.freeze([]);
+export const DEPRECATIONS: readonly Deprecation[] = Object.freeze([
+  {
+    kind: 'argument',
+    name: 'get_work_item.minimal_output',
+    replacement: 'get_work_item.skip_related',
+    since: '0.6.0',
+    removeIn: '0.7.0',
+    note: 'minimal_output means "identity columns only" in query_assets and get_assets; the related-assets switch has its own name.',
+  },
+]);
 
 /** The deprecated environment variables that are set, for one warning each at startup. */
 export function deprecatedEnv(

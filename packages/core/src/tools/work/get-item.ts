@@ -28,6 +28,8 @@ export const getWorkItem: ToolDefinition = defineTool({
   group: 'work',
   // Capped at run time: resolution, metadata for the item, its relations and child types (cold cache), one batch.
   cost: COST,
+  // `minimal_output` was this tool's name for `skip_related` until 0.5 (P6-45, deprecated for one release).
+  deprecatedArguments: { minimal_output: 'skip_related' },
   inputSchema: z.object({
     asset: assetArg,
     skip_related: skipRelatedArg,

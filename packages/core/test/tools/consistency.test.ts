@@ -4,7 +4,7 @@
 // advertised; this file checks what is returned: identity columns first, the shared result keys declared and typed,
 // the same error code for the same mistake, one paging contract.
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_LIMITS } from '../../src/index.ts';
+import { DEFAULT_LIMITS, DEPRECATIONS } from '../../src/index.ts';
 import { CORE_TOOLS } from '../../src/tools/index.ts';
 import { advertisedSchemas } from '../harness/lint.ts';
 import { costFakeOptions } from './cost-world.ts';
@@ -248,5 +248,26 @@ describe('one paging contract', () => {
   it('a tool without a cursor does not return nextCursor', async () => {
     for (const [name, r] of await ran)
       if (!pagedTools.includes(name)) expect(s(r)?.nextCursor, name).toBeUndefined();
+  });
+});
+
+describe('deprecated arguments (P6-45)', () => {
+  it('are listed in the registry, mapped to an advertised argument, and not advertised themselves', () => {
+    const declared = CORE_TOOLS.flatMap((t) =>
+      Object.entries(t.deprecatedArguments ?? {}).map(([old, now]) => ({ tool: t.name, old, now })),
+    );
+    expect(declared.length).toBeGreaterThan(0);
+    for (const { tool, old, now } of declared) {
+      expect(inputNames(tool), `${tool}.${old} is not advertised`).not.toContain(old);
+      expect(inputNames(tool), `${tool}.${now} is`).toContain(now);
+      expect(
+        DEPRECATIONS.find((d) => d.kind === 'argument' && d.name === `${tool}.${old}`)?.replacement,
+        `${tool}.${old} is in the deprecation registry`,
+      ).toBe(`${tool}.${now}`);
+    }
+    for (const d of DEPRECATIONS.filter((x) => x.kind === 'argument')) {
+      const [tool, arg] = d.name.split('.');
+      expect(toolByName(tool as string).deprecatedArguments?.[arg as string], d.name).toBeDefined();
+    }
   });
 });

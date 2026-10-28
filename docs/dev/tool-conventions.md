@@ -218,6 +218,7 @@ Annotations are derived from `kind` by the registry, never written by hand. Non-
   non-empty; the output schema stays open, so `tools/list` does not grow). The admin panel shows the same note on a
   workspace or grant whose explicit `callBudget` is below the cost of a tool in its explicit list; a budget inherited from
   the server's default is not known to the panel (see P6-58).
+- The small readers of Agility values (`num`, `text`, `round1`, `isAcceptanceAttribute`) live once in `tools/common.ts` (P6-45, L-317); a tool does not define its own.
 - One test (`packages/core/test/tools/cost.test.ts`) walks `CORE_TOOLS` and measures each tool's worst-case call on a cold
   cache against its declared cost (L-313). **A new tool needs an entry in `test/tools/worst-case.ts`** (arguments of its most
   expensive call over the shared world, composites measured with their siblings), or the test fails; a fixture whose call
@@ -352,5 +353,8 @@ window), never widen it; any value above a configured limit is clamped and repor
   `Deprecated:`, log one warning per process, and list it in the deprecation registry (tool arguments, output fields and
   environment variables alike), which `doctor` and the docs read (L-045). Aliases count against the catalogue budget
   only while their deprecation runs (prior-art follow-up 2).
-
-- The small readers of Agility values (`num`, `text`, `round1`, `isAcceptanceAttribute`) live once in `tools/common.ts` (P6-45, L-317); a tool does not define its own.
+- How a deprecated argument works (P6-45): the tool lists `deprecatedArguments: { old: 'new' }`; the server maps the old name
+  to the new one before validating (the new name wins when both are given), adds a fixed `Note:` and a `notes` entry to the
+  result, and logs one warning per process. The old name is **not** advertised (the input schema, `tools/list` and the
+  argument lint stay as they are); `DEPRECATIONS` lists it with `since` and `removeIn`, and a consistency test ties the
+  two. `get_work_item.minimal_output` (renamed `skip_related`) is the first, removed in 0.7.0.
