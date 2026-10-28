@@ -12,7 +12,7 @@ import { readinessVerdict } from '../../src/tools/reports/release-readiness.ts';
 import { classifySiblingNotes, SPRINT_NOTES } from '../../src/tools/reports/sibling-notes.ts';
 import { paceStatus } from '../../src/tools/reports/sprint-health.ts';
 import { findLeaks } from '../harness/index.ts';
-import { NOW, rig, SIBLINGS, s, text, toolByName } from './reports-world.ts';
+import { NOW, rig, SIBLINGS, s, text, toolByName, world } from './reports-world.ts';
 
 const REPORTS = Object.keys(SIBLINGS);
 const ARGS: Record<string, Record<string, unknown>> = {
@@ -347,7 +347,7 @@ describe('defect_triage', () => {
       'D-01102',
       'D-01103',
     ]);
-    expect(out.likelyDuplicates[0].similarity).toBe(0.86);
+    expect(out.likelyDuplicates[0].similarity).toBe(0.8);
     expect(text(r)).not.toContain('another project');
     expect(text(r)).toContain('Priority and severity are not read');
   });
@@ -599,7 +599,7 @@ describe('derived verdicts', () => {
   it('compares names by word overlap and refuses to compare very short ones', () => {
     expect(
       nameSimilarity('Crash on save when the network drops', 'Crash on save when the network drops again'),
-    ).toBeGreaterThan(0.8);
+    ).toBeGreaterThanOrEqual(0.8);
     expect(nameSimilarity('Crash on save', 'Crash on save')).toBe(0);
     expect(nameSimilarity('Login page layout broken', 'Invoice export fails nightly')).toBe(0);
     expect(defectTriage.name).toBe('defect_triage');
@@ -749,5 +749,61 @@ describe('sibling notes are our own text only when they match a fixed template (
     expect(s(r).sprintNoteCodes).toContain('no_capacity_model');
     const outside = text(r).replace(/<untrusted-data[\s\S]*?<\/untrusted-data[^>]*>/g, '');
     expect(outside).toContain('Sprint section: Capacity is not reported');
+  });
+});
+
+describe('defect_triage output details (P6-47)', () => {
+  const defect = (id: number, name: string) => ({
+    _oid: `Defect:${id}`,
+    AssetType: 'Defect',
+    Number: `D-0${id}`,
+    Name: name,
+    AssetState: 64,
+    Scope: 'Scope:1001',
+    'Scope.Name': 'Mobile App',
+    Status: 'StoryStatus:1',
+    'Status.Name': 'Not started',
+    ChangeDateUTC: '2026-10-19T10:00:00.0000000Z',
+  });
+  const crowded = () => {
+    const w = world();
+    const extra = [
+      // Six near-twins (similarity 0.71 each pair: 15 pairs), then one identical pair that comes last in the page.
+      ...['one', 'two', 'three', 'four', 'five', 'six'].map((n, i) =>
+        defect(3000 + i, `alpha bravo charlie delta echo ${n}`),
+      ),
+      defect(3100, 'foxtrot golf hotel india juliet'),
+      defect(3101, 'foxtrot golf hotel india juliet'),
+      // Unrelated defects, so that more than 20 are flagged.
+      ...Array.from({ length: 16 }, (_, i) => defect(3200 + i, `unrelated${i} topic${i} thing${i}`)),
+    ];
+    return {
+      ...w,
+      Defect: [...(w['Defect'] ?? []), ...extra],
+      PrimaryWorkitem: [...(w['PrimaryWorkitem'] ?? []), ...extra],
+      Workitem: [...(w['Workitem'] ?? []), ...extra],
+    };
+  };
+
+  it('lists the most similar pairs first and says when pairs and flagged defects were cut', async () => {
+    const { call } = rig({ fake: { assets: crowded() } });
+    const r = await call('defect_triage', {});
+    expect(r['isError'], text(r)).toBeUndefined();
+    const out = s(r);
+    expect(out.likelyDuplicates).toHaveLength(10);
+    expect(out.likelyDuplicates[0]).toMatchObject({ first: 'D-03100', second: 'D-03101', similarity: 1 });
+    const sims = out.likelyDuplicates.map((p: { similarity: number }) => p.similarity);
+    expect([...sims].sort((a, b) => b - a)).toEqual(sims);
+    expect(out.counts.duplicatePairsNotListed).toBeGreaterThan(0);
+    expect(text(r)).toMatch(/likely duplicate pairs found: the 10 most similar are listed/);
+    expect(out.flagged).toHaveLength(20);
+    expect(out.counts.flagged).toBeGreaterThan(20);
+    expect(text(r)).toMatch(/defects are flagged: the first 20 are listed/);
+  });
+
+  it('does not count stop words as shared words', () => {
+    // Without the stop words these would share "for", "the", "and" and "with".
+    expect(nameSimilarity('red car tree for the and with', 'blue boat lamp for the and with')).toBe(0);
+    expect(nameSimilarity('crash save network drops', 'crash save network again')).toBeGreaterThan(0.5);
   });
 });

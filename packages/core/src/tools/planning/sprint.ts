@@ -528,6 +528,18 @@ export const getSprint: ToolDefinition = defineTool({
       ...(end === undefined ? {} : { endDate: dateOf(end) }),
       ...(scheduleOid === undefined ? {} : { schedule: schedule ?? { oid: scheduleOid } }),
     };
+    const specBlocks = [
+      { title: 'Status categories', source: 'status categories', rows: byStatusCategory },
+      ...(burndown.length === 0
+        ? []
+        : [{ title: 'Burndown (remaining estimate, UTC)', source: 'burndown', rows: burndown }]),
+      {
+        title: 'Items',
+        source: 'sprint items',
+        rows: itemRows.slice(0, ITEM_LIST_CAP),
+        columns: ['number', 'assetType', 'oid', 'status', 'category', 'estimate', 'name'],
+      },
+    ];
     const { output, blocks } = shapeOutput(ctx, {
       summary: [
         'Sprint ',
@@ -535,18 +547,7 @@ export const getSprint: ToolDefinition = defineTool({
         `: ${timing ?? 'dates unknown'}, ${total.itemCount} item${total.itemCount === 1 ? '' : 's'}, ${total.estimate === undefined ? 'no estimates' : `${done.estimate ?? (done.itemCount === 0 ? 0 : 'none estimated')} of ${total.estimate} estimate done`}${total.unestimatedItems > 0 ? ` (${total.unestimatedItems} unestimated)` : ''}${committed?.estimate === undefined ? '' : `, ${committed.estimate} committed at the start`}.`,
       ],
       notes,
-      blocks: [
-        { title: 'Status categories', source: 'status categories', rows: byStatusCategory },
-        ...(burndown.length === 0
-          ? []
-          : [{ title: 'Burndown (remaining estimate, UTC)', source: 'burndown', rows: burndown }]),
-        {
-          title: 'Items',
-          source: 'sprint items',
-          rows: itemRows.slice(0, ITEM_LIST_CAP),
-          columns: ['number', 'assetType', 'oid', 'status', 'category', 'estimate', 'name'],
-        },
-      ],
+      blocks: specBlocks,
       partial: partial || listCut,
       caps: { maxRows: ITEM_LIST_CAP },
       structured: {
@@ -570,7 +571,8 @@ export const getSprint: ToolDefinition = defineTool({
       },
       ...(input.format === undefined ? {} : { format: input.format }),
     });
-    const itemsBlock = blocks[burndown.length === 0 ? 1 : 2];
+    // Looked up by its source, not by position: a block added before it must not change which rows are the items (P6-47).
+    const itemsBlock = blocks[specBlocks.findIndex((b) => b.source === 'sprint items')];
     return {
       ...output,
       structured: {

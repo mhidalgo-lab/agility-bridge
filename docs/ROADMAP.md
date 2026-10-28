@@ -303,11 +303,12 @@ Status lives in each task file.
 | P6-44 | [Cut the core test suite's runtime](tasks/phase-6-tool-breadth/P6-44-cut-the-core-test-suite-s-runtime.md) | low | P6-13 | done |
 | P6-45 | [Remove the duplicated tool helpers and the double meaning of `minimal_output`](tasks/phase-6-tool-breadth/P6-45-remove-the-duplicated-tool-helpers-and-the-double.md) | low | P6-13, P6-12 | done |
 | P6-46 | [Settle the edge semantics of `work_item_quality`](tasks/phase-6-tool-breadth/P6-46-settle-the-edge-semantics-of-work-item-quality.md) | low | P6-13, P6-03 | todo |
-| P6-47 | [Polish defect triage, standup and get_sprint output details](tasks/phase-6-tool-breadth/P6-47-polish-defect-triage-standup-and-get-sprint-output.md) | low | P6-13 | todo |
+| P6-47 | [Polish defect triage, standup and get_sprint output details](tasks/phase-6-tool-breadth/P6-47-polish-defect-triage-standup-and-get-sprint-output.md) | low | P6-13 | done |
 | P6-48 | [Forward sibling facts in composites as codes, with a lint](tasks/phase-6-tool-breadth/P6-48-forward-sibling-facts-in-composites-as-codes-with.md) | low | P6-13, P6-07 | done |
 | P6-51 | [Live check of the get_sprint read shapes](tasks/phase-6-tool-breadth/P6-51-live-check-of-the-sprint-read-shapes.md) | low | P6-41, P6-42, P6-18 | todo |
 | P6-52 | [Sprint burndown by aggregation for very large sprints](tasks/phase-6-tool-breadth/P6-52-sprint-burndown-by-aggregation.md) | low | P6-18 | todo |
 | P6-55 | [Filter standup_summary on the change date instead of reading the newest page](tasks/phase-6-tool-breadth/P6-55-standup-change-date-filter.md) | low | P6-40, P6-27 | todo |
+| P6-56 | [Check whether a sprint is still current on its end date](tasks/phase-6-tool-breadth/P6-56-sprint-end-date-inclusive-check.md) | low | P6-47, P6-27 | todo |
 | P6-58 | [Show the budget-hidden tools note for an inherited call budget in the panel](tasks/phase-6-tool-breadth/P6-58-panel-inherited-call-budget-note.md) | low | P6-36 | todo |
 
 ### Phase 7

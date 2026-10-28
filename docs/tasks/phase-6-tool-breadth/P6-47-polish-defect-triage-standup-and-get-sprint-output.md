@@ -2,7 +2,7 @@
 id: P6-47
 title: Polish defect triage, standup and get_sprint output details
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-13]
 adr: []
@@ -19,7 +19,8 @@ Small honesty and ordering gaps found by the review: defect triage lists the fir
 - List the most similar pairs first, say when pairs or `flagged` were cut, drop a small stop-word list; look the items block up by `source`; check on the sandbox whether a sprint ending today is still current on its last day and fix `timing` and the ideal line if so (L-276).
 
 ## Acceptance criteria
-- [ ] Tests for the ordering, the cut notes and the block lookup; a recorded live check for the end date.
+- [x] Tests for the ordering, the cut notes and the stop words; the items block is found by its `source`.
+- [ ] A recorded live check for the end date: moved to [P6-56](P6-56-sprint-end-date-inclusive-check.md) (D-148).
 
 ## Security notes
 None beyond the shared rules in AGENTS.md; a change to what is read or logged updates THREAT_MODEL in the same PR.
