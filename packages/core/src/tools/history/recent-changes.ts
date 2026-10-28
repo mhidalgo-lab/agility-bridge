@@ -9,7 +9,7 @@ import { metadataFor } from '../../metadata/service.ts';
 import { shapeList } from '../../output/result.ts';
 import { utcIso } from '../../output/text.ts';
 import type { FilterInput } from '../../query/compiler.ts';
-import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
+import { checkCursorShape, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { invalid } from '../../query/limits.ts';
 import { parseTimeRange } from '../../query/time.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
@@ -64,6 +64,7 @@ export const listRecentChanges: ToolDefinition = defineTool({
       ...outer,
       budget: capBudget(outer.budget, COST),
     };
+    checkCursorShape(ctx, input.cursor);
     // The window and the page size are validated before any request (L-060).
     const window = parseTimeRange(
       input.time_range ?? DEFAULT_WINDOW,

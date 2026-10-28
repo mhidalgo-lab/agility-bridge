@@ -293,7 +293,7 @@ Status lives in each task file.
 | P6-35 | [Live composite warnings in the workspace and grant forms](tasks/phase-6-tool-breadth/P6-35-live-composite-warnings-in-forms.md) | low | P6-11 | todo |
 | P6-36 | [Name the tools hidden by the per-call budget](tasks/phase-6-tool-breadth/P6-36-budget-hidden-tools-in-whoami.md) | low | P6-11 | todo |
 | P6-37 | [Report schema-validation failures as AB_INPUT_INVALID tool errors](tasks/phase-6-tool-breadth/P6-37-consistency-schema-errors.md) | low | P6-12 | done |
-| P6-38 | [Run the consistency checks on an empty and a denied world](tasks/phase-6-tool-breadth/P6-38-consistency-empty-world.md) | low | P6-12 | todo |
+| P6-38 | [Run the consistency checks on an empty and a denied world](tasks/phase-6-tool-breadth/P6-38-consistency-empty-world.md) | low | P6-12 | done |
 | P6-39 | [Keep instance metadata across isolates and measure Phase 6 tools on the Worker bench](tasks/phase-6-tool-breadth/P6-39-keep-instance-metadata-across-isolates-and-measure.md) | medium | P6-13 | todo |
 | P6-40 | [Run independent report sections together and share resolution within a request](tasks/phase-6-tool-breadth/P6-40-run-independent-report-sections-together-and-share.md) | medium | P6-13, P6-07 | todo |
 | P6-41 | [Read sprint pages and burndown history concurrently](tasks/phase-6-tool-breadth/P6-41-read-sprint-pages-and-burndown-history-concurrentl.md) | low | P6-13, P6-02 | todo |

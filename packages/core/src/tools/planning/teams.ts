@@ -8,7 +8,7 @@ import { inScope, oidsOf, sanitizeRow } from '../../identity/scope.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { shapeList, shapeOutput, untrusted } from '../../output/result.ts';
 import { compileQuery } from '../../query/compiler.ts';
-import { cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
+import { checkCursorShape, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import {
   containsArg,
@@ -39,6 +39,7 @@ export const listTeams: ToolDefinition = defineTool({
   }),
   outputSchema: listOutput(z.looseObject({ assetType: z.string(), oid: z.string(), name: z.string() })),
   handler: async (input, ctx) => {
+    checkCursorShape(ctx, input.cursor);
     const binding = await cursorBinding(ctx, LIST_TEAMS, { contains: input.contains });
     const offset = input.cursor === undefined ? 0 : (await decodeCursor(ctx, input.cursor, binding)).offset;
     const compiled = await compileQuery(

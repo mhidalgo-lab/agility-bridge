@@ -97,11 +97,13 @@ const refused = () =>
     'Pass nextCursor back unchanged, with the same tool and filters.',
   );
 
-/**
- * The cursor's state, or AB_INPUT_INVALID when it is malformed, bound to something else, or carries a window or "now" a
- * fresh call could not have (a window longer than `maxTimeRangeDays`, a "now" in the future or older than a day).
- */
-export async function decodeCursor(ctx: ToolContext, cursor: string, binding: string): Promise<CursorState> {
+interface ParsedCursor {
+  readonly state: CursorState;
+  readonly bound: unknown;
+}
+
+/** Everything about a cursor that needs no request state: shape, offsets, window and "now" (no binding comparison). */
+function parseCursor(ctx: ToolContext, cursor: string): ParsedCursor {
   if (typeof cursor !== 'string' || cursor.length > 2_000 || !/^[A-Za-z0-9_-]+$/.test(cursor))
     throw refused();
   let parsed: { v?: unknown; b?: unknown; o?: unknown; t?: unknown; w?: unknown; n?: unknown };
@@ -132,18 +134,39 @@ export async function decodeCursor(ctx: ToolContext, cursor: string, binding: st
   }
   const window = parsed.w === undefined ? undefined : checkWindow(parsed.w, ctx.limits.maxTimeRangeDays);
   const now = parsed.n === undefined ? undefined : checkNow(parsed.n, ctx.clock.now());
+  return {
+    bound: parsed.b,
+    state: {
+      offset,
+      ...(offsets === undefined ? {} : { offsets }),
+      ...(window === undefined ? {} : { window }),
+      ...(now === undefined ? {} : { now }),
+    },
+  };
+}
+
+/**
+ * Refuses a cursor that is malformed or carries a window or "now" a fresh call could not have, without the binding.
+ * A tool whose binding needs upstream lookups (names resolved to ids) calls this first, so a bad cursor costs no
+ * request (L-318); `decodeCursor` still checks the binding.
+ */
+export function checkCursorShape(ctx: ToolContext, cursor: string | undefined): void {
+  if (cursor !== undefined) parseCursor(ctx, cursor);
+}
+
+/**
+ * The cursor's state, or AB_INPUT_INVALID when it is malformed, bound to something else, or carries a window or "now" a
+ * fresh call could not have (a window longer than `maxTimeRangeDays`, a "now" in the future or older than a day).
+ */
+export async function decodeCursor(ctx: ToolContext, cursor: string, binding: string): Promise<CursorState> {
+  const { state, bound } = parseCursor(ctx, cursor);
   // Compare only after the fields were checked: the expected binding is hashed from the cursor's own window and "now".
   const expected = await bindFixed(binding, {
-    ...(window === undefined ? {} : { window }),
-    ...(now === undefined ? {} : { now }),
+    ...(state.window === undefined ? {} : { window: state.window }),
+    ...(state.now === undefined ? {} : { now: state.now }),
   });
-  if (parsed.b !== expected) throw refused();
-  return {
-    offset,
-    ...(offsets === undefined ? {} : { offsets }),
-    ...(window === undefined ? {} : { window }),
-    ...(now === undefined ? {} : { now }),
-  };
+  if (bound !== expected) throw refused();
+  return state;
 }
 
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;

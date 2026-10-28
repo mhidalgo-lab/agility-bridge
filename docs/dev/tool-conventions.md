@@ -215,6 +215,11 @@ Annotations are derived from `kind` by the registry, never written by hand. Non-
   cache against its declared cost (L-313). **A new tool needs an entry in `test/tools/worst-case.ts`** (arguments of its most
   expensive call over the shared world, composites measured with their siblings), or the test fails; a fixture whose call
   errors or makes no request fails too. The deepest cases (four-level trees, every page) stay in the tool's own test file.
+- The consistency checks also run on worlds where branches return early (`test/tools/consistency-worlds.test.ts`, P6-38):
+  no rows, a workspace whose projects list nothing, a grant denying asset types, a grant without the report siblings. A
+  paged tool refuses a bad cursor as `AB_INPUT_INVALID` first in all of them, with the full arguments and before any
+  name is resolved or any request made: call `checkCursorShape(ctx, input.cursor)` (`query/cursor.ts`) at the top of the
+  handler, since the binding itself needs resolved ids and is checked later by `decodeCursor` (L-318).
 - A composite names the tools it reads in `COMPOSITE_SIBLINGS` (`tools/reports/siblings.ts`); a test ties the table to the
   sections it runs. `whoami` (`warnings`, a note) and the admin panel (workspace and grant pages, from `GET /tools`
   `siblings`) warn when a composite is granted without some of them (L-314). A composite never costs less than a sibling,
