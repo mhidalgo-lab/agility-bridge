@@ -2,7 +2,7 @@
 id: P6-48
 title: Forward sibling facts in composites as codes, with a lint
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-13, P6-07]
 adr: []
@@ -19,8 +19,8 @@ owner: ""
 - Map the sibling notes the composites use to fixed codes and wording of our own; a lint or test that composite notes come only from that allowlist or are enveloped.
 
 ## Acceptance criteria
-- [ ] A test adds a sibling note with an Agility name and checks it never appears as our own text.
-- [ ] No change to the numbers a report returns.
+- [x] A test adds a sibling note with an Agility name and checks it never appears as our own text.
+- [x] No change to the numbers a report returns.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md; a change to what is read or logged updates THREAT_MODEL in the same PR.
