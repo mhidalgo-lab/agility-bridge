@@ -192,6 +192,16 @@ Per client (the full evidence, with versions and dates, is in the
 | Cursor, Windsurf, claude.ai, Claude mobile, Claude Desktop | approval page (remote); elicitation on stdio where the client declares it | documented only, **not yet run** |
 | Copilot cloud agent | none: refused | documented only |
 
+**Require the page (`page_only`).** Elicitation proves that the client answered, not that a person did: a client set to
+accept every question approves by itself. An owner can require the approval page for every write, per workspace
+(*How writes are approved* on the workspace form, or `writePolicy.approval` in the admin API) or per grant (the grant form,
+or `rateLimit.writeApproval: "page_only"`). The stricter of the two applies; a grant can only tighten. Under `page_only` the
+client is **never asked**: a client that can elicit gets the same `AB_WRITE_APPROVAL_PENDING` link as one that cannot, and
+`whoami` and dry runs report `page`. Without a page (sign-in not configured, or a service grant) the answer is
+`AB_WRITE_APPROVAL_UNAVAILABLE`. Only an owner with a recent sign-in sets or removes it. The default is `any` (D-208, the
+owner's to confirm). Remaining risk: an agent that drives the person's browser session can still use the page; the recent
+sign-in required to approve and the ten-minute life of a request are the barrier, so keep the sign-in window short.
+
 The server checks the request's declared capability **before** asking. `whoami` and every dry run report the channel this
 client has (`elicitation`, `page`, `not_required` or `unavailable`). A user who declines gets `AB_WRITE_APPROVAL_DECLINED`;
 the agent should ask what to change instead of repeating the call.

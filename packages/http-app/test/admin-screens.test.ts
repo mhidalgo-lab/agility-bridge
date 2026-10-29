@@ -758,6 +758,61 @@ describe('workspace writable custom attributes (P7-20)', () => {
   });
 });
 
+describe('how writes are approved (P7-26)', () => {
+  it("the workspace's choice is the owner's: only the owner sees it, a forged field from an admin is ignored, and a stale sign-in is asked again", async () => {
+    const e = await env();
+    const { s, owner, admin } = e;
+    const edit = `/admin/workspaces/${e.ids.workspaceA}/edit`;
+    const base = { name: 'Team A', scopes: 'Scope:1001', tools_all: '1' };
+    const stored = async () => (await s.w.storage.workspaces.get(e.ids.workspaceA))?.writePolicy;
+    expect(await (await page(s, edit, owner)).text()).toContain('name="approval"');
+    expect(await (await page(s, edit, admin)).text()).not.toContain('name="approval"');
+    expect((await submit(s, edit, admin, { ...base, writes: '1', approval: 'page_only' })).status).toBe(303);
+    expect(await stored()).toEqual({});
+    s.w.now.t += 11 * MIN;
+    expect((await submit(s, edit, owner, { ...base, writes: '1', approval: 'page_only' })).status).toBe(403);
+    expect(await stored()).toEqual({});
+    const fresh = await s.session(OWNER);
+    expect((await submit(s, edit, fresh, { ...base, writes: '1', approval: 'page_only' })).status).toBe(303);
+    expect(await stored()).toEqual({ enabled: true, approval: 'page_only' });
+    expect(await (await page(s, edit, fresh)).text()).toMatch(/<option value="page_only"[^>]*selected/);
+    expect(await (await page(s, `/admin/workspaces/${e.ids.workspaceA}`, admin)).text()).toContain(
+      'on the approval page only',
+    );
+    // An admin's other save keeps it; the owner removes it with the select.
+    expect((await submit(s, edit, admin, { ...base, name: 'Team A 2' })).status).toBe(303);
+    expect(await stored()).toEqual({ enabled: true, approval: 'page_only' });
+    expect((await submit(s, edit, fresh, { ...base, writes: '1', approval: 'any' })).status).toBe(303);
+    expect(await stored()).toEqual({ enabled: true });
+  });
+
+  it("the grant's choice is the owner's too: the admin's save keeps it, a forged field changes nothing", async () => {
+    const e = await env();
+    const { s, admin, owner } = e;
+    const grant = e.ids.aliceGrant;
+    const path = `/admin/grants/${grant}/edit`;
+    const base = { credential: e.ids.aliceCredential, tools_all: '1', scopes_all: '1', expiry: 'keep' };
+    const stored = async () => (await s.w.storage.grants.get(grant))?.rateLimit ?? null;
+    expect(await (await page(s, path, admin)).text()).not.toContain('name="approval"');
+    expect(await (await page(s, path, owner)).text()).toContain('name="approval"');
+    expect((await submit(s, path, admin, { ...base, approval: 'page_only' })).status).toBe(303);
+    expect(await stored()).toBeNull();
+    expect((await submit(s, path, owner, { ...base, perMinute: '30', approval: 'page_only' })).status).toBe(
+      303,
+    );
+    expect(await stored()).toEqual({ perMinute: 30, writeApproval: 'page_only' });
+    expect(await (await page(s, `/admin/grants/${grant}`, admin)).text()).toContain(
+      'on the approval page only',
+    );
+    expect((await submit(s, path, admin, { ...base, perMinute: '40' })).status).toBe(303);
+    expect(await stored()).toEqual({ perMinute: 40, writeApproval: 'page_only' });
+    expect((await submit(s, path, owner, { ...base, perMinute: '40', approval: 'workspace' })).status).toBe(
+      303,
+    );
+    expect(await stored()).toEqual({ perMinute: 40 });
+  });
+});
+
 describe('grants', () => {
   it('creates a person grant and a service grant, edits, and shows the notes the API would warn about', async () => {
     const e = await env();

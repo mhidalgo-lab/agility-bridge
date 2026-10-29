@@ -108,6 +108,8 @@ export interface EffectiveAccess {
   readonly writeTools: readonly string[];
   /** Custom attributes the owner enabled for writing in the workspace; empty unless `writeTools` is (P7-20). */
   readonly writeCustomFields: readonly string[];
+  /** How writes are approved (P7-26): `page_only` when the workspace or the grant says so, else `any`. */
+  readonly writeApproval: 'any' | 'page_only';
   readonly projects: { readonly allowed: readonly string[]; readonly includeChildren: boolean };
   readonly assetTypes: { readonly allow?: readonly string[]; readonly deny: readonly string[] };
   readonly limits: EffectiveLimits;
@@ -298,6 +300,11 @@ export function resolveAccess(
       writeTools: Object.freeze(writeTools),
       // Custom attributes are writable only where a write tool is: an empty list otherwise (P7-20).
       writeCustomFields: Object.freeze(writeTools.length > 0 ? [...(ws.writePolicy.customFields ?? [])] : []),
+      // The workspace or the grant: a grant can only tighten (P7-26).
+      writeApproval:
+        ws.writePolicy.approval === 'page_only' || gp.rateLimit?.writeApproval === 'page_only'
+          ? 'page_only'
+          : 'any',
       projects: { allowed: Object.freeze([...projects]), includeChildren: ws.includeChildScopes },
       assetTypes,
       limits,
@@ -360,6 +367,7 @@ export function resolvePassthroughAccess(
       tools: Object.freeze(tools),
       writeTools: Object.freeze([]),
       writeCustomFields: Object.freeze([]),
+      writeApproval: 'any' as const,
       projects: { allowed: Object.freeze([...ws.allowedScopeIds]), includeChildren: ws.includeChildScopes },
       assetTypes: effectiveAssetTypes(ws.assetTypes as AssetTypePolicy | null, null),
       limits,

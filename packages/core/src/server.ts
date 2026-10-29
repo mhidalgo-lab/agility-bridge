@@ -341,7 +341,9 @@ function withWriteChannel(
 ): ToolContext {
   const rt = ctx.writes;
   if (rt === undefined) return ctx;
-  const channel = elicitationChannel(sdk, legacyCapabilities) ?? rt.page;
+  // Under `page_only` (P7-26) the client is never asked: the page is the channel, or there is none.
+  const channel =
+    rt.approvalPolicy === 'page_only' ? rt.page : (elicitationChannel(sdk, legacyCapabilities) ?? rt.page);
   const approval =
     rt.approval === 'off' ? 'not_required' : channel === undefined ? 'unavailable' : channel.kind;
   return {

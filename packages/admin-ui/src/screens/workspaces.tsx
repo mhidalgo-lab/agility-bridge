@@ -95,6 +95,7 @@ function workspaceValues(ws: Workspace): URLSearchParams {
   if (ws.defaultCredentialId !== null) v.set('credential', ws.defaultCredentialId);
   v.set('source', ws.credentialSource);
   if (ws.writesEnabled) v.set('writes', '1');
+  v.set('approval', ws.writeApproval);
   if (ws.customFields.length > 0) v.set('customfields', ws.customFields.join(', '));
   toolValues(ws.enabledTools, v);
   assetTypeValues(ws.assetTypes, v);
@@ -251,6 +252,16 @@ function WorkspaceForm(props: WorkspaceFormProps) {
               hint="Write tools also need the server's write switch, listing in the tools above, and a grant."
               checked={v.has('writes')}
             />
+            <SelectField
+              name="approval"
+              label="How writes are approved"
+              hint="Page only: the person must approve on the approval page for every write, even in a client that can ask. Use it where a client might approve by itself (a client set to accept every question proves no person answered)."
+              value={v.get('approval') ?? 'any'}
+              options={[
+                { value: 'any', label: 'In the client when it can ask, else on the page' },
+                { value: 'page_only', label: 'On the approval page only' },
+              ]}
+            />
             <TextField
               name="customfields"
               label="Custom attributes agents may write"
@@ -360,16 +371,20 @@ export function registerWorkspaces(ui: Hono, kit: UiKit): void {
     }
     if (owner) {
       const writes = form.fields.has('writes');
+      const approval = form.fields.get('approval') === 'page_only' ? 'page_only' : 'any';
       const custom = customFieldsFrom(field(form, 'customfields'));
       if ('error' in custom) errors['customfields'] = custom.error;
       // The policy is replaced as a whole, so both settings travel together; nothing is sent when neither changed.
       else if (
         current === null
-          ? writes || custom.value.length > 0
-          : writes !== current.writesEnabled || !sameList(custom.value, current.customFields)
+          ? writes || custom.value.length > 0 || approval === 'page_only'
+          : writes !== current.writesEnabled ||
+            approval !== current.writeApproval ||
+            !sameList(custom.value, current.customFields)
       )
         body['writePolicy'] = {
           enabled: writes,
+          ...(approval === 'page_only' ? { approval } : {}),
           ...(custom.value.length > 0 ? { customFields: custom.value } : {}),
         };
       const source = form.fields.get('source') === 'passthrough' ? 'passthrough' : 'stored';
@@ -602,6 +617,16 @@ export function registerWorkspaces(ui: Hono, kit: UiKit): void {
                 ],
                 ['Limits', limitsSummary(ws.limits).join('; ') || "the server's defaults"],
                 ['Writes', ws.writesEnabled ? 'allowed (with the right tools and grants)' : 'off'],
+                ...(ws.writesEnabled
+                  ? [
+                      [
+                        'Approval',
+                        ws.writeApproval === 'page_only'
+                          ? 'on the approval page only'
+                          : 'in the client when it can ask, else on the page',
+                      ] as [string, string],
+                    ]
+                  : []),
                 [
                   'Writable custom attributes',
                   ws.customFields.length === 0 ? 'none' : ws.customFields.join(', '),

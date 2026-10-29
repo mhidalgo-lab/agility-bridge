@@ -222,9 +222,14 @@ async function obtainApproval(
   if (channel === undefined) {
     throw new AbError(
       ErrorCode.WriteApprovalUnavailable,
-      'This write needs a person to approve it, and this client cannot be asked.',
+      rt.approvalPolicy === 'page_only'
+        ? 'This connection may only be approved on the approval page, and that page is not available here.'
+        : 'This write needs a person to approve it, and this client cannot be asked.',
       {
-        hint: 'Use a client that supports elicitation (Claude Code, Copilot CLI, VS Code), or ask the owner about the approval page. See docs/guide/write-tools.md.',
+        hint:
+          rt.approvalPolicy === 'page_only'
+            ? 'Ask the owner: the approval page needs sign-in configured and a grant that belongs to a user. See docs/guide/write-tools.md.'
+            : 'Use a client that supports elicitation (Claude Code, Copilot CLI, VS Code), or ask the owner about the approval page. See docs/guide/write-tools.md.',
       },
     );
   }

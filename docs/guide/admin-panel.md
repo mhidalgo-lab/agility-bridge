@@ -92,7 +92,9 @@ limits. Creating one is two steps: choose the instance (it cannot change later),
 A grant gives a **person**, or a **service** (a named automation, read-only), access to a workspace. Creating one is two
 steps (workspace, then form). Choose the credential (shared, or the person's own), the tools, the projects (all of the
 workspace's, or some), asset types, limits, a rate, an owner's cap on **writes per hour** (never above the server's own
-limit; [write tools](write-tools.md#limits)) and an expiry. A grant can only narrow its workspace; a value that
+limit; [write tools](write-tools.md#limits)), an owner's choice of **how its writes are approved** (the approval page only;
+the workspace form has the same choice, and the stricter applies, see [write tools](write-tools.md#approval)) and an
+expiry. A grant can only narrow its workspace; a value that
 tries to widen it is stored and the grant's page says it has no effect. Write tools need an owner and a recent sign-in.
 
 On a grant's page, **New device token** makes one token for one device (make one per laptop or phone, so a lost one can be

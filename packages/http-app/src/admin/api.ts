@@ -1310,7 +1310,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       ...ws,
       params: true,
       summary:
-        'Change a workspace (owners and admins; write settings and pass-through: an owner with a recent sign-in; so is adding projects or asset types to a workspace that has write tools)',
+        'Change a workspace (owners and admins; write settings, including `writePolicy.approval` (`any` or `page_only`), and pass-through: an owner with a recent sign-in; so is adding projects or asset types to a workspace that has write tools)',
       body: WorkspacePatch,
       out: WorkspaceOut,
       audit: { action: 'workspace.update', targetType: 'workspace' },
@@ -1392,7 +1392,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       ...gr,
       params: true,
       summary:
-        "Change a grant (owners and admins; write tools, widening the projects, asset types or end date of a grant that has them, and the grant's own hourly write limit `rateLimit.writesPerHour`, which can only lower the server's: an owner with a recent sign-in)",
+        "Change a grant (owners and admins; write tools, widening the projects, asset types or end date of a grant that has them, the grant's own hourly write limit `rateLimit.writesPerHour`, which can only lower the server's, and `rateLimit.writeApproval` (`page_only`), which makes the grant's writes need the approval page: an owner with a recent sign-in)",
       body: GrantPatch,
       out: GrantWithWarnings,
       audit: { action: 'grant.update', targetType: 'grant' },
@@ -1401,11 +1401,14 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
     async (c, { id, body }) => {
       // The hourly write limit before the change, so a loosening can be told from a tightening in the audit log (P7-15).
       const before = (await services(c).grants.get(id))?.rateLimit as
-        | { writesPerHour?: unknown }
+        | { writesPerHour?: unknown; writeApproval?: unknown }
         | null
         | undefined;
-      if (typeof before?.writesPerHour === 'number')
-        c.set('auditDetails' as never, { previousWritesPerHour: before.writesPerHour } as never);
+      const previous = {
+        ...(typeof before?.writesPerHour === 'number' ? { previousWritesPerHour: before.writesPerHour } : {}),
+        ...(before?.writeApproval === 'page_only' ? { previousWriteApproval: before.writeApproval } : {}),
+      };
+      if (Object.keys(previous).length > 0) c.set('auditDetails' as never, previous as never);
       return services(c).grants.update(id, body as never);
     },
   );

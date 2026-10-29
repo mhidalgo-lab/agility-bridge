@@ -114,6 +114,7 @@ function grantValues(g: Grant): URLSearchParams {
   limitValues(g.limits, v);
   if (g.perMinute !== null) v.set('perMinute', String(g.perMinute));
   if (g.writesPerHour !== null) v.set('writesPerHour', String(g.writesPerHour));
+  if (g.writeApproval !== null) v.set('approval', g.writeApproval);
   v.set('expiry', 'keep');
   return v;
 }
@@ -264,6 +265,18 @@ function GrantForm(props: GrantFormProps) {
             error={errors['writesPerHour']}
           />
         ) : null}
+        {owner ? (
+          <SelectField
+            name="approval"
+            label="How this grant's writes are approved"
+            hint="Page only: every write of this grant needs the approval page, even in a client that can ask. It can only tighten the workspace's setting. Only an owner can set this."
+            value={v.get('approval') ?? 'workspace'}
+            options={[
+              { value: 'workspace', label: 'As the workspace says' },
+              { value: 'page_only', label: 'On the approval page only' },
+            ]}
+          />
+        ) : null}
         <SelectField
           name="expiry"
           label="Expiry"
@@ -295,7 +308,11 @@ function formFieldOf(apiField: string | undefined): string | undefined {
       credentialId: 'credential',
       tools: 'tools',
       scopeIds: 'scopes',
-      rateLimit: apiField.startsWith('rateLimit.writesPerHour') ? 'writesPerHour' : 'perMinute',
+      rateLimit: apiField.startsWith('rateLimit.writesPerHour')
+        ? 'writesPerHour'
+        : apiField.startsWith('rateLimit.writeApproval')
+          ? 'approval'
+          : 'perMinute',
       userId: 'who',
       expiresAt: 'expiry',
     }[apiField.split('.')[0] ?? '']
@@ -407,10 +424,17 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
       ? wholeNumber(form, 'writesPerHour', 1, 1_000)
       : (current?.writesPerHour ?? undefined);
     if (writes === null) errors['writesPerHour'] = 'Enter a whole number from 1 to 1000, or leave it blank.';
+    // How the grant's writes are approved is an owner's setting too (P7-26): anyone else keeps what is stored.
+    const approval = isOwner(principal)
+      ? form.fields.get('approval') === 'page_only'
+        ? 'page_only'
+        : null
+      : (current?.writeApproval ?? null);
     if (rate !== null && writes !== null) {
       const parts = {
         ...(rate === undefined ? {} : { perMinute: rate }),
         ...(writes === undefined ? {} : { writesPerHour: writes }),
+        ...(approval === null ? {} : { writeApproval: approval }),
       };
       body['rateLimit'] = Object.keys(parts).length === 0 ? null : parts;
     }
@@ -693,6 +717,10 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
                 ...(writeBudget !== null && writeBudget.state === 'off'
                   ? []
                   : ([['Writes this hour', budgetText(writeBudget)]] as [string, string][])),
+                [
+                  'Write approval',
+                  g.writeApproval === 'page_only' ? 'on the approval page only' : 'as the workspace says',
+                ],
                 [
                   'Writes per hour',
                   g.writesPerHour === null ? "the server's limit" : `${g.writesPerHour} (an owner's cap)`,
