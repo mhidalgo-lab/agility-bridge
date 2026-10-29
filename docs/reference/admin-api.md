@@ -21,6 +21,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 |---|---|---|---|---|
 | `GET` | `/audit` | Read the audit log, newest first (owner and admin: every row; a member: only their own rows, and another userId is refused) | — | 200 AuditEntry[] |
 | `GET` | `/audit/stats` | Usage statistics from tool calls: calls, errors, denials, Agility requests and durations per tool, workspace, grant, user or day (owner, admin). Reads at most the newest 10,000 rows of the window and says when it stopped there. | — | 200 AuditStats |
+| `GET` | `/writes/budget` | The deployment's writes used this hour and its limit, read without taking a unit (owner, admin). `{ enabled: false }` when write tools are off; `unknown` when the counters cannot be read, never "unlimited". | — | 200 WriteBudget |
 | `GET` | `/audit/write-stats` | Write statistics (P7-11): writes by tool and approval channel, and by outcome (ok, error, no outcome recorded), counting each intent with its outcome once, and the intents with no outcome (owner, admin). Reads at most the newest 3,000 write rows of the window and says when it stopped there. | — | 200 WriteStats |
 
 ## credentials
@@ -45,6 +46,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | `GET` | `/grants/{id}` | Get a grant | — | 200 Grant |
 | `PATCH` | `/grants/{id}` | Change a grant (owners and admins; write tools, widening the projects, asset types or end date of a grant that has them, and the grant's own hourly write limit `rateLimit.writesPerHour`, which can only lower the server's: an owner with a recent sign-in) | `label`?: string \| null<br>`credentialId`?: string \| null<br>`tools`?: array \| null<br>`scopeIds`?: array \| null<br>`assetTypes`?: object \| null<br>`limits`?: object<br>`rateLimit`?: object \| null<br>`expiresAt`?: integer \| null | 200 object |
 | `DELETE` | `/grants/{id}` | Delete a grant and its tokens | — | 200 object |
+| `GET` | `/grants/{id}/write-budget` | One grant's writes used this hour and its limit (the lower of the server's and the grant's own cap), read without taking a unit. Owners and admins any grant, a member only their own (another is a 404). `{ enabled: false }` when write tools are off. | — | 200 WriteBudget |
 | `POST` | `/grants/{id}/revoke` | Revoke a grant | — | 200 Grant |
 
 ## instances
@@ -151,4 +153,5 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 - **Tool**: `name`: string, `kind`: "read" \| "write" \| "destructive", `group`: string, `cost`?: integer, `siblings`?: string[]
 - **User**: `id`: string, `email`: string, `displayName`: string \| null, `idp`: string \| null, `idpSubject`: string \| null, `role`: "owner" \| "admin" \| "member", `createdAt`: number, `updatedAt`: number, `disabledAt`: number \| null
 - **Workspace**: `id`: string, `slug`: string, `name`: string, `instanceId`: string, `allowedScopeIds`: string[], `includeChildScopes`: boolean, `assetTypes`: object \| null, `enabledTools`: array \| null, `limits`: object, `defaultCredentialId`: string \| null, `writePolicy`: object, `credentialSource`: "stored" \| "passthrough", `createdAt`: number, `updatedAt`: number, `disabledAt`: number \| null
+- **WriteBudget**: `enabled`: boolean, `status`?: "ok" \| "unknown", `windowEndsAt`?: number, `grant`?: object, `deployment`?: object \| null
 - **WriteStats**: `byTool`: object[], `byChannel`: object[], `total`: object, `unpaired`: object[], `scanned`: number, `truncated`: boolean

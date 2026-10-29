@@ -31,6 +31,10 @@ same audit row (`via: api`). A button appears only when the API would allow it f
 | Audit log | `/admin/audit` | yes | yes | Every tool call, refusal and change, filtered and paged; **members see their own rows** here |
 | Usage | `/admin/usage` | yes | yes | Calls, errors, denials, Agility requests and durations per tool, workspace, grant, user or day |
 
+The **overview** (`/admin`) also shows, to owners and admins on a server with write tools on, **Writes this hour**: the
+server-wide count against its limit, read without using one (`unknown` when the counters cannot be read; see
+[write tools](write-tools.md#limits)). A grant's page shows that grant's count.
+
 Members get a 403 page on all of these except the audit log. Lists show 25 rows a page (`?page=2`); the credential and grant lists can be
 filtered by instance or workspace. Every address needs a signed-in browser; anyone else is sent to the sign-in page.
 

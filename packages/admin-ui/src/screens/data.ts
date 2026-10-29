@@ -593,3 +593,39 @@ export function parseWriteStats(body: unknown): WriteStatsView | null {
     truncated: o['truncated'] === true,
   };
 }
+
+/** The write budget of this hour (P7-16): `GET /writes/budget` and `GET /grants/{id}/write-budget`. */
+export type WriteBudgetView =
+  | { readonly state: 'off' }
+  | { readonly state: 'unknown' }
+  | {
+      readonly state: 'ok';
+      readonly windowEndsAt: number;
+      readonly used: number;
+      readonly limit: number;
+      readonly remaining: number;
+    };
+
+/** `part` is the counter to read: `deployment` for the whole server, `grant` for one grant. */
+export function parseWriteBudget(body: unknown, part: 'grant' | 'deployment'): WriteBudgetView | null {
+  const o = obj(body);
+  if (typeof o['enabled'] !== 'boolean') return null;
+  if (!o['enabled']) return { state: 'off' };
+  if (o['status'] !== 'ok') return { state: 'unknown' };
+  const c = obj(o[part]);
+  if (typeof c['limit'] !== 'number' || typeof c['used'] !== 'number') return { state: 'unknown' };
+  return {
+    state: 'ok',
+    windowEndsAt: int(o['windowEndsAt']),
+    used: int(c['used']),
+    limit: int(c['limit']),
+    remaining: int(c['remaining']),
+  };
+}
+
+/** One line for a budget: `3 of 20 used this hour (17 left)`, or why there is no number. Never "unlimited". */
+export function budgetText(b: WriteBudgetView | null): string {
+  if (b === null || b.state === 'unknown') return 'unknown right now';
+  if (b.state === 'off') return 'write tools are off on this server';
+  return `${b.used} of ${b.limit} used this hour (${b.remaining} left)`;
+}

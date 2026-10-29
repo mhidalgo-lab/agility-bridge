@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // The write framework (P7-01): public surface for hosts and write tools.
 export { APPROVAL_SCHEMA, displayLabel, renderApproval, shortId } from './approval.ts';
+export { type CallerWriteBudget, callerView, callerWriteBudget } from './budget.ts';
 export { APPROVAL_INPUT_KEY, elicitationChannel, supportsFormElicitation } from './elicitation.ts';
 export { ApprovalLedger, type LedgerEntry, type LedgerStore, memoryLedgerStore } from './ledger.ts';
 export {
@@ -53,6 +54,8 @@ export {
   type WriteActor,
   type WriteAuditRecord,
   type WriteAuditSink,
+  type WriteBudget,
+  type WriteBudgetCount,
   type WriteLimiter,
   type WriteRuntime,
 } from './runtime.ts';

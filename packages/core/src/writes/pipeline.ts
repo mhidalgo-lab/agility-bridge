@@ -7,12 +7,14 @@
 //   -> send once -> outcome
 //
 // Never retried (the Agility client sends writes once, L-047). Nothing here keeps request data in module state (T21).
+
 import { z } from 'zod';
 import type { ToolContext } from '../context.ts';
 import { AbError, ErrorCode } from '../errors.ts';
 import { shapeOutput } from '../output/result.ts';
 import type { InputSchema, ToolDefinition, ToolOutput } from '../tool.ts';
 import { APPROVAL_SCHEMA, renderApproval, shortId } from './approval.ts';
+import { callerWriteBudget } from './budget.ts';
 import type { LedgerEntry } from './ledger.ts';
 import {
   type CanonicalMutation,
@@ -378,6 +380,8 @@ export function defineWriteTool<I extends InputSchema>(spec: WriteToolSpec<I>): 
 
     if (dryRun === true) {
       const noop = isNoop(mutation);
+      // What is left of the grant's writes this hour, read without taking a unit (P7-16).
+      const budget = await callerWriteBudget(ctx);
       return planOutput(
         ctx,
         noop
@@ -385,7 +389,14 @@ export function defineWriteTool<I extends InputSchema>(spec: WriteToolSpec<I>): 
           : `Dry run: ${mutation.operation} on ${mutation.target.number ?? mutation.target.oid} would change ${mutation.changes.length} field(s). Nothing was sent.`,
         plan,
         hash,
-        { applied: false, dryRun: true, noop, approval: 'dry_run', approvalChannel: channel },
+        {
+          applied: false,
+          dryRun: true,
+          noop,
+          approval: 'dry_run',
+          approvalChannel: channel,
+          ...(budget === undefined ? {} : { writeBudget: budget }),
+        },
         [
           channel === 'unavailable'
             ? 'A real call would be refused: no approval channel is available for this client (AB_WRITE_APPROVAL_UNAVAILABLE).'
@@ -394,6 +405,13 @@ export function defineWriteTool<I extends InputSchema>(spec: WriteToolSpec<I>): 
               : channel === 'page'
                 ? 'A real call needs the person to approve on a page.'
                 : 'A real call asks the person to approve in the client.',
+          ...(budget?.status === 'ok' && (budget.remaining === 0 || budget.deploymentFull === true)
+            ? [
+                budget.remaining === 0
+                  ? `A real call would be refused: this connection has used its ${budget.limit} writes for this hour (resets ${budget.resetsAt}).`
+                  : 'A real call would be refused: the whole deployment has used its writes for this hour.',
+              ]
+            : []),
           'To apply: repeat the call with confirm: true and without dry_run.',
         ],
       );

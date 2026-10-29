@@ -49,7 +49,7 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 
 **Who am I** · group `core` · read · cost 2 Agility requests at most
 
-Show who you are connected as: the Agility instance and version, the member behind the token, the workspace, which projects and asset types you can see, enabled tool groups, limits, the per-call request budget and write availability. Not paged.
+Show who you are connected as: the Agility instance and version, the member behind the token, the workspace, which projects and asset types you can see, enabled tool groups, limits, the per-call request budget, write availability and budget. Not paged.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 

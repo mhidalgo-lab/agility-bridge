@@ -6,7 +6,7 @@
 // only; the counters are the only state and they carry the window in their key (T21).
 import type { Clock } from '../context.ts';
 import { AbError, ErrorCode } from '../errors.ts';
-import type { WriteLimiter } from './runtime.ts';
+import type { WriteBudget, WriteBudgetCount, WriteLimiter } from './runtime.ts';
 
 /** The part of the storage `kv` table the limiter needs (`KvStore` satisfies it structurally). */
 export interface CounterStore {
@@ -58,7 +58,45 @@ function unavailable(cause: unknown): AbError {
 export function createWriteLimiter(options: WriteLimiterOptions): WriteLimiter {
   const limits = options.limits ?? DEFAULT_WRITE_RATE_LIMITS;
   const { counters, clock } = options;
+  /** `limit` of the grant's counter: the configured value, lowered by the grant's own cap (P7-15). */
+  const grantMax = (grantLimit: number | undefined): number =>
+    grantLimit !== undefined && Number.isInteger(grantLimit) && grantLimit >= 1
+      ? Math.min(limits.perGrant, grantLimit)
+      : limits.perGrant;
+  /** A counter's value as a whole number (0 when there is none yet); throws for anything else. */
+  const readCount = async (key: string): Promise<number> => {
+    const seen = await counters.get(key);
+    if (seen === null) return 0;
+    if (!/^\d{1,15}$/.test(seen)) throw new Error('write limiter: unexpected counter value');
+    return Number(seen);
+  };
+  const countOf = (limit: number, used: number): WriteBudgetCount => ({
+    limit,
+    used,
+    remaining: Math.max(0, limit - used),
+  });
   return {
+    async budget({ actor, grantLimit }): Promise<WriteBudget> {
+      // A read: nothing is taken, and no failure is shown as "unlimited" (P7-16).
+      try {
+        const now = clock.now();
+        const window = Math.floor(now / WRITE_LIMIT_WINDOW_MS);
+        const subject = encodeURIComponent(actor.grantId ?? actor.id);
+        const [grantUsed, deploymentUsed] = await Promise.all([
+          readCount(`wl:g:${subject}:${window}`),
+          limits.deployment === null ? Promise.resolve(0) : readCount(`wl:all:${window}`),
+        ]);
+        return {
+          status: 'ok',
+          windowEndsAt: (window + 1) * WRITE_LIMIT_WINDOW_MS,
+          grant: countOf(grantMax(grantLimit), grantUsed),
+          deployment: limits.deployment === null ? null : countOf(limits.deployment, deploymentUsed),
+        };
+      } catch (error) {
+        options.onError?.(error);
+        return { status: 'unknown' };
+      }
+    },
     async check({ actor, purpose, grantLimit }) {
       const now = clock.now();
       const window = Math.floor(now / WRITE_LIMIT_WINDOW_MS);
@@ -105,10 +143,7 @@ export function createWriteLimiter(options: WriteLimiterOptions): WriteLimiter {
           scope: 'grant',
           key: `wl:g:${subject}:${window}`,
           // A grant's own cap can only lower the configured value, never raise it (P7-15).
-          max:
-            grantLimit !== undefined && Number.isInteger(grantLimit) && grantLimit >= 1
-              ? Math.min(limits.perGrant, grantLimit)
-              : limits.perGrant,
+          max: grantMax(grantLimit),
         },
       ];
       if (limits.deployment !== null) {
