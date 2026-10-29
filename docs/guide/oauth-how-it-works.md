@@ -31,6 +31,13 @@ credential. Ticked, the app still cannot change anything without your approval o
 A refresh never adds the scope: to give a read-only app changes later, disconnect it on **My access** and connect it again.
 Disconnecting removes both reading and changing at once.
 
+**Which apps can ask for changes.** The **Changes** column on **My access** (and on the administrators' **Connected apps**
+list) marks each app **can ask for changes** (its authorization holds `mcp:write`) or **read only**. It says what the app was
+given when it connected, not that a change would go through today: the server switch, the workspace, the grant and your own
+credential still decide that, and each change still needs your approval. The scope itself is never shown, and it cannot be
+changed in place: disconnect the app to remove it. The same fact is `canWrite` in `GET /api/admin/v1/me/oauth-devices` and
+`GET /api/admin/v1/oauth/devices`.
+
 ## The short version
 
 An app (claude.ai, Claude on a phone, an IDE) that connects by OAuth does not hold your Agility token or a long-lived

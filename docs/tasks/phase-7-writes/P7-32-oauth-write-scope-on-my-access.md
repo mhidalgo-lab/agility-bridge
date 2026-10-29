@@ -2,7 +2,7 @@
 id: P7-32
 title: "Show the OAuth write scope on My access and the administrators' device list"
 phase: 7
-status: in-progress
+status: done
 priority: low
 depends_on: [P7-24]
 adr: ["0013"]

@@ -114,7 +114,7 @@ revoked alone). The page that follows shows the token **once**:
 
 With [OAuth](oauth-phone.md) on, two more screens show what people connected. Without it they say so and show nothing.
 
-- **Connected apps** (`/admin/oauth/devices`, owners and admins): every person's connected apps, ten to a page (**Next
+- **Connected apps** (`/admin/oauth/devices`, owners and admins): every person's connected apps (with a **Changes** column: *can ask for changes* or *read only*, from the app's `mcp:write` scope), ten to a page (**Next
   page** follows the list), each with the person and their role, the name the app gave itself (not verified), the device
   name, the workspace, where the app sends its answers, and when it was connected and ends. **Disconnect** ends that app's
   access and refresh tokens at once. An owner disconnects anyone's app; an admin a member's (and their own), the same rule as

@@ -1611,6 +1611,10 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
         description:
           'When a token was last issued or the app last made a request, to within about 5 minutes; null when not seen yet.',
       }),
+      canWrite: z.boolean().openapi({
+        description:
+          'The authorization holds the `mcp:write` scope: the app can ask for changes. Whether a write would run still depends on the server, the workspace, the grant and a personal credential; disconnect and connect again to change it.',
+      }),
     })
     .openapi('OAuthDevice');
   /** The signed-in person's id for the OAuth device routes: a session only, never the break-glass token. */
@@ -1700,6 +1704,9 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       label: z.string().nullable(),
       createdAt: z.number(),
       expiresAt: z.number().nullable(),
+      canWrite: z
+        .boolean()
+        .openapi({ description: 'The authorization holds the `mcp:write` scope (P7-32).' }),
     })
     .openapi('OAuthAdminDevice');
   const OAuthClientOut = z

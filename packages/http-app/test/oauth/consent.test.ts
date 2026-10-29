@@ -290,6 +290,72 @@ describe('sign-in and consent (P5-04)', () => {
     expect(((await forgedToken.json()) as { scope: string }).scope.split(' ')).not.toContain('mcp:write');
   });
 
+  it("shows which connected apps can ask for changes, on My access and in the administrators' list, without showing a scope (P7-32)", async () => {
+    const t = await server({ writeSwitch: true });
+    const w = t.w;
+    await w.storage.workspaces.update(w.ids.workspaceA, {
+      enabledTools: ['whoami', 'add_comment'],
+      writePolicy: { enabled: true },
+    });
+    await w.storage.grants.update(w.ids.aliceGrant, { tools: ['whoami', 'add_comment'] });
+    const cookie = await login(t, 'alice@example.test');
+    // One app asked for and was given the write scope, one asked and was not ticked, one never asked.
+    const device = async (name: string, scope: string, tick: boolean) => {
+      const clientId = await register(t, { name });
+      const asked = await authRequest(t, clientId, { extra: { scope } });
+      const { form } = await consentPage(t, asked, cookie);
+      const res = await post(
+        t,
+        form,
+        cookie,
+        body(form, tick ? { write: '1', label: name } : { label: name }),
+      );
+      expect((await exchange(t, asked, codeOf(res) as string)).status).toBe(200);
+    };
+    await device('Writer app', 'mcp:read mcp:write offline_access', true);
+    await device('Unticked app', 'mcp:read mcp:write offline_access', false);
+    await device('Reader app', 'mcp:read offline_access', false);
+    const csrf = await csrfOf(t, cookie);
+    const mine = (await (await api(t, cookie, csrf, 'GET', '/me/oauth-devices')).json()) as {
+      label: string;
+      canWrite: boolean;
+    }[];
+    expect(Object.fromEntries(mine.map((d) => [d.label, d.canWrite]))).toEqual({
+      'Writer app': true,
+      'Unticked app': false,
+      'Reader app': false,
+    });
+    // My access: a badge each, and no scope string anywhere on the page.
+    const page = await (await t.send('GET', '/admin/me', { cookie })).text();
+    expect(page).toContain('Changes');
+    expect(page.match(/can ask for changes/g)).toHaveLength(1);
+    expect(page.match(/read only/g)).toHaveLength(2);
+    expect(page).not.toContain('mcp:write');
+    // The administrators' list (API and page) shows the same, for the owner.
+    const owner = await login(t, 'owner@example.test');
+    const ownerCsrf = await csrfOf(t, owner);
+    const all = (await (await api(t, owner, ownerCsrf, 'GET', '/oauth/devices')).json()) as {
+      data: { label: string; canWrite: boolean }[];
+    };
+    expect(Object.fromEntries(all.data.map((d) => [d.label, d.canWrite]))).toEqual({
+      'Writer app': true,
+      'Unticked app': false,
+      'Reader app': false,
+    });
+    const adminPage = await (await t.send('GET', '/admin/oauth/devices', { cookie: owner })).text();
+    expect(adminPage.match(/can ask for changes/g)).toHaveLength(1);
+    expect(adminPage.match(/read only/g)).toHaveLength(2);
+    expect(adminPage).not.toContain('mcp:write');
+    // Another member sees none of Alice's apps, with or without the flag; a member cannot read the administrators' list.
+    const bob = await login(t, 'bob@example.test');
+    const bobCsrf = await csrfOf(t, bob);
+    expect(await (await api(t, bob, bobCsrf, 'GET', '/me/oauth-devices')).json()).toEqual([]);
+    const refused = await api(t, bob, bobCsrf, 'GET', '/oauth/devices');
+    expect(refused.status).toBe(403);
+    expect(await refused.text()).not.toContain('canWrite');
+    expect((await t.send('GET', '/admin/oauth/devices', { cookie: bob })).status).toBe(403);
+  });
+
   it('shows no write box when the server switch is off, even if the app asks', async () => {
     const t = await server();
     const clientId = await register(t);

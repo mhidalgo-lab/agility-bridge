@@ -350,7 +350,7 @@ Status lives in each task file.
 | P7-29 | [Approval text: values that contain the envelope phrase](tasks/phase-7-writes/P7-29-envelope-lookalike-in-approval.md) | low | P7-02 | done |
 | P7-30 | [Free-plan ceiling for the deployment write cap; one statement for the grant and denial take](tasks/phase-7-writes/P7-30-free-plan-write-cap-and-one-statement-take.md) | low | P7-03, P7-02 | todo |
 | P7-31 | [Bench the approval page and the write limiter; take the outcome audit off the hot path](tasks/phase-7-writes/P7-31-write-path-bench-and-audit-latency.md) | low | P7-09 | todo |
-| P7-32 | [Show the OAuth write scope on My access and the administrators' device list](tasks/phase-7-writes/P7-32-oauth-write-scope-on-my-access.md) | low | P7-24 | in-progress |
+| P7-32 | [Show the OAuth write scope on My access and the administrators' device list](tasks/phase-7-writes/P7-32-oauth-write-scope-on-my-access.md) | low | P7-24 | done |
 | P7-33 | [Step-up consent for mcp:write instead of reconnecting](tasks/phase-7-writes/P7-33-oauth-write-step-up.md) | low | P7-24, P7-10 | todo |
 | P7-40 | [CLI command to change a grant](tasks/phase-7-writes/P7-40-cli-grant-update.md) | low | P7-15 | todo |
 | P7-46 | [URL-mode elicitation for the approval page](tasks/phase-7-writes/P7-46-url-mode-elicitation.md) | low | P7-13, P7-12 | todo |

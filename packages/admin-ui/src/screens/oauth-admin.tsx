@@ -17,7 +17,7 @@ import { Badge, ConfirmAction, DataTable, Form, Pager } from '../components.tsx'
 import { adminPath, requestIdOf, type UiKit } from '../kit.ts';
 import { errorPage } from '../pages.tsx';
 import { OAUTH_DEVICE_ID_RE, rows } from './data.ts';
-import { isOk, load, Screen, When, withQuery } from './shared.tsx';
+import { isOk, load, Screen, When, WriteScope, withQuery } from './shared.tsx';
 
 export const OAUTH_DEVICES = '/admin/oauth/devices';
 export const OAUTH_CLIENTS = '/admin/oauth/clients';
@@ -44,6 +44,8 @@ export interface OAuthAdminDevice {
   readonly userRole: 'owner' | 'admin' | 'member' | null;
   readonly clientName: string | null;
   readonly redirectHost: string;
+  /** The app holds `mcp:write`: it can ask for changes (P7-32). */
+  readonly canWrite: boolean;
   readonly workspaceName: string | null;
   readonly workspaceSlug: string | null;
   readonly label: string | null;
@@ -68,6 +70,7 @@ export function parseOAuthAdminDevicePage(
       userRole: role === 'owner' || role === 'admin' || role === 'member' ? role : null,
       clientName: strOrNull(r['clientName']),
       redirectHost: str(r['redirectHost']),
+      canWrite: r['canWrite'] === true,
       workspaceName: strOrNull(r['workspaceName']),
       workspaceSlug: strOrNull(r['workspaceSlug']),
       label: strOrNull(r['label']),
@@ -250,6 +253,7 @@ export function registerOAuthAdmin(ui: Hono, kit: UiKit): void {
                 cell: (d) => <Untrusted text={d.workspaceName ?? d.workspaceSlug} none="unknown" />,
               },
               { header: 'Sends to', cell: (d) => <span class="mono">{d.redirectHost}</span> },
+              { header: 'Changes', cell: (d) => <WriteScope canWrite={d.canWrite} /> },
               { header: 'Connected', cell: (d) => <When at={d.createdAt} /> },
               { header: 'Ends', cell: (d) => <When at={d.expiresAt} none="never" /> },
               {
