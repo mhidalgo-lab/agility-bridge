@@ -37,7 +37,7 @@ How to use it:
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
-| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-396 |
+| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-396, L-400 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382 |
@@ -1610,6 +1610,13 @@ A fake that only records the POST cannot exercise the re-read, the no-op repeat 
 the XML and sets, adds, removes and creates on its rows, asserts the exact bytes sent, and says in its header that the shapes
 are the documented ones, not verified ones (L-112). The shared fake had to stop parsing every POST body as JSON.
 *Applied in:* P7-04, `test/tools/writes-world.ts`.
+
+**L-400 — Put a fact the person relies on into the mutation, even when it is not a field you write.**
+Closing sends no attribute, yet "this item has no open children" is what makes the approval safe. Carry it as an
+informational change whose old and new are equal (`OpenChildren 0 -> 0`): the approval shows it, the hash binds it, the
+re-read compares it (a child that appears is a conflict), and it never counts toward "something to change". The operation
+name goes in the mutation's operation for the same reason.
+*Applied in:* P7-06, `tools/writes/lifecycle.ts`.
 
 ## O. Caching, quotas and budgets
 

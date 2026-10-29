@@ -52,3 +52,8 @@ None beyond the shared rules in AGENTS.md.
 
 ## Out of scope
 - Anything not listed under Scope.
+
+## Lifecycle items from P7-06 (unverified operation shapes)
+- [ ] `close_asset`: which of `QuickClose`, `Close`, `Inactivate` each type has and which is right; does `QuickClose` close open tasks and tests (D-186, P7-22); what the validators refuse.
+- [ ] `reopen_asset`: `Reactivate` per type; refused when the parent is closed? (P7-23).
+- [ ] The response of an operation with no body, and the read lag before the state shows (L-051).

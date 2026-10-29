@@ -20,6 +20,8 @@ export interface Post {
   readonly path: string;
   readonly xml: string;
   readonly contentType: string | null;
+  /** The `?op=` operation of a lifecycle write (P7-06); absent for attribute writes. */
+  readonly op?: string;
 }
 
 type Mutable = Record<string, unknown>;
@@ -72,7 +74,16 @@ export function writeRig(
     return (assets[type] ?? []).find((r) => r['_oid'] === oid);
   };
   const memberName = (oid: string): string => String(find(oid)?.['Name'] ?? oid);
-  const apply = (type: string, id: string | undefined, xml: string): string => {
+  const apply = (type: string, id: string | undefined, xml: string, operation?: string): string => {
+    if (operation !== undefined) {
+      const target = find(`${type}:${id}`);
+      if (target === undefined) throw new Error(`the fake write endpoint has no ${type}:${id}`);
+      if (['QuickClose', 'Close', 'Inactivate'].includes(operation)) target['AssetState'] = 128;
+      else if (operation === 'Reactivate') target['AssetState'] = 64;
+      else throw new Error(`the fake write endpoint does not model the operation ${operation}`);
+      target['ChangeDateUTC'] = `2026-10-21T12:00:0${posts.length}.0000000Z`;
+      return `${type}:${id}:${++counter}`;
+    }
     const root = parseXml(xml);
     const op = (name: string) => root.children.filter((c) => c.attributes['name'] === name);
     if (id === undefined) {
@@ -146,9 +157,15 @@ export function writeRig(
     override: (req, call) => {
       if (req.method === 'POST' && call.path.startsWith('rest-1.v1/Data/')) {
         const [, , type = '', id] = call.path.split('/');
-        const xml = String(call.body);
-        posts.push({ path: call.path, xml, contentType: req.headers.get('content-type') });
-        const moment = apply(type, id, xml);
+        const xml = call.body === undefined ? '' : String(call.body);
+        const opName = new URL(req.url).searchParams.get('op') ?? undefined;
+        posts.push({
+          path: call.path,
+          xml,
+          contentType: req.headers.get('content-type'),
+          ...(opName === undefined ? {} : { op: opName }),
+        });
+        const moment = apply(type, id, xml, opName);
         return new Response(`<Asset href="/SyntheticInstance/${call.path}" id="${moment}"/>`, {
           status: 200,
           headers: { 'content-type': 'application/xml' },
@@ -209,5 +226,13 @@ export const WRITE_WORST_CASES: Readonly<
   move_to_sprint: {
     args: { asset: 'B-01002', sprint: 'next' },
     why: 'a relative sprint (two reads), its state, the re-read and the write',
+  },
+  close_asset: {
+    args: { asset: 'B-01004' },
+    why: 'number lookup, item read, metadata of the type and the child types, child counts, the re-read with counts and the operation',
+  },
+  reopen_asset: {
+    args: { asset: 'B-01001' },
+    why: 'number lookup, item read, the type metadata, the re-read and the operation',
   },
 };

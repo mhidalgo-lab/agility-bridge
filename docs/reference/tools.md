@@ -2,7 +2,7 @@
 
 # Tool reference
 
-33 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
+35 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
 later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a cold metadata cache.
 
 | Tool | Group | Cost | Title |
@@ -40,6 +40,8 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 | [`log_effort`](#log_effort) | writes | 14 | Log effort |
 | [`assign_owners`](#assign_owners) | writes | 26 | Assign owners |
 | [`move_to_sprint`](#move_to_sprint) | writes | 14 | Move to sprint |
+| [`close_asset`](#close_asset) | writes | 22 | Close work item |
+| [`reopen_asset`](#reopen_asset) | writes | 22 | Reopen work item |
 
 ## `whoami`
 
@@ -607,5 +609,33 @@ Annotations: read-only false, destructive false, idempotent true, open world tru
 |---|---|---|---|---|
 | `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
 | `sprint` | string | yes |  | Sprint: name, Timebox:<id>, or current, previous or next. |
+| `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
+| `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |
+
+## `close_asset`
+
+**Close work item** · group `writes` · destructive · cost 22 Agility requests at most
+
+Close one backlog item, defect, task, test or epic with the close operation its type has on this instance. Refused while it has open child items; an item that is already closed is a no-op. Destructive. Needs approval; preview with dry_run. Not paged. Cold call: up to 22 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+
+Annotations: read-only false, destructive true, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
+| `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
+| `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |
+
+## `reopen_asset`
+
+**Reopen work item** · group `writes` · destructive · cost 22 Agility requests at most
+
+Reopen one closed backlog item, defect, task, test or epic with its Reactivate operation. An item that is already open is a no-op. Destructive. Needs approval; preview with dry_run. Not paged. Cold call: up to 22 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+
+Annotations: read-only false, destructive true, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
 | `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
 | `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |
