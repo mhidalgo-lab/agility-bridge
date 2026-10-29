@@ -43,7 +43,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | `GET` | `/grants` | List grants | — | 200 Grant[] |
 | `POST` | `/grants` | Grant a user or service access to a workspace | `workspaceId`: string<br>`userId`: string \| null<br>`label`?: string \| null<br>`credentialId`?: string \| null<br>`tools`?: array \| null<br>`scopeIds`?: array \| null<br>`assetTypes`?: object \| null<br>`limits`?: object<br>`rateLimit`?: object \| null<br>`expiresAt`?: integer \| null | 201 object |
 | `GET` | `/grants/{id}` | Get a grant | — | 200 Grant |
-| `PATCH` | `/grants/{id}` | Change a grant (owners and admins; write tools, and widening the projects, asset types or end date of a grant that has them: an owner with a recent sign-in) | `label`?: string \| null<br>`credentialId`?: string \| null<br>`tools`?: array \| null<br>`scopeIds`?: array \| null<br>`assetTypes`?: object \| null<br>`limits`?: object<br>`rateLimit`?: object \| null<br>`expiresAt`?: integer \| null | 200 object |
+| `PATCH` | `/grants/{id}` | Change a grant (owners and admins; write tools, widening the projects, asset types or end date of a grant that has them, and the grant's own hourly write limit `rateLimit.writesPerHour`, which can only lower the server's: an owner with a recent sign-in) | `label`?: string \| null<br>`credentialId`?: string \| null<br>`tools`?: array \| null<br>`scopeIds`?: array \| null<br>`assetTypes`?: object \| null<br>`limits`?: object<br>`rateLimit`?: object \| null<br>`expiresAt`?: integer \| null | 200 object |
 | `DELETE` | `/grants/{id}` | Delete a grant and its tokens | — | 200 object |
 | `POST` | `/grants/{id}/revoke` | Revoke a grant | — | 200 Grant |
 

@@ -245,6 +245,13 @@ The counters are fixed hourly windows in the shared `kv` table, so they hold acr
 (stdio counts in its own process and has no deployment limit). The write limit cannot be switched off, and it **fails
 closed**: if the counters cannot be reached the write is refused (`AB_WRITE_LIMIT_UNAVAILABLE`), never allowed.
 
+- **A lower limit for one grant.** An owner can give a grant its own **writes per hour** (1 to 1,000) on the grant's form in
+  the panel (*Writes per hour*) or as `rateLimit.writesPerHour` in `PATCH /api/admin/v1/grants/<id>`. The write limiter uses
+  the **lower** of that and `AB_WRITE_RATE_PER_GRANT_HOURLY`, so it can only tighten: a value above the server's is refused
+  when you set it, and one that became higher because the server's limit was lowered later simply has no effect. Setting,
+  changing or removing it needs an **owner** with a recent sign-in (an administrator cannot loosen what an owner set, and the
+  form keeps the value when an administrator saves it); the `grant.update` audit row records the new `rateLimit` and
+  `previousWritesPerHour`. It applies from the next write in the current hour (the counter is not reset).
 - Over a limit: `AB_LIMIT_RATE` with the scope (`grant` or `deployment`), the limit and the seconds until the next hour.
   The refusal makes no read of the target and no send, and writes no intent audit row.
 - **Approval requests are counted too.** Before a person is asked (a prompt in the client, a question round, a new pending

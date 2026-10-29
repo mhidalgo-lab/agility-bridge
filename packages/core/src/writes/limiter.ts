@@ -59,7 +59,7 @@ export function createWriteLimiter(options: WriteLimiterOptions): WriteLimiter {
   const limits = options.limits ?? DEFAULT_WRITE_RATE_LIMITS;
   const { counters, clock } = options;
   return {
-    async check({ actor, purpose }) {
+    async check({ actor, purpose, grantLimit }) {
       const now = clock.now();
       const window = Math.floor(now / WRITE_LIMIT_WINDOW_MS);
       const expiresAt = (window + 1) * WRITE_LIMIT_WINDOW_MS;
@@ -101,7 +101,15 @@ export function createWriteLimiter(options: WriteLimiterOptions): WriteLimiter {
       // The grant first: a caller over its own limit must not spend the deployment's budget.
       const subject = encodeURIComponent(actor.grantId ?? actor.id);
       const scopes: Array<{ scope: 'grant' | 'deployment'; key: string; max: number }> = [
-        { scope: 'grant', key: `wl:g:${subject}:${window}`, max: limits.perGrant },
+        {
+          scope: 'grant',
+          key: `wl:g:${subject}:${window}`,
+          // A grant's own cap can only lower the configured value, never raise it (P7-15).
+          max:
+            grantLimit !== undefined && Number.isInteger(grantLimit) && grantLimit >= 1
+              ? Math.min(limits.perGrant, grantLimit)
+              : limits.perGrant,
+        },
       ];
       if (limits.deployment !== null) {
         scopes.push({ scope: 'deployment', key: `wl:all:${window}`, max: limits.deployment });

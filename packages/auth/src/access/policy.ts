@@ -65,6 +65,11 @@ export type WritePolicy = z.infer<typeof writePolicySchema>;
 /** Per-grant rate limit (P2-07). */
 export const rateLimitPolicySchema = z.strictObject({
   perMinute: z.number().int().min(1).max(100_000).optional(),
+  /**
+   * Writes per hour for this grant (P7-15): a cap an owner sets. The write limiter uses the lower of this and the
+   * deployment's `AB_WRITE_RATE_PER_GRANT_HOURLY`; setting one above the deployment's value is refused.
+   */
+  writesPerHour: z.number().int().min(1).max(1_000).optional(),
 });
 export type RateLimitPolicy = z.infer<typeof rateLimitPolicySchema>;
 

@@ -28,6 +28,8 @@ export interface Opts {
   writes?: HttpWrites;
   /** The server switch for write tools is on (`AB_WRITE_TOOLS=on`); the consent screen then offers `mcp:write` (P7-24). */
   writeSwitch?: boolean;
+  /** The deployment's writes per grant per hour, which a grant's own limit may not exceed (P7-15). */
+  writeRateCap?: number;
 }
 
 export async function setup(options: Opts = {}) {
@@ -100,6 +102,7 @@ export async function setup(options: Opts = {}) {
     },
     {
       admin: true,
+      ...(options.writeRateCap === undefined ? {} : { writeRateCap: options.writeRateCap }),
       ...(options.oauth === undefined ? {} : { liveClock: true }),
       ...(options.tools === undefined ? {} : { tools: options.tools }),
       ...(options.validate === undefined ? {} : { validate: options.validate }),

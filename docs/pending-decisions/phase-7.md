@@ -369,3 +369,16 @@
 - **Options:** (a) refuse the new request (`AB_LIMIT_RATE`, scope `approvals_pending`, nothing stored); the same change asked again still returns its own link; (b) keep evicting the oldest; (c) evict the newest of the same tool.
 - **Recommendation:** (a), built. The cost is that a flood can fill the 20 places for ten minutes and refuse the person's own later requests; that is a denial of approvals, never a way to make a change, and it clears when the person declines or the requests expire. The request counter (D-205) bounds how fast it can happen.
 - **Owner:** *(open; built as (a))*
+
+### D-225 — A grant's hourly write cap lives in its `rateLimit`, and only an owner can set it *(P7-15)*
+- **Context:** The task names a new `writeRate.perHour` field "in storage, admin API, CLI, panel". The grant already has a `rateLimit` JSON column (`perMinute`), validated by one schema.
+- **Options:** (a) add `writesPerHour` to `rateLimit` (no migration, three storage adapters untouched, the admin API and panel already carry the object), owner-only with a recent sign-in because it is a safety control; (b) a new column (a migration in memory, SQLite and D1 and a contract test); (c) any manager may set it (an administrator could then loosen what an owner chose).
+- **Recommendation:** (a), built. The deployment value stays authoritative: the limiter uses the minimum at run time, and the API refuses a higher value when it is set.
+- **Owner:** *(open; built as (a))*
+
+### D-226 — The CLI is not extended for the write cap; a `grant update` command is a follow-up *(P7-15)*
+- **Context:** The task says "CLI if that is how other grant settings work". Today no grant command sets any rate (`grant add` has no rate option and there is no `grant update`).
+- **Options:** (a) leave the CLI and file P7-40 (`grant update` with `--rate-per-minute` and `--writes-per-hour`); (b) add only a write-cap flag to `grant add` (a different setting from every other one, and a half-finished command).
+- **Recommendation:** (a), built. The CLI's in-process client already enforces the same owner rule and the cap (it is handed the server's value).
+- **Owner:** *(open; built as (a))*
+

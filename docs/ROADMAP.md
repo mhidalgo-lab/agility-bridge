@@ -333,7 +333,7 @@ Status lives in each task file.
 | P7-12 | [What real clients render of the approval text](tasks/phase-7-writes/P7-12-approval-text-in-clients.md) | medium | P7-01 | todo |
 | P7-13 | [Approval page in the browser suites, URL-mode elicitation and a non-eliciting client on staging](tasks/phase-7-writes/P7-13-approval-page-e2e-url-elicitation.md) | medium | P7-02, P7-04 | review |
 | P7-14 | [A list of my pending approvals](tasks/phase-7-writes/P7-14-pending-approvals-list.md) | low | P7-02 | done |
-| P7-15 | [Per-grant write limit set by an owner](tasks/phase-7-writes/P7-15-per-grant-write-limit.md) | low | P7-03, P4-05 | in-progress |
+| P7-15 | [Per-grant write limit set by an owner](tasks/phase-7-writes/P7-15-per-grant-write-limit.md) | low | P7-03, P4-05 | done |
 | P7-16 | [Show the remaining write budget](tasks/phase-7-writes/P7-16-write-budget-visibility.md) | low | P7-03 | todo |
 | P7-17 | [Wave-1 extensions: clear the sprint, effort for others, to-do](tasks/phase-7-writes/P7-17-wave-1-extensions.md) | low | P7-04 | review |
 | P7-18 | [Comments: rich text and mentions](tasks/phase-7-writes/P7-18-comment-rich-text-mentions.md) | low | P7-04, P7-07 | todo |

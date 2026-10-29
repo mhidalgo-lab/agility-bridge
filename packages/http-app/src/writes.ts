@@ -130,6 +130,11 @@ export function createHttpWrites(options: HttpWritesOptions): HttpWrites {
         },
       };
       const channel = page?.channelFor(access);
+      // The grant's own hourly cap (P7-15): the limiter takes the lower of it and the deployment's value.
+      const own = (access.rateLimit as { writesPerHour?: unknown } | null | undefined)?.writesPerHour;
+      const grantLimit = typeof own === 'number' ? own : undefined;
+      const grantLimiter: WriteLimiter =
+        grantLimit === undefined ? limiter : { check: (info) => limiter.check({ ...info, grantLimit }) };
       return {
         approval: 'required',
         ...(channel === undefined ? {} : { page: channel }),
@@ -138,7 +143,7 @@ export function createHttpWrites(options: HttpWritesOptions): HttpWrites {
         ledger,
         audit,
         stateKey: await key(),
-        limiter,
+        limiter: grantLimiter,
       };
     },
   };

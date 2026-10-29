@@ -764,6 +764,59 @@ describe('grants', () => {
     expect(detail).toContain('maxRows (50) is above the workspace&#39;s (5)');
   });
 
+  it("the hourly write limit is the owner's: only the owner sees the field, the admin's save keeps it, and a value above the server's is refused beside the form (P7-15)", async () => {
+    const e = await env({ writeRateCap: 20 });
+    const { s, admin, owner } = e;
+    const grant = e.ids.aliceGrant;
+    const base = { credential: e.ids.aliceCredential, tools_all: '1', scopes_all: '1', expiry: 'keep' };
+    expect(await (await page(s, `/admin/grants/${grant}/edit`, admin)).text()).not.toContain(
+      'name="writesPerHour"',
+    );
+    expect(await (await page(s, `/admin/grants/${grant}/edit`, owner)).text()).toContain(
+      'name="writesPerHour"',
+    );
+    // The owner sets it (with the per-minute rate beside it).
+    const set = await submit(s, `/admin/grants/${grant}/edit`, owner, {
+      ...base,
+      perMinute: '30',
+      writesPerHour: '5',
+    });
+    expect(set.status).toBe(303);
+    expect((await s.w.storage.grants.get(grant))?.rateLimit).toEqual({ perMinute: 30, writesPerHour: 5 });
+    expect(await (await page(s, `/admin/grants/${grant}`, admin)).text()).toContain('5 (an owner&#39;s cap)');
+    // The admin saves the form (no such field): the limit is kept, and the per-minute rate can change.
+    const kept = await submit(s, `/admin/grants/${grant}/edit`, admin, { ...base, perMinute: '40' });
+    expect(kept.status).toBe(303);
+    expect((await s.w.storage.grants.get(grant))?.rateLimit).toEqual({ perMinute: 40, writesPerHour: 5 });
+    // A forged field from the admin changes nothing either: the form ignores it and keeps the stored value.
+    const forged = await submit(s, `/admin/grants/${grant}/edit`, admin, {
+      ...base,
+      perMinute: '40',
+      writesPerHour: '1000',
+    });
+    expect(forged.status).toBe(303);
+    expect((await s.w.storage.grants.get(grant))?.rateLimit).toEqual({ perMinute: 40, writesPerHour: 5 });
+    // Above the server's limit, a fraction and text: refused with the message beside the field, nothing stored.
+    for (const bad of ['21', '1.5', 'many', '0']) {
+      const res = await submit(s, `/admin/grants/${grant}/edit`, owner, {
+        ...base,
+        perMinute: '40',
+        writesPerHour: bad,
+      });
+      expect(res.status, bad).toBe(422);
+      expect(await res.text(), bad).toMatch(/writesPerHour|Writes per hour/);
+    }
+    expect((await s.w.storage.grants.get(grant))?.rateLimit).toEqual({ perMinute: 40, writesPerHour: 5 });
+    // Blank removes it.
+    const cleared = await submit(s, `/admin/grants/${grant}/edit`, owner, {
+      ...base,
+      perMinute: '40',
+      writesPerHour: '',
+    });
+    expect(cleared.status).toBe(303);
+    expect((await s.w.storage.grants.get(grant))?.rateLimit).toEqual({ perMinute: 40 });
+  });
+
   it('refuses what the workspace and credential rules refuse, with the message beside the form', async () => {
     const e = await env();
     const { s, admin } = e;

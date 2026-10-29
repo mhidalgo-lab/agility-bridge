@@ -63,6 +63,8 @@ export interface WriteLimiter {
      * Absent or `write`: a write is about to run.
      */
     readonly purpose?: 'write' | 'approval_request';
+    /** The grant's own hourly cap (P7-15): the limiter uses the lower of this and its configured value. */
+    readonly grantLimit?: number;
   }): Promise<void>;
 }
 

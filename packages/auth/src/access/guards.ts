@@ -131,6 +131,11 @@ export interface GuardContext {
    * An owner may only name one of these when moving a user (P4-39, D-130); absent or empty = none can be named.
    */
   readonly configuredIdps?: readonly string[];
+  /**
+   * The deployment's writes per grant per hour (`AB_WRITE_RATE_PER_GRANT_HOURLY`): the most a grant's own `writesPerHour`
+   * may be (P7-15). Absent = only the schema's ceiling applies.
+   */
+  readonly writeRateCap?: number;
 }
 
 /** The services, each call checked against the actor's role (and, for members, ownership). */
@@ -139,6 +144,27 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
   const writeTools = (names: readonly string[] | null | undefined) =>
     (names ?? []).filter((n) => tools.get(n) !== undefined && tools.get(n)?.kind !== 'read');
   const self = userIdOf(actor);
+
+  /** `rateLimit.writesPerHour` of a stored or submitted value (anything else is no limit). */
+  const writesPerHourOf = (rateLimit: unknown): number | null => {
+    const v = (rateLimit as { writesPerHour?: unknown } | null | undefined)?.writesPerHour;
+    return typeof v === 'number' ? v : null;
+  };
+  /**
+   * A grant's own hourly write limit is the owner's to set, change or remove (P7-15): it can only lower the deployment's
+   * value, and an administrator must not loosen what an owner set. Nothing else about `rateLimit` needs an owner.
+   */
+  function checkWriteRate(next: unknown, current: unknown): void {
+    const nextValue = writesPerHourOf(next);
+    if (nextValue === (current === undefined ? null : writesPerHourOf(current))) return;
+    needOwner(actor, 'change the write limit of a grant');
+    needRecent(actor, 'changing the write limit of a grant');
+    if (nextValue !== null && ctx.writeRateCap !== undefined && nextValue > ctx.writeRateCap) {
+      throw new InvalidInputError(
+        `rateLimit.writesPerHour: at most ${ctx.writeRateCap}, the server's limit per grant; a grant can only lower it.`,
+      );
+    }
+  }
 
   async function load<T>(row: Promise<T | null>, what: string): Promise<T> {
     const r = await row;
@@ -483,6 +509,7 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
         needOwner(actor, 'grant write tools');
         needRecent(actor, 'granting write tools');
       }
+      checkWriteRate(input.rateLimit, null);
       return services.grants.create(input);
     },
     async update(id: string, patch: GrantPatchInput): Promise<WithWarnings<Grant>> {
@@ -492,6 +519,7 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
         needRecent(actor, 'granting write tools');
       }
       const current = await load(storage.grants.get(id), 'grant');
+      if (patch.rateLimit !== undefined) checkWriteRate(patch.rateLimit, current.rateLimit);
       if (patch.credentialId !== undefined && patch.credentialId !== current.credentialId) {
         await needCredentialOwner(patch.credentialId, "put a grant on someone's personal Agility token");
       }

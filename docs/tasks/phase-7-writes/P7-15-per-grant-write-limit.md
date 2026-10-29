@@ -2,7 +2,7 @@
 id: P7-15
 title: Per-grant write limit set by an owner
 phase: 7
-status: in-progress
+status: done
 priority: low
 depends_on: [P7-03, P4-05]
 adr: ["0013"]

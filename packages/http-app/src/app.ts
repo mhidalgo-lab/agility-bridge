@@ -176,7 +176,7 @@ export interface HttpAppOptions extends EdgeOptions {
     readonly audit?: (event: OAuthEvent) => unknown;
   };
   /** The admin API at `/api/admin/v1` (P2-09); absent = the whole API answers 404. */
-  readonly admin?: Pick<AdminApiOptions, 'services' | 'audit' | 'authenticate'>;
+  readonly admin?: Pick<AdminApiOptions, 'services' | 'audit' | 'authenticate' | 'writeRateCap'>;
   /** Admin session timeouts, cap and logout behaviour (P4-02); used when sign-in (`identity`) is configured. */
   readonly session?: SessionOptions;
   /**
