@@ -429,3 +429,9 @@
 - **Recommendation:** (a), built. More than three owners are added with `assign_owners`. The defaults Agility applies on create (`rest-1.v1/New`, D-180) are not shown yet: the response of that endpoint is a P7-07 question.
 - **Owner:** *(open; built as (a))*
 
+### D-230 — The device lists show whether the app holds `mcp:write`, as a badge from a boolean *(P7-32)*
+- **Context:** The granted scope is in the provider's grant record but the device lists did not show it, so a person could not tell a read-only app from one that can ask for changes.
+- **Options:** (a) a `canWrite` boolean derived on the server from the grant record's scope (`mcp:write` present), shown as "can ask for changes" or "read only" on My access and the administrators' list, with the plain wording that it is what the app was given and not that a write would run today; (b) show the scope strings (untrusted-looking text, and a string for something the person never needs to read); (c) compute "could write right now" from the live access layers (an extra access resolution per device on every page view).
+- **Recommendation:** (a), built. The badge cannot be forged by a client (it comes from the grant record the server wrote), and (c) is cost and meaning the person cannot act on: the way to remove it is the disconnect button either way (D-202).
+- **Owner:** *(open; built as (a))*
+

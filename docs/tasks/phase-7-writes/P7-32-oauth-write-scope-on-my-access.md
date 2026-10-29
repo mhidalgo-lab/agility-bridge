@@ -2,7 +2,7 @@
 id: P7-32
 title: "Show the OAuth write scope on My access and the administrators' device list"
 phase: 7
-status: todo
+status: done
 priority: low
 depends_on: [P7-24]
 adr: ["0013"]
@@ -20,12 +20,17 @@ they are connected. Today the granted scope is in the `oauth.authorize` audit ro
 device list does not show it.
 
 ## Scope
-- Add the granted write scope to `OAuthDevice` (from the grant record's `scope`), the panel list, the admin API and CLI reference.
-- Label it plainly ("can ask for changes") and keep the disconnect button the way to remove it.
+Refined 2026-10-29.
+
+- `OAuthDevice` (and the administrators' `OAuthAdminDevice`) gains `canWrite: boolean`: the grant record's `scope` holds `mcp:write` (the scope the person ticked on the consent screen and the server granted, P7-24). It is a fact about the authorization, not about whether a write would succeed today: the server switch, the workspace, the grant and a personal credential still decide that (ADR-0013), so the label says "can ask for changes", never "can change".
+- Both device routes (`GET /me/oauth-devices`, `GET /oauth/devices`) return it; the panel shows a "Changes" column on My access and on the administrators' list: a badge "can ask for changes" or "read only". The disconnect button stays the way to remove it (a scope is not changed in place, D-202).
+- Nothing in the badge or the reference comes from an untrusted source: it is a boolean derived from a scope string the server issued; no scope string is rendered.
+- No new route, no change to what a token may do.
 
 ## Acceptance criteria
-- [ ] The list shows a write-capable app differently from a read-only one, on My access and in the administrators' list.
-- [ ] Generated API and CLI references are refreshed; no token or scope string from an untrusted source is rendered unescaped.
+- [x] The list shows a write-capable app differently from a read-only one, on My access and in the administrators' list (a granted-write and a read-only device in each).
+- [x] The generated admin API reference is refreshed; the CLI has no OAuth device command (nothing to refresh); no scope string is rendered.
+- [x] A person still sees only their own devices and the administrators' list keeps its role rules (existing negative tests unchanged and passing).
 
 ## Docs to update
 - docs/guide/oauth-how-it-works.md

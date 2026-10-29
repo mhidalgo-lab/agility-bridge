@@ -58,6 +58,7 @@ import {
   RowAction,
   StatusBadge,
   When,
+  WriteScope,
 } from './shared.tsx';
 import { canIssueOn, MEMBER_AREA, TokenTable } from './tokens.tsx';
 
@@ -336,6 +337,7 @@ export function registerMe(ui: Hono, kit: UiKit): void {
                       { header: 'Device', cell: (d) => d.label ?? 'no name' },
                       { header: 'Workspace', cell: (d) => d.workspaceName ?? d.workspaceSlug ?? 'unknown' },
                       { header: 'Sends to', cell: (d) => <span class="mono">{d.redirectHost}</span> },
+                      { header: 'Changes', cell: (d) => <WriteScope canWrite={d.canWrite} /> },
                       { header: 'Connected', cell: (d) => <When at={d.createdAt} /> },
                       { header: 'Last used', cell: (d) => <When at={d.lastUsedAt} none="not yet" /> },
                       { header: 'Ends', cell: (d) => <When at={d.expiresAt} none="never" /> },

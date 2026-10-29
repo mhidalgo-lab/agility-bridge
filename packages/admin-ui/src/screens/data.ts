@@ -339,6 +339,8 @@ export interface OAuthDevice {
   readonly expiresAt: number | null;
   /** Last token issuance or request, to within about 5 minutes; null when not seen yet. */
   readonly lastUsedAt: number | null;
+  /** The app holds the `mcp:write` scope: it can ask for changes (P7-32). Read-only otherwise. */
+  readonly canWrite: boolean;
 }
 
 /** The id of an OAuth device: the provider's 16 URL-safe characters. */
@@ -357,6 +359,7 @@ export function parseOAuthDevice(r: Row): OAuthDevice | null {
     createdAt: int(r['createdAt']),
     expiresAt: intOrNull(r['expiresAt']),
     lastUsedAt: intOrNull(r['lastUsedAt']),
+    canWrite: r['canWrite'] === true,
   };
 }
 

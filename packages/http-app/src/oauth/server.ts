@@ -214,6 +214,12 @@ export interface OAuthDevice {
   readonly expiresAt: number | null;
   /** Epoch ms of the last token issuance or MCP request (to within about 5 minutes); null when not seen yet (P5-14). */
   readonly lastUsedAt: number | null;
+  /**
+   * The authorization holds `mcp:write` (P7-32): the person ticked the separate box and the server granted it. A fact
+   * about the grant record only: whether a write would run still depends on the server switch, the workspace, the grant
+   * and a personal credential (ADR-0013).
+   */
+  readonly canWrite: boolean;
 }
 
 /** A device of any person, for the administrators' list (P5-08). */
@@ -1767,6 +1773,7 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       createdAt: g.createdAt * 1000,
       expiresAt: g.expiresAt === undefined ? null : g.expiresAt * 1000,
       lastUsedAt: userId === undefined ? null : await lastUsed(userId, g.id).catch(() => null),
+      canWrite: Array.isArray(g.scope) && g.scope.includes(MCP_WRITE_SCOPE),
     };
   };
 

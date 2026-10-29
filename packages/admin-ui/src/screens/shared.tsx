@@ -682,3 +682,16 @@ export function formErrors(
     ? { errors: {}, message: formMessage(problem) }
     : { errors: { [target]: formMessage(problem) }, message: undefined };
 }
+
+/**
+ * Whether a connected app holds the `mcp:write` scope (P7-32): "can ask for changes" or "read only". It says what the
+ * app was given at connection time, not that a write would run today (the server, workspace, grant and credential still
+ * decide that). No scope string from the provider is shown: only a boolean the server derived.
+ */
+export function WriteScope(props: { readonly canWrite: boolean }): JSX.Element {
+  return props.canWrite ? (
+    <Badge tone="info">can ask for changes</Badge>
+  ) : (
+    <Badge tone="muted">read only</Badge>
+  );
+}
