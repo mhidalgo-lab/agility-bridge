@@ -148,22 +148,24 @@ describe('the typed field allowlist', () => {
         expect(['Name', 'Description', 'Estimate', 'DetailEstimate', 'ToDo', 'Priority']).toContain(f);
     }
     for (const n of NAMES) {
-      // `custom` is the one deliberate argument that names attributes (P7-20): enabled per workspace, never listed here.
-      const keys = Object.keys(tool(n).inputSchema.shape).filter((k) => k !== 'custom');
+      // The deliberate arguments that name an attribute or a relation: `custom` (P7-20, enabled per workspace, never listed
+      // here) and the typed owners, team and sprint of a create (P7-21). Every other argument must not.
+      const typed = n === 'create_work_item' ? ['custom', 'owners', 'team', 'sprint'] : ['custom'];
+      const keys = Object.keys(tool(n).inputSchema.shape).filter((k) => !typed.includes(k));
       expect(
         keys.filter((k) => /custom|scope|status|owner|sprint|team|attribute|field|where|delete/i.test(k)),
       ).toEqual([]);
     }
   });
 
-  it('an unknown argument (a custom attribute, a project change) never reaches the request', async () => {
+  it('an unknown argument (a custom attribute, a team, a project attribute) never reaches the request', async () => {
     const w = writeRig();
     const t = tool('update_fields');
     const input = t.inputSchema.parse({
       asset: 'B-01002',
       name: 'Sign in page',
       Custom_SyntheticNote: 'x',
-      project: 'Outside',
+      team: 'Team 2',
       Scope: 'Scope:2000',
       confirm: true,
     });

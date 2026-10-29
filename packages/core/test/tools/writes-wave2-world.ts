@@ -56,6 +56,21 @@ export function createItem(env: Wave2Env, type: string, root: XmlElement): strin
       row[`${n}.Name`] = env.find(ref)?.['Name'];
     }
   }
+  // Owners, team and sprint of a create (P7-21).
+  const owners = root.children
+    .filter((x) => x.name === 'Relation' && x.attributes['name'] === 'Owners')
+    .flatMap((x) => x.children.map((a) => a.attributes['idref'] as string));
+  if (owners.length > 0) {
+    row['Owners'] = owners;
+    row['Owners.Name'] = owners.map((o) => env.find(o)?.['Name']);
+  }
+  for (const n of ['Team', 'Timebox']) {
+    const ref = rel(root, n);
+    if (ref !== undefined) {
+      row[n] = ref;
+      row[`${n}.Name`] = env.find(ref)?.['Name'];
+    }
+  }
   const into = (name: string): Mutable[] => {
     const list = env.assets[name] ?? [];
     env.assets[name] = list;

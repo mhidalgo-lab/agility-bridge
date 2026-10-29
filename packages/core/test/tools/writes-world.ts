@@ -70,6 +70,11 @@ export function writeRig(
     { _oid: 'WorkitemPriority:1', Name: 'High', Order: 1, AssetState: 64 },
     { _oid: 'WorkitemPriority:2', Name: 'Low', Order: 2, AssetState: 64 },
   ];
+  // A second project of the workspace, for moves (P7-21): empty, so no other test sees it unless it names it.
+  assets['Scope'] = [
+    ...(assets['Scope'] ?? []),
+    { _oid: 'Scope:1002', Name: 'Web App', AssetState: 64, ChildrenMeAndDown: ['Scope:1002'] },
+  ];
   assets['Actual'] = [];
   assets['Expression'] = [];
   const posts: Post[] = [];
@@ -151,6 +156,10 @@ export function writeRig(
         // An empty `set` takes the item out of its sprint (P7-17, unverified shape).
         row['Timebox'] = oids[0] ?? null;
         row['Timebox.Name'] = oids[0] === undefined ? null : find(oids[0])?.['Name'];
+      } else if (['Super', 'Parent', 'Scope'].includes(name) && act === 'set') {
+        // A re-parent and a move (P7-21, unverified shapes).
+        row[name] = oids[0];
+        row[`${name}.Name`] = find(oids[0] as string)?.['Name'];
       } else if (name === 'Owners') {
         const now = new Set<string>(((row['Owners'] as string[] | undefined) ?? []).map(String));
         for (const o of oids) act === 'add' ? now.add(o) : now.delete(o);
@@ -196,7 +205,7 @@ export function writeRig(
     writeContext(runtime, {
       fetch: base_ctx.fetch,
       ...(base_ctx.metadata === undefined ? {} : { metadata: base_ctx.metadata }),
-      projects: base_ctx.projects,
+      projects: { allowed: ['Scope:1001', 'Scope:1002'], includeChildren: true },
       clock: base_ctx.clock,
       budget: createBudget(200),
       grantedTools: [...WRITE_NAMES],
@@ -222,7 +231,15 @@ export type { Row };
 
 /** The most expensive call the shared world can make on a cold cache, per write tool (L-114): applied once, with confirm. */
 export const WRITE_WORST_CASES: Readonly<
-  Record<string, { readonly args: Record<string, unknown>; readonly why: string }>
+  Record<
+    string,
+    {
+      readonly args: Record<string, unknown>;
+      readonly why: string;
+      /** Puts the world in the state the worst case needs (a story out of its sprint, for a move). */
+      readonly prepare?: (assets: Record<string, Mutable[]>) => void;
+    }
+  >
 > = {
   add_comment: {
     args: { asset: 'B-01002', text: 'Looks good' },
@@ -253,11 +270,33 @@ export const WRITE_WORST_CASES: Readonly<
     why: 'number lookup, item read, the type metadata, the re-read and the operation',
   },
   create_work_item: {
-    args: { item_type: 'Task', name: 'Write the tests', parent: 'B-01002', estimate: 3 },
-    why: 'parent lookup and read, the project twice, member, the duplicate scan twice, the re-read and the write',
+    args: {
+      item_type: 'Story',
+      name: 'Write the tests',
+      project: 'Mobile App',
+      parent: 'E-00003',
+      estimate: 3,
+      priority: 'High',
+      owners: ['bob', 'Bob Example', 'me'],
+      team: 'Blue',
+      sprint: 'next',
+    },
+    why: 'project by name, parent lookup and read, the priority, three members by different paths, the team, a relative sprint with its state, the duplicate scan twice, the re-read and the write',
   },
   update_fields: {
-    args: { asset: 'B-01002', name: 'Sign in page', description: 'New text', estimate: 5, priority: 'High' },
-    why: 'number lookup, item read, the priority (metadata and list), the re-read and the write',
+    args: {
+      asset: 'B-01002',
+      name: 'Sign in page',
+      description: 'New text',
+      estimate: 5,
+      priority: 'High',
+      parent: 'E-00003',
+      project: 'Web App',
+    },
+    why: 'number lookup, item read with the relations, the priority (metadata and list), the new parent lookup and read, the new project (resolution, read, metadata), the re-read with the parent and the write',
+    prepare: (assets) => {
+      const row = assets['Story']?.find((r) => r['_oid'] === 'Story:1002');
+      if (row) Object.assign(row, { Timebox: null, 'Timebox.Name': null });
+    },
   },
 };

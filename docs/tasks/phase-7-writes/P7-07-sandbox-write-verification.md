@@ -72,6 +72,12 @@ None beyond the shared rules in AGENTS.md.
 - [ ] `update_fields` and `create_work_item` with `custom`: `<Attribute name="Custom_X" act="set">` for a Text, a LongText and a Numeric custom attribute on a Story, a Defect and a Task; is a LongText stored as HTML (our escaped paragraphs) or as plain text; the real length limit of a Text attribute; a required custom attribute on create; the read side shows the new value (L-051).
 - [ ] A custom attribute of kind list, date or boolean is refused by the tool today; check which kinds the sandbox's custom fields really are, and whether a list kind is worth a later task.
 
+## Items from P7-21 (create relations, re-parent, move; unverified request shapes)
+- [ ] `create_work_item` with `owners`, `team` and `sprint`: `Owners` `act="add"` with several children, `Team` and `Timebox` set, on a Story, a Defect and an Epic; which of them a Task or Test accepts on create; does Agility derive the team or sprint when not given.
+- [ ] `update_fields` with `parent`: `Super` on a Story, Defect and Epic; `Parent` on a Task and Test; a parent in another project; an epic cycle; what a closed parent does.
+- [ ] `update_fields` with `project`: `Scope` set on a Story, Defect and Epic; what happens to open children, tasks, tests and the epic link; is a story in a sprint refused by Agility (the tool refuses it first); the read side after the move.
+- [ ] Show the defaults Agility applies on create (`rest-1.v1/New/<Type>`, D-180) in the approval: what the endpoint returns, and whether it is worth the request (needs the writable sandbox).
+
 ## Items moved from P7-08 (documentation walkthrough)
 - [ ] Walk the [write tools guide](../../guide/write-tools.md) on staging against the sandbox: every command, the enablement steps for stdio and for a device-token HTTP connection, and the operator checklist.
 - [ ] Copy each sandbox-verified fact into the guide's "What is unverified" list (remove what is now verified, with date and instance version) and into RESEARCH §1.5; update THREAT_MODEL T31, A2, A6 from "verified on fakes only" where the sandbox shows it.

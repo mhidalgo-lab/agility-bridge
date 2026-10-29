@@ -576,6 +576,7 @@ describe('worst-case cost of every write tool (L-114)', () => {
     const w = writeRig();
     const t = tool(name as string);
     const fixture = WRITE_WORST_CASES[t.name];
+    fixture?.prepare?.(w.assets);
     const out = await w.run(t.name, { ...fixture?.args, confirm: true });
     expect(out.structured, `${t.name}: ${fixture?.why}`).toMatchObject({ applied: true });
     expect(w.posts).toHaveLength(1);
