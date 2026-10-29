@@ -2,7 +2,7 @@
 id: P6-13
 title: Phase 6 review and live verification
 phase: 6
-status: review
+status: done
 priority: high
 depends_on: [P6-03, P6-04, P6-06, P6-10, P6-11, P6-12]
 adr: []
@@ -45,7 +45,7 @@ and the owner's list for the release.
 - [x] THREAT_MODEL, logging docs and RESEARCH updated where the fixes or live facts require; lessons and decisions numbered
       consistently; generated references current; a patch changeset is included.
 - [x] P6-01 … P6-12 are `done`; `pnpm lint && pnpm typecheck && pnpm test && pnpm build` are green.
-- [ ] Release v0.6 (owner: merges the Version Packages PR after P6-14 and P6-33).
+- [x] Release v0.6 (owner: merges the Version Packages PR after P6-14 and P6-33). Published 2026-10-29 (v0.6.0).
 
 ## Outcome
 - [docs/reviews/phase-6-review.md](../../reviews/phase-6-review.md): three high, five medium and about twenty low findings from three reviews;

@@ -2,7 +2,7 @@
 
 These instructions apply to every AI coding agent (and human) working in this repository.
 
-> Status: **Phase 6 built and reviewed**; v0.5.0 is published and v0.6 waits on owner steps. The current state is in
+> Status: **v0.6.0 published**; Phase 7 (opt-in writes) in progress. The current state is in
 > [`docs/ROADMAP.md`](docs/ROADMAP.md); `pnpm tasks` drives the plan (P0-05).
 
 ## Start here

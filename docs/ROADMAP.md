@@ -4,9 +4,8 @@
 > (every asset type, read and opt-in write) with each member's own access token. Runs locally (stdio), self-hosted
 > (Node / Docker) or as a **Cloudflare Worker** reachable from every device.
 
-Status: **Phase 6 built and reviewed** (2026-10-28) — v0.5.0 is published; v0.6 waits on the owner's OAuth client runs
-(P6-14) and the Version Packages PR ([Phase 6 review](reviews/phase-6-review.md)). Phase 7 can start: it needs Phases 2,
-4 and 5. Architecture:
+Status: **v0.6.0 published** (2026-10-29), Phase 6 done ([Phase 6 review](reviews/phase-6-review.md)); **Phase 7 (opt-in
+writes) in progress**. Architecture:
 [ARCHITECTURE.md](ARCHITECTURE.md) · Decisions: [adr/](adr/) · Facts & limits: [RESEARCH.md](RESEARCH.md) · Security:
 [THREAT_MODEL.md](THREAT_MODEL.md) · Lessons: [LESSONS-LEARNED.md](LESSONS-LEARNED.md) · Task rules:
 [tasks/README.md](tasks/README.md) · Open questions and owner steps: [pending-decisions/phase-6.md](pending-decisions/phase-6.md)
@@ -272,7 +271,7 @@ Status lives in each task file.
 | P6-10 | [Tool evaluations](tasks/phase-6-tool-breadth/P6-10-tool-evals.md) | medium | P6-07 | done |
 | P6-11 | [Cost accounting and composite grants](tasks/phase-6-tool-breadth/P6-11-cost-composite-grants.md) | medium | P6-07 | done |
 | P6-12 | [Consistency pass (arguments, outputs, paging, tool count)](tasks/phase-6-tool-breadth/P6-12-consistency-pass.md) | medium | P6-07, P6-08, P6-09 | done |
-| P6-13 | [Phase 6 review and live verification](tasks/phase-6-tool-breadth/P6-13-phase-6-review.md) | high | P6-03, P6-04, P6-06, P6-10, P6-11, P6-12 | review |
+| P6-13 | [Phase 6 review and live verification](tasks/phase-6-tool-breadth/P6-13-phase-6-review.md) | high | P6-03, P6-04, P6-06, P6-10, P6-11, P6-12 | done |
 | P6-14 | [OAuth client matrix for the remaining clients](tasks/phase-6-tool-breadth/P6-14-oauth-client-matrix-rest.md) | medium | P5-06 | todo |
 | P6-15 | [Server-side aggregate roll-ups for the portfolio tree](tasks/phase-6-tool-breadth/P6-15-portfolio-aggregate-rollups.md) | low | P6-01 | done |
 | P6-16 | [Portfolio tree for very large epics (per-child roll-ups)](tasks/phase-6-tool-breadth/P6-16-portfolio-tree-large-epics.md) | low | P6-01 | done |
@@ -285,13 +284,13 @@ Status lives in each task file.
 | P6-25 | [Verify the regression and test-set recipes on the writable sandbox](tasks/phase-6-tool-breadth/P6-25-verify-regression-recipes-sandbox.md) | low | P6-03, P7-07 | todo |
 | P6-26 | [Revisit a typed quality tool after the tool evals](tasks/phase-6-tool-breadth/P6-26-quality-typed-tool-revisit.md) | low | P6-03, P6-10 | done |
 | P6-27 | [Verify requests and empty asset types on a writable sandbox](tasks/phase-6-tool-breadth/P6-27-verify-requests-on-sandbox.md) | low | P6-06 | todo |
-| P6-28 | [Decide on typed tools for issues and requests from usage and evals](tasks/phase-6-tool-breadth/P6-28-typed-tools-for-other-types.md) | low | P6-06, P6-10 | todo |
+| P6-28 | [Decide on typed tools for issues and requests from usage and evals](tasks/phase-6-tool-breadth/P6-28-typed-tools-for-other-types.md) | low | P6-06, P6-10 | done |
 | P6-29 | [Quality scan over a sprint or epic](tasks/phase-6-tool-breadth/P6-29-quality-batch-scan.md) | low | P6-07 | done |
 | P6-30 | [Priority and severity in defect triage](tasks/phase-6-tool-breadth/P6-30-defect-priority-severity-triage.md) | low | P6-07 | done |
 | P6-31 | [Prompt fallbacks without the reports group](tasks/phase-6-tool-breadth/P6-31-prompt-fallbacks-without-reports.md) | low | P6-08 | dropped |
 | P6-32 | [Prompt argument completion](tasks/phase-6-tool-breadth/P6-32-prompt-argument-completion.md) | low | P6-08 | done |
 | P6-33 | [First LLM tool-eval run and triage](tasks/phase-6-tool-breadth/P6-33-first-llm-eval-run.md) | medium | P6-10 | done |
-| P6-34 | [Tune tool descriptions from the eval misses](tasks/phase-6-tool-breadth/P6-34-description-tuning-from-evals.md) | low | P6-33 | in-progress |
+| P6-34 | [Tune tool descriptions from the eval misses](tasks/phase-6-tool-breadth/P6-34-description-tuning-from-evals.md) | low | P6-33 | done |
 | P6-35 | [Live composite warnings in the workspace and grant forms](tasks/phase-6-tool-breadth/P6-35-live-composite-warnings-in-forms.md) | low | P6-11 | done |
 | P6-36 | [Name the tools hidden by the per-call budget](tasks/phase-6-tool-breadth/P6-36-budget-hidden-tools-in-whoami.md) | low | P6-11 | done |
 | P6-37 | [Report schema-validation failures as AB_INPUT_INVALID tool errors](tasks/phase-6-tool-breadth/P6-37-consistency-schema-errors.md) | low | P6-12 | done |
