@@ -8,6 +8,7 @@ import { WRITE_TOOLS } from '../../src/tools/writes/index.ts';
 import type { FakeCall, Row } from '../harness/index.ts';
 import { answeringChannel, makeRuntime, type RecordingAudit, writeContext } from '../helpers/writes.ts';
 import { rig, world } from './reports-world.ts';
+import { createItem, updateItem, type Wave2Env } from './writes-wave2-world.ts';
 
 export const WRITE_NAMES: readonly string[] = WRITE_TOOLS.map((t) => t.name);
 export const tool = (name: string): ToolDefinition => {
@@ -65,6 +66,10 @@ export function writeRig(
     { _oid: 'StoryStatus:5', Name: 'Green review', Order: 5, RollupState: 64, Team: 'Team:6' },
     { _oid: 'StoryStatus:6', Name: 'Retired', Order: 6, RollupState: 64, Inactive: true },
   ];
+  assets['WorkitemPriority'] = [
+    { _oid: 'WorkitemPriority:1', Name: 'High', Order: 1, AssetState: 64 },
+    { _oid: 'WorkitemPriority:2', Name: 'Low', Order: 2, AssetState: 64 },
+  ];
   assets['Actual'] = [];
   assets['Expression'] = [];
   const posts: Post[] = [];
@@ -74,6 +79,12 @@ export function writeRig(
     return (assets[type] ?? []).find((r) => r['_oid'] === oid);
   };
   const memberName = (oid: string): string => String(find(oid)?.['Name'] ?? oid);
+  const wave2: Wave2Env = {
+    assets,
+    find,
+    nextId: () => ++counter,
+    now: '2026-10-21T12:00:00.0000000Z',
+  };
   const apply = (type: string, id: string | undefined, xml: string, operation?: string): string => {
     if (operation !== undefined) {
       const target = find(`${type}:${id}`);
@@ -87,6 +98,8 @@ export function writeRig(
     const root = parseXml(xml);
     const op = (name: string) => root.children.filter((c) => c.attributes['name'] === name);
     if (id === undefined) {
+      const created = createItem(wave2, type, root);
+      if (created !== undefined) return created;
       const oid = `${type}:${++counter}`;
       if (type === 'Expression') {
         const item = find(op('Mentions')[0]?.children[0]?.attributes['idref'] ?? '');
@@ -123,10 +136,12 @@ export function writeRig(
     }
     const row = find(`${type}:${id}`);
     if (row === undefined) throw new Error(`the fake write endpoint has no ${type}:${id}`);
+    updateItem(wave2, row, root);
     for (const rel of root.children.filter((c) => c.name === 'Relation')) {
       const name = rel.attributes['name'] as string;
       const act = rel.attributes['act'];
       const oids = rel.children.map((c) => c.attributes['idref'] as string);
+      if (name === 'Priority' && act === 'set') continue;
       if (name === 'Status' && act === 'set') {
         const status = find(oids[0] as string);
         row['Status'] = status?.['_oid'];
@@ -234,5 +249,13 @@ export const WRITE_WORST_CASES: Readonly<
   reopen_asset: {
     args: { asset: 'B-01001' },
     why: 'number lookup, item read, the type metadata, the re-read and the operation',
+  },
+  create_work_item: {
+    args: { item_type: 'Task', name: 'Write the tests', parent: 'B-01002', estimate: 3 },
+    why: 'parent lookup and read, the project twice, member, the duplicate scan twice, the re-read and the write',
+  },
+  update_fields: {
+    args: { asset: 'B-01002', name: 'Sign in page', description: 'New text', estimate: 5, priority: 'High' },
+    why: 'number lookup, item read, the priority (metadata and list), the re-read and the write',
   },
 };

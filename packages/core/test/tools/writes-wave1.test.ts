@@ -49,7 +49,7 @@ describe('negative authorization: no layer can be skipped', () => {
       (w) => w.context({ credential: { id: 'c', kind: 'shared', token: new Secret('x') } }),
     ],
   ];
-  for (const name of WRITE_NAMES) {
+  for (const name of Object.keys(CALLS)) {
     it.each(layers)(`${name}: %s refuses before any request`, async (_n, build) => {
       const w = writeRig();
       const error = await refused(w.run(name, { ...CALLS[name], confirm: true }, build(w)));
@@ -69,7 +69,7 @@ describe('negative authorization: no layer can be skipped', () => {
     }
   });
 
-  for (const name of WRITE_NAMES) {
+  for (const name of Object.keys(CALLS)) {
     it(`${name}: an item outside the workspace's projects is refused: no approval, no write`, async () => {
       const w = writeRig();
       const error = await refused(w.run(name, { ...CALLS[name], asset: 'B-02001', confirm: true }));

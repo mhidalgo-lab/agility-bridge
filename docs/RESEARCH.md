@@ -203,6 +203,16 @@ except `group`, and adds `op` (POST only). *docs*
   (the tools read the OID from it when it is) and how soon the read side shows the change (L-051); does a team workflow
   restrict `Status` on write the way the status list's `Team` attribute suggests; is `Owners` `add`/`remove` accepted in one document.
 - **Lifecycle operations (P7-06, 2026-10-29), *unverified* until P7-07.** `close_asset` and `reopen_asset` send `POST rest-1.v1/Data/<Type>/<id>?op=<Name>` with no body through `restWrite` (the documented operation route above). The name is chosen from the type's `meta.v1` `Operations` (close: `QuickClose`, `Close`, `Inactivate` in that order; reopen: `Reactivate`); the developer pages for these operations were not reachable, so the names, which types have which, whether `QuickClose` also closes a story's open tasks and tests, whether a reopen is refused when the parent is closed, and the response shape are all open for P7-07 (D-186, D-187). The Phase 0 snapshot lists `QuickClose` (Story, Defect, Task), `Inactivate` and `Reactivate` (Story) and `Reactivate` (Defect) only; it is synthetic, not an instance's full list.
+- **Wave-2 write shapes (P7-05, 2026-10-29), all *unverified* until P7-07.** `create_work_item` sends `POST rest-1.v1/Data/<Type>`
+  (`Story`, `Defect`, `Task`, `Test`, `Epic`) with `<Attribute name="Name|Description|Estimate|DetailEstimate" act="set">` and
+  `<Relation name="Scope|Priority|Super|Parent" act="set"><Asset idref="Type:id"/></Relation>`; the response is expected to be
+  `<Asset id="Type:id:moment">` (the tool reports the OID). `update_fields` posts the same attributes and the `Priority` relation to
+  `/Data/<Type>/<id>`, only for fields that differ. `Description` is sent as escaped HTML paragraphs. Open questions for P7-07: are
+  `Scope` and `Parent` both required for a Task (does Agility derive `Scope` from `Parent`), which attributes are required on create
+  without a default (the metadata flags `IsRequired` on defaulted attributes, so the tool leaves it to Agility), what `rest-1.v1/New`
+  returns for each type, whether `Description` HTML is kept or re-sanitised, whether `Estimate` applies to epics and
+  `DetailEstimate` to stories on this instance, and how soon `CreateDateUTC` and `CreatedBy` make the new item visible to the
+  duplicate check (L-051).
 - **Idempotency**: no idempotency keys; each `rest-1.v1` POST is atomic for one asset. *docs / inferred*
 
 ### 1.6 Asset model

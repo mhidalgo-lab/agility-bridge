@@ -2,7 +2,7 @@
 
 # Tool reference
 
-35 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
+37 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
 later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a cold metadata cache.
 
 | Tool | Group | Cost | Title |
@@ -42,6 +42,8 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 | [`move_to_sprint`](#move_to_sprint) | writes | 14 | Move to sprint |
 | [`close_asset`](#close_asset) | writes | 22 | Close work item |
 | [`reopen_asset`](#reopen_asset) | writes | 22 | Reopen work item |
+| [`create_work_item`](#create_work_item) | writes | 28 | Create work item |
+| [`update_fields`](#update_fields) | writes | 16 | Update fields |
 
 ## `whoami`
 
@@ -637,5 +639,43 @@ Annotations: read-only false, destructive true, idempotent true, open world true
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
+| `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
+| `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |
+
+## `create_work_item`
+
+**Create work item** · group `writes` · write · cost 28 Agility requests at most
+
+Create one backlog item, defect, task, test or epic in an Agility project. A task or test needs a parent item; a backlog item, defect or epic may have an epic as parent. Sets only title, description, estimate and priority. Not paged. Cold call: up to 28 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+
+Annotations: read-only false, destructive false, idempotent false, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `item_type` | `Story` \| `Defect` \| `Task` \| `Test` \| `Epic` | yes |  | Story, Defect, Task, Test or Epic. |
+| `name` | string | yes |  | Title: one line, at most 200 characters. |
+| `project` | string |  |  | Agility project: name or Scope:<id>, within the workspace. |
+| `parent` | string |  |  | Parent asset number or OID token: a story or defect for a task or test, an epic otherwise. |
+| `description` | string |  |  | Plain text, at most 4,000 characters; a blank line starts a paragraph. |
+| `estimate` | number (≥ 0, ≤ 10000) |  |  | Story points for a story or defect; hours for a task or test. Not for an epic. |
+| `priority` | string |  |  | Priority name or OID token, for a story or defect. |
+| `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
+| `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |
+
+## `update_fields`
+
+**Update fields** · group `writes` · write · cost 16 Agility requests at most
+
+Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic. Give only what changes; the person approves old and new for each. Not paged. Cold call: up to 16 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+
+Annotations: read-only false, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
+| `name` | string |  |  | New title: one line, at most 200 characters. |
+| `description` | string |  |  | New description, plain text, at most 4,000 characters; it replaces the old one. |
+| `estimate` | number (≥ 0, ≤ 10000) |  |  | Story points for a story or defect; hours for a task or test. Not for an epic. |
+| `priority` | string |  |  | Priority name or OID token, for a story or defect. |
 | `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
 | `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |

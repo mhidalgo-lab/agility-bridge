@@ -2,12 +2,12 @@
 id: P7-05
 title: "Writes wave 2: create work items and update fields"
 phase: 7
-status: todo
+status: review
 priority: medium
 depends_on: [P7-04]
 adr: ["0011", "0013"]
 lessons: [L-044, L-108, L-142]
-owner: ""
+owner: "claude"
 ---
 
 # P7-05 — Writes wave 2: create work items and update fields

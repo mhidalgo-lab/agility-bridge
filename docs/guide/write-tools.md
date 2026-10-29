@@ -1,6 +1,6 @@
 # Write tools
 
-> The write **framework** (P7-01) and the **approval page** (P7-02) are built and tested on fakes, with the wave-1 tools (P7-04) and the lifecycle tools (P7-06); they are
+> The write **framework** (P7-01) and the **approval page** (P7-02) are built and tested on fakes, with the wave-1 tools (P7-04), the create and update tools (P7-05) and the lifecycle tools (P7-06); they are
 > verified against a writable sandbox in P7-07. Until then no release offers a write tool, and nothing below changes
 > what a running server does. [ADR-0013](../adr/0013-opt-in-writes-human-approval.md) is the policy this page explains.
 
@@ -176,6 +176,17 @@ operation is refused before anything is asked. The approval shows the item, its 
 child count; if a child is opened, or the item is deleted, before the send, the call is `AB_WRITE_CONFLICT`; if someone else
 already made the change it is an idempotent no-op. Agility's own validators still run when the operation is sent; the
 operation names and what they cascade to are *unverified* until the sandbox run (P7-07, [RESEARCH](../RESEARCH.md) 1.5).
+
+## The tools (wave 2): create and update fields
+
+| Tool | Changes | Notes |
+|---|---|---|
+| `create_work_item` | creates one Story, Defect, Task, Test or Epic | `item_type`, `name` (one line, at most 200 characters), `project` (or a `parent`), optional `description` (plain text, at most 4,000), `estimate` (story points; hours for a task or test; not for an epic) and `priority` (story and defect). A task or test needs a `parent` story or defect and is created in its project; a story, defect or epic may have an epic as `parent`. The approval shows every field of the new item. Repeating the same call (same title and parent, within 30 minutes) is refused and names the item that exists: read it with `get_work_item`. |
+| `update_fields` | `name`, `description`, `estimate` and `priority` of one open item | Old and new are shown for each field and only fields that differ are sent. A description replaces the old one and is plain text. Custom attributes, the project, status, owners, sprint, team and parent cannot be changed with it. |
+
+The project of a create must be open and inside the workspace; a parent or item outside it answers "not found". If the project
+or parent changes or closes between the plan and the send, or the item was created meanwhile, the call is `AB_WRITE_CONFLICT`
+and nothing is created. These request shapes are not yet verified against a real instance (P7-07).
 
 ## For a tool author
 

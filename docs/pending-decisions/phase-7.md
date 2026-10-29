@@ -174,4 +174,39 @@
 - **Context:** A repeated close must not ask again or send anything; a state that changes while the person decides must not be overwritten.
 - **Options:** (a) already closed (close) or not closed (reopen; a future item counts as open) is a no-op at plan time (no approval, no audit, no request); at the re-read a target already in the new state is a no-op and one that was deleted, removed or whose open-child count changed is `AB_WRITE_CONFLICT`; deleted, template and broken-down items are refused at plan time; (b) treat every repeat as a conflict; (c) force the state regardless.
 - **Recommendation:** (a), built. The state shows as `Open` or `Closed` (not Agility's numeric codes) so the approval reads plainly.
+
+### D-179 — A create is made idempotent by a derived key, and a repeat is refused *(P7-05)*
+- **Context:** Agility has no idempotency keys (RESEARCH 1.5). A create has no old value, so the "no-op when already applied" rule of the other tools has nothing to compare. A call repeated after a timeout, a lost answer or an agent retry must not create two items (L-393).
+- **Options:** (a) derive the key from what a retry repeats: the same member (the caller), the same asset type, project, parent and title (trimmed, case and inner spacing aside), created within the last 30 minutes (`CreateDateUTC`); checked in the plan and again after the approval; (b) a caller-supplied `idempotency_key` argument (needs somewhere to remember it: a custom field on the item or our own store, and a model that remembers to pass it); (c) no protection, the approval is the only guard.
+- **Recommendation:** (a), built. A match in the plan is refused (`AB_INPUT_INVALID`, naming the existing item); a match found after the approval (the repeat won the race) is `AB_WRITE_CONFLICT` and nothing is sent. It reads at most 20 of the caller's own items in that project, newest first, so its cost is one request. Limit: two calls that pass the re-read in the same instant can still both create (Agility offers no atomic check); the approval, the per-grant limit and the window make that rare, and the audit shows both. A deliberate second item needs another title or parent.
+- **Owner:** *(open; built as (a))*
+
+### D-180 — Defaults and required fields are Agility's, not read from `rest-1.v1/New` *(P7-05)*
+- **Context:** The catalogue entry said "defaults from `rest-1.v1/New`". A `New` call is an extra request, its response shape for our instance is unverified, and the defaults (status, team, rank) are applied by Agility when the asset is created anyway.
+- **Options:** (a) send only the fields the caller gave plus the project and the parent; Agility applies defaults and rejects a create that misses a required field (a rejected create creates nothing, single-asset POSTs are atomic); the approval shows what we send, not Agility's defaults; (b) call `New` first and show the defaults in the approval (one more request, an unverified shape); (c) check `IsRequired` in metadata ourselves (the flag is set on attributes that Agility defaults, so it would refuse valid creates).
+- **Recommendation:** (a), built. What `New` returns and whether the approval should show the defaults is an item of P7-07; (b) would be P7-21.
+- **Owner:** *(open; built as (a))*
+
+### D-181 — The writable fields are a fixed typed list; custom attributes are refused *(P7-05)*
+- **Context:** The catalogue says "workspace-enabled custom fields". No workspace setting for writable custom attributes exists, custom attribute names differ per instance (the descriptions must not name them, A12), and they can carry anything: an allowlist that grows by configuration needs an owner screen and its own review.
+- **Options:** (a) a fixed list per type (Story, Defect: Name, Description, Estimate, Priority; Task, Test: Name, Description, DetailEstimate; Epic: Name, Description); no argument can name an attribute; `Scope` is only set on create (to the target project) and never on update; no status, owner, sprint, team, parent change or custom attribute; (b) a per-workspace list of writable custom attributes set by an owner; (c) any attribute the metadata calls writable.
+- **Recommendation:** (a), built; (b) is P7-20 with an owner setting, the typed value check from the metadata and the same approval. (c) would make a prompt injection a tool for rewriting any field.
+- **Owner:** *(open; built as (a))*
+
+### D-182 — A description is plain text in and escaped paragraphs out *(P7-05)*
+- **Context:** Agility descriptions are HTML. The approval must show exactly what is stored (L-106) and caller text must not add markup, links or script to an item that other people open in the Agility UI.
+- **Options:** (a) the argument is plain text (at most 4,000 characters, control and hidden characters refused); on send it becomes HTML-escaped paragraphs (a blank line starts a `<p>`, a line break becomes `<br>`), then XML-escaped by the one builder; the approval shows the plain text; an existing description is shown as plain text (the read-side conversion) and replaced whole; (b) accept HTML and sanitise (what is shown differs from what is stored); (c) accept Markdown and convert (the converter becomes an attack surface).
+- **Recommendation:** (a), built. Whether Agility keeps or re-sanitises the HTML, and how it renders `<br>`, is a P7-07 check. Rich text and mentions are P7-18.
+- **Owner:** *(open; built as (a))*
+
+### D-183 — The target of a create is the project, the parent is a field of the new item *(P7-05)*
+- **Context:** The mutation has one target (ADR-0013) and the approval hash binds it; a new item has no OID. Tasks and tests live in the project of their parent; stories, defects and epics choose one.
+- **Options:** (a) the target is the Agility project that will hold the item (`Scope:<id>`, checked visible, open and inside the workspace, and re-checked after the approval), and every field of the new item, its type and its parent (`Super` or `Parent`, as `Name [OID]`) are changes with an empty old value; a task or test takes its project from its parent (a different `project` is refused) and the parent must be open; (b) the parent as the target (a story with no epic would have none); (c) a pseudo target `Story:new`.
+- **Recommendation:** (a), built. The framework allowlist for the target type `Scope` is the union of the type lists; the per-type list is enforced in the plan and a test proves no custom, status or owner field is reachable. One argument, `estimate`, maps to `Estimate` (points) or `DetailEstimate` (hours) by type; a type that has none refuses it.
+- **Owner:** *(open; built as (a))*
+
+### D-184 — Argument names: `item_type` and `name` *(P7-05)*
+- **Context:** Argument names have one meaning each (L-030, L-395): `asset_type` is an API name filter elsewhere and `type` is not in the vocabulary.
+- **Options:** (a) `item_type` (Story, Defect, Task, Test, Epic) and `name` for the title; `project`, `parent`, `description`, `estimate`, `priority` and `asset` as in the shared vocabulary; (b) reuse `asset_type`.
+- **Recommendation:** (a), built; `project` keeps its shared description.
 - **Owner:** *(open; built as (a))*
