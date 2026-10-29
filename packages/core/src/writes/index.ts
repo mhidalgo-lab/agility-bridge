@@ -6,6 +6,7 @@ export { ApprovalLedger, type LedgerEntry, type LedgerStore, memoryLedgerStore }
 export {
   type CounterStore,
   createWriteLimiter,
+  DEFAULT_APPROVAL_REQUESTS_PER_GRANT,
   DEFAULT_WRITE_RATE_LIMITS,
   memoryCounterStore,
   WRITE_LIMIT_WINDOW_MS,

@@ -357,3 +357,15 @@
 - **Options:** (a) find the approval with a read, run the limiter, the re-read and the intent audit, then use it up with the atomic `take` immediately before the send; a lost take refuses the call, writes an error outcome ("nothing was sent") and sends nothing; a push elicitation answer, which is stored nowhere, is written as a grant (`via: elicitation`) only when a later step refuses, so the repeated call is not asked again; (b) keep taking it first and document the cost; (c) take it last, after the send (an approval that is never consumed if the process dies: unsafe).
 - **Recommendation:** (a), built. The take is still the single-use guarantee (L-073); the cost is that two concurrent calls on one approval can both spend a limiter unit and write an intent row, of which one ends as an error outcome with no send. A conflict keeps the approval only when the new plan is the same change (the hash includes the old values).
 - **Owner:** *(open; built as (a))*
+
+### D-205 — Approval requests are counted per grant, 30 an hour, before anyone is asked *(P7-27)*
+- **Context:** A prompt-injected agent can call a write tool with `confirm: true` and varying values without limit: unbounded elicitation prompts (approval fatigue), unbounded page records and ledger rounds.
+- **Options:** (a) a second purpose of the existing write limiter (`approval_request`): one unit of a per-grant hourly counter `wl:q:<grant>:<window>`, default 30, taken in the pipeline just before the channel is asked, fail closed, a grant or round that already exists is not counted, no deployment-wide counter, not configurable by environment variable yet; (b) count inside each channel (three implementations); (c) also a deployment counter and an env variable.
+- **Recommendation:** (a), built. 30 an hour is above what an honest session needs (one ask per distinct change; repeating after approval asks nothing) and well below a flood; an agent repeating the same pending change while the person is away spends units, which is the "do not poll" advice. The counter costs one `kv` increment per fresh ask (one D1 row write), small next to the page flow's 18 to 30. A setting can follow once real use shows a need.
+- **Owner:** *(open; built as (a))*
+
+### D-206 — A full pending list refuses the new request; it never drops the oldest *(P7-27)*
+- **Context:** At 20 open requests the page channel dropped the oldest to store the new one, so an agent could push the request a person was about to open out of the list (review L3). P7-14 kept the bound of 20 and left it to this task.
+- **Options:** (a) refuse the new request (`AB_LIMIT_RATE`, scope `approvals_pending`, nothing stored); the same change asked again still returns its own link; (b) keep evicting the oldest; (c) evict the newest of the same tool.
+- **Recommendation:** (a), built. The cost is that a flood can fill the 20 places for ten minutes and refuse the person's own later requests; that is a denial of approvals, never a way to make a change, and it clears when the person declines or the requests expire. The request counter (D-205) bounds how fast it can happen.
+- **Owner:** *(open; built as (a))*

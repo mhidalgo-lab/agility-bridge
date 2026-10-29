@@ -259,6 +259,9 @@ async function obtainApproval(
     mutation: plan.mutation,
     ...(plan.label === undefined ? {} : { label: plan.label }),
   };
+  // A person is about to be asked: count it first, so a flood of varying proposals cannot become a flood of prompts or
+  // pending records (P7-27). Past the limit nothing is asked, stored or opened.
+  await rt.limiter.check({ tool, actor: rt.actor, requestId: ctx.requestId, purpose: 'approval_request' });
   const reply = await channel.ask(prompt);
   switch (reply.status) {
     case 'answered':

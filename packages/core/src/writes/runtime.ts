@@ -58,6 +58,11 @@ export interface WriteLimiter {
     readonly tool: string;
     readonly actor: WriteActor;
     readonly requestId: string;
+    /**
+     * `approval_request`: a person is about to be asked (P7-27); counts only against the grant's own request counter.
+     * Absent or `write`: a write is about to run.
+     */
+    readonly purpose?: 'write' | 'approval_request';
   }): Promise<void>;
 }
 

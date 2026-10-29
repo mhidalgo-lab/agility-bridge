@@ -345,7 +345,7 @@ Status lives in each task file.
 | P7-24 | [OAuth `mcp:write` scope and non-remembered write consent](tasks/phase-7-writes/P7-24-oauth-write-scope.md) | medium | P7-02, P7-07 | review |
 | P7-25 | [Keep the write guide equal to the registry and the approval renderer](tasks/phase-7-writes/P7-25-write-docs-drift-test.md) | low | P7-08 | done |
 | P7-26 | [Approval policy: page only, per workspace or grant](tasks/phase-7-writes/P7-26-approval-policy-page-only.md) | medium | P7-02 | todo |
-| P7-27 | [Limit approval prompts and stop pending approvals evicting each other](tasks/phase-7-writes/P7-27-approval-request-limits.md) | medium | P7-02 | todo |
+| P7-27 | [Limit approval prompts and stop pending approvals evicting each other](tasks/phase-7-writes/P7-27-approval-request-limits.md) | medium | P7-02 | done |
 | P7-28 | [Do not burn an approval on a later refusal](tasks/phase-7-writes/P7-28-approval-consumed-before-refusals.md) | low | P7-02 | done |
 | P7-29 | [Approval text: values that contain the envelope phrase](tasks/phase-7-writes/P7-29-envelope-lookalike-in-approval.md) | low | P7-02 | todo |
 | P7-30 | [Free-plan ceiling for the deployment write cap; one statement for the grant and denial take](tasks/phase-7-writes/P7-30-free-plan-write-cap-and-one-statement-take.md) | low | P7-03, P7-02 | todo |

@@ -272,24 +272,38 @@ describe('the approval page channel with the write pipeline', () => {
     expect(r.page.channelFor(access(null))).toBeUndefined();
   });
 
-  it('bounds the open requests of one person', async () => {
+  it('refuses a new request at the cap and keeps every open one (P7-27)', async () => {
     const r = rig();
     const channel = r.page.channelFor(access('user-1')) as NonNullable<ReturnType<typeof r.page.channelFor>>;
     const mutation = { operation: 'x', target: { assetType: 'Story', oid: 'Story:1' }, changes: [] };
-    for (let i = 0; i < MAX_PENDING_PER_USER + 5; i++) {
+    const prompt = (hash: string, actor = 'user-1') => ({
+      message: 'm',
+      requestedSchema: {},
+      hash,
+      tool: 't',
+      actor: { id: actor },
+      expiresAt: 0,
+      workspaceId: 'ws-1',
+      mutation,
+    });
+    const links: string[] = [];
+    for (let i = 0; i < MAX_PENDING_PER_USER; i++) {
       r.clock.t += 1_000;
-      await channel.ask({
-        message: 'm',
-        requestedSchema: {},
-        hash: `h${i}`,
-        tool: 't',
-        actor: { id: 'user-1' },
-        expiresAt: 0,
-        workspaceId: 'ws-1',
-        mutation,
-      });
+      const reply = await channel.ask(prompt(`h${i}`));
+      if (reply.status === 'pending') links.push(reply.link);
     }
-    expect(await r.storage.kv.list('wr:pend:user-1:', { limit: 1_000 })).toHaveLength(MAX_PENDING_PER_USER);
+    const before = await r.storage.kv.list('wr:pend:user-1:', { limit: 1_000 });
+    expect(before).toHaveLength(MAX_PENDING_PER_USER);
+    // The next one is refused; nothing is stored or removed.
+    const error = await channel.ask(prompt('one-too-many')).catch((e: AbError) => e);
+    expect((error as AbError).code).toBe(ErrorCode.LimitRate);
+    expect((error as AbError).details).toMatchObject({ scope: 'approvals_pending' });
+    expect(await r.storage.kv.list('wr:pend:user-1:', { limit: 1_000 })).toEqual(before);
+    // The oldest is still there: asking for its change again returns its own link.
+    expect(await channel.ask(prompt('h0'))).toMatchObject({ status: 'pending', link: links[0] });
+    // Another person is not affected by this one's flood.
+    const other = r.page.channelFor(access('user-2')) as NonNullable<ReturnType<typeof r.page.channelFor>>;
+    expect((await other.ask(prompt('x', 'user-2'))).status).toBe('pending');
   });
 });
 

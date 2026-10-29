@@ -344,6 +344,7 @@ describe('apply once', () => {
     const { fake, tool, ctx } = setup({
       limiter: {
         async check(info) {
+          if (info.purpose === 'approval_request') return;
           calls.push(info.tool);
           throw new AbError(ErrorCode.LimitRate, 'Write limit reached.');
         },
@@ -704,7 +705,8 @@ describe('the approval is used up only when the send is attempted (P7-28)', () =
     const runtime = makeRuntime({
       page: answeringChannel(true, 'page'),
       limiter: {
-        check: async () => {
+        check: async (info) => {
+          if (info.purpose === 'approval_request') return;
           if (refuse) throw new AbError(ErrorCode.LimitRate, 'Write limit reached.');
         },
       },
@@ -801,7 +803,8 @@ describe('the approval is used up only when the send is attempted (P7-28)', () =
     let refuse = true;
     const runtime = makeRuntime({
       limiter: {
-        check: async () => {
+        check: async (info) => {
+          if (info.purpose === 'approval_request') return;
           if (refuse) throw new AbError(ErrorCode.LimitRate, 'Write limit reached.');
         },
       },
@@ -846,7 +849,8 @@ describe('the approval is used up only when the send is attempted (P7-28)', () =
     const runtime = makeRuntime({
       channel,
       limiter: {
-        check: async () => {
+        check: async (info) => {
+          if (info.purpose === 'approval_request') return;
           if (refuse) throw new AbError(ErrorCode.LimitRate, 'Write limit reached.');
         },
       },
@@ -880,7 +884,8 @@ describe('the approval is used up only when the send is attempted (P7-28)', () =
     const runtime = makeRuntime({
       channel,
       limiter: {
-        check: async () => {
+        check: async (info) => {
+          if (info.purpose === 'approval_request') return;
           throw new AbError(ErrorCode.LimitRate, 'Write limit reached.');
         },
       },
@@ -892,5 +897,101 @@ describe('the approval is used up only when the send is attempted (P7-28)', () =
     await refused(run(tool, CONFIRMED, ctx)); // Done is not the kept change
     expect(asked).toHaveLength(3);
     expect(fake.sends).toHaveLength(0);
+  });
+});
+
+describe('approval requests are counted before anyone is asked (P7-27)', () => {
+  const overRequests = {
+    check: async (info: { purpose?: string }) => {
+      if (info.purpose === 'approval_request') {
+        throw new AbError(ErrorCode.LimitRate, 'Too many approvals asked.');
+      }
+    },
+  };
+
+  it('over the counter: no push prompt, nothing sent, no audit', async () => {
+    const { fake, tool, ctx, channel, runtime } = setup({ limiter: overRequests });
+    expect((await refused(run(tool, CONFIRMED, ctx))).code).toBe(ErrorCode.LimitRate);
+    expect(channel.asked).toHaveLength(0);
+    expect(fake.sends).toHaveLength(0);
+    expect(runtime.audit.records).toHaveLength(0);
+  });
+
+  it('over the counter: no multi round-trip question and no ledger round', async () => {
+    const fake = new FakeItems();
+    const keys: string[] = [];
+    const inner = memoryLedgerStore(systemClock);
+    const runtime = makeRuntime({
+      ledger: new ApprovalLedger(
+        { ...inner, set: async (k, v, o) => (keys.push(k), inner.set(k, v, o)) },
+        systemClock,
+      ),
+      limiter: overRequests,
+      channel: { kind: 'elicitation', ask: async () => ({ status: 'needs_input' }) },
+    });
+    const error = await refused(run(makeTestWriteTool(fake), CONFIRMED, writeContext(runtime)));
+    expect(error.code).toBe(ErrorCode.LimitRate);
+    expect(keys).toEqual([]);
+  });
+
+  it('over the counter: the page channel stores no pending record and is not called', async () => {
+    const fake = new FakeItems();
+    let asks = 0;
+    const page: ApprovalChannelPort = {
+      kind: 'page',
+      ask: async () => {
+        asks++;
+        return { status: 'pending', link: 'https://example.test/x', expiresAt: 1 };
+      },
+    };
+    const runtime = makeRuntime({ channel: page, limiter: overRequests });
+    expect((await refused(run(makeTestWriteTool(fake), CONFIRMED, writeContext(runtime)))).code).toBe(
+      ErrorCode.LimitRate,
+    );
+    expect(asks).toBe(0);
+  });
+
+  it('a grant that already exists asks nothing and is not counted', async () => {
+    const fake = new FakeItems();
+    const seen: Array<string | undefined> = [];
+    const runtime = makeRuntime({
+      page: answeringChannel(true, 'page'),
+      limiter: {
+        check: async (info) => {
+          seen.push(info.purpose);
+        },
+      },
+    });
+    const m = canonicalize(
+      {
+        operation: 'update_status',
+        target: { assetType: 'Story', oid: 'Story:1', number: 'B-00001' },
+        changes: [{ field: 'Status', old: 'In Progress', new: 'Done' }],
+      },
+      { Story: ['Status'] },
+    );
+    await runtime.ledger.grant({
+      hash: await mutationHash(TEST_TOOL, ACTOR.id, m),
+      actor: ACTOR.id,
+      tool: TEST_TOOL,
+      expiresAt: systemClock.now() + 60_000,
+      scope: 'ws-1',
+    });
+    await run(makeTestWriteTool(fake), CONFIRMED, writeContext(runtime));
+    expect(seen).toEqual([undefined]);
+  });
+
+  it('a counter that fails closes the question: nobody is asked', async () => {
+    const { tool, ctx, channel } = setup({
+      limiter: {
+        check: async (info) => {
+          if (info.purpose === 'approval_request') {
+            throw new AbError(ErrorCode.WriteLimitUnavailable, 'The write limiter is not available.');
+          }
+        },
+      },
+    });
+    expect((await refused(run(tool, CONFIRMED, ctx))).code).toBe(ErrorCode.WriteLimitUnavailable);
+    expect(channel.asked).toHaveLength(0);
   });
 });

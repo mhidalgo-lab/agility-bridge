@@ -219,7 +219,7 @@ the whole change (workspace, item, every field with the value now and the value 
 - Approving needs a recent sign-in (the page sends you to sign in again, then back to it); declining does not.
 - An approval is for **one** repeat of **exactly** this change, in **this** workspace, for ten minutes. A different value, item,
   tool or workspace asks again; so does a second repeat. A decline makes the next call fail as `AB_WRITE_APPROVAL_DECLINED`.
-- The same pending change asked again before the person acts gets the same link; at most 20 requests are open per person.
+- The same pending change asked again before the person acts gets the same link; at most 20 requests are open per person. At the 21st, a new request is refused (`AB_LIMIT_RATE`, scope `approvals_pending`, nothing stored): the open ones are never dropped to make room, so the one you are about to open stays. Approve or decline what is waiting, or let it expire, then the agent repeats the call (P7-27).
 - Available only on a server with `AB_WRITE_TOOLS=on` **and** sign-in configured, for grants that belong to a user (a service
   grant has nobody to sign in). Otherwise the answer is `AB_WRITE_APPROVAL_UNAVAILABLE`.
 - Each decision is an admin audit row (`write.approval.approved`, `.declined`, `.refused`) with ids, field names and the
@@ -247,6 +247,11 @@ closed**: if the counters cannot be reached the write is refused (`AB_WRITE_LIMI
 
 - Over a limit: `AB_LIMIT_RATE` with the scope (`grant` or `deployment`), the limit and the seconds until the next hour.
   The refusal makes no read of the target and no send, and writes no intent audit row.
+- **Approval requests are counted too.** Before a person is asked (a prompt in the client, a question round, a new pending
+  record on the page) one unit is taken from a per-grant counter, 30 an hour. Past it the call is `AB_LIMIT_RATE` with
+  scope `approval_requests`: nobody was asked, nothing was stored. An approval that already exists asks nothing and costs
+  nothing. This bounds what a prompt-injected agent can do with varying proposals (approval fatigue); the limit is fixed
+  for now (D-205).
 - A unit is spent when the limiter runs and is not refunded: an approved write that turns out to be a conflict, an
   already-applied no-op or a failed send still counts. The approval itself survives a limiter refusal, a conflict and
   an audit outage (D-204), so the person is not asked twice; it expires after ten minutes. A declined or unavailable approval counts nothing.
@@ -264,7 +269,7 @@ closed**: if the counters cannot be reached the write is refused (`AB_WRITE_LIMI
 | `AB_WRITE_APPROVAL_DECLINED` | the person said no | ask what to change |
 | `AB_WRITE_CONFLICT` | the target changed since the plan | read, plan again, ask again |
 | `AB_WRITE_AUDIT_UNAVAILABLE` | the intent could not be stored, nothing was changed | try later; tell the administrator |
-| `AB_LIMIT_RATE` | the grant or the deployment used its write limit for this hour; nothing was changed | wait for the next hour; do not loop |
+| `AB_LIMIT_RATE` | the grant or the deployment used its write limit for this hour, the grant asked for too many approvals (`approval_requests`) or the person has too many approvals waiting (`approvals_pending`); nothing was changed | wait; approve or decline what is waiting; do not loop |
 | `AB_WRITE_LIMIT_UNAVAILABLE` | the limiter could not count, so nothing was changed | try later; tell the administrator |
 | `AB_AGILITY_*` | Agility refused or failed; the change may or may not have been applied | look at the item before repeating |
 
