@@ -2,7 +2,7 @@
 id: P6-60
 title: Fix the flaky tests behind the CI reruns
 phase: 6
-status: review
+status: done
 priority: high
 depends_on: []
 adr: []
