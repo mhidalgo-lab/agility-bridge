@@ -2,7 +2,7 @@
 id: P7-01
 title: Write framework (enablement, approval, dry run, audit intent)
 phase: 7
-status: in-progress
+status: review
 priority: high
 depends_on: [P2-17, P0-07]
 adr: ["0013", "0008"]
@@ -47,16 +47,16 @@ One pipeline that every write tool uses, so no write can skip enablement, approv
 - `tools/list` budget test with the write group enabled (a test tool in the `writes` group).
 
 ## Acceptance criteria
-- [ ] Tests: every layer missing → tool absent; shared credential → never writes; approval replay refused; approval for a different target or value refused; intent-audit failure → refused; refusals are errors.
-- [ ] Approval text shows the full change; oversized approvals refused rather than truncated.
-- [ ] A test-only write tool runs the whole pipeline on fakes: dry run, no confirm, declined, unavailable, conflict, no-op, applied once, outcome audited, no retry after a failed send.
-- [ ] Both elicitation eras are tested: 2026-07-28 `input_required` (first round, approved and declined retries, forged and replayed state) and 2025-era push elicitation; a client without the capability gets `AB_WRITE_APPROVAL_UNAVAILABLE` as a tool error.
-- [ ] The registry refuses a non-read tool that was not built by `defineWriteTool`, or that is outside the `writes` group.
-- [ ] HTTP host: write tools reach `tools/list` only for `access.writeTools`; the runtime uses the `kv` ledger and `kind: 'write'` audit rows (tested with a fake tool).
-- [ ] stdio host: `AB_WRITE_TOOLS` and `AB_WRITE_APPROVAL=off` parsed, startup warning when approval is off.
-- [ ] `tools/list` budget test with the write group enabled.
-- [ ] `docs/guide/write-tools.md` and THREAT_MODEL updated; decisions in `docs/pending-decisions/phase-7.md`.
-- [ ] *Sandbox (P7-07):* the pipeline against a real writable instance (real re-read values, read lag, one real approval in a client).
+- [x] Tests: every layer missing → tool absent; shared credential → never writes; approval replay refused; approval for a different target or value refused; intent-audit failure → refused; refusals are errors.
+- [x] Approval text shows the full change; oversized approvals refused rather than truncated.
+- [x] A test-only write tool runs the whole pipeline on fakes: dry run, no confirm, declined, unavailable, conflict, no-op, applied once, outcome audited, no retry after a failed send.
+- [x] Both elicitation eras are tested: 2026-07-28 `input_required` (first round, approved and declined retries, forged and replayed state) and 2025-era push elicitation; a client without the capability gets `AB_WRITE_APPROVAL_UNAVAILABLE` as a tool error.
+- [x] The registry refuses a non-read tool that was not built by `defineWriteTool`, or that is outside the `writes` group.
+- [x] HTTP host: write tools reach `tools/list` only for `access.writeTools`; the runtime uses the `kv` ledger and `kind: 'write'` audit rows (tested with a fake tool).
+- [x] stdio host: `AB_WRITE_TOOLS` and `AB_WRITE_APPROVAL=off` parsed, startup warning when approval is off.
+- [x] `tools/list` budget test with the write group enabled.
+- [x] `docs/guide/write-tools.md` and THREAT_MODEL updated; decisions in `docs/pending-decisions/phase-7.md`.
+- [ ] *Sandbox (P7-07):* the pipeline against a real writable instance (real re-read values, read lag, one real approval in a client). Staging Workers: P7-10; real clients rendering the approval text: P7-12; audit viewer: P7-11.
 
 ## Security notes
 THREAT_MODEL T17, T31, A2, A6.
@@ -75,6 +75,7 @@ THREAT_MODEL T17, T31, A2, A6.
 ## Docs to update
 - docs/guide/write-tools.md (new)
 - docs/THREAT_MODEL.md
+- docs/pending-decisions/phase-7.md (D-155 to D-162), LESSONS-LEARNED (L-383 to L-386)
 
 ## Out of scope
 - Anything not listed under Scope.

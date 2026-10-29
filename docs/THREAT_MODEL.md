@@ -335,3 +335,22 @@ registrations, and the T25 note that counters hold "a hash of the address", whic
 Residual: edge limits on Workers (P5-19), the operator view of refusals (P5-20), keyed address hashes (P5-22), recoverable
 refusals (P5-21). The §8e sections of P5-08, P5-09 and this one sit after §9 in this file for historical reasons; the order is
 not a statement of priority.
+
+## 8f. Status after P7-01 (2026-10-29)
+
+The write framework ([guide](guide/write-tools.md), `packages/core/src/writes/`) is built and tested on fakes with a test-only
+tool; no release has a real write tool yet (P7-04 – P7-06) and nothing has run against a writable instance (P7-07).
+
+| Id | Status | Evidence |
+|---|---|---|
+| T31 | framework implemented, unverified live | Every layer is checked again inside the tool (runtime present, caller's write list, granted tool, workspace flag, personal credential) and a missing one is `AB_TOOL_DISABLED` with no read or send; the registry refuses a `write` or `destructive` tool that is not built by `defineWriteTool` or is outside the `writes` group; HTTP offers write tools only for `access.writeTools`, stdio only with `AB_WRITE_TOOLS=on` and `AB_TOOLS` naming the tool. Approval is bound to a SHA-256 over tool, actor, operation, target and every field's old and new value; a grant or round for another value, target, actor, tool or past its expiry is refused; each entry is taken once from the ledger (replay refused). `confirm: true` is a precondition, never approval. The write rate limit is the P7-03 seam. |
+| T17 | implemented for writes | Intent row (`kind: write`, `details.phase: intent`) stored before the send, refused with `AB_WRITE_AUDIT_UNAVAILABLE` when it cannot be (HTTP test: audit down, nothing sent); outcome row after, best effort; rows hold field names and the change hash, never values. **stdio is weaker**: intent and outcome are stderr log lines, no table. |
+| A2 | framework implemented | One target per mutation, typed allowlist per asset type (a field outside it is `AB_INTERNAL`, a tool bug), no retries (the Agility client never retries a write; a failed send is audited and says the change may or may not have applied), re-read before the send (`AB_WRITE_CONFLICT`, idempotent no-op when already applied), dry run shows the complete plan. Per-grant and deployment-wide limits wait for P7-03. |
+| A6 | partly | Writes need the caller's personal credential (shared never writes); the audit names user, grant, device, client and the approval channel next to the hash. |
+| T6 (approval text) | implemented | What a person approves is what is sent: values with control, invisible or bidirectional characters are refused rather than cleaned; Agility and agent text is JSON-quoted inside the untrusted-data envelope (a forged closing tag or a newline cannot pose as our line); an approval above 24,000 characters (8,000 per value, 20 changes) is refused, never truncated. |
+| T21 | verified | The write runtime and approval channel are built per request; the in-process stdio ledger and key live in the process, not in module state. |
+
+Residual: the page channel (P7-02), the write limiter (P7-03), the real tools' field allowlists and metadata checks (P7-04 –
+P7-06), the multi-isolate `kv` ledger and sealed state on Workers (P7-10) and what real clients render of the approval text
+(P7-12) are not verified yet. In stdio with `AB_WRITE_APPROVAL=off` nothing asks a person: documented, warned at start,
+stdio only (D-10).

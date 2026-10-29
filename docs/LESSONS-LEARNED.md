@@ -37,7 +37,7 @@ How to use it:
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
-| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237 |
+| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-386 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382 |
@@ -1536,6 +1536,30 @@ tools were an administrator's to widen: adding a project to a write-enabled work
 guard now compares the change with the stored record (a list is a set, no policy equals empty lists, narrowing is never a
 widening) and asks for an owner with a recent sign-in only when it widens, so ordinary edits stay with administrators.
 *Applied in:* P4-09.
+
+**L-383 — Make the rule a type: only the framework can build a write tool.**
+A checklist every write tool must follow is a review item that gets missed once. `defineWriteTool` is the only constructor of a
+`write` or `destructive` tool and the registry refuses anything else, so enablement, approval, re-read and audit cannot be left
+out; a tool declares its plan, re-read and send and cannot reach Agility any other way. Hosts register write tools always and
+select them by kind, so a host with writes off is tested as "registered, not offered".
+*Applied in:* P7-01.
+
+**L-384 — An approval answer counts only with the sealed, single-use state of its question.**
+On 2026-07-28 the client repeats the call with `inputResponses`; the arguments, the answer and the echoed state are all
+attacker-controlled. The state is an HMAC over a nonce, the change hash, the actor and an expiry, and the nonce's ledger entry is
+taken exactly once; anything forged, replayed, expired or for another change does not approve, it makes the pipeline ask again.
+*Applied in:* P7-01.
+
+**L-385 — What the person reads must be byte for byte what is sent.**
+Cleaning a value for display (stripping bidi or zero-width characters) shows something other than what is sent. Refuse such
+values instead, JSON-quote every value and put the block in the untrusted-data envelope, so no value can start a line that looks
+like the question or close the block.
+*Applied in:* P7-01.
+
+**L-386 — A no-op needs no approval, and "already changed" after the plan is a no-op, not a conflict.**
+Compare the plan's values with the target before asking (nothing to approve), and compare again after approval: if the item
+already holds the new values the call is an idempotent no-op; only a different value or a moved version is `AB_WRITE_CONFLICT`.
+*Applied in:* P7-01.
 
 ## O. Caching, quotas and budgets
 

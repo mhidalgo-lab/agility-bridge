@@ -32,6 +32,7 @@ import {
   type ToolContext,
   type ToolDefinition,
   ToolRegistry,
+  type WriteRuntime,
 } from '@agility-bridge/core';
 import type { Storage } from '@agility-bridge/storage';
 import { createMcpHandler } from '@modelcontextprotocol/server';
@@ -60,6 +61,7 @@ import {
   type OAuthRuntime,
 } from './oauth/server.ts';
 import { createSessionManager, type SessionManager, type SessionOptions } from './session.ts';
+import type { HttpWrites } from './writes.ts';
 
 /** 1 MiB (ARCHITECTURE §5 step 1). */
 export const MAX_BODY_BYTES = 1024 * 1024;
@@ -200,6 +202,11 @@ export interface HttpAppOptions extends EdgeOptions {
    * request's CPU budget (P3-14); default: built here from `tools`.
    */
   readonly registry?: ToolRegistry;
+  /**
+   * The write runtime (P7-01, ADR-0013): present only when `AB_WRITE_TOOLS` is on. Without it write tools are neither
+   * registered nor selected, whatever the access records say.
+   */
+  readonly writes?: HttpWrites;
 }
 
 export interface HttpApp {
@@ -311,7 +318,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     identities.set(key, until);
   };
   const { services } = options;
-  const registry = options.registry ?? new ToolRegistry();
+  const registry = options.registry ?? new ToolRegistry({ allowNonRead: true });
   if (options.registry === undefined) for (const tool of options.tools) registry.register(tool);
   const clientIp = options.clientIp ?? (() => 'unknown');
 
@@ -902,9 +909,24 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       return finish(c.json({ error: 'temporarily unavailable' }, 503, { 'retry-after': '5' }), 'unavailable');
     }
     const resolved = access;
-    const tools = registry.select({ allowed: [...resolved.tools], maxCost: resolved.limits.callBudget });
+    // Write tools only with the write wiring and only the ones every layer enabled (`resolved.tools` holds them then).
+    const kinds = options.writes === undefined ? undefined : (['read', 'write', 'destructive'] as const);
+    const selection = { allowed: [...resolved.tools], ...(kinds === undefined ? {} : { kinds }) };
+    const tools = registry.select({ ...selection, maxCost: resolved.limits.callBudget });
+    let writes: WriteRuntime | undefined;
+    if (options.writes !== undefined && resolved.writeTools.length > 0) {
+      try {
+        writes = await options.writes.runtimeFor(resolved);
+      } catch (error) {
+        services.logger.error('write runtime unavailable', { requestId, error: (error as Error).name });
+        return finish(
+          c.json({ error: 'temporarily unavailable' }, 503, { 'retry-after': '5' }),
+          'unavailable',
+        );
+      }
+    }
     const hiddenByBudget = registry
-      .hiddenByBudget({ allowed: [...resolved.tools], maxCost: resolved.limits.callBudget })
+      .hiddenByBudget({ ...selection, maxCost: resolved.limits.callBudget })
       .map((t) => ({ name: t.name, cost: t.cost }));
     const groups = [...new Set(tools.map((t) => t.group))];
     const ctx: ToolContext = {
@@ -920,7 +942,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         id: resolved.workspace.id,
         name: resolved.workspace.name,
         groups,
-        writes: { enabled: resolved.writeTools.length > 0, approval: 'unavailable' },
+        writes: { enabled: writes !== undefined, approval: 'unavailable' },
       },
       credential: { id: resolved.credential.id, kind: resolved.credential.kind, token: new Secret(token) },
       projects: {
@@ -945,6 +967,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       clock: services.clock,
       random: services.random,
       ...(hiddenByBudget.length === 0 ? {} : { hiddenByBudget }),
+      ...(writes === undefined ? {} : { writes }),
     };
     const prepared: PreparedRequest = {
       tools,

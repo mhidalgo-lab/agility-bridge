@@ -134,3 +134,4 @@ export {
   type SessionOptions,
   type SessionPrincipal,
 } from './session.ts';
+export { createHttpWrites, type HttpWrites, type HttpWritesOptions } from './writes.ts';

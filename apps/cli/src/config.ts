@@ -37,6 +37,13 @@ export interface StdioConfig {
   readonly attachmentDownload: boolean;
   /** The composite reports group (P6-07, D-101): off by default. */
   readonly reports: boolean;
+  /**
+   * `AB_WRITE_TOOLS=on` (P7-01, ADR-0013): write tools may be offered, and only the ones `AB_TOOLS` names ("all tools"
+   * never includes a write). Off by default.
+   */
+  readonly writeTools: boolean;
+  /** `required` (default): a person approves every write. `off`: stdio only, your own token (D-10); warned at start. */
+  readonly writeApproval: 'required' | 'off';
   readonly attachmentMaxBytes: number;
   readonly attachmentTypes: readonly string[];
   readonly maxRows: number;
@@ -195,6 +202,13 @@ function bool(name: string, value: string | undefined, fallback: boolean): boole
   throw new ConfigError(`${name} must be on or off (got "${value.slice(0, 20)}").`);
 }
 
+function writeApproval(value: string | undefined): 'required' | 'off' {
+  if (value === undefined || value === '') return 'required';
+  const v = value.trim().toLowerCase();
+  if (v === 'required' || v === 'off') return v;
+  throw new ConfigError(`AB_WRITE_APPROVAL must be required or off (got "${value.slice(0, 20)}").`);
+}
+
 function int(name: string, value: string | undefined, fallback: number, min: number, max: number): number {
   if (value === undefined || value === '') return fallback;
   const n = Number(value);
@@ -335,6 +349,12 @@ const workspaceSchema = z.strictObject({
     .optional(),
   generic_query: z.boolean().optional(),
   reports: z.boolean().optional(),
+  writes: z
+    .strictObject({
+      enabled: z.boolean().optional(),
+      approval: z.enum(['required', 'off']).optional(),
+    })
+    .optional(),
   member_emails: z.boolean().optional(),
   attachments: z
     .strictObject({
@@ -476,6 +496,8 @@ function fromYaml(env: Readonly<Record<string, string | undefined>>, options: Lo
     genericQuery: resolved.generic_query ?? true,
     memberEmails: resolved.member_emails ?? false,
     reports: resolved.reports ?? false,
+    writeTools: resolved.writes?.enabled ?? false,
+    writeApproval: resolved.writes?.approval ?? 'required',
     attachmentDownload: resolved.attachments?.download ?? false,
     attachmentMaxBytes: resolved.attachments?.max_bytes ?? DEFAULTS.attachmentMaxBytes,
     attachmentTypes: attachmentTypes(`workspaces.${id}.attachments.types`, resolved.attachments?.types),
@@ -540,6 +562,8 @@ export function loadConfig(
     genericQuery: bool('AB_GENERIC_QUERY', env['AB_GENERIC_QUERY'], true),
     memberEmails: bool('AB_MEMBER_EMAILS', env['AB_MEMBER_EMAILS'], false),
     reports: bool('AB_REPORTS', env['AB_REPORTS'], false),
+    writeTools: bool('AB_WRITE_TOOLS', env['AB_WRITE_TOOLS'], false),
+    writeApproval: writeApproval(env['AB_WRITE_APPROVAL']),
     attachmentDownload: bool('AB_ATTACHMENT_DOWNLOAD', env['AB_ATTACHMENT_DOWNLOAD'], false),
     attachmentMaxBytes: int(
       'AB_ATTACHMENT_MAX_BYTES',

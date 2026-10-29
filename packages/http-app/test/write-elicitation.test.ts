@@ -2,17 +2,18 @@
 // The write pipeline behind the real MCP server and the SDK client, both protocol eras (P7-01, P0-07): elicitation over
 // 2026-07-28 `input_required`, push elicitation on a stateful 2025-era connection, no channel on stateless 2025-era
 // HTTP, and a client without the capability answered with our own tool error (never a protocol error).
-import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
-import { createMcpHandler, InMemoryTransport } from '@modelcontextprotocol/server';
-import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
+
 import {
   buildMcpServer,
   defineTool,
   ERROR_META_KEY,
   ErrorCode,
   type ToolDefinition,
-} from '../../src/index.ts';
+} from '@agility-bridge/core';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { createMcpHandler, InMemoryTransport } from '@modelcontextprotocol/server';
+import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import {
   answeringChannel,
   FakeItems,
@@ -20,7 +21,7 @@ import {
   makeTestWriteTool,
   TEST_TOOL,
   writeContext,
-} from '../helpers/writes.ts';
+} from '../../core/test/helpers/writes.ts';
 
 type Mode = 'legacy' | { pin: '2026-07-28' };
 

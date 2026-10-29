@@ -44,6 +44,7 @@ import {
   type RateLimiter,
 } from './rate-limit.ts';
 import type { SessionOptions } from './session.ts';
+import { createHttpWrites } from './writes.ts';
 
 /** A setting is missing or malformed; the message names the setting, never its value. */
 export class SettingsError extends Error {
@@ -108,6 +109,8 @@ export interface ServerSettings {
   readonly passthrough: boolean;
   /** `AB_ALLOW_HTTP_INSTANCES=on`: plain-HTTP loopback instance URLs, for tests and local fixtures (P2-19). */
   readonly allowHttpInstances: boolean;
+  /** `AB_WRITE_TOOLS=on` (P7-01, ADR-0013): write tools may be offered; every other layer still has to enable them. */
+  readonly writeTools: boolean;
   /** Sign-in providers and the login policy (P4-01); absent = no `/auth` routes. */
   readonly identity?: IdentitySettings;
   /** Admin session timeouts, cap and logout behaviour (P4-02); only used with sign-in. */
@@ -280,6 +283,7 @@ export function parseServerSettings(
     ),
     passthrough: onOff('AB_PASSTHROUGH', env['AB_PASSTHROUGH'], false),
     allowHttpInstances: onOff('AB_ALLOW_HTTP_INSTANCES', env['AB_ALLOW_HTTP_INSTANCES'], false),
+    writeTools: onOff('AB_WRITE_TOOLS', env['AB_WRITE_TOOLS'], false),
     ...(identity === null ? {} : { identity }),
     ...(oauth === null ? {} : { oauth }),
     session: parseSessionSettings(env),
@@ -307,8 +311,11 @@ export function parseSessionSettings(env: Env): SessionOptions & { timeouts: Ses
 /** The warnings both hosts log at start for risky but valid settings. */
 export function settingWarnings(env: Env, settings: ServerSettings): string[] {
   const warnings: string[] = [];
-  if (env['AB_WRITE_TOOLS'] === 'on')
-    warnings.push('AB_WRITE_TOOLS is on, but this version has no write tools.');
+  if (settings.writeTools) {
+    warnings.push(
+      'AB_WRITE_TOOLS is on: owners can enable write tools per workspace and grant; every write needs a person to approve it.',
+    );
+  }
   if (!settings.rateLimits.enabled) {
     warnings.push('AB_RATE_LIMIT is off: no request, token or authentication-failure limits.');
   }
@@ -440,7 +447,7 @@ export function assembleServer(parts: ServerParts): AssembledServer {
     keyring,
     access: {
       tools,
-      writesEnabled: false,
+      writesEnabled: settings.writeTools,
       environment: settings.environment,
       limits: {
         defaults: {
@@ -453,6 +460,9 @@ export function assembleServer(parts: ServerParts): AssembledServer {
       },
     },
     tools: CORE_TOOLS,
+    ...(settings.writeTools
+      ? { writes: createHttpWrites({ storage, audit, keyring, clock: host.clock }) }
+      : {}),
     services: host,
     ...(settings.publicUrl === undefined ? {} : { publicUrl: settings.publicUrl }),
     allowedHosts: settings.allowedHosts,

@@ -3,6 +3,7 @@
 // only MCP frames (L-021): logs go to stderr through the redacting logger.
 import {
   AbError,
+  ApprovalLedger,
   buildMcpServer,
   CircuitBreakers,
   CORE_TOOLS,
@@ -15,6 +16,7 @@ import {
   type FetchLike,
   type Logger,
   MetadataService,
+  memoryLedgerStore,
   Secret,
   type SelectOptions,
   silentLogger,
@@ -23,6 +25,8 @@ import {
   type ToolContext,
   type ToolDefinition,
   ToolRegistry,
+  type WriteAuditSink,
+  type WriteRuntime,
   webCryptoRandom,
 } from '@agility-bridge/core';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
@@ -41,14 +45,15 @@ export const STDIO_GROUPS = [
   'portfolio',
   'history',
   'reports',
+  'writes',
 ] as const;
 
 const SETUP_HINT =
   'Set AB_AGILITY_URL (the address you open Agility at) and AB_AGILITY_TOKEN (an access token from the Agility Applications page) in the env block of your MCP client, then restart the server. See docs/guide/configuration.md.';
 
 /** The tools this configuration serves; an unknown name in the allowlist fails startup and lists the valid ones. */
-export function selectTools(config: LoadedConfig): ToolDefinition[] {
-  const { registry, options } = selection(config);
+export function selectTools(config: LoadedConfig, extra: readonly ToolDefinition[] = []): ToolDefinition[] {
+  const { registry, options } = selection(config, extra);
   return registry.select(options);
 }
 
@@ -61,13 +66,19 @@ export function hiddenTools(config: LoadedConfig): Array<{ name: string; cost: n
     .map((t) => ({ name: t.name, cost: t.cost }));
 }
 
-function selection(config: LoadedConfig): { registry: ToolRegistry; options: SelectOptions } {
-  const registry = new ToolRegistry();
-  for (const tool of CORE_TOOLS) registry.register(tool);
+function selection(
+  config: LoadedConfig,
+  extra: readonly ToolDefinition[] = [],
+): { registry: ToolRegistry; options: SelectOptions } {
+  // Write tools are always registered (so AB_TOOLS can name them) and selected only with AB_WRITE_TOOLS=on below.
+  const registry = new ToolRegistry({ allowNonRead: true });
+  for (const tool of [...CORE_TOOLS, ...extra]) registry.register(tool);
   if (config.kind === 'setup')
     return {
       registry,
-      options: { groups: STDIO_GROUPS.filter((g) => g !== 'attachments' && g !== 'reports') },
+      options: {
+        groups: STDIO_GROUPS.filter((g) => g !== 'attachments' && g !== 'reports' && g !== 'writes'),
+      },
     };
   const valid = registry.list().map((t) => t.name);
   const unknown = (config.tools ?? []).filter((t) => !valid.includes(t));
@@ -80,7 +91,8 @@ function selection(config: LoadedConfig): { registry: ToolRegistry; options: Sel
     (g) =>
       (g !== 'query' || config.genericQuery) &&
       (g !== 'attachments' || config.attachmentDownload) &&
-      (g !== 'reports' || config.reports),
+      (g !== 'reports' || config.reports) &&
+      (g !== 'writes' || config.writeTools),
   );
   return {
     registry,
@@ -88,6 +100,10 @@ function selection(config: LoadedConfig): { registry: ToolRegistry; options: Sel
       groups,
       maxCost: config.callBudget,
       ...(config.tools === undefined ? {} : { allowed: config.tools }),
+      // A write tool is offered only with AB_WRITE_TOOLS=on and when AB_TOOLS names it: "every tool" never includes one.
+      ...(config.writeTools && config.tools !== undefined
+        ? { kinds: ['read', 'write', 'destructive'] as const }
+        : {}),
     },
   };
 }
@@ -95,6 +111,32 @@ function selection(config: LoadedConfig): { registry: ToolRegistry; options: Sel
 export interface StdioServices {
   readonly fetch: FetchLike;
   readonly logger: Logger;
+}
+
+/**
+ * The write runtime of a stdio process (ADR-0013): an in-process ledger that lives as long as the process, a random
+ * per-process key that seals multi round-trip state, and intent and outcome logged to stderr. That log is the whole
+ * audit here (no audit table in stdio): documented as weaker than the remote durable rows.
+ */
+function stdioWrites(config: StdioConfig, logger: Logger, tools: readonly string[]): WriteRuntime {
+  const audit: WriteAuditSink = {
+    durable: false,
+    async intent(record) {
+      logger.info('write intent', { ...record });
+      return null;
+    },
+    async outcome(record) {
+      logger.info('write outcome', { ...record });
+    },
+  };
+  return {
+    approval: config.writeApproval,
+    tools,
+    actor: { id: 'stdio' },
+    ledger: new ApprovalLedger(memoryLedgerStore(systemClock), systemClock),
+    audit,
+    stateKey: webCryptoRandom.bytes(32),
+  };
 }
 
 /** A fresh, complete context for every tool call. */
@@ -109,6 +151,8 @@ export function contextFactory(
   const metadata = new MetadataService();
   const instanceId = config.workspace.id;
   const groups = [...new Set(tools.map((t) => t.group))];
+  const writeNames = tools.filter((t) => t.kind !== 'read').map((t) => t.name);
+  const writes = writeNames.length === 0 ? undefined : stdioWrites(config, services.logger, writeNames);
   return () => ({
     requestId: webCryptoRandom.uuid(),
     instance: { id: instanceId, baseUrl: config.instanceUrl },
@@ -116,7 +160,7 @@ export function contextFactory(
       id: config.workspace.id,
       name: config.workspace.name,
       groups,
-      writes: { enabled: false, approval: 'unavailable' },
+      writes: { enabled: writes !== undefined, approval: 'unavailable' },
     },
     credential: { id: 'stdio', kind: 'personal', token: config.token },
     projects: { allowed: [...config.projects], includeChildren: config.includeChildProjects },
@@ -143,6 +187,7 @@ export function contextFactory(
     clock: systemClock,
     random: webCryptoRandom,
     ...(hiddenByBudget.length === 0 ? {} : { hiddenByBudget }),
+    ...(writes === undefined ? {} : { writes }),
   });
 }
 
@@ -201,6 +246,16 @@ export function startStdio(config: LoadedConfig, options: StartOptions): { close
     );
   }
   const tools = selectTools(config);
+  if (config.kind === 'configured') {
+    if (config.writeTools && config.writeApproval === 'off') {
+      logger.warn(
+        'AB_WRITE_APPROVAL=off: write tools change Agility without asking a person first. Use it only with your own token on your own machine.',
+      );
+    }
+    if (config.writeTools && !tools.some((t) => t.kind !== 'read')) {
+      logger.warn('AB_WRITE_TOOLS is on, but AB_TOOLS names no write tool, so none is offered.');
+    }
+  }
   if (config.kind === 'setup') {
     logger.warn(
       'Not configured: tools are listed, and every call explains how to set AB_AGILITY_URL and AB_AGILITY_TOKEN.',
