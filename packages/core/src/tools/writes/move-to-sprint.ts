@@ -115,7 +115,10 @@ export const moveToSprint: ToolDefinition = defineWriteTool({
 });
 
 /** `AssetState` code of one sprint, read through the compiler (scope rechecked). */
-async function sprintState(ctx: Parameters<typeof planTarget>[0], oid: string): Promise<number | undefined> {
+export async function sprintState(
+  ctx: Parameters<typeof planTarget>[0],
+  oid: string,
+): Promise<number | undefined> {
   const compiled = await compileQuery(ctx, {
     assetType: 'Timebox',
     fields: ['AssetState'],

@@ -5,7 +5,8 @@
 // parent and their scope must still be fine, and the item must not exist already. Idempotency has no key in Agility, so it
 // is derived: the same caller creating the same title under the same parent in the same project within 30 minutes is a
 // repeat and is refused, naming the item that exists (D-179). Custom attributes the workspace owner enabled are set from
-// `custom` (P7-20). The write shape is *unverified* until the sandbox (P7-07).
+// `custom` (P7-20), and the new item's owners, team and sprint from `owners`, `team` and `sprint` (P7-21, shown as new
+// values, sent in the same request). The write shape is *unverified* until the sandbox (P7-07).
 import { z } from 'zod';
 import { type ToolContext, withMemo } from '../../context.ts';
 import { AbError, ErrorCode } from '../../errors.ts';
@@ -16,7 +17,7 @@ import { compileQuery } from '../../query/compiler.ts';
 import { invalid } from '../../query/limits.ts';
 import type { ToolDefinition } from '../../tool.ts';
 import { CUSTOM_FIELD_RE, defineWriteTool } from '../../writes/index.ts';
-import { text as textOf } from '../common.ts';
+import { sprintArg, teamArg, text as textOf } from '../common.ts';
 import {
   assertTypeAllowed,
   conflict,
@@ -45,20 +46,28 @@ import {
   PARENT_TYPES,
   resolvePriority,
 } from './fields.ts';
+import { sprintState } from './move-to-sprint.ts';
+import { MAX_OWNERS, planOwners, planSprint, planTeam, SPRINT_OPEN } from './relations.ts';
 
 /** A repeat of the same create inside this window is refused (D-179). */
 export const DUPLICATE_WINDOW_MS: number = 30 * 60_000;
-const COST = 20;
+const COST = 31;
 
 /** Everything `create_work_item` may write: the type's fields and its parent relation; the project is the target. */
 const CREATE_FIELDS: readonly string[] = [
-  ...new Set(['AssetType', ...FIELD_TYPES.flatMap((t) => [...FIELD_ALLOWLIST[t], PARENT_RELATION[t]])]),
+  ...new Set([
+    'AssetType',
+    'Owners',
+    'Team',
+    'Timebox',
+    ...FIELD_TYPES.flatMap((t) => [...FIELD_ALLOWLIST[t], PARENT_RELATION[t]]),
+  ]),
 ];
 
 const OPEN_STATES = new Set(['active', 'future']);
 
 /** The project that will hold the item: visible in the workspace (the compiler's scope) and open. */
-async function projectOf(
+export async function projectOf(
   ctx: ToolContext,
   oid: string,
 ): Promise<{ readonly oid: string; readonly name: string }> {
@@ -129,9 +138,10 @@ const newValue = (
 const defined: ToolDefinition = defineWriteTool({
   name: 'create_work_item',
   title: 'Create work item',
-  description: `Create one backlog item, defect, task, test or epic in an Agility project. A task or test needs a parent item; a backlog item, defect or epic may have an epic as parent. Sets only title, description, estimate, priority and enabled custom attributes. Not paged. Cold call: up to ${COST} Agility requests.`,
+  description: `Create one backlog item, defect, task, test or epic in an Agility project. A task or test needs a parent item; a backlog item, defect or epic may have an epic as parent. Sets only title, description, estimate, priority, owners, team, sprint and enabled custom attributes. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
-  // Resolution of the project, the parent and the priority, metadata (cold), the duplicate scan, the re-read and the write.
+  // Resolution of the project, the parent and the priority, up to three members, the team and a relative sprint, metadata (cold),
+  // the duplicate scan, the re-read and the write: 27 measured, 31 declared (D-199, P7-21).
   cost: COST,
   idempotent: false,
   inputSchema: z.object({
@@ -167,6 +177,13 @@ const defined: ToolDefinition = defineWriteTool({
       .max(200)
       .optional()
       .describe('Priority name or OID token, for a story or defect.'),
+    owners: z
+      .array(z.string().min(1).max(200))
+      .max(MAX_OWNERS)
+      .optional()
+      .describe(`Members to make owners: me, a username, a name or Member:<id>; at most ${MAX_OWNERS}.`),
+    team: teamArg,
+    sprint: sprintArg,
     custom: customArg,
   }),
   allowedFields: { Scope: CREATE_FIELDS },
@@ -231,6 +248,15 @@ const defined: ToolDefinition = defineWriteTool({
     const priority =
       input.priority === undefined ? undefined : await resolvePriority(ctx, type, input.priority);
     const custom = await planCustom(ctx, type, input.custom);
+    const owners =
+      input.owners === undefined || input.owners.length === 0
+        ? undefined
+        : await planOwners(ctx, type, input.owners);
+    const team = input.team === undefined ? undefined : await planTeam(ctx, type, input.team);
+    const sprint =
+      input.sprint === undefined
+        ? undefined
+        : await planSprint(ctx, type, input.sprint, projectRef.oid, sprintState);
 
     const duplicate = await recentDuplicate(ctx, type, projectRef.oid, parentOid, name);
     if (duplicate !== undefined) {
@@ -240,7 +266,7 @@ const defined: ToolDefinition = defineWriteTool({
       );
     }
 
-    const changes: Array<{ field: string; old: null; new: string | number }> = [
+    const changes: Array<{ field: string; old: null; new: string | number | readonly string[] }> = [
       { field: 'AssetType', old: null, new: type },
       { field: 'Name', old: null, new: name },
     ];
@@ -251,6 +277,9 @@ const defined: ToolDefinition = defineWriteTool({
     if (priority !== undefined)
       changes.push({ field: 'Priority', old: null, new: labelOf(priority.name, priority.oid) });
     if (parentLabel !== null) changes.push({ field: relation, old: null, new: parentLabel });
+    if (owners !== undefined) changes.push({ field: 'Owners', old: null, new: owners });
+    if (team !== undefined) changes.push({ field: 'Team', old: null, new: team });
+    if (sprint !== undefined) changes.push({ field: 'Timebox', old: null, new: sprint });
     for (const x of custom) changes.push({ field: x.field, old: null, new: x.value });
     return {
       mutation: {
@@ -276,6 +305,10 @@ const defined: ToolDefinition = defineWriteTool({
       if ((type === 'Task' || type === 'Test') && oidsOf(parent.row['Scope'])[0] !== project) {
         throw conflict(parent.number ?? parentOid);
       }
+    }
+    const sprintLabel = newValue(plan.mutation.changes, 'Timebox');
+    if (typeof sprintLabel === 'string' && !SPRINT_OPEN(await sprintState(ctx, oidOfLabel(sprintLabel)))) {
+      throw conflict(project);
     }
     const name = newValue(plan.mutation.changes, 'Name') as string;
     const duplicate = await recentDuplicate(ctx, type, project, parentOid, name);
@@ -307,6 +340,20 @@ const defined: ToolDefinition = defineWriteTool({
       type,
       plan.mutation.changes.map((x) => x.field).filter((f) => CUSTOM_FIELD_RE.test(f)),
     );
+    const owners = newValue(c, 'Owners');
+    const team = newValue(c, 'Team');
+    const sprint = newValue(c, 'Timebox');
+    const relationOps = [
+      ...(Array.isArray(owners) && owners.length > 0
+        ? [{ relation: 'Owners', act: 'add' as const, oids: (owners as readonly string[]).map(oidOfLabel) }]
+        : []),
+      ...(typeof team === 'string'
+        ? [{ relation: 'Team', act: 'set' as const, oids: [oidOfLabel(team)] }]
+        : []),
+      ...(typeof sprint === 'string'
+        ? [{ relation: 'Timebox', act: 'set' as const, oids: [oidOfLabel(sprint)] }]
+        : []),
+    ];
     const customOps = plan.mutation.changes.flatMap((x) => {
       const kind = kinds.get(x.field);
       return kind === undefined || (typeof x.new !== 'string' && typeof x.new !== 'number')
@@ -328,6 +375,7 @@ const defined: ToolDefinition = defineWriteTool({
       ...(typeof parent === 'string'
         ? [{ relation: PARENT_RELATION[field], act: 'set' as const, oids: [oidOfLabel(parent)] }]
         : []),
+      ...relationOps,
       ...customOps,
     ]);
   },

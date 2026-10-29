@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // update_fields (P7-05): changes the title, description, estimate, priority or (task and test, P7-17) remaining to-do of one
-// work item, plus the custom attributes the workspace owner enabled (P7-20), and nothing else. The
-// field allowlist is typed per asset type (fields.ts); custom attributes, the project, the status, owners, parent and every
-// other attribute have no argument and no allowlist entry, so they cannot be reached (D-181). The approval shows old ->
+// work item, plus the custom attributes the workspace owner enabled (P7-20), and re-parents it or moves it to another
+// project of the workspace (P7-21, D-240), and nothing else. The field allowlist is typed per asset type (fields.ts); the
+// status, owners, sprint, team and every other attribute have no argument and no allowlist entry, so they cannot be reached
+// (D-181). The approval shows old ->
 // new for each field; the re-read compares them. Only fields that actually differ are sent. The shapes are *unverified*
 // until the sandbox (P7-07).
 import { z } from 'zod';
@@ -11,7 +12,7 @@ import { richText } from '../../output/text.ts';
 import { invalid } from '../../query/limits.ts';
 import type { ToolDefinition } from '../../tool.ts';
 import { CUSTOM_FIELD_RE, defineWriteTool } from '../../writes/index.ts';
-import { assetArg, num, text as textOf } from '../common.ts';
+import { assetArg, num, projectArg, text as textOf } from '../common.ts';
 import type { XmlOp } from './asset-xml.ts';
 import {
   idOf,
@@ -23,6 +24,7 @@ import {
   requireWritable,
   rereadTarget,
 } from './common.ts';
+import { projectOf } from './create-work-item.ts';
 import {
   assertReplaceable,
   checkCustomNames,
@@ -45,11 +47,13 @@ import {
   itemName,
   MAX_DESCRIPTION_CHARS,
   notAllowed,
+  PARENT_RELATION,
   resolvePriority,
   round2,
 } from './fields.ts';
+import { MOVABLE_TYPES, planMove, planParent, rereadRelations } from './relations.ts';
 
-const COST = 14;
+const COST = 22;
 
 /** Read for every type; attributes the type lacks are left out by the reader. */
 const READ_FIELDS = [
@@ -60,6 +64,14 @@ const READ_FIELDS = [
   'ToDo',
   'Priority',
   'Priority.Name',
+];
+
+/** Read only when a re-parent or a move is asked: each related type costs a metadata request on a cold cache (L-114). */
+const PARENT_FIELDS = ['Super', 'Super.Name', 'Parent', 'Parent.Name'];
+const MOVE_FIELDS = ['Scope.Name', 'Timebox'];
+const relationFields = (fields: readonly string[]): string[] => [
+  ...(fields.includes('Super') || fields.includes('Parent') ? PARENT_FIELDS : []),
+  ...(fields.includes('Scope') ? MOVE_FIELDS : []),
 ];
 
 /** The item's current values of the allowlisted fields; a description is read as plain text (it is HTML in Agility). */
@@ -82,16 +94,19 @@ function currentValues(
     out['ToDo'] = todo === undefined ? null : round2(todo);
   }
   if (FIELD_ALLOWLIST[type].includes('Priority')) out['Priority'] = labelFrom(row, 'Priority');
+  out['Scope'] = labelFrom(row, 'Scope');
+  out[PARENT_RELATION[type]] = labelFrom(row, PARENT_RELATION[type]);
   return out;
 }
 
 export const updateFields: ToolDefinition = defineWriteTool({
   name: 'update_fields',
   title: 'Update fields',
-  description: `Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic, the remaining to-do hours of a task or test, or an enabled custom attribute. Give only what changes; the person approves old and new for each. Not paged. Cold call: up to ${COST} Agility requests.`,
+  description: `Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic, the remaining to-do hours of a task or test, or an enabled custom attribute; or re-parent it (parent) or move it to another project (project). Give only what changes; the person approves old and new for each. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
   overwrites: true,
-  // Resolution, the item read, metadata (cold), the priority (1 to 3), the re-read and the one write.
+  // Resolution, the item read, metadata (cold), the priority (1 to 3), a new parent and a new project (each a lookup, a read and
+  // metadata), the re-read with the parent and the one write: 18 measured, 22 declared (D-199, P7-21).
   cost: COST,
   idempotent: true,
   inputSchema: z.object({
@@ -123,10 +138,25 @@ export const updateFields: ToolDefinition = defineWriteTool({
       .max(10_000)
       .optional()
       .describe('Remaining hours, for a task or test. Not for a backlog item, defect or epic.'),
+    parent: z
+      .string()
+      .min(1)
+      .max(64)
+      .optional()
+      .describe(
+        'New parent: an epic for a backlog item, defect or epic; a story or defect of the same project for a task or test.',
+      ),
+    project: projectArg,
     custom: customArg,
   }),
   customFields: true,
-  allowedFields: Object.fromEntries(FIELD_TYPES.map((t) => [t, FIELD_ALLOWLIST[t]])),
+  // The relations of a re-parent and a move are named per type (P7-21): a task or test has no `Scope` of its own to change.
+  allowedFields: Object.fromEntries(
+    FIELD_TYPES.map((t) => [
+      t,
+      [...FIELD_ALLOWLIST[t], PARENT_RELATION[t], ...(MOVABLE_TYPES.includes(t) ? ['Scope'] : [])],
+    ]),
+  ),
   async plan(input, ctx) {
     if (
       input.name === undefined &&
@@ -134,11 +164,13 @@ export const updateFields: ToolDefinition = defineWriteTool({
       input.estimate === undefined &&
       input.priority === undefined &&
       input.todo === undefined &&
+      input.parent === undefined &&
+      input.project === undefined &&
       (input.custom ?? []).length === 0
     ) {
       throw invalid(
         'Give at least one field to change.',
-        'Fields: name, description, estimate, priority, todo, custom.',
+        'Fields: name, description, estimate, priority, todo, parent, project, custom.',
       );
     }
     // Check the cheap arguments before any request.
@@ -148,7 +180,14 @@ export const updateFields: ToolDefinition = defineWriteTool({
     const customNames = checkCustomNames(ctx, input.custom);
     const target = await planTarget(ctx, input.asset, {
       types: FIELD_TYPES,
-      fields: [...READ_FIELDS, ...customNames],
+      fields: [
+        ...READ_FIELDS,
+        ...customNames,
+        ...relationFields([
+          ...(input.parent === undefined ? [] : ['Super']),
+          ...(input.project === undefined ? [] : ['Scope']),
+        ]),
+      ],
     });
     if (!isFieldType(target.assetType))
       throw invalid(`${target.assetType} cannot be changed with this tool.`);
@@ -196,6 +235,9 @@ export const updateFields: ToolDefinition = defineWriteTool({
         new: labelOf(priority.name, priority.oid),
       });
     }
+    if (input.parent !== undefined) changes.push(await planParent(ctx, type, target, input.parent));
+    if (input.project !== undefined)
+      changes.push(await planMove(ctx, type, target, input.project, projectOf));
     for (const c of await planCustom(ctx, type, input.custom)) {
       const was = customCurrent(target.row, c.field, c.kind);
       assertReplaceable(target.row, c, was, target.number ?? target.oid);
@@ -219,7 +261,12 @@ export const updateFields: ToolDefinition = defineWriteTool({
     const t = plan.mutation.target;
     const type = t.assetType as FieldType;
     const customFields = plan.mutation.changes.map((c) => c.field).filter((f) => CUSTOM_FIELD_RE.test(f));
-    const now = await rereadTarget(ctx, t.assetType, t.oid, [...READ_FIELDS, ...customFields]);
+    const now = await rereadTarget(ctx, t.assetType, t.oid, [
+      ...READ_FIELDS,
+      ...customFields,
+      ...relationFields(plan.mutation.changes.map((c) => c.field)),
+    ]);
+    await rereadRelations(ctx, type, now, plan.mutation.changes, oidOfLabel);
     const current: Record<string, string | number | null> = currentValues(now.row, type);
     for (const [field, kind] of await customKinds(ctx, t.assetType, customFields)) {
       current[field] = customCurrent(now.row, field, kind) as string | number | null;
@@ -249,8 +296,11 @@ export const updateFields: ToolDefinition = defineWriteTool({
         case 'ToDo':
           return typeof c.new === 'number' ? [{ attribute: c.field, value: c.new }] : [];
         case 'Priority':
+        case 'Scope':
+        case 'Super':
+        case 'Parent':
           return typeof c.new === 'string'
-            ? [{ relation: 'Priority', act: 'set' as const, oids: [oidOfLabel(c.new)] }]
+            ? [{ relation: c.field, act: 'set' as const, oids: [oidOfLabel(c.new)] }]
             : [];
         default: {
           const kind = kinds.get(c.field);

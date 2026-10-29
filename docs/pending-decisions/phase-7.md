@@ -416,5 +416,16 @@
 - **Context:** A member has no grants page in the panel; My access lists their grants and tokens.
 - **Options:** (a) the member reads their grant's count through `whoami` (the agent) and `GET /grants/{id}/write-budget`; no new panel element; (b) one budget read per grant on My access (a query per grant on every page view).
 - **Recommendation:** (a), built; (b) is easy to add if people ask.
+
+### D-240 — Moving to another project and re-parenting: narrow rules, items in a sprint are not moved *(P7-21)*
+- **Context:** D-181 left `Scope` and the parent relations out of `update_fields`. A move changes which project (and so which sprint schedule, team workflow and members) an item belongs to; Agility's cascade to children and sprints is undocumented here.
+- **Options:** (a) `project` only for a story, defect or epic, to another open project inside the workspace, refused while the item is in a sprint of its current project (take it out first with `move_to_sprint` and `to_backlog`); `parent` for every item type, the new parent found inside the workspace, open, of the allowed type, never itself, and for a task or test of the item's own project; (b) also move tasks and tests (they follow their parent in Agility, which we cannot verify); (c) allow the move with a sprint and let Agility refuse; (d) leave both out.
+- **Recommendation:** (a), built. The sprint rule closes the one cascade we can see from the item's own row without asking Agility; children and epic links are the sandbox's question (P7-07) and Agility's validators still run. A cross-project re-parent of a task is the same question and is refused now.
+- **Owner:** *(open; built as (a))*
+
+### D-241 — Create with owners, team and sprint: at most three owners, and the costs say so *(P7-21)*
+- **Context:** Each member name can take up to three lookups, a relative sprint two reads and a state read, and each relation needs its type's metadata on a cold cache. The measured worst case of `create_work_item` went from 15 requests to 27, of `update_fields` from 11 to 18 (re-parent and move together).
+- **Options:** (a) `owners` at most three, `team` and `sprint` through the shared resolvers, declared costs 31 and 22 (measured plus 4, inside the D-199 margin), both under the Free budget of 45; (b) five owners like `assign_owners` (the declared cost would pass 35, and more calls hidden by small budgets); (c) no owners on create: add them with `assign_owners` afterwards (two approvals and a window where the item has no owner).
+- **Recommendation:** (a), built. More than three owners are added with `assign_owners`. The defaults Agility applies on create (`rest-1.v1/New`, D-180) are not shown yet: the response of that endpoint is a P7-07 question.
 - **Owner:** *(open; built as (a))*
 

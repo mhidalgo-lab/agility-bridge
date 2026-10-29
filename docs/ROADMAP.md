@@ -339,7 +339,7 @@ Status lives in each task file.
 | P7-18 | [Comments: rich text and mentions](tasks/phase-7-writes/P7-18-comment-rich-text-mentions.md) | low | P7-04, P7-07 | todo |
 | P7-19 | [Optional read-back after a write](tasks/phase-7-writes/P7-19-read-back-after-write.md) | low | P7-04, P7-07 | todo |
 | P7-20 | [Workspace-enabled writable custom fields](tasks/phase-7-writes/P7-20-writable-custom-fields.md) | low | P7-05 | review |
-| P7-21 | [Create and update with owners, team, sprint and defaults from New](tasks/phase-7-writes/P7-21-create-update-relations.md) | low | P7-05 | todo |
+| P7-21 | [Create and update with owners, team, sprint and defaults from New](tasks/phase-7-writes/P7-21-create-update-relations.md) | low | P7-05 | review |
 | P7-22 | [Close an item together with its open children](tasks/phase-7-writes/P7-22-close-with-children.md) | low | P7-06, P7-07 | todo |
 | P7-23 | [Reopen preconditions: closed parent and per-type operations](tasks/phase-7-writes/P7-23-reopen-preconditions.md) | low | P7-06, P7-07 | todo |
 | P7-24 | [OAuth `mcp:write` scope and non-remembered write consent](tasks/phase-7-writes/P7-24-oauth-write-scope.md) | medium | P7-02, P7-07 | review |
