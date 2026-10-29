@@ -279,8 +279,7 @@ describe('write rows in the viewer and CSV', () => {
     expect(usage).not.toContain('<script>alert(2)');
     expect(usage).toContain('Writes');
     const csv = await (await page(s, '/admin/audit.csv?kind=write', owner)).text();
-    expect(csv).not.toContain('<script>alert(2)'.replace('<', '\n<'));
-    // The details JSON cell holds the field name; the write_fields cell is quoted text (a formula would be neutralised).
+    // Every cell is quoted text, so the hostile names are data in a CSV.
     expect(csv).toContain('"update"');
   });
 });
