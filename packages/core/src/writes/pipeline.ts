@@ -3,7 +3,8 @@
 // its field allowlist and three steps (plan, re-read, send); everything between is the framework's, so no write can
 // skip enablement, approval, the re-check or the audit (L-105, L-108, L-109):
 //
-//   enablement -> plan -> dry run -> confirm -> approval -> limiter -> re-read -> intent audit -> send once -> outcome
+//   enablement -> plan -> dry run -> confirm -> approval found -> limiter -> re-read -> intent audit -> approval used up
+//   -> send once -> outcome
 //
 // Never retried (the Agility client sends writes once, L-047). Nothing here keeps request data in module state (T21).
 import { z } from 'zod';
@@ -12,6 +13,7 @@ import { AbError, ErrorCode } from '../errors.ts';
 import { shapeOutput } from '../output/result.ts';
 import type { InputSchema, ToolDefinition, ToolOutput } from '../tool.ts';
 import { APPROVAL_SCHEMA, renderApproval, shortId } from './approval.ts';
+import type { LedgerEntry } from './ledger.ts';
 import {
   type CanonicalMutation,
   canonicalize,
@@ -157,11 +159,28 @@ export function approvalChannelOf(ctx: ToolContext): 'elicitation' | 'page' | 'n
   return rt.channel?.kind ?? 'unavailable';
 }
 
+/** An approval found for this change. It is used up by `consume`, just before the send (P7-28). */
+interface Approval {
+  readonly kind: 'elicitation' | 'page' | 'not_required';
+  /** Atomic and single use: `false` means another call used it first, and nothing may be sent. */
+  consume(): Promise<boolean>;
+  /** A step before the send refused: keep a record that the person said yes, where none is stored yet. */
+  retain(): Promise<void>;
+}
+
+const noApproval = (kind: Approval['kind'], retain: () => Promise<void> = async () => {}): Approval => ({
+  kind,
+  consume: async () => true,
+  retain,
+});
+
 /**
- * Gets the approval for this exact change, or throws. Order: a grant recorded out of band (the page, P7-02) for this
- * actor and hash; else the retried round of a multi round-trip (sealed state verified, ledger entry taken, answer read);
+ * Finds the approval for this exact change, or throws. Order: a grant recorded out of band (the page, P7-02) for this
+ * actor and hash; else the retried round of a multi round-trip (sealed state verified, ledger entry read, answer read);
  * else a fresh ask on the request's channel. Anything forged, replayed, expired or for another change falls through to a
- * fresh ask: it can never approve.
+ * fresh ask: it can never approve. A stored grant or round is only *read* here and used up by `consume` after the
+ * limiter, the re-read and the intent audit, so a refusal in between does not make the person approve again (P7-28); the
+ * atomic take there is what keeps one approval from sending twice.
  */
 async function obtainApproval(
   ctx: ToolContext,
@@ -170,27 +189,32 @@ async function obtainApproval(
   hash: string,
   message: string,
   plan: WritePlan,
-): Promise<'elicitation' | 'page' | 'not_required'> {
-  if (rt.approval === 'off') return 'not_required';
+): Promise<Approval> {
+  if (rt.approval === 'off') return noApproval('not_required');
   const now = ctx.clock.now();
   const scope = ctx.workspace.id;
   const declined = (): AbError =>
     new AbError(ErrorCode.WriteApprovalDeclined, 'The change was not approved, so nothing was changed.', {
       hint: 'Ask the person what to change instead; do not repeat the same call unprompted.',
     });
-  // A grant or a denial can exist only where the approval page does (P7-02): without it these two reads (each a storage
-  // round trip) can never hit, so they are skipped (P7-09). Fail closed: no entry read, no approval from one.
-  if (rt.page !== undefined || rt.channel?.kind === 'page') {
-    const grant = await rt.ledger.takeGrant(rt.actor.id, hash, scope);
-    if (grant !== null && grant.tool === tool && grant.actor === rt.actor.id && grant.hash === hash) {
-      return 'page';
-    }
-    const denial = await rt.ledger.takeDenial(rt.actor.id, hash, scope);
-    if (denial !== null && denial.tool === tool && denial.actor === rt.actor.id && denial.hash === hash) {
-      throw declined();
-    }
-  }
+  const mine = (e: LedgerEntry | null): e is LedgerEntry =>
+    e !== null && e.tool === tool && e.actor === rt.actor.id && e.hash === hash;
+  // A grant or a denial can exist only where the approval page does (P7-02), or where a push answer can be kept after a
+  // refusal (P7-28): without them these two reads (each a storage round trip) can never hit, so they are skipped
+  // (P7-09). Fail closed: no entry read, no approval from one.
   const channel = rt.channel;
+  if (rt.page !== undefined || channel?.kind === 'page' || channel?.sameCall === true) {
+    const grant = await rt.ledger.peekGrant(rt.actor.id, hash, scope);
+    if (mine(grant)) {
+      return {
+        kind: grant.via ?? 'page',
+        consume: async () => mine(await rt.ledger.takeGrant(rt.actor.id, hash, scope)),
+        retain: async () => {},
+      };
+    }
+    // A denial is final: used up at once.
+    if (mine(await rt.ledger.takeDenial(rt.actor.id, hash, scope))) throw declined();
+  }
   if (channel === undefined) {
     throw new AbError(
       ErrorCode.WriteApprovalUnavailable,
@@ -210,9 +234,15 @@ async function obtainApproval(
       state.w === scope &&
       state.i === ctx.instance.id
     ) {
-      const round = await rt.ledger.takeRound(state.n, scope);
-      if (round !== null && round.hash === hash && round.actor === rt.actor.id && round.tool === tool) {
-        if (channel.resume.answer === 'approve') return channel.kind;
+      if (channel.resume.answer === 'approve') {
+        if (mine(await rt.ledger.peekRound(state.n, scope))) {
+          return {
+            kind: channel.kind,
+            consume: async () => mine(await rt.ledger.takeRound(state.n, scope)),
+            retain: async () => {},
+          };
+        }
+      } else if (mine(await rt.ledger.takeRound(state.n, scope))) {
         throw declined();
       }
     }
@@ -232,8 +262,10 @@ async function obtainApproval(
   const reply = await channel.ask(prompt);
   switch (reply.status) {
     case 'answered':
-      if (reply.approved) return channel.kind;
-      throw declined();
+      if (!reply.approved) throw declined();
+      return noApproval(channel.kind, () =>
+        rt.ledger.grant({ hash, actor: rt.actor.id, tool, expiresAt, scope, via: 'elicitation' }),
+      );
     case 'needs_input': {
       const nonce = ctx.random.uuid();
       await rt.ledger.openRound(nonce, { hash, actor: rt.actor.id, tool, expiresAt, scope });
@@ -375,49 +407,91 @@ export function defineWriteTool<I extends InputSchema>(spec: WriteToolSpec<I>): 
       );
     }
 
-    const approval = await obtainApproval(ctx, rt, spec.name, hash, message, plan);
-    await rt.limiter.check({ tool: spec.name, actor: rt.actor, requestId: ctx.requestId });
+    const held = await obtainApproval(ctx, rt, spec.name, hash, message, plan);
+    const approval = held.kind;
 
-    if (spec.reread !== undefined) {
-      const now = await spec.reread(plan, ctx);
-      const applied = mutation.changes.every((c) => {
-        const cur = now.values[c.field];
-        return cur !== undefined && valuesEqual(cur, c.new);
-      });
-      if (applied) {
-        return planOutput(
-          ctx,
-          `Nothing to change: ${mutation.target.number ?? mutation.target.oid} already has these values (changed since the plan).`,
-          plan,
-          hash,
-          { applied: false, noop: true, approval },
-          [],
-        );
-      }
-      const moved =
-        (plan.version !== undefined && now.version !== plan.version) ||
-        mutation.changes.some((c) => {
-          const cur = now.values[c.field];
-          return cur === undefined || !valuesEqual(cur, c.old);
-        });
-      if (moved) {
-        throw new AbError(
-          ErrorCode.WriteConflict,
-          `${mutation.target.number ?? mutation.target.oid} changed after the plan was made, so nothing was changed.`,
-          { hint: 'Read the item again, make a new plan with dry_run: true, and ask for approval again.' },
-        );
-      }
-    }
-
+    // Everything that can refuse comes before the approval is used up (P7-28): a limiter refusal, a conflict or an audit
+    // outage leaves it usable. A push answer, kept nowhere, is stored as a grant so the repeated call is not asked again.
     let intentId: string | null;
     try {
-      intentId = await rt.audit.intent(auditRecord(ctx, rt, spec.name, mutation, hash, approval, 'intent'));
+      await rt.limiter.check({ tool: spec.name, actor: rt.actor, requestId: ctx.requestId });
+
+      if (spec.reread !== undefined) {
+        const now = await spec.reread(plan, ctx);
+        const applied = mutation.changes.every((c) => {
+          const cur = now.values[c.field];
+          return cur !== undefined && valuesEqual(cur, c.new);
+        });
+        if (applied) {
+          // Nothing left to approve: the approval is used up.
+          await held.consume();
+          return planOutput(
+            ctx,
+            `Nothing to change: ${mutation.target.number ?? mutation.target.oid} already has these values (changed since the plan).`,
+            plan,
+            hash,
+            { applied: false, noop: true, approval },
+            [],
+          );
+        }
+        const moved =
+          (plan.version !== undefined && now.version !== plan.version) ||
+          mutation.changes.some((c) => {
+            const cur = now.values[c.field];
+            return cur === undefined || !valuesEqual(cur, c.old);
+          });
+        if (moved) {
+          throw new AbError(
+            ErrorCode.WriteConflict,
+            `${mutation.target.number ?? mutation.target.oid} changed after the plan was made, so nothing was changed.`,
+            {
+              hint: 'Read the item again, make a new plan with dry_run: true, and repeat the call. The approval is kept for the same change until it expires.',
+            },
+          );
+        }
+      }
+
+      try {
+        intentId = await rt.audit.intent(auditRecord(ctx, rt, spec.name, mutation, hash, approval, 'intent'));
+      } catch (error) {
+        ctx.logger.error('write refused: intent audit failed', { tool: spec.name, error });
+        throw new AbError(
+          ErrorCode.WriteAuditUnavailable,
+          'The change was not made because its audit record could not be stored.',
+          { hint: 'Try again later; if it keeps failing, ask the administrator to check the audit storage.' },
+        );
+      }
     } catch (error) {
-      ctx.logger.error('write refused: intent audit failed', { tool: spec.name, error });
+      await held
+        .retain()
+        .catch((e: unknown) =>
+          ctx.logger.error('write approval could not be kept', { tool: spec.name, error: e }),
+        );
+      throw error;
+    }
+
+    // The single use: the atomic take. Of two calls on one approval exactly one gets past here; the other has an intent
+    // row and gets an error outcome, and nothing is sent for it.
+    let used = false;
+    try {
+      used = await held.consume();
+    } catch (error) {
+      ctx.logger.error('write approval could not be consumed', { tool: spec.name, error });
+    }
+    if (!used) {
+      await rt.audit
+        .outcome({
+          ...auditRecord(ctx, rt, spec.name, mutation, hash, approval, 'outcome'),
+          status: 'error',
+          errorCode: ErrorCode.WriteApprovalDeclined,
+          intentId,
+          note: 'approval already used or unavailable: nothing was sent',
+        })
+        .catch((e: unknown) => ctx.logger.error('write outcome audit failed', { tool: spec.name, error: e }));
       throw new AbError(
-        ErrorCode.WriteAuditUnavailable,
-        'The change was not made because its audit record could not be stored.',
-        { hint: 'Try again later; if it keeps failing, ask the administrator to check the audit storage.' },
+        ErrorCode.WriteApprovalDeclined,
+        'The approval for this change was already used, so nothing was changed.',
+        { hint: 'If the change is still wanted, repeat the call and ask the person to approve it again.' },
       );
     }
 

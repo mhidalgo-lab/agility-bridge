@@ -58,6 +58,7 @@ export function elicitationChannel(
   if (!supportsFormElicitation(legacyCapabilities())) return undefined;
   return {
     kind: 'elicitation',
+    sameCall: true,
     ask: async (prompt: ApprovalPrompt) => {
       try {
         const r = await sdk.mcpReq.elicitInput({

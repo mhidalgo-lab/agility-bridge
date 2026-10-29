@@ -390,12 +390,13 @@ validate input + metadata (operation allowed, attributes writable, values typed)
  → build canonical mutation (one target, explicit fields, old → new)
  → dry_run? return plan (+ whether approval is reachable)
  → confirm: true required
- → approval bound to hash(canonical mutation, actor, target, expiry); single-use ledger:
+ → approval found (not yet used up), bound to hash(canonical mutation, actor, target, expiry); single-use ledger:
      elicitation when the request can be elicited, otherwise the out-of-band approval page (AB_WRITE_APPROVAL_PENDING)
      remote modes: ledger in `kv`, durable intent audit · stdio: in-process ledger, HMAC-signed state for
      multi round-trip requests, intent and outcome logged to stderr (documented as weaker)
- → re-read target; changed since plan → AB_WRITE_CONFLICT; already applied → idempotent no-op
- → audit intent (durable; failure → refuse)
+ → write limiter, then re-read target; changed since plan → AB_WRITE_CONFLICT; already applied → idempotent no-op
+ → audit intent (durable; failure → refuse); a refusal so far keeps the approval (P7-28)
+ → use up the approval (atomic take; lost race → refuse, nothing sent)
  → send once (api/asset or rest-1.v1 per ADR-0011); never retried
  → audit outcome; result notes possible read lag (L-051)
 ```

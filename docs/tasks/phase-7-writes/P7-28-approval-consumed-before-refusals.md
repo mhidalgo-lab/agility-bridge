@@ -2,7 +2,7 @@
 id: P7-28
 title: "Do not burn an approval on a later refusal"
 phase: 7
-status: review
+status: done
 priority: low
 depends_on: [P7-02]
 adr: ["0013"]
