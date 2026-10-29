@@ -18,12 +18,14 @@
 import type { ApprovalOutcome, ApprovalSummary, ApprovalsPort, ApprovalView } from '@agility-bridge/admin-ui';
 import type { EffectiveAccess } from '@agility-bridge/auth';
 import {
+  AbError,
   type ApprovalChannelPort,
   type ApprovalLedger,
   type CanonicalMutation,
   type Clock,
   DEFAULT_APPROVAL_TTL_MS,
   displayLabel,
+  ErrorCode,
   forDisplay,
   shortId,
 } from '@agility-bridge/core';
@@ -32,7 +34,7 @@ import type { AdminChange } from './audit.ts';
 
 /** Where the approval page is mounted in the panel. */
 export const APPROVE_PATH = '/admin/approve';
-/** Pending approvals one person may have open: past this the oldest is dropped. */
+/** Pending approvals one person may have open: past this a new request is refused and the open ones are kept (P7-27). */
 export const MAX_PENDING_PER_USER = 20;
 /** How long a pending request waits for the person (the prompt's expiry; the grant that follows lives as long again). */
 export const PENDING_TTL_MS: number = DEFAULT_APPROVAL_TTL_MS;
@@ -176,7 +178,16 @@ export function createApprovalPage(options: ApprovalPageOptions): ApprovalPage {
         const id = `${String(expiresAt).padStart(14, '0')}-${b64u(crypto.getRandomValues(new Uint8Array(16)))}`;
         const open = await kv.list(pendPrefix(userId), { limit: MAX_PENDING_PER_USER + 1 });
         if (open.length >= MAX_PENDING_PER_USER) {
-          for (const key of open.slice(0, open.length - MAX_PENDING_PER_USER + 1)) await kv.delete(key);
+          // Refuse the newcomer, never drop an older request: the one the person is about to open must not vanish (P7-27).
+          throw new AbError(
+            ErrorCode.LimitRate,
+            'This person already has too many approvals waiting. Nobody was asked and nothing was changed.',
+            {
+              hint: 'Ask the person to open the approval page and approve or decline what is waiting, or wait for it to expire (about ten minutes), then repeat the call.',
+              details: { scope: 'approvals_pending', limit: MAX_PENDING_PER_USER },
+              localDetails: true,
+            },
+          );
         }
         const pending: PendingApproval = {
           v: 1,

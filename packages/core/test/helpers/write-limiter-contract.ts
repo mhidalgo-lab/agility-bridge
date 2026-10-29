@@ -81,5 +81,20 @@ export function writeLimiterContract(name: string, make: () => Promise<LimiterWo
       );
       expect(results.filter((r) => r === 'ok')).toHaveLength(5);
     });
+
+    it('counts approval requests apart from writes, admits exactly the limit under concurrency, and resets in the next window (P7-27)', async () => {
+      const w = await make();
+      const isolates = [1, 2, 3].map(() => build(w, { perGrant: 5, deployment: 1, approvalRequests: 4 }));
+      const ask = { ...grant('asker'), purpose: 'approval_request' as const };
+      const results = await Promise.all(
+        Array.from({ length: 24 }, (_, i) => outcome((isolates[i % 3] as WriteLimiter).check(ask))),
+      );
+      expect(results.filter((r) => r === 'ok')).toHaveLength(4);
+      expect(results.filter((r) => r === 'AB_LIMIT_RATE:approval_requests')).toHaveLength(20);
+      // The write budget of the same grant, and the deployment's, are untouched.
+      expect(await outcome((isolates[0] as WriteLimiter).check(grant('asker')))).toBe('ok');
+      w.advance(WRITE_LIMIT_WINDOW_MS);
+      expect(await outcome((isolates[0] as WriteLimiter).check(ask))).toBe('ok');
+    });
   });
 }

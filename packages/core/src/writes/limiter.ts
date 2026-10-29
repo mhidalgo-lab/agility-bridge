@@ -21,9 +21,17 @@ export interface WriteRateLimits {
   readonly perGrant: number;
   /** Writes of the whole deployment in each window; `null` = no deployment limit (stdio). Default 200. */
   readonly deployment: number | null;
+  /** Approval requests (prompts asked, pending records stored) per grant in each window (P7-27). Default 30. */
+  readonly approvalRequests?: number;
 }
 
-export const DEFAULT_WRITE_RATE_LIMITS: WriteRateLimits = Object.freeze({ perGrant: 20, deployment: 200 });
+export const DEFAULT_WRITE_RATE_LIMITS: WriteRateLimits = Object.freeze({
+  perGrant: 20,
+  deployment: 200,
+  approvalRequests: 30,
+});
+/** Approval requests per grant per window when a host's limits do not say (P7-27). */
+export const DEFAULT_APPROVAL_REQUESTS_PER_GRANT = 30;
 
 export const WRITE_LIMIT_WINDOW_MS = 3_600_000;
 
@@ -51,11 +59,45 @@ export function createWriteLimiter(options: WriteLimiterOptions): WriteLimiter {
   const limits = options.limits ?? DEFAULT_WRITE_RATE_LIMITS;
   const { counters, clock } = options;
   return {
-    async check({ actor }) {
+    async check({ actor, purpose }) {
       const now = clock.now();
       const window = Math.floor(now / WRITE_LIMIT_WINDOW_MS);
       const expiresAt = (window + 1) * WRITE_LIMIT_WINDOW_MS;
       const retryAfterSeconds = Math.max(1, Math.ceil((expiresAt - now) / 1000));
+      if (purpose === 'approval_request') {
+        // Before a person is asked (P7-27): one unit of the grant's own counter, nothing of the deployment's. Over it
+        // nothing is asked. Fails closed like the write counter.
+        const max = limits.approvalRequests ?? DEFAULT_APPROVAL_REQUESTS_PER_GRANT;
+        let count: number | null;
+        try {
+          count = await counters.increment(
+            `wl:q:${encodeURIComponent(actor.grantId ?? actor.id)}:${window}`,
+            {
+              expiresAt,
+              max,
+            },
+          );
+        } catch (error) {
+          options.onError?.(error);
+          throw unavailable(error);
+        }
+        if (count === null) {
+          throw new AbError(
+            ErrorCode.LimitRate,
+            'This connection has asked for too many approvals this hour. Nobody was asked and nothing was changed.',
+            {
+              hint: `Wait about ${retryAfterSeconds} seconds; do not retry in a loop. Ask the person what to change instead of proposing many variants.`,
+              details: { scope: 'approval_requests', limit: max, retryAfterSeconds },
+              localDetails: true,
+            },
+          );
+        }
+        if (!Number.isInteger(count) || count < 1 || count > max) {
+          options.onError?.(new Error('write limiter: unexpected counter value'));
+          throw unavailable(undefined);
+        }
+        return;
+      }
       // The grant first: a caller over its own limit must not spend the deployment's budget.
       const subject = encodeURIComponent(actor.grantId ?? actor.id);
       const scopes: Array<{ scope: 'grant' | 'deployment'; key: string; max: number }> = [

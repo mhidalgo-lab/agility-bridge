@@ -190,3 +190,41 @@ describe('in the pipeline: a refused write leaves nothing behind', () => {
     expect(runtime.audit.records).toHaveLength(0);
   });
 });
+
+describe('approval requests (P7-27)', () => {
+  const ask = { ...info, purpose: 'approval_request' as const };
+
+  it('allows the limit, refuses past it with the scope, and never touches the write or deployment counters', async () => {
+    const counters = memoryCounterStore(clock);
+    const l = createWriteLimiter({
+      counters,
+      clock,
+      limits: { perGrant: 1, deployment: 1, approvalRequests: 3 },
+    });
+    for (let i = 0; i < 3; i++) await l.check(ask);
+    const e = (await l.check(ask).catch((x: AbError) => x)) as AbError;
+    expect(e.code).toBe(ErrorCode.LimitRate);
+    expect(e.details).toMatchObject({ scope: 'approval_requests', limit: 3 });
+    expect(e.message).toContain('Nobody was asked');
+    const window = Math.floor(clock.now() / 3_600_000);
+    const subject = encodeURIComponent(info.actor.grantId ?? info.actor.id);
+    expect(await counters.get(`wl:g:${subject}:${window}`)).toBeNull();
+    expect(await counters.get(`wl:all:${window}`)).toBeNull();
+    // Writes still have their own budget.
+    await l.check(info);
+  });
+
+  it('counts per grant and defaults to 30 an hour', async () => {
+    const l = createWriteLimiter({ counters: memoryCounterStore(clock), clock });
+    for (let i = 0; i < 30; i++) await l.check(ask);
+    expect(await codeOf(l.check(ask))).toBe(ErrorCode.LimitRate);
+    await l.check({ ...ask, actor: { id: 'other', grantId: 'g-other' } });
+  });
+
+  it('fails closed when the counter throws or answers something that is not a count', async () => {
+    for (const increment of [() => Promise.reject(new Error('down')), async () => 0, async () => 99]) {
+      const l = createWriteLimiter({ counters: { increment, get: async () => null }, clock });
+      expect(await codeOf(l.check(ask))).toBe(ErrorCode.WriteLimitUnavailable);
+    }
+  });
+});
