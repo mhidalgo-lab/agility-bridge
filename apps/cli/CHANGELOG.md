@@ -1,5 +1,97 @@
 # agility-bridge
 
+## 0.6.0
+
+### Minor Changes
+
+- 86b116a: `get_attachment` reads long text in steps: `offset_characters` and `nextOffset` (each step downloads the attachment again).
+- 3b30c41: Collaboration tools: `get_conversations` (comments of an asset, newest first, paged), `list_attachments` (attachment
+  metadata and external links as text) and the opt-in `get_attachment` (text of one attachment, off by default in its own
+  `attachments` group). The download is enabled per workspace (`attachmentDownload`, `attachmentMaxBytes` limits; a grant
+  can only turn it off or lower it) or with `AB_ATTACHMENT_DOWNLOAD`, `AB_ATTACHMENT_MAX_BYTES` and `AB_ATTACHMENT_TYPES` in
+  stdio; it checks scope through the parent asset, the content type on the metadata and the response, counts the size on
+  the stream, and is audited.
+- 3d4f694: Composite reports in a new opt-in `reports` group: `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage`
+  and `work_item_quality` (scored with the versioned rubric). Each report reads through its sibling tools with the call's own
+  scope and budget, skips and names any section whose tool the caller was not granted, and never turns missing data into a
+  zero. The group is off by default: enable it per workspace (limit `reports`; a grant can only turn it off) or with
+  `AB_REPORTS=on` in stdio. `search_work_items` now lists `changedAt` when sorted by recent change.
+- 8ffe617: `defect_triage` shows each defect's priority and severity where the instance has them and orders the flagged list by the instance's own priority rank.
+- 8fa45c3: New tool `get_sprint` (planning group): one sprint with its UTC dates and schedule, backlog items and defects by status category, committed (at the begin date) vs done, scope change, carry-over of a finished sprint and a daily burndown read from bounded history. Sprint names and OIDs now also resolve closed (finished) sprints, and a status without a rollup category is no longer counted as "not started".
+- 35065d4: New tool `get_velocity` (planning group): the completed estimate of the last past sprints of a team or Agility project,
+  each read as it ended, with the average over the sprints read in full; sprints that cannot be read are named, never
+  estimated. Capacity is not reported.
+- e991057: New tools in the `history` group: `get_asset_history` (what changed on one asset in a bounded window, from the authoritative Agility history, one row per changed field with who and when) and `list_recent_changes` (work items changed in a bounded window in a project, a team or the workspace, newest change first). Both validate the window and the row limit before any request; the activity stream is not used.
+- 6447ef0: MCP prompts: `review_backlog_item_quality`, `sprint_review`, `standup`, `triage_defects`, `draft_release_notes`,
+  `refine_backlog` and `explain_asset`, registered from one manifest and offered (`prompts/list`, `prompts/get`) only when
+  every tool they use is allowed, on stdio and HTTP. A prompt is static text that tells the model which tools to call, to treat
+  what they return as untrusted data and to stay read-only; its string arguments are validated and never reach a query. The
+  three that use report tools need the opt-in `reports` group.
+- 4d5ff63: MCP resources: the server now offers reference material an agent can read on demand: the structured filter vocabulary, the instance's asset types (and one resource per readable type), the allowed Agility projects as a tree, and the versioned backlog item quality rubric. Resources are served through the tool handlers with the same limits, cache, scope rules, untrusted-data envelope and audit as the tools, and a resource is offered only when the tools it is served through are allowed for the workspace and grant.
+- ba6301b: OAuth: `AB_OAUTH_CIMD_HOSTS` limits metadata-document clients to a list of host names; any other client id is refused before
+  anything is fetched.
+- 947ef44: OAuth: My access shows when each connected app was last used, and `AB_OAUTH_IDLE_TTL` (off by default) ends an app that
+  nobody has used for that long at its next refresh.
+- 930983f: Issues, requests, goals, themes and retrospectives are first-class through the generic tools: four recipe resources (issues, requests, goals and themes, retrospectives) with example `query_assets` and `get_assets` inputs, offered when those tools are allowed, and a default field tier that includes the owner of issues (which have a single owner). No new tools.
+- 59df125: Add the `portfolio` tool group: `list_portfolio_items` (epics with category, status, parent, estimates and child counts, filtered and paged) and `get_portfolio_tree` (an epic with its descendant epics and roll-ups of items, done items, open defects, estimate and done percentage; a depth, size, budget or permission cut is reported as `partial` and marks the roll-ups it touches `incomplete`). The stdio server serves the group by default.
+- 878a99c: `get_portfolio_tree` continues a very large epic with a `cursor`: the totals are carried between steps and the last step is exact.
+- 7f80d5f: Prompt argument completion: `completion/complete` suggests teams, projects and sprints (and `current`, `previous`, `next`) for the prompts that are offered, through the list tools the caller is granted.
+- dcc0870: Quality recipes: two new MCP resources (`agility-bridge://recipes/tests-and-defects` and `agility-bridge://recipes/regression-assets`) with worked `query_assets` calls for tests, defects, regression tests and test sets. They are offered only when the generic query and metadata tools are allowed. No new tool.
+- d581ab3: New report `quality_scan` (opt-in `reports` group): scores the open stories and defects of a sprint or an epic with the same versioned rubric as `work_item_quality`, weakest first, from one batched read; more than 50 items per type are reported as partial.
+- 32ca06a: `list_recent_changes` now includes epics (portfolio items): `asset_type` accepts `Epic`, and with no type given epics are listed with the work items, newest change first, under the same bounded window, scope and team filters.
+- 3e10700: `agility-bridge user unbind --to <provider> [--ttl-minutes N]` (and `provider`, `ttlMinutes` in the admin API and a field in
+  the panel) narrow who can claim an unbound account: only a verified sign-in at the named provider can bind it while the
+  claim lasts (default 24 hours, at most 7 days).
+
+### Patch Changes
+
+- 1c9b48e: `whoami` names the granted tools the per-call budget hides (with their declared cost); the admin panel shows the same note on a workspace or grant with an explicit `callBudget`.
+- 2e8c8ef: `get_sprint`: a burndown history request that exceeds the response limit now leaves out its points (named in `notes`,
+  `partial`) instead of failing the whole call; large page sizes send fewer queries per request.
+- 636cd4a: Consistency pass over the 26 tools (P6-12). Shared arguments (`asset`, `project`, `team`, `sprint`, `member`, `time_range`, `status`, `limit`, `cursor`, `format`, `include_closed`, `minimal_output`) now have one description each, from one schema, and every tool uses it; titles, the paging and cost sentences and descriptions open the same way everywhere ("Cold call: up to N Agility requests"). `list_members` now refuses a cursor that is not its own even when the workspace's projects list no members. `list_my_work` and `list_recent_changes` rows start with the identity columns like every other list (`number`, `assetType`, `oid`, `state`, `project`, then the tool's own columns). `get_sprint` (not yet released) names its counts `itemCount` instead of `items` (`totals`, `byStatusCategory[]`, `committed`, `planned`, `carryOver`, burndown points), and `sprint_health` reads them under the new name. `get_assets`, `list_asset_types`, `get_team`, `get_work_item` and `whoami` now declare the `partial` and `notes` keys they already returned in their output schemas. The advertised output schemas no longer repeat `additionalProperties: {}`: the default `tools/list` shrank from 39,179 to 35,892 bytes and the every-group one from 47,946 to 44,157 bytes, and the tool descriptions were reworded so the lexical router eval improved (65.8 % to 75 % top-1). No argument or released output field was renamed, so there is no deprecation alias.
+- 0ab45f7: `whoami` and the admin panel (workspace and grant pages) now warn when a composite report is granted without the sibling
+  tools it reads. The admin API's tool catalogue (`GET /tools`) lists each composite's `siblings`. The cost of every tool is
+  now tested against its declared worst case in one test over the whole catalogue.
+- ed94256: A malformed cursor is refused as `AB_INPUT_INVALID` before any name is resolved or request made, in every paged tool.
+- b2cbccb: `get_work_item` renames its `minimal_output` argument to `skip_related` (it leaves out children, links and comments), so `minimal_output` means one thing everywhere (identity columns only). The old name is **deprecated**: it still works on `get_work_item` for one release (mapped to `skip_related`, with a deprecation note in the result, not advertised in `tools/list`) and will be removed in 0.7.0. Small internal helpers were deduplicated.
+- 696a104: `defect_triage` lists the most similar duplicate pairs first, says when pairs or flagged defects were cut and ignores common English words in names.
+- f58df3d: The admin panel's workspace and grant forms have a "Check these tools" step that shows which composite reports would be granted without the tools they read, before saving.
+- dfc47d2: Tool evaluation for this release (Claude Sonnet 5.5 and Opus 5.5, through the maintainer's router): no injected instruction
+  followed in 70 trials; tool choice 86.3 % and 90.4 % allowing one lookup. Reports: `docs/dev/eval-reports/2026-10-28-sonnet-5-5.md`
+  and `docs/dev/eval-reports/2026-10-28-opus-5-5.md`, with the caveats in `docs/dev/evals.md`.
+- 75ed44c: The Worker keeps parsed asset-type metadata in D1 so a new isolate reads it instead of asking Agility for every type again (fewer upstream requests on a cold call), and prompt argument schemas are converted at module load.
+- eb11a63: OAuth apps page and `GET /oauth/abuse` (owners): registration caps against their use, the configured limits and the limit
+  refusals of the last 24 hours, without any address or client.
+- 6a18cb1: The panel's users list is paged on the server (`GET /users` accepts `limit`, `offset` and `ids`) and the audit page loads at
+  most 100 users for its filter, so both screens cost the same at a few hundred users.
+- 42a606a: Phase 6 review fixes (P6-13), in tools not yet released. `get_asset_history` now refuses a window older than `maxAsOfAgeDays`, does not follow `Scope`, ignores the order of multi-valued relations, and explains an over-long history instead of a generic size error. `get_attachment` no longer echoes the uploader's content type in an error message, no longer repeats the text in `structuredContent`, and audits the asset and attachment id of a refused or failed download. `release_readiness` can say `ready` for an epic with more than 100 backlog items, and a roll-up percentage is by estimate only when every item has one (`unestimatedItemCount` says how many do not). `defect_triage` reads the oldest change first (`search_work_items` gains `sort_by: oldest_changed`) and tokenises each name once; `work_item_quality` checks Given/When/Then in linear time. `get_sprint` says when closed items without a status category are done now but remaining at earlier burndown points, and reports `partial` when rows outside the workspace were left out, as the composite reports now do. `resources/list` makes no Agility request, independent metadata loads go out together, prompt arguments refuse Unicode format characters, the stdio server serves the `history` group, and the redaction of large plain text is about 30 times faster.
+- a3327c7: `work_item_quality` (rubric 1.1.0): an estimate of 0 counts as not estimated, a priority that was not read names why (budget, permission, no field, failure) and a description cut at 4,000 characters is reported.
+- 02b5460: `query_assets` names goals, themes and retrospectives among the asset types it reads, so agents route questions about them to it.
+- 4093f02: An OAuth device now survives a token refusal that can pass (P5-21, D-77, ADR-0018). Refusals at a code exchange, a refresh or a repeat inside the refresh reuse window are final or recoverable. Final ones (access grant revoked, ended or deleted, person removed, client revoked, and so on) still end the device at once. Recoverable ones (workspace, instance or person disabled, credential revoked or not validated, no project, no tool) answer `503 temporarily_unavailable` with `Retry-After: 60`, keep the device and its refresh token, and write `oauth.token.refused` with `revoked: false`; once the cause is fixed the app refreshes with no new approval. Access tokens are still refused on every MCP request while the reason holds. A code exchange refused this way still spends the code.
+- 11c9772: The two sections of `sprint_health` and `standup_summary` run together and share the member, team, project and sprint
+  resolution within a request.
+- c2157ce: A tool argument the input schema refuses (below the minimum, outside an enum, missing, wrong type) is now an
+  `AB_INPUT_INVALID` tool error with the argument path and a hint, like every other refused input.
+- f86f954: `sprint_health` reports the fixed-wording notes of `get_sprint` as its own text with stable codes (`sprintNoteCodes`) and keeps any other sibling note inside the untrusted-data envelope.
+- 2704a08: `get_sprint`: burndown history requests are sent up to three at a time, the first two item pages share one request, and
+  each history point is compiled once.
+- 252c58b: `get_sprint`: sprints of up to 1,000 items are read in full (five to ten pages), with fewer burndown points instead of
+  none; the history queries per call stay at 60.
+- eacf0f0: The number prefixes an owner stores for an instance in the admin panel now apply when a number such as `B-01234` is resolved; types left out are still learned from Agility.
+- d730a46: Device token lists read one page from storage by `(created_at, id)` instead of every token (new migration 0002, an index
+  on `access_tokens`); the admin API and its cursor format are unchanged.
+- 7de7232: `defect_triage` shows priority and severity again on projects with more than 50 open defects: the read of those fields used a
+  filter bounded at 50 values and failed silently ("could not be read"). Found by the live check of P6-57.
+- e9b0387: The owner's unbind (`POST /users/{id}/unbind`, `user unbind --to`, the panel) only accepts a provider this deployment has configured: a typo is refused with 422 before anything is written, and the panel offers a select of the configured providers.
+- abd4dfa: Dates a caller selects, filters or sorts by on `query_assets` and `get_assets` (`ChangeDate`, `CreateDate`, …) are read
+  through their `…UTC` siblings and returned as ISO 8601 UTC under the requested key; a zone-less date with no sibling is
+  returned raw with a note. `get_work_item` and the work lists now include `createdAt`.
+- 533a47e: A credential validation result is written only while the stored token is the one that was checked (one conditional
+  write in storage), so a token replaced while Agility was answering can never be marked valid by the old answer.
+- 50a358d: Agility's own error messages are no longer shown to the model: when Agility refuses a request, the tool error carries the
+  error code, our message and a hint naming a working next step, and Agility's text goes to the server log (`agility refused
+  the request`). The pre-release LLM eval showed models following an instruction planted in that text.
+
 ## 0.5.0
 
 ### Minor Changes
