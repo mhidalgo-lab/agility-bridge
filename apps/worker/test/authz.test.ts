@@ -3,7 +3,6 @@
 // × initialize, tools/list and every tool gets 401 with one body, reaches no Agility, changes nothing and leaves an
 // `auth` audit row with its reason (written through waitUntil) carrying the CF-Connecting-IP address. The world is built
 // from Node on the Worker's own local D1 with the same master key; each denial runs on its own Worker and database.
-import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { accessServices, generateDeviceToken, generateMasterKey, Keyring } from '@agility-bridge/auth';
@@ -12,6 +11,7 @@ import { createD1Driver, type D1Database, openSqlStorage, type Storage } from '@
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { type FixtureAgility, startFixtureAgility } from '../../../scripts/fixture-agility.ts';
+import { until } from './wait.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPT = join(ROOT, 'dist', 'index.js');
@@ -20,10 +20,6 @@ const CLIENT_IP = '203.0.113.7';
 let agility: FixtureAgility;
 const running: Miniflare[] = [];
 beforeAll(async () => {
-  execFileSync(join(ROOT, 'node_modules', '.bin', 'wrangler'), ['deploy', '--dry-run', '--outdir', 'dist'], {
-    cwd: ROOT,
-    stdio: 'ignore',
-  });
   agility = await startFixtureAgility();
 });
 afterAll(() => agility.close());
@@ -288,12 +284,12 @@ describe('MCP route × principal × method/tool on workerd: every denial denies 
     expect(bodies).toEqual(new Set([JSON.stringify({ error: 'unauthorized' })]));
     expect(agility.requests()).toBe(upstream);
     expect(await snapshot(w)).toBe(before);
-    // Written through waitUntil after each response.
+    // Written through waitUntil after each response (L-381).
     let rows: Awaited<ReturnType<Storage['audit']['query']>> = [];
-    for (let i = 0; i < 40 && rows.length < METHODS.length; i++) {
+    await until(async () => {
       rows = await w.storage.audit.query({ kind: 'auth', limit: 1_000 });
-      if (rows.length < METHODS.length) await new Promise((r) => setTimeout(r, 25));
-    }
+      return rows.length >= METHODS.length;
+    });
     expect(rows).toHaveLength(METHODS.length);
     for (const row of rows) expect(row.details).toMatchObject({ reason: denial.reason, ip: CLIENT_IP });
     expect(await w.storage.audit.query({ kind: 'tool_call' })).toEqual([]);

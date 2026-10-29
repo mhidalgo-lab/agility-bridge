@@ -9,5 +9,7 @@ export default defineProject({
       '@agility-bridge/storage': fileURLToPath(new URL('../storage/src/index.ts', import.meta.url)),
     },
   },
-  test: { name: 'storage-sqlite' },
+  // Real database files: every commit, VACUUM and migration fsyncs, which on the Windows runner takes seconds a test,
+  // not the 5 s default (as for apps/cli, L-104). Legitimately slow work, so a longer limit, not a weaker test.
+  test: { name: 'storage-sqlite', testTimeout: 60_000 },
 });

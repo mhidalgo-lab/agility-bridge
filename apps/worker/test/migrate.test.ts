@@ -2,7 +2,6 @@
 // Self-hosted → Worker (P3-09): a SQLite deployment with every kind of row, backed up with `storage.backup`, exported
 // by scripts/cf-migrate.ts and imported into the Worker's local D1 equals the source row for row, and the Worker then
 // serves a migrated device token with the same master key. Refusals happen before anything is written.
-import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,6 +23,7 @@ import {
   type TargetState,
 } from '../../../scripts/cf-migrate.ts';
 import { type FixtureAgility, startFixtureAgility } from '../../../scripts/fixture-agility.ts';
+import { until } from './wait.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPT = join(ROOT, 'dist', 'index.js');
@@ -31,10 +31,6 @@ let agility: FixtureAgility;
 let dir: string;
 const running: Miniflare[] = [];
 beforeAll(async () => {
-  execFileSync(join(ROOT, 'node_modules', '.bin', 'wrangler'), ['deploy', '--dry-run', '--outdir', 'dist'], {
-    cwd: ROOT,
-    stdio: 'ignore',
-  });
   agility = await startFixtureAgility();
 });
 afterAll(() => agility.close());
@@ -155,9 +151,7 @@ describe('self-hosted to Worker', () => {
     // An internet-facing Worker is probed before anyone migrates into it: the refusal's audit row must not block.
     await target.mf.dispatchFetch('http://127.0.0.1/w/team/mcp', { method: 'POST', body: '{}' });
     const migrated = await openSqlStorage(createD1Driver(target.d1));
-    for (let i = 0; i < 40 && (await migrated.audit.query({ limit: 5 })).length === 0; i++) {
-      await new Promise((r) => setTimeout(r, 25));
-    }
+    await until(async () => (await migrated.audit.query({ limit: 5 })).length > 0);
     expect((await migrated.audit.query({ limit: 5 })).length).toBe(1);
     const state = await targetState(target.d1);
     checkTarget(exp, state);

@@ -311,6 +311,7 @@ Status lives in each task file.
 | P6-56 | [Check whether a sprint is still current on its end date](tasks/phase-6-tool-breadth/P6-56-sprint-end-date-inclusive-check.md) | low | P6-47, P6-27 | todo |
 | P6-57 | [Verify the defect priority and severity read live](tasks/phase-6-tool-breadth/P6-57-verify-defect-severity-discovery-live.md) | low | P6-30, P6-27 | todo |
 | P6-58 | [Show the budget-hidden tools note for an inherited call budget in the panel](tasks/phase-6-tool-breadth/P6-58-panel-inherited-call-budget-note.md) | low | P6-36 | todo |
+| P6-60 | [Fix the flaky tests behind the CI reruns](tasks/phase-6-tool-breadth/P6-60-flaky-tests.md) | high | — | review |
 
 ### Phase 7
 
