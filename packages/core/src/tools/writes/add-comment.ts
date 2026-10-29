@@ -7,13 +7,20 @@ import { AbError, ErrorCode } from '../../errors.ts';
 import { resolveMember, runQuery } from '../../identity/resolve.ts';
 import { oidsOf } from '../../identity/scope.ts';
 import { metadataFor } from '../../metadata/service.ts';
-import { cleanText } from '../../output/text.ts';
+import { hasHiddenCharacters } from '../../output/text.ts';
 import { compileQuery } from '../../query/compiler.ts';
 import { invalid } from '../../query/limits.ts';
 import type { ToolDefinition } from '../../tool.ts';
 import { defineWriteTool } from '../../writes/index.ts';
 import { assetArg, text as textOf } from '../common.ts';
-import { assertTypeAllowed, ITEM_TYPES, planTarget, postAsset, rereadTarget } from './common.ts';
+import {
+  assertTypeAllowed,
+  ITEM_TYPES,
+  planTarget,
+  postAsset,
+  rereadTarget,
+  withinWindow,
+} from './common.ts';
 
 const COST = 16;
 
@@ -30,7 +37,7 @@ export function commentText(raw: string): string {
       'Shorten it: the person approves the whole text, so it is never cut.',
     );
   }
-  if (cleanText(value) !== value) {
+  if (hasHiddenCharacters(value)) {
     throw invalid(
       'The comment contains control, invisible or bidirectional characters.',
       'Remove them; they would be hidden from the person who approves.',
@@ -39,7 +46,10 @@ export function commentText(raw: string): string {
   return value;
 }
 
-/** The text of the most recent comment on the item written by `memberOid`, or null. */
+/** An identical comment by the same member counts as the same call only inside this window (D-194). */
+export const COMMENT_REPEAT_WINDOW_MS: number = 10 * 60_000;
+
+/** The text of the most recent comment on the item written by `memberOid` in the repeat window, or null. */
 async function latestOwnComment(
   ctx: Parameters<typeof planTarget>[0],
   itemOid: string,
@@ -54,13 +64,19 @@ async function latestOwnComment(
   });
   const { rows } = await runQuery(ctx, compiled);
   const mine = rows.find((r) => oidsOf(r['Author'])[0] === memberOid);
-  return mine === undefined ? null : (textOf(mine['Content']) ?? null);
+  if (
+    mine === undefined ||
+    !withinWindow(textOf(mine['AuthoredAt']), ctx.clock.now(), COMMENT_REPEAT_WINDOW_MS)
+  ) {
+    return null;
+  }
+  return textOf(mine['Content']) ?? null;
 }
 
 export const addComment: ToolDefinition = defineWriteTool({
   name: 'add_comment',
   title: 'Add comment',
-  description: `Add a comment to one backlog item, defect, task, test or epic. The text is shown in full to the person who approves, at most 4,000 characters. Not paged. Cold call: up to ${COST} Agility requests.`,
+  description: `Add a comment to one backlog item, defect, task, test or epic. The text is shown in full to the person who approves, at most 4,000 characters. A comment identical to your latest one from the last 10 minutes is treated as already added. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
   // Resolution, the item read, member, the latest comments, then the re-read (3) and the one write; metadata cold.
   cost: COST,
@@ -70,7 +86,7 @@ export const addComment: ToolDefinition = defineWriteTool({
     text: z
       .string()
       .min(1)
-      .max(MAX_COMMENT_CHARS * 2)
+      .max(MAX_COMMENT_CHARS)
       .describe('The comment, at most 4,000 characters, plain text.'),
   }),
   allowedFields: Object.fromEntries(ITEM_TYPES.map((t) => [t, ['Comment']])),

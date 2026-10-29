@@ -45,6 +45,11 @@ export interface ToolDefinition<I extends InputSchema = InputSchema, O = unknown
   readonly outputSchema?: z.ZodType<O>;
   /** For `write` / `destructive` tools: repeating the same call has no further effect. Reads are always idempotent. */
   readonly idempotent?: boolean;
+  /**
+   * For `write` tools: the call replaces or removes a value that exists (a rename, a status, a sprint, an owner), so the MCP
+   * `destructiveHint` is true (non-additive update, MCP spec) although the kind stays `write` (P7-09, D-197).
+   */
+  readonly overwrites?: boolean;
   /** Set by `defineWriteTool` only: the tool runs the write pipeline. The registry refuses a non-read tool without it. */
   readonly writePipeline?: true;
   readonly handler: (input: z.infer<I>, ctx: ToolContext) => Promise<ToolOutput<O>>;
@@ -63,12 +68,15 @@ export function defineTool<I extends InputSchema, O = unknown>(
  * depends on them.
  */
 export function annotationsFor(
-  def: Pick<ToolDefinition, 'kind' | 'title'> & { readonly idempotent?: boolean | undefined },
+  def: Pick<ToolDefinition, 'kind' | 'title'> & {
+    readonly idempotent?: boolean | undefined;
+    readonly overwrites?: boolean | undefined;
+  },
 ): ToolAnnotations {
   return {
     title: def.title,
     readOnlyHint: def.kind === 'read',
-    destructiveHint: def.kind === 'destructive',
+    destructiveHint: def.kind === 'destructive' || def.overwrites === true,
     idempotentHint: def.kind === 'read' || def.idempotent === true,
     openWorldHint: true,
   };

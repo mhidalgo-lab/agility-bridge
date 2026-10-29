@@ -16,6 +16,7 @@ import {
   type CanonicalMutation,
   canonicalize,
   type FieldAllowlist,
+  forDisplay,
   isNoop,
   mutationHash,
   valuesEqual,
@@ -48,6 +49,8 @@ export interface Reread {
 export interface SendResult {
   /** The OID of what was created or changed, when the response says. */
   readonly oid?: string;
+  /** Agility answered 2xx but the body was empty or unreadable: the write is applied, the answer is not usable. */
+  readonly unreadable?: boolean;
 }
 
 export interface WriteToolSpec<I extends InputSchema> {
@@ -65,6 +68,8 @@ export interface WriteToolSpec<I extends InputSchema> {
   readonly allowedFields: FieldAllowlist;
   /** Repeating the call has no further effect (true for set-a-field operations, false for creates and comments). */
   readonly idempotent?: boolean;
+  /** The call replaces or removes an existing value: advertised as `destructiveHint` (the kind stays `write`, D-197). */
+  readonly overwrites?: boolean;
   /**
    * Validates the input fully (metadata, allowed field, typed values), resolves the single target, verifies its scope,
    * reads the current values and builds the canonical mutation. Nothing is sent. Throws `AbError` to refuse.
@@ -80,8 +85,18 @@ export const WRITE_GROUP: string = 'writes';
 const NOTICE = 'Changes Agility. Needs approval. Preview with dry_run.';
 const READ_LAG =
   'Agility may take a moment to show the change; read the item again later instead of repeating the write.';
+const UNREADABLE_NOTE =
+  'Agility accepted the change but its answer could not be read, so the new state is not confirmed here: read the item to check. Do not repeat the write.';
 const MAYBE_APPLIED_HINT =
   'The change may or may not have been applied: check the item before repeating. Writes are never retried.';
+
+/** Failures after the request started that do not prove nothing was applied (a refusal, 401/403/404/429 and 4xx do). */
+const MAYBE_APPLIED_CODES: ReadonlySet<string> = new Set([
+  ErrorCode.AgilityTimeout,
+  ErrorCode.AgilityUnavailable,
+  ErrorCode.AgilityWrongInstance,
+  ErrorCode.Internal,
+]);
 
 const refuseDisabled = (): AbError =>
   new AbError(ErrorCode.ToolDisabled, 'This write tool is not enabled for this connection.', {
@@ -183,8 +198,15 @@ async function obtainApproval(
   }
   if (channel.resume !== undefined && channel.resume.answer !== 'none') {
     const state = await openState(rt.stateKey, channel.resume.state);
-    if (state !== null && state.h === hash && state.a === rt.actor.id && state.e > now) {
-      const round = await rt.ledger.takeRound(state.n);
+    if (
+      state !== null &&
+      state.h === hash &&
+      state.a === rt.actor.id &&
+      state.e > now &&
+      state.w === scope &&
+      state.i === ctx.instance.id
+    ) {
+      const round = await rt.ledger.takeRound(state.n, scope);
       if (round !== null && round.hash === hash && round.actor === rt.actor.id && round.tool === tool) {
         if (channel.resume.answer === 'approve') return channel.kind;
         throw declined();
@@ -210,10 +232,17 @@ async function obtainApproval(
       throw declined();
     case 'needs_input': {
       const nonce = ctx.random.uuid();
-      await rt.ledger.openRound(nonce, { hash, actor: rt.actor.id, tool, expiresAt });
+      await rt.ledger.openRound(nonce, { hash, actor: rt.actor.id, tool, expiresAt, scope });
       throw new InputRequiredSignal(
         prompt,
-        await sealState(rt.stateKey, { n: nonce, h: hash, a: rt.actor.id, e: expiresAt }),
+        await sealState(rt.stateKey, {
+          n: nonce,
+          h: hash,
+          a: rt.actor.id,
+          e: expiresAt,
+          w: scope,
+          i: ctx.instance.id,
+        }),
       );
     }
     case 'pending':
@@ -243,7 +272,7 @@ function planOutput(
       {
         title: 'Change',
         source: 'proposed change',
-        rows: m.changes.map((c) => ({ field: c.field, old: c.old, new: c.new })),
+        rows: forDisplay(m).changes.map((c) => ({ field: c.field, old: c.old, new: c.new })),
         columns: ['field', 'old', 'new'],
       },
     ],
@@ -343,7 +372,7 @@ export function defineWriteTool<I extends InputSchema>(spec: WriteToolSpec<I>): 
     }
 
     const approval = await obtainApproval(ctx, rt, spec.name, hash, message, plan);
-    await rt.limiter?.check({ tool: spec.name, actor: rt.actor, requestId: ctx.requestId });
+    await rt.limiter.check({ tool: spec.name, actor: rt.actor, requestId: ctx.requestId });
 
     if (spec.reread !== undefined) {
       const now = await spec.reread(plan, ctx);
@@ -399,14 +428,19 @@ export function defineWriteTool<I extends InputSchema>(spec: WriteToolSpec<I>): 
           status: 'error',
           errorCode: code,
           intentId,
+          ...(MAYBE_APPLIED_CODES.has(code)
+            ? { note: 'outcome unknown: the change may have been applied' }
+            : {}),
         })
         .catch((e: unknown) => ctx.logger.error('write outcome audit failed', { tool: spec.name, error: e }));
-      if (
-        error instanceof AbError &&
-        (code === ErrorCode.AgilityTimeout || code === ErrorCode.AgilityUnavailable) &&
-        error.hint === undefined
-      ) {
-        throw new AbError(code, error.message, { hint: MAYBE_APPLIED_HINT, cause: error });
+      if (error instanceof AbError && MAYBE_APPLIED_CODES.has(code)) {
+        // The client's own hint ("try again") is advice for a read: for a write it replaces it (P7-09, L-404).
+        throw new AbError(code, error.message, {
+          hint: MAYBE_APPLIED_HINT,
+          ...(error.details === undefined ? {} : { details: error.details }),
+          localDetails: error.localDetails,
+          cause: error,
+        });
       }
       throw error;
     }
@@ -416,6 +450,7 @@ export function defineWriteTool<I extends InputSchema>(spec: WriteToolSpec<I>): 
         status: 'ok',
         errorCode: null,
         intentId,
+        ...(sent.unreadable === true ? { note: 'applied; the Agility response could not be read' } : {}),
       })
       .catch((e: unknown) => ctx.logger.error('write outcome audit failed', { tool: spec.name, error: e }));
     ctx.logger.info('write applied', { tool: spec.name, change: shortId(hash), approval });
@@ -428,8 +463,9 @@ export function defineWriteTool<I extends InputSchema>(spec: WriteToolSpec<I>): 
         applied: true,
         approval,
         ...(sent.oid === undefined ? {} : { resultOid: sent.oid }),
+        ...(sent.unreadable === true ? { responseReadable: false } : {}),
       },
-      [READ_LAG],
+      sent.unreadable === true ? [UNREADABLE_NOTE, READ_LAG] : [READ_LAG],
     );
   };
 
@@ -442,6 +478,7 @@ export function defineWriteTool<I extends InputSchema>(spec: WriteToolSpec<I>): 
     cost: spec.cost,
     inputSchema,
     ...(spec.idempotent === undefined ? {} : { idempotent: spec.idempotent }),
+    ...(spec.overwrites === true ? { overwrites: true } : {}),
     writePipeline: true,
     handler: handler as ToolDefinition['handler'],
   };

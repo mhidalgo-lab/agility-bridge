@@ -74,6 +74,7 @@ function row(record: WriteAuditRecord, access: EffectiveAccess) {
       approval: record.approval,
       credential: access.credential.kind,
       ...(record.intentId === undefined || record.intentId === null ? {} : { intentId: record.intentId }),
+      ...(record.note === undefined ? {} : { note: record.note }),
     },
   };
 }

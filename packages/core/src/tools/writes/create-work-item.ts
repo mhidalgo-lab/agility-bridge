@@ -11,7 +11,6 @@ import { AbError, ErrorCode } from '../../errors.ts';
 import { resolveMember, resolveProject, runQuery } from '../../identity/resolve.ts';
 import { oidsOf } from '../../identity/scope.ts';
 import { metadataFor } from '../../metadata/service.ts';
-import { utcIso } from '../../output/text.ts';
 import { compileQuery } from '../../query/compiler.ts';
 import { invalid } from '../../query/limits.ts';
 import type { ToolDefinition } from '../../tool.ts';
@@ -27,6 +26,7 @@ import {
   readTarget,
   requireWritable,
   rereadTarget,
+  withinWindow,
 } from './common.ts';
 import {
   descriptionHtml,
@@ -37,6 +37,7 @@ import {
   FIELD_TYPES,
   type FieldType,
   itemName,
+  MAX_DESCRIPTION_CHARS,
   notAllowed,
   PARENT_RELATION,
   PARENT_TYPES,
@@ -108,9 +109,8 @@ async function recentDuplicate(
     if (rowName === undefined || !same(rowName, name)) continue;
     if (oidsOf(row['CreatedBy'])[0] !== me.oid) continue;
     if ((oidsOf(row[relation])[0] ?? undefined) !== parent) continue;
-    const at = utcIso(textOf(row[created]) ?? '');
-    // A creation time that cannot be read counts as recent: refusing is safe, a second item is not.
-    if (at !== undefined && now - Date.parse(at) > DUPLICATE_WINDOW_MS) continue;
+    // A creation time that cannot be read is not "recent": one old item must not block its title for ever (D-195).
+    if (!withinWindow(textOf(row[created]), now, DUPLICATE_WINDOW_MS)) continue;
     const oid = oidsOf(row['_oid'])[0];
     if (oid === undefined) continue;
     const number = textOf(row['Number']);
@@ -150,7 +150,7 @@ export const createWorkItem: ToolDefinition = defineWriteTool({
     description: z
       .string()
       .min(1)
-      .max(8_000)
+      .max(MAX_DESCRIPTION_CHARS)
       .optional()
       .describe('Plain text, at most 4,000 characters; a blank line starts a paragraph.'),
     estimate: z

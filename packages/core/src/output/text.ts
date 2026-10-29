@@ -15,6 +15,21 @@ export function cleanText(text: string): string {
   return text.replace(LINE_SEPARATOR_RE, '\n').replace(CONTROL_RE, '').replace(INVISIBLE_RE, '');
 }
 
+// A zero-width non-joiner or joiner that sits between two visible characters is part of the text (Persian and Indic
+// scripts, emoji sequences such as a family or a profession); anywhere else it is a hidden character (P7-09, D-193).
+const JOINS_RE =
+  /(?<=[\p{L}\p{M}\p{N}\p{Extended_Pictographic}\p{Emoji_Modifier}]|\uFE0F|\u20E3)[\u200C\u200D](?=[\p{L}\p{M}\p{N}\p{Extended_Pictographic}])/gu;
+
+/**
+ * True when text a caller supplied (a comment, a name, a description, a value to write) contains a control character, a
+ * bidirectional or invisible character, or a line separator other than `\n`: things the person who approves cannot see.
+ * ZWNJ and ZWJ between visible characters are allowed. Text from Agility is cleaned for display instead (`cleanText`).
+ */
+export function hasHiddenCharacters(text: string): boolean {
+  const kept = text.replace(JOINS_RE, 'x');
+  return cleanText(kept) !== kept;
+}
+
 const NAMED_ENTITIES: Readonly<Record<string, string>> = {
   amp: '&',
   lt: '<',

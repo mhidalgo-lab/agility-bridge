@@ -37,6 +37,8 @@ export interface WriteAuditRecord {
   readonly errorCode?: string | null;
   /** Outcome only: the id of the intent row. */
   readonly intentId?: string | null;
+  /** Outcome only: a short fixed note (no Agility text), e.g. that the answer could not be read or the outcome is unknown. */
+  readonly note?: string;
 }
 
 /**
@@ -104,7 +106,8 @@ export interface WriteRuntime {
   readonly stateKey: Uint8Array;
   /** How long an approval stays valid (default 10 minutes). */
   readonly approvalTtlMs?: number;
-  readonly limiter?: WriteLimiter;
+  /** Required: a host without a write limiter does not compile (P7-09). Stdio uses in-process counters. */
+  readonly limiter: WriteLimiter;
   /** The out-of-band channel (P7-02), used when the request cannot be elicited. */
   readonly page?: ApprovalChannelPort;
   /** The channel of this request; set per call by the server wrapper from the request's declared capabilities. */

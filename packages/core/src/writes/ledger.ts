@@ -39,8 +39,9 @@ export class ApprovalLedger {
     return this.#put(`wr:round:${part(nonce)}`, entry);
   }
 
-  takeRound(nonce: string): Promise<LedgerEntry | null> {
-    return this.#take(`wr:round:${part(nonce)}`);
+  /** Takes the round once; an entry opened for another workspace is consumed and refused (`scope`, P7-09). */
+  takeRound(nonce: string, scope = ''): Promise<LedgerEntry | null> {
+    return this.#take(`wr:round:${part(nonce)}`, scope);
   }
 
   /** Records an out-of-band approval (P7-02): valid for this actor, workspace and hash only, until `expiresAt`. */

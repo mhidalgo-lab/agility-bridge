@@ -104,7 +104,7 @@ describe('valuesEqual', () => {
 
 describe('sealed approval state', () => {
   const key = new Uint8Array(32).fill(3);
-  const state = { n: 'nonce', h: 'hash', a: 'actor', e: 123 };
+  const state = { n: 'nonce', h: 'hash', a: 'actor', e: 123, w: 'ws', i: 'inst' };
   it('round-trips and rejects any change, another key and a short key', async () => {
     const sealed = await sealState(key, state);
     expect(await openState(key, sealed)).toEqual(state);

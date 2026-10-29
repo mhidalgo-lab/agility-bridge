@@ -275,6 +275,34 @@ describe('apply once', () => {
     expect(fake.items.get('Story:1')?.status).toBe('In Progress');
   });
 
+  it.each([
+    [ErrorCode.AgilityUnavailable, 'Try again in a moment.'],
+    [
+      ErrorCode.AgilityTimeout,
+      'Narrow the request (fewer rows, fewer fields, no ChangeDate sort) and try again.',
+    ],
+    [ErrorCode.AgilityWrongInstance, 'Check the instance URL: use the address you open Agility at.'],
+  ])(
+    '%s with the real client hint: the agent is told the write may have been applied',
+    async (code, hint) => {
+      const { fake, tool, ctx } = setup();
+      fake.failSendWith = new AbError(code, 'Agility did not answer.', { hint });
+      const error = await refused(run(tool, CONFIRMED, ctx));
+      expect(error.code).toBe(code);
+      expect(error.hint).toMatch(/may or may not have been applied/);
+      expect(error.hint).not.toContain(hint);
+    },
+  );
+
+  it('a refusal from Agility keeps its own hint (nothing was applied)', async () => {
+    const { fake, tool, ctx } = setup();
+    fake.failSendWith = new AbError(ErrorCode.AgilityError, 'Agility refused the request (HTTP 400).', {
+      hint: 'Agility refused this change.',
+    });
+    const error = await refused(run(tool, CONFIRMED, ctx));
+    expect(error.hint).toBe('Agility refused this change.');
+  });
+
   it('records a failed send as an error outcome and never retries', async () => {
     const { fake, tool, ctx, runtime } = setup();
     fake.failSendWith = new AbError(ErrorCode.AgilityTimeout, 'The Agility write timed out.');
@@ -508,6 +536,36 @@ describe('multi round-trip approval (2026-07-28): sealed state, single use, boun
     if (item) Object.assign(item, { status: 'In Progress', version: 9 });
     await expect(run(tool, CONFIRMED, retry)).rejects.toBeInstanceOf(InputRequiredSignal);
     expect(fake.sends).toHaveLength(1);
+  });
+
+  it('a round asked in one workspace or for one instance never approves in another (L2)', async () => {
+    const fake = new FakeItems();
+    const runtime = makeRuntime();
+    const { tool, signal } = await stateOf(fake, runtime);
+    const elsewhere: Array<[string, Partial<ToolContext>]> = [
+      [
+        'workspace',
+        {
+          workspace: {
+            id: 'ws-2',
+            name: 'Other',
+            groups: ['core', 'writes'],
+            writes: { enabled: true, approval: 'elicitation' },
+          },
+        },
+      ],
+      ['instance', { instance: { id: 'other-instance', baseUrl: 'https://agility.example.com/Other' } }],
+    ];
+    for (const [, change] of elsewhere) {
+      const ctx = writeContext(
+        { ...runtime, channel: round({ state: signal.state, answer: 'approve' }) },
+        change,
+      );
+      await expect(run(tool, CONFIRMED, ctx)).rejects.toBeInstanceOf(InputRequiredSignal);
+    }
+    expect(fake.sends).toHaveLength(0);
+    // The round was not spent by the wrong workspace's attempt only if it was never taken; where it was asked it still works
+    // once, or is gone: either way nothing was sent elsewhere.
   });
 
   it('a declined round is AB_WRITE_APPROVAL_DECLINED and sends nothing', async () => {

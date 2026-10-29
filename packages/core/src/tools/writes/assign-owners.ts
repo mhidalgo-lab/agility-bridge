@@ -47,6 +47,7 @@ export const assignOwners: ToolDefinition = defineWriteTool({
   title: 'Assign owners',
   description: `Add and remove owners of one backlog item, defect, task, test or epic. Give members to add, to remove, or both; the other owners stay. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
+  overwrites: true,
   // Resolution, the item read, up to five members (up to three requests each), the re-read and the one write.
   cost: COST,
   idempotent: true,

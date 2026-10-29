@@ -10,6 +10,7 @@ import { resolveAsset, runQuery } from '../../identity/resolve.ts';
 import { oidsOf } from '../../identity/scope.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { assetState } from '../../output/result.ts';
+import { cleanText, utcIso } from '../../output/text.ts';
 import { type CompiledQuery, compileQuery } from '../../query/compiler.ts';
 import { invalid } from '../../query/limits.ts';
 import type { WriteValue } from '../../writes/index.ts';
@@ -33,8 +34,18 @@ export function assertTypeAllowed(ctx: ToolContext, type: string): void {
   }
 }
 
-/** `Name [Member:20]`: readable for the person who approves, and the OID the hash binds. */
-export const labelOf = (name: string, oid: string): string => `${name} [${oid}]`;
+/** The longest Agility name kept in a `Name [OID]` label (display only; the OID is what is bound). */
+const MAX_LABEL_NAME_CHARS = 120;
+
+/**
+ * `Name [Member:20]`: readable for the person who approves, and the OID the hash binds. The name came from Agility, so it is
+ * cleaned for display (hidden characters and line breaks removed, long names cut) and never blocks a write (D-192).
+ */
+export const labelOf = (name: string, oid: string): string => {
+  const clean = cleanText(name).replace(/\s+/g, ' ').trim();
+  const shown = clean.length > MAX_LABEL_NAME_CHARS ? `${clean.slice(0, MAX_LABEL_NAME_CHARS - 1)}…` : clean;
+  return `${shown === '' ? oid : shown} [${oid}]`;
+};
 const LABEL_OID_RE = /\[([A-Za-z][A-Za-z0-9_]*:\d{1,12})\]$/;
 export const oidOfLabel = (label: string): string => {
   const oid = LABEL_OID_RE.exec(label)?.[1];
@@ -208,10 +219,13 @@ export async function postAsset(
   type: string,
   id: string | undefined,
   ops: readonly XmlOp[],
-): Promise<{ oid?: string }> {
+): Promise<{ oid?: string; unreadable?: boolean }> {
   const res = await agilityClient(ctx).restWrite(type, id, assetXml(ops));
   const oid = resultOid(res.data);
-  return oid === undefined ? {} : { oid };
+  return {
+    ...(oid === undefined ? {} : { oid }),
+    ...(res.unreadable === true ? { unreadable: true } : {}),
+  };
 }
 
 /** The numeric id of an OID token (`Story:1234` -> `1234`). */
@@ -222,3 +236,21 @@ export const sortedLabels = (labels: readonly string[]): readonly string[] =>
   [...labels].sort((a, b) => oidOfLabel(a).localeCompare(oidOfLabel(b)));
 
 export type { WriteValue };
+
+/** A zone-less Agility timestamp may be in any zone: allow for the widest offset when comparing ages. */
+const ZONE_SKEW_MS = 14 * 3_600_000;
+
+/**
+ * True when an Agility timestamp is at most `windowMs` before `now`. A timestamp with a zone is exact; one without is read
+ * as UTC and given the widest zone skew (a repeat is never missed, at worst a little more is treated as recent). A value
+ * that cannot be read at all is never "recent": it cannot prove a repeat (D-195, P7-09).
+ */
+export function withinWindow(raw: string | undefined, now: number, windowMs: number): boolean {
+  if (raw === undefined) return false;
+  const exact = utcIso(raw);
+  if (exact !== undefined) return now - Date.parse(exact) <= windowMs;
+  const naive = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}(?::\d{2})?)(?:\.\d{1,9})?$/.exec(raw.trim());
+  if (naive === null) return false;
+  const t = Date.parse(`${naive[1]}T${naive[2]?.length === 5 ? `${naive[2]}:00` : naive[2]}Z`);
+  return !Number.isNaN(t) && now - t <= windowMs + ZONE_SKEW_MS;
+}

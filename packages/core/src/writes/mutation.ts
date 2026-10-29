@@ -2,7 +2,7 @@
 // The canonical mutation (ADR-0013, ARCHITECTURE 6.6): what a write changes, as data. One target, explicit fields,
 // old -> new, from the tool's allowlist. Approval shows it whole and binds to its hash (THREAT_MODEL T31, A2, L-106).
 import { AbError, ErrorCode } from '../errors.ts';
-import { cleanText } from '../output/text.ts';
+import { cleanText, hasHiddenCharacters } from '../output/text.ts';
 
 /** A value a write can set: scalars, null (clear) or a list of strings (OIDs, tags). */
 export type WriteValue = string | number | boolean | null | readonly string[];
@@ -57,8 +57,44 @@ export function valuesEqual(a: WriteValue, b: WriteValue): boolean {
   return a === b;
 }
 
+/** The longest old value shown to the person; a longer one is cut with a note (the hash still binds the whole value). */
+export const MAX_OLD_DISPLAY_CHARS = 2_000;
+
+/**
+ * An old value as shown for approval. It came from Agility, so it never blocks a write: hidden characters are removed and
+ * a long value is shortened, each with a visible note. The hash is over the full value (D-192, P7-09).
+ */
+export function displayOld(text: string): string {
+  const flat = text.replace(/\r\n?|[\u2028\u2029]/g, '\n');
+  const clean = cleanText(text);
+  const hidden = clean !== flat;
+  let shown = clean;
+  let cut = false;
+  if (clean.length > MAX_OLD_DISPLAY_CHARS) {
+    let end = MAX_OLD_DISPLAY_CHARS;
+    const last = clean.charCodeAt(end - 1);
+    if (last >= 0xd800 && last <= 0xdbff) end--;
+    shown = clean.slice(0, end);
+    cut = true;
+  }
+  const notes = [
+    ...(cut ? [`shortened for display, ${clean.length} characters in total`] : []),
+    ...(hidden ? ['hidden characters removed for display'] : []),
+  ];
+  return notes.length === 0 ? text : `${shown} [${notes.join('; ')}]`;
+}
+
+/** The mutation as a person reads it: old values cleaned and shortened (never the new values, which are refused instead). */
+export function forDisplay(m: CanonicalMutation): CanonicalMutation {
+  const show = (v: WriteValue): WriteValue =>
+    typeof v === 'string' ? displayOld(v) : Array.isArray(v) ? v.map(displayOld) : v;
+  return { ...m, changes: m.changes.map((c) => ({ ...c, old: show(c.old) })) };
+}
+
 function checkValue(field: string, value: unknown, side: 'old' | 'new'): WriteValue {
   const text = (v: string): string => {
+    // An old value is Agility's own: it is shown cleaned and shortened, never refused (D-192).
+    if (side === 'old') return v;
     if (v.length > MAX_VALUE_CHARS) {
       throw invalid(
         `The ${side} value of ${field} is longer than ${MAX_VALUE_CHARS} characters, too long to show in full for approval.`,
@@ -66,7 +102,7 @@ function checkValue(field: string, value: unknown, side: 'old' | 'new'): WriteVa
       );
     }
     // What the person reads must be exactly what is sent: no hidden characters (Trojan Source, zero-width).
-    if (cleanText(v) !== v) {
+    if (hasHiddenCharacters(v)) {
       throw invalid(
         `The ${side} value of ${field} contains control, invisible or bidirectional characters.`,
         'Remove them; they would be hidden from the person who approves.',

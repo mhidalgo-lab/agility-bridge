@@ -36,6 +36,7 @@ export const updateStatus: ToolDefinition = defineWriteTool({
   title: 'Update status',
   description: `Set the status of one backlog item, defect, task, test or epic to a status of its workflow (by name or OID token). Changes the status only: it does not close the item. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
+  overwrites: true,
   // Resolution, the item read, the status list (cold), the re-read and the one write.
   cost: COST,
   idempotent: true,

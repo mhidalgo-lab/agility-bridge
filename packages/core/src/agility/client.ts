@@ -14,6 +14,8 @@ export interface AgilityResponse<T> {
   readonly bytes: number;
   /** `meta.v1` answers `"<version>.<schema stamp>"` (P0-06); the metadata service keys its cache on it. */
   readonly etag?: string;
+  /** A 2xx to a write whose body was empty or not readable XML: the write happened, the answer is not usable (P7-09). */
+  readonly unreadable?: boolean;
 }
 
 export interface AgilityClientOptions {
@@ -604,6 +606,18 @@ export class AgilityClient {
     const contentType = res.headers.get('content-type') ?? '';
     const { text, bytes } = await readCapped(res, this.#ctx.limits.maxResponseBytes);
     log(bytes);
+    // A 2xx to a write means Agility applied it, whatever the body looks like (an operation answers with little or
+    // nothing, RESEARCH 1.5): an empty or unreadable body is reported as applied with an unreadable answer, never as an
+    // error that would invite a repeat (P7-09, L-404).
+    if (call.write && call.expect === 'xml' && (text.trim() === '' || !looksLikeHtml(contentType, text))) {
+      try {
+        const data = text.trim() === '' ? undefined : parseXml(text);
+        if (data !== undefined) return { ok: true, response: { status: res.status, data, bytes } };
+      } catch {
+        // fall through: unreadable
+      }
+      return { ok: true, response: { status: res.status, data: EMPTY_XML, bytes, unreadable: true } };
+    }
     if (looksLikeHtml(contentType, text)) {
       return { ok: false, retryable: false, error: wrongInstance('an HTML page, often a login page') };
     }
@@ -621,6 +635,8 @@ export class AgilityClient {
     return { ok: true, response: { status: res.status, data, bytes, ...(etag === null ? {} : { etag }) } };
   }
 }
+
+const EMPTY_XML: XmlElement = Object.freeze({ name: '', attributes: {}, children: [], text: '' });
 
 /** The Agility client for one tool call. */
 export function agilityClient(ctx: ToolContext, options?: AgilityClientOptions): AgilityClient {

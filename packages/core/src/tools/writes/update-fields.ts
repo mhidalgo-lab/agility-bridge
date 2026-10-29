@@ -30,8 +30,10 @@ import {
   FIELD_ALLOWLIST,
   FIELD_TYPES,
   type FieldType,
+  hasRichFormatting,
   isFieldType,
   itemName,
+  MAX_DESCRIPTION_CHARS,
   notAllowed,
   resolvePriority,
   round2,
@@ -66,6 +68,7 @@ export const updateFields: ToolDefinition = defineWriteTool({
   title: 'Update fields',
   description: `Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic. Give only what changes; the person approves old and new for each. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
+  overwrites: true,
   // Resolution, the item read, metadata (cold), the priority (1 to 3), the re-read and the one write.
   cost: COST,
   idempotent: true,
@@ -75,9 +78,11 @@ export const updateFields: ToolDefinition = defineWriteTool({
     description: z
       .string()
       .min(1)
-      .max(8_000)
+      .max(MAX_DESCRIPTION_CHARS)
       .optional()
-      .describe('New description, plain text, at most 4,000 characters; it replaces the old one.'),
+      .describe(
+        'New description, plain text, at most 4,000 characters; it replaces the old one, which must be plain (no links, lists or images).',
+      ),
     estimate: z
       .number()
       .min(0)
@@ -121,6 +126,13 @@ export const updateFields: ToolDefinition = defineWriteTool({
     }
     if (description !== undefined) {
       await requireWritable(ctx, type, 'Description');
+      const rawOld = textOf(target.row['Description']);
+      if (rawOld !== undefined && hasRichFormatting(rawOld) && (old['Description'] ?? null) !== description) {
+        throw invalid(
+          `The current description of ${target.number ?? target.oid} has formatting that plain text cannot keep (links, images, lists, tables or styles), so replacing it would lose that content.`,
+          'Edit the description in Agility, or add a comment instead; this tool only replaces plain descriptions.',
+        );
+      }
       changes.push({ field: 'Description', old: old['Description'] ?? null, new: description });
     }
     if (input.estimate !== undefined && estimateAttribute !== undefined) {

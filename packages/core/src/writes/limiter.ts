@@ -12,6 +12,8 @@ import type { WriteLimiter } from './runtime.ts';
 export interface CounterStore {
   /** Atomically adds one and returns the new count, or `null` when `max` would be exceeded. */
   increment(key: string, options: { expiresAt: number; max: number }): Promise<number | null>;
+  /** The current count as text, or `null` when there is none (a read; nothing is spent). */
+  get(key: string): Promise<string | null>;
 }
 
 export interface WriteRateLimits {
@@ -62,6 +64,38 @@ export function createWriteLimiter(options: WriteLimiterOptions): WriteLimiter {
       if (limits.deployment !== null) {
         scopes.push({ scope: 'deployment', key: `wl:all:${window}`, max: limits.deployment });
       }
+      const refuse = (s: { scope: 'grant' | 'deployment'; max: number }): AbError =>
+        new AbError(
+          ErrorCode.LimitRate,
+          s.scope === 'grant'
+            ? 'This connection has used its write limit for this hour. Nothing was changed.'
+            : 'This deployment has used its write limit for this hour. Nothing was changed.',
+          {
+            hint: `Wait about ${retryAfterSeconds} seconds before asking for another change; do not retry in a loop.`,
+            details: { scope: s.scope, limit: s.max, retryAfterSeconds },
+            localDetails: true,
+          },
+        );
+      // A refused check spends nothing (D-170): the deployment counter is read before the grant's unit is taken, so a
+      // full deployment does not drain every grant. Two calls racing past this read can still leave one unit spent.
+      const wide = scopes.find((s) => s.scope === 'deployment');
+      if (wide !== undefined) {
+        let seen: string | null;
+        try {
+          seen = await counters.get(wide.key);
+        } catch (error) {
+          options.onError?.(error);
+          throw unavailable(error);
+        }
+        if (seen !== null) {
+          const n = Number(seen);
+          if (!Number.isInteger(n) || n < 0) {
+            options.onError?.(new Error('write limiter: unexpected counter value'));
+            throw unavailable(undefined);
+          }
+          if (n >= wide.max) throw refuse(wide);
+        }
+      }
       for (const s of scopes) {
         let count: number | null;
         try {
@@ -70,19 +104,7 @@ export function createWriteLimiter(options: WriteLimiterOptions): WriteLimiter {
           options.onError?.(error);
           throw unavailable(error);
         }
-        if (count === null) {
-          throw new AbError(
-            ErrorCode.LimitRate,
-            s.scope === 'grant'
-              ? 'This connection has used its write limit for this hour. Nothing was changed.'
-              : 'This deployment has used its write limit for this hour. Nothing was changed.',
-            {
-              hint: `Wait about ${retryAfterSeconds} seconds before asking for another change; do not retry in a loop.`,
-              details: { scope: s.scope, limit: s.max, retryAfterSeconds },
-              localDetails: true,
-            },
-          );
-        }
+        if (count === null) throw refuse(s);
         if (!Number.isInteger(count) || count < 1 || count > s.max) {
           // Not a count we can trust: refuse (L-080).
           options.onError?.(new Error('write limiter: unexpected counter value'));
@@ -97,6 +119,10 @@ export function createWriteLimiter(options: WriteLimiterOptions): WriteLimiter {
 export function memoryCounterStore(clock: Clock, maxKeys = 1_000): CounterStore {
   const data = new Map<string, { n: number; expiresAt: number }>();
   return {
+    async get(key) {
+      const cur = data.get(key);
+      return cur === undefined || cur.expiresAt <= clock.now() ? null : String(cur.n);
+    },
     async increment(key, { expiresAt, max }) {
       const now = clock.now();
       const cur = data.get(key);
