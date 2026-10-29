@@ -328,3 +328,15 @@
 - **Recommendation:** (a), built. The statistics are the authoritative count; the viewer never reports a false "missing".
 - **Owner:** *(open; built as (a))*
 
+### D-223 — The pending list is reached from My access, with no count on the overview *(P7-14)*
+- **Context:** The task asks whether the overview needs a count. A count is one more `kv` read on every overview load for every person, and the overview is for owners and admins while any member can have a request.
+- **Options:** (a) `GET /admin/approve` (a page of the signed-in person's own requests) with a link on My access, shown only when the approval page exists; (b) also a count badge on the overview and in the menu (an extra read per page view); (c) a menu entry for everyone (a dead link on servers without writes).
+- **Recommendation:** (a), built. The page is for finding a lost link; the agent's own answer already carries the link when it is needed.
+- **Owner:** *(open; built as (a))*
+
+### D-224 — The bound of 20 open requests stays, and the list reads only the person's own prefix *(P7-14)*
+- **Context:** `MAX_PENDING_PER_USER` (20) drops the oldest request past it. The list reads one key range and at most 20 values (21 queries on D1, only when the page is opened).
+- **Options:** (a) keep 20 and list at most that many; (b) raise it (more values in `kv`, a longer list and a longer page); (c) store a summary row per request (one more write on every ask, on the tight Free-plan write quota).
+- **Recommendation:** (a), built. Real tools may show that 20 is too many or too few; P7-27 (request limits) owns the bound.
+- **Owner:** *(open; built as (a))*
+

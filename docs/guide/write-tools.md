@@ -205,6 +205,10 @@ the whole change (workspace, item, every field with the value now and the value 
 
 - Only the signed-in person whose grant made the request can see or answer it; anyone else (another user, a link forwarded to
   a colleague, an administrator) gets "not available", the same as for an expired or used link.
+- **Lost the link?** `<AB_PUBLIC_URL>/admin/approve` (also *Changes waiting for my approval* on My access) lists your own open
+  requests: when asked, the change and tool, the item, the workspace, the **names** of the fields, the change id and the expiry,
+  with a button to open each. It never shows a value, the item's title or anyone else's request, and a request you answered or
+  that expired is not listed. Opening one is the same page as above.
 - Approving needs a recent sign-in (the page sends you to sign in again, then back to it); declining does not.
 - An approval is for **one** repeat of **exactly** this change, in **this** workspace, for ten minutes. A different value, item,
   tool or workspace asks again; so does a second repeat. A decline makes the next call fail as `AB_WRITE_APPROVAL_DECLINED`.

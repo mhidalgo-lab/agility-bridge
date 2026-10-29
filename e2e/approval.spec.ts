@@ -61,6 +61,29 @@ test('the change is shown whole, with its target, every field old and new, and a
   w.assertClean();
 });
 
+test('my pending requests are listed without values and link to the page, from My access', async ({
+  page,
+}) => {
+  const w = await watch(page);
+  await signIn(page, server);
+  const path = await link();
+  await page.goto(rel('/admin/me'));
+  await page.getByRole('link', { name: 'Changes waiting for my approval' }).click();
+  await expect(page).toHaveURL(rel('/admin/approve'));
+  await expectNoHorizontalScroll(page);
+  await expectAccessible(page);
+  const main = page.locator('main');
+  await expect(main).toContainText('update_status');
+  await expect(main).toContainText('Story B-01001');
+  await expect(main).toContainText('Status');
+  // Names only: the old and new values are on the request's own page.
+  await expect(main).not.toContainText('In Progress');
+  await expect(main).not.toContainText('Synthetic sign-in page');
+  await page.locator(`a[href="${path}"]`).first().click();
+  await expect(page.getByRole('heading', { name: 'An app asks to change Agility' })).toBeVisible();
+  w.assertClean();
+});
+
 test('decline answers and a second answer finds nothing', async ({ page }) => {
   const w = await watch(page);
   await signIn(page, server);

@@ -4,6 +4,7 @@
 // ask the person answers `AB_WRITE_APPROVAL_PENDING` with a link here; the signed-in person who made the request reviews
 // the exact change and approves or declines it, and the agent repeats the call.
 //
+//   GET  /admin/approve       the signed-in person's own open requests, without values (P7-14)
 //   GET  /admin/approve/:id   the whole change (every field, old and new), the target and the workspace
 //   POST /admin/approve/:id   `decision=approve|decline` plus the change hash the page showed: CSRF, Origin, and for
 //                             approving, a recent sign-in (stale: the re-authentication prompt, nothing recorded)
@@ -12,8 +13,18 @@
 // shown is rendered escaped; text from Agility and from the agent is marked as data, not instructions.
 import type { Hono } from 'hono';
 import type { JSX } from 'hono/jsx/jsx-runtime';
-import { Badge, Button, Facts, Form, Layout, LinkButton, Time, type UiViewer } from '../components.tsx';
-import { type ApprovalView, requestIdOf, type UiKit } from '../kit.ts';
+import {
+  Badge,
+  Button,
+  DataTable,
+  Facts,
+  Form,
+  Layout,
+  LinkButton,
+  Time,
+  type UiViewer,
+} from '../components.tsx';
+import { type ApprovalSummary, type ApprovalView, requestIdOf, type UiKit } from '../kit.ts';
 import { errorPage, messagePageResponse, reauthPage } from '../pages.tsx';
 
 export const APPROVE_FIELDS: { readonly decision: 'decision'; readonly hash: 'hash' } = Object.freeze({
@@ -118,6 +129,55 @@ export function ApprovePage(props: ApprovePageProps): JSX.Element {
   );
 }
 
+export interface PendingListProps {
+  readonly viewer: UiViewer;
+  readonly items: readonly ApprovalSummary[];
+}
+
+/** The open requests of the signed-in person: where each is and what it touches, never a value (P7-14). */
+export function PendingList(props: PendingListProps): JSX.Element {
+  return (
+    <Layout title="Changes waiting for me" viewer={props.viewer}>
+      <p>
+        Changes an app asked to make in Agility that wait for your decision. Open one to review every field
+        and approve or decline it. A request expires a few minutes after the app asked; ask the app again if
+        it is not listed. Only your own requests are shown, and no values: those are on each request's page.
+      </p>
+      <DataTable
+        caption="Changes waiting for my approval"
+        empty="Nothing is waiting for you."
+        rows={props.items}
+        columns={[
+          { header: 'Requested', cell: (r) => <Time at={r.requestedAt} /> },
+          {
+            header: 'Change',
+            cell: (r) => (
+              <>
+                {r.operation} (<code>{r.tool}</code>)
+              </>
+            ),
+          },
+          {
+            header: 'Item',
+            cell: (r) => `${r.target.assetType} ${r.target.number ?? r.target.oid}`,
+          },
+          { header: 'Workspace', cell: (r) => r.workspaceName ?? 'unnamed' },
+          { header: 'Fields', cell: (r) => r.fields.join(', ') || '—' },
+          { header: 'Expires', cell: (r) => <Time at={r.expiresAt} /> },
+          {
+            header: 'Review',
+            cell: (r) => (
+              <LinkButton href={`/admin/approve/${encodeURIComponent(r.id)}`} variant="secondary">
+                Review {r.changeId}
+              </LinkButton>
+            ),
+          },
+        ]}
+      />
+    </Layout>
+  );
+}
+
 const GONE_TITLE = 'This request is not available';
 const GONE_TEXT =
   'This approval request was already answered, has expired, or belongs to someone else. Nothing was approved. If you still want the change, ask the app to try again.';
@@ -125,6 +185,14 @@ const GONE_TEXT =
 export function registerApprove(ui: Hono, kit: UiKit): void {
   const port = kit.deps.approvals;
   if (port === undefined) return;
+
+  ui.get(
+    '/approve',
+    kit.page('member', async (c, page) => {
+      const items = await port.list(c, page.principal);
+      return page.html(<PendingList viewer={page.principal} items={items} />);
+    }),
+  );
 
   ui.get(
     '/approve/:id',
