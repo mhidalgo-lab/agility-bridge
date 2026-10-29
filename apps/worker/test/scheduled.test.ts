@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Scheduled housekeeping on workerd (P3-08): bounded slices per cron run, resumable key rotation that never rotates a
 // row twice, a lease that skips overlapping runs, retention and kv purges, at most one revalidation per run.
-import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { accessServices, generateAdminToken, generateMasterKey, Keyring } from '@agility-bridge/auth';
@@ -11,6 +10,7 @@ import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { type FixtureAgility, startFixtureAgility } from '../../../scripts/fixture-agility.ts';
 import { ROTATION_LEASE, SLICES } from '../src/scheduled.ts';
+import { until } from './wait.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPT = join(ROOT, 'dist', 'index.js');
@@ -19,10 +19,6 @@ const DAY = 86_400_000;
 let agility: FixtureAgility;
 const running: Miniflare[] = [];
 beforeAll(async () => {
-  execFileSync(join(ROOT, 'node_modules', '.bin', 'wrangler'), ['deploy', '--dry-run', '--outdir', 'dist'], {
-    cwd: ROOT,
-    stdio: 'ignore',
-  });
   agility = await startFixtureAgility();
 });
 afterAll(() => agility.close());
@@ -76,11 +72,6 @@ async function setUp(bindings: Record<string, string> = {}) {
     await worker.scheduled({ scheduledTime: new Date(scheduledTime), cron: '*/15 * * * *' });
   };
   return { mf, storage, credentials, run, keyring: await Keyring.create(k2, k1) };
-}
-
-/** Waits for the work the scheduled handler left to waitUntil. */
-async function until(check: () => Promise<boolean>): Promise<void> {
-  for (let i = 0; i < 100 && !(await check()); i++) await new Promise((r) => setTimeout(r, 25));
 }
 
 const onVersion = async (storage: Storage, v: number) =>

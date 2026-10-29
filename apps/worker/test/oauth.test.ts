@@ -3,7 +3,6 @@
 // stand-in of the tests in place of the screen P5-04 adds, run in Miniflare on a local D1. The world is built from Node
 // on the Worker's own database with the same master key, as in the authorization matrix (P3-06). State is in D1 on
 // every request (the Worker keeps nothing between requests), so a code approved by one request is redeemed by another.
-import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { accessServices, generateAdminToken, generateMasterKey, Keyring } from '@agility-bridge/auth';
@@ -37,12 +36,7 @@ const ORIGIN = 'http://127.0.0.1';
 let agility: FixtureAgility;
 const running: Miniflare[] = [];
 beforeAll(async () => {
-  // The Worker plus the consent stand-in (test/fixtures/oauth-entry.ts), bundled by wrangler like the real one.
-  execFileSync(
-    join(ROOT, 'node_modules', '.bin', 'wrangler'),
-    ['deploy', '--dry-run', '--outdir', 'dist/oauth-test', 'test/fixtures/oauth-entry.ts'],
-    { cwd: ROOT, stdio: 'ignore' },
-  );
+  // The Worker plus the consent stand-in is built once by `test/global-setup.ts` (L-380).
   agility = await startFixtureAgility();
 });
 afterAll(() => agility.close());

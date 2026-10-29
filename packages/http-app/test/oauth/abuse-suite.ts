@@ -25,6 +25,11 @@ const AUTHORIZE_IP = 30;
 const TOKEN_FAILURE_IP = 20;
 const DCR_IP = 10;
 const CIMD_IP = 20;
+/** The fixed windows of the counters (`ABUSE_WINDOW_S` and `CAP_WINDOW_S` in `oauth/server.ts`). */
+const ABUSE_WINDOW_S = 600;
+const HOUR_S = 3600;
+/** A flood takes a few seconds even on a loaded runner; it starts only when this much of its window is left. */
+const NEAR_END_MS = 20_000;
 const sha256Hex = async (text: string): Promise<string> =>
   [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))]
     .map((b) => b.toString(16).padStart(2, '0'))
@@ -37,9 +42,15 @@ export function defineOAuthAbuseSuite(name: string, makeHost: () => Promise<OAut
     afterEach(async () => {
       await Promise.all(open.splice(0).map((h) => h.close()));
     });
-    const host = async (): Promise<OAuthHost> => {
+    /**
+     * A host whose clock is at least `NEAR_END_MS` from the end of the abuse window, so a flood cannot straddle two
+     * fixed windows (the counters reset at the boundary: a flood split in two is cut by neither, L-382).
+     */
+    const host = async (windowSeconds = ABUSE_WINDOW_S): Promise<OAuthHost> => {
       const h = await makeHost();
       open.push(h);
+      const left = windowSeconds * 1000 - (Date.now() % (windowSeconds * 1000));
+      if (left < NEAR_END_MS) await new Promise((r) => setTimeout(r, left + 50));
       return h;
     };
     const rows = (h: OAuthHost, prefix: string) => h.storage.kv.list(prefix, { limit: 1000 });
@@ -213,7 +224,7 @@ export function defineOAuthAbuseSuite(name: string, makeHost: () => Promise<OAut
     });
 
     it('register: a flood from one address stores only its own limit of clients, and another address can still register', async () => {
-      const h = await host();
+      const h = await host(HOUR_S);
       const out = await statuses(Array.from({ length: DCR_IP + 4 }, () => dcr(h, ATTACKER)));
       expect(out.filter((s) => s === 201)).toHaveLength(DCR_IP);
       expect(out.filter((s) => s === 429)).toHaveLength(4);
@@ -231,7 +242,7 @@ export function defineOAuthAbuseSuite(name: string, makeHost: () => Promise<OAut
     });
 
     it('metadata documents: a flood of client ids from one address causes at most its budget of fetches and stored clients', async () => {
-      const h = await host();
+      const h = await host(HOUR_S);
       const agility = h.agilityRequests();
       const ask = (n: number, ip: string) => {
         h.documents.serveClient(docUrl(n));
@@ -254,7 +265,7 @@ export function defineOAuthAbuseSuite(name: string, makeHost: () => Promise<OAut
     });
 
     it('a document client that is already stored costs no fetch and no counter, however often it is asked for', async () => {
-      const h = await host();
+      const h = await host(HOUR_S);
       h.documents.serveClient(docUrl(1));
       for (let i = 0; i < 10; i++) {
         await h.call(authorizeUrl(h, { client_id: docUrl(1) }), {

@@ -40,7 +40,7 @@ How to use it:
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297, L-335 |
@@ -1731,6 +1731,28 @@ agent and trains descriptions toward a single route. A question about an opt-in 
 the catalogue that includes it, as a workspace that enabled the group would see it, and one about a default tool against the
 default list, so an opt-in tool never steals a default question.
 *Applied in:* P6-10, `scripts/evals/dataset.json`.
+
+**L-380 — Parallel test files never build into the same output directory; build once in a global setup.**
+Four worker test files each ran `wrangler deploy --dry-run --outdir dist` in `beforeAll`. A build truncates and rewrites
+`dist/index.js` while the other files' Miniflare instances load it, so a file saw an empty or half-written script (sampled
+during a build: 0 bytes, 2 MB and 3 MB of 3.2 MB). It showed as a 500 where a 404 was expected, "bundle of 0 bytes" and
+several authorization cases failing together, and a rerun passed. `apps/worker/test/global-setup.ts` builds both bundles
+once before any file starts; the files only read them.
+*Applied in:* P6-60, `apps/worker/vitest.config.ts`, `apps/worker/test/global-setup.ts`, L-321.
+
+**L-381 — Wait for work left to `waitUntil` on the condition, with a deadline only a hung Worker reaches.**
+Audit rows and credential validations are written after the response. Tests polled 20 to 100 times at 25 to 50 ms (about
+one to two seconds) and then asserted; a loaded runner needed longer. `apps/worker/test/wait.ts` (`until`) polls the
+condition for 20 s. A test that has to show that something did not happen still needs a fixed pause; it does not use this.
+*Applied in:* P6-60, `apps/worker/test/authz.test.ts`, `worker.test.ts`, `migrate.test.ts`, `scheduled.test.ts`.
+
+**L-382 — A test of a fixed-window limit starts at the beginning of its window, and a suite of real-time files has a timeout that fits the slowest runner.**
+The OAuth abuse counters reset at wall-clock window boundaries (10 minutes, one hour). A flood of 35 requests that
+straddles a boundary is cut by neither half, so the test saw no refusal at all once in a few hundred runs. The suite's
+host now waits for the next window when fewer than 20 s are left. Separately, `storage-sqlite` tests fsync real files
+(migrations, commits, `VACUUM INTO`) and took 6 to 18 s on the Windows runner against the 5 s default; the project now sets
+60 s, as `apps/cli` does, instead of weakening the tests.
+*Applied in:* P6-60, `packages/http-app/test/oauth/abuse-suite.ts`, `packages/storage-sqlite/vitest.config.ts`, L-104, L-322.
 
 ## R. CI, release and supply chain
 

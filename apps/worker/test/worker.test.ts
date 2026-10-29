@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // The bundled Worker in workerd (P3-01): Miniflare with a local D1, no Cloudflare account. Setup goes through the
 // Worker's own admin API with the break-glass token; MCP calls use a device token against the synthetic Agility.
-import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,6 +11,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { fakeOidc } from '../../../packages/auth/test/helpers/fake-idp.ts';
 import { type FixtureAgility, startFixtureAgility } from '../../../scripts/fixture-agility.ts';
 import { serveFetch } from '../../../scripts/serve-fetch.ts';
+import { until } from './wait.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPT = join(ROOT, 'dist', 'index.js');
@@ -27,11 +27,7 @@ let persist: string;
 const running: Miniflare[] = [];
 
 beforeAll(async () => {
-  // The bundle CI deploys, built the same way (`wrangler deploy --dry-run`).
-  execFileSync(join(ROOT, 'node_modules', '.bin', 'wrangler'), ['deploy', '--dry-run', '--outdir', 'dist'], {
-    cwd: ROOT,
-    stdio: 'ignore',
-  });
+  // The bundle is built once by `test/global-setup.ts` (L-380).
   agility = await startFixtureAgility();
 });
 afterAll(() => agility.close());
@@ -157,13 +153,13 @@ describe('the Worker in workerd', () => {
 
     // Audit rows were written through waitUntil (detached writes, L-096).
     let audit: { action: string }[] = [];
-    for (let i = 0; i < 20 && !audit.some((r) => r.action === 'search_work_items'); i++) {
+    await until(async () => {
       const res = await call(mf, '/api/admin/v1/audit?kind=tool_call', {
         headers: { authorization: `Bearer ${admin}` },
       });
       audit = (await res.json()) as { action: string }[];
-      if (!audit.some((r) => r.action === 'search_work_items')) await new Promise((r) => setTimeout(r, 50));
-    }
+      return audit.some((r) => r.action === 'search_work_items');
+    });
     expect(audit.map((r) => r.action)).toContain('search_work_items');
   });
 
@@ -212,13 +208,13 @@ describe('plan presets (P3-03)', () => {
     }
     await (await mcp(mf, 'team', tokens['team'] as string, search)).text();
     let rows: { action: string; agilityRequests: number | null }[] = [];
-    for (let i = 0; i < 20 && rows.length === 0; i++) {
+    await until(async () => {
       const res = await call(mf, '/api/admin/v1/audit?kind=tool_call', {
         headers: { authorization: `Bearer ${admin}` },
       });
       rows = (await res.json()) as typeof rows;
-      if (rows.length === 0) await new Promise((r) => setTimeout(r, 50));
-    }
+      return rows.length > 0;
+    });
     expect(rows[0]?.action).toBe('search_work_items');
     expect(rows[0]?.agilityRequests).toBeGreaterThan(0);
     expect(rows[0]?.agilityRequests).toBeLessThanOrEqual(45);

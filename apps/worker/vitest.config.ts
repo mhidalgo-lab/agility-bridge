@@ -16,5 +16,11 @@ export default defineProject({
       '@agility-bridge/storage': src('storage'),
     },
   },
-  test: { name: 'worker', testTimeout: 60_000, hookTimeout: 120_000 },
+  // `globalSetup` builds the bundles once; test files only read them (L-380).
+  test: {
+    name: 'worker',
+    testTimeout: 60_000,
+    hookTimeout: 120_000,
+    globalSetup: ['./test/global-setup.ts'],
+  },
 });
