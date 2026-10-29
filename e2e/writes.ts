@@ -62,10 +62,14 @@ export async function setupWrites(server: TestServer, cookie: string): Promise<W
   const users = (await server.api('GET', '/users')).json as { id: string; role: string }[];
   const owner = users.find((u) => u.role === 'owner');
   if (owner === undefined) throw new Error('setupWrites needs the owner to have signed in');
-  const instance = await must(
-    'instance',
-    server.api('POST', '/instances', { label: 'Writes', baseUrl: server.agilityUrl }),
-  );
+  // The ZAP scan seeds the same synthetic Agility before this runs (an address is one instance): reuse it.
+  const known = (await server.api('GET', '/instances')).json as { id: string; baseUrl: string }[];
+  const instance: Record<string, unknown> =
+    known.find((i) => i.baseUrl === server.agilityUrl) ??
+    (await must(
+      'instance',
+      server.api('POST', '/instances', { label: 'Writes', baseUrl: server.agilityUrl }),
+    ));
   const shared = await must(
     'shared credential',
     server.api('POST', '/credentials', {
