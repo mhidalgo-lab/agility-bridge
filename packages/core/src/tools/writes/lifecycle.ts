@@ -52,16 +52,11 @@ export const CLOSED = 'Closed';
 const FIELDS = ['Parent', 'Super'];
 const ALLOWED = Object.fromEntries(ITEM_TYPES.map((t) => [t, ['AssetState', 'OpenChildren']]));
 
-<<<<<<< HEAD
-/** Open children of one item, counted with the same scoped, bound-parameter queries the read tools use (capped). */
-export async function openChildren(ctx: ToolContext, type: string, oid: string): Promise<number> {
-=======
 /**
  * Open children of one item, counted with the same scoped, bound-parameter queries the read tools use (capped). The
  * queries of all child types go out in one `query.v1` request (an array body), so the count costs one request.
  */
-async function openChildren(ctx: ToolContext, type: string, oid: string): Promise<number> {
->>>>>>> fbeee2c (perf(core): fix the Worker bench, honest write costs, fewer storage round trips (P7-09))
+export async function openChildren(ctx: ToolContext, type: string, oid: string): Promise<number> {
   const md = metadataFor(ctx);
   const queries: CompiledQuery[] = [];
   for (const [childType, relation] of CHILDREN[type] ?? []) {

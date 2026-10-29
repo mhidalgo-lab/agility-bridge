@@ -541,7 +541,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Add comment** · group `writes` · write · cost 18 Agility requests at most
 
-Add a comment to one backlog item, defect, task, test or epic. The text is shown in full to the person who approves, at most 4,000 characters. Not paged. Cold call: up to 18 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+Add a comment to one backlog item, defect, task, test or epic. The text is shown in full to the person who approves, at most 4,000 characters. A comment identical to your latest one from the last 10 minutes is treated as already added. Not paged. Cold call: up to 18 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
 Annotations: read-only false, destructive false, idempotent false, open world true.
 
@@ -558,7 +558,7 @@ Annotations: read-only false, destructive false, idempotent false, open world tr
 
 Set the status of one backlog item, defect, task, test or epic to a status of its workflow (by name or OID token). Changes the status only: it does not close the item. Not paged. Cold call: up to 15 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
-Annotations: read-only false, destructive false, idempotent true, open world true.
+Annotations: read-only false, destructive true, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
@@ -589,7 +589,7 @@ Annotations: read-only false, destructive false, idempotent false, open world tr
 
 Add and remove owners of one backlog item, defect, task, test or epic. Give members to add, to remove, or both; the other owners stay. Not paged. Cold call: up to 18 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
-Annotations: read-only false, destructive false, idempotent true, open world true.
+Annotations: read-only false, destructive true, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
@@ -605,7 +605,7 @@ Annotations: read-only false, destructive false, idempotent true, open world tru
 
 Move one backlog item or defect into a sprint of its own Agility project, by sprint name, OID token or current, previous or next. A closed sprint is refused. Not paged. Cold call: up to 14 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
-Annotations: read-only false, destructive false, idempotent true, open world true.
+Annotations: read-only false, destructive true, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
@@ -668,13 +668,13 @@ Annotations: read-only false, destructive false, idempotent false, open world tr
 
 Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic. Give only what changes; the person approves old and new for each. Not paged. Cold call: up to 14 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
-Annotations: read-only false, destructive false, idempotent true, open world true.
+Annotations: read-only false, destructive true, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
 | `name` | string |  |  | New title: one line, at most 200 characters. |
-| `description` | string |  |  | New description, plain text, at most 4,000 characters; it replaces the old one. |
+| `description` | string |  |  | New description, plain text, at most 4,000 characters; it replaces the old one, which must be plain (no links, lists or images). |
 | `estimate` | number (≥ 0, ≤ 10000) |  |  | Story points for a story or defect; hours for a task or test. Not for an epic. |
 | `priority` | string |  |  | Priority name or OID token, for a story or defect. |
 | `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
