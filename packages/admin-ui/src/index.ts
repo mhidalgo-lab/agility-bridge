@@ -66,6 +66,9 @@ export {
   type AdminCall,
   type AdminCallResult,
   type AdminUiDeps,
+  type ApprovalOutcome,
+  type ApprovalsPort,
+  type ApprovalView,
   adminPath,
   createUiKit,
   DEFAULT_MAX_FORM_BYTES,
@@ -97,3 +100,4 @@ export {
   SetupPage,
   setupPageResponse,
 } from './pages.tsx';
+export { APPROVE_FIELDS, ApprovePage, type ApprovePageProps } from './screens/approve.tsx';

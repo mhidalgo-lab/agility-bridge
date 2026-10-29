@@ -4,7 +4,13 @@
 // record or a secret: pages get a `UiPrincipal` (what they show, plus the CSRF token their forms embed) and change things
 // only through `callAdmin`, which runs the admin API's own app in-process with the caller's session. Web-standard only
 // (ADR-0004).
-import type { AdminCall, AdminCallResult, AdminUiDeps, UiPrincipal } from '@agility-bridge/admin-ui';
+import type {
+  AdminCall,
+  AdminCallResult,
+  AdminUiDeps,
+  ApprovalsPort,
+  UiPrincipal,
+} from '@agility-bridge/admin-ui';
 import type { KvStore } from '@agility-bridge/storage';
 import type { Context } from 'hono';
 import { ADMIN_BASE } from './admin/api.ts';
@@ -39,6 +45,8 @@ export interface AdminUiWiring {
   readonly callApi?: (request: Request, c: Context) => Response | Promise<Response>;
   /** The configured sign-in providers, for the unbind page's select (P4-39). */
   readonly identityProviders?: AdminUiDeps['identityProviders'];
+  /** The write approval page (P7-02), when write tools are on and sign-in is configured. */
+  readonly approvals?: ApprovalsPort;
 }
 
 export function adminUiDeps(w: AdminUiWiring): AdminUiDeps {
@@ -73,6 +81,7 @@ export function adminUiDeps(w: AdminUiWiring): AdminUiDeps {
     publicOrigin: w.publicOrigin,
     clearSessionCookie: sessions.clearCookie,
     ...(w.identityProviders === undefined ? {} : { identityProviders: w.identityProviders }),
+    ...(w.approvals === undefined ? {} : { approvals: w.approvals }),
     ...(w.beforeAuth === undefined ? {} : { beforeAuth: w.beforeAuth }),
     onceStore: {
       put: (key, ttlSeconds) => w.kv.set(key, '1', { expiresAt: w.now() + ttlSeconds * 1000 }),

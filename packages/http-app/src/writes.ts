@@ -4,6 +4,7 @@
 // mutation (`AuditWriter.writeIntent`, L-109) and the multi round-trip state is sealed with a key derived from the master
 // key, so any isolate can verify what another one issued. Nothing is kept in module state (T21).
 
+import type { ApprovalsPort } from '@agility-bridge/admin-ui';
 import type { EffectiveAccess, Keyring } from '@agility-bridge/auth';
 import { KeyPurpose } from '@agility-bridge/auth';
 import {
@@ -15,12 +16,15 @@ import {
   type WriteRuntime,
 } from '@agility-bridge/core';
 import type { Storage } from '@agility-bridge/storage';
-import type { AuditWriter } from './audit.ts';
+import { type ApprovalPage, createApprovalPage } from './approval-page.ts';
+import type { AdminChange, AuditWriter } from './audit.ts';
 
 /** The host's write wiring: given to `createHttpApp` only when `AB_WRITE_TOOLS` is on. */
 export interface HttpWrites {
   /** The runtime for one request of a caller that has write tools. */
   runtimeFor(access: EffectiveAccess): Promise<WriteRuntime>;
+  /** The approval page's side of the panel (P7-02); absent when sign-in is not configured (no page channel then). */
+  readonly approvals?: ApprovalsPort;
 }
 
 export interface HttpWritesOptions {
@@ -28,6 +32,13 @@ export interface HttpWritesOptions {
   readonly audit: AuditWriter;
   readonly keyring: Keyring;
   readonly clock: Clock;
+  /**
+   * `AB_PUBLIC_URL`'s origin, **only** when the panel is on (sign-in configured): it turns on the out-of-band approval
+   * page (P7-02) for callers that cannot elicit. Without it such callers get `AB_WRITE_APPROVAL_UNAVAILABLE`.
+   */
+  readonly panelOrigin?: string;
+  /** Admin audit for the approval page's decisions. */
+  readonly auditAdmin?: (change: AdminChange) => Promise<void> | undefined;
 }
 
 const enc = new TextEncoder();
@@ -62,6 +73,16 @@ function row(record: WriteAuditRecord, access: EffectiveAccess) {
 
 export function createHttpWrites(options: HttpWritesOptions): HttpWrites {
   const ledger = new ApprovalLedger(options.storage.kv, options.clock);
+  const page: ApprovalPage | undefined =
+    options.panelOrigin === undefined
+      ? undefined
+      : createApprovalPage({
+          kv: options.storage.kv,
+          ledger,
+          clock: options.clock,
+          publicOrigin: options.panelOrigin,
+          ...(options.auditAdmin === undefined ? {} : { audit: options.auditAdmin }),
+        });
   let stateKey: Promise<Uint8Array> | undefined;
   const key = (): Promise<Uint8Array> =>
     (stateKey ??= options.keyring
@@ -73,6 +94,7 @@ export function createHttpWrites(options: HttpWritesOptions): HttpWrites {
         throw error;
       }));
   return {
+    ...(page === undefined ? {} : { approvals: page.port }),
     async runtimeFor(access) {
       const actor: WriteActor = {
         id: access.grant.userId ?? access.grant.id,
@@ -89,8 +111,10 @@ export function createHttpWrites(options: HttpWritesOptions): HttpWrites {
           await options.audit.writeIntent(row(record, access));
         },
       };
+      const channel = page?.channelFor(access);
       return {
         approval: 'required',
+        ...(channel === undefined ? {} : { page: channel }),
         tools: access.writeTools,
         actor,
         ledger,

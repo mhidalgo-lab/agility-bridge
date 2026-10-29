@@ -37,7 +37,7 @@ How to use it:
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
-| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-386 |
+| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382 |
@@ -1560,6 +1560,19 @@ like the question or close the block.
 Compare the plan's values with the target before asking (nothing to approve), and compare again after approval: if the item
 already holds the new values the call is an idempotent no-op; only a different value or a moved version is `AB_WRITE_CONFLICT`.
 *Applied in:* P7-01.
+
+**L-387 — Look an approval request up by the signed-in person, so another person's link has nothing to find.**
+Key the pending record by the session's own user id and read it with that id, instead of loading by the id in the link and
+comparing owners: the foreign, unknown, used and expired cases all become the same "not available" answer, and a forgotten
+check cannot leak or approve. Take the record atomically when answered (a double click approves once) and post back the
+change hash the page showed, so a page cannot approve a change it did not display.
+*Applied in:* P7-02, `approval-page.ts`.
+
+**L-388 — A hash of the change is not a scope: bind an out-of-band approval to the workspace too.**
+The change hash covers tool, actor, target and values; an approval recorded on a page outlives the request that asked, so it
+also carries the workspace it was given for and is checked on take. A decline is stored the same way, so the agent hears "no"
+instead of being asked again.
+*Applied in:* P7-02, `ledger.ts`.
 
 ## O. Caching, quotas and budgets
 

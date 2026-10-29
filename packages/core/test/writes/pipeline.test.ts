@@ -338,7 +338,7 @@ describe('the out-of-band grant (seam for P7-02): bound to the change, the actor
   async function grantFor(
     runtime: ReturnType<typeof makeRuntime>,
     status: string,
-    over: { actor?: string; expiresAt?: number; tool?: string } = {},
+    over: { actor?: string; expiresAt?: number; tool?: string; scope?: string } = {},
   ) {
     const m = canonicalize(
       {
@@ -354,6 +354,7 @@ describe('the out-of-band grant (seam for P7-02): bound to the change, the actor
       actor: over.actor ?? ACTOR.id,
       tool: over.tool ?? TEST_TOOL,
       expiresAt: over.expiresAt ?? systemClock.now() + 60_000,
+      scope: over.scope ?? writeContext(runtime).workspace.id,
     });
   }
 
@@ -408,6 +409,42 @@ describe('the out-of-band grant (seam for P7-02): bound to the change, the actor
       expect(error.code).toBe(ErrorCode.WriteApprovalUnavailable);
       expect(fake.sends).toHaveLength(0);
     }
+  });
+
+  it('does not apply an approval recorded for another workspace', async () => {
+    const fake = new FakeItems();
+    const runtime = makeRuntime();
+    await grantFor(runtime, 'Done', { scope: 'another-workspace' });
+    const error = await refused(run(makeTestWriteTool(fake), CONFIRMED, writeContext(runtime)));
+    expect(error.code).toBe(ErrorCode.WriteApprovalUnavailable);
+    expect(fake.sends).toHaveLength(0);
+  });
+
+  it('a denial recorded on the page refuses the repeated call once, as declined', async () => {
+    const fake = new FakeItems();
+    const runtime = makeRuntime();
+    const ctx = writeContext(runtime);
+    const tool = makeTestWriteTool(fake);
+    const m = canonicalize(
+      {
+        operation: 'update_status',
+        target: { assetType: 'Story', oid: 'Story:1', number: 'B-00001' },
+        changes: [{ field: 'Status', old: 'In Progress', new: 'Done' }],
+      },
+      { Story: ['Status'] },
+    );
+    const hash = await mutationHash(TEST_TOOL, ACTOR.id, m);
+    await runtime.ledger.deny({
+      hash,
+      actor: ACTOR.id,
+      tool: TEST_TOOL,
+      expiresAt: systemClock.now() + 60_000,
+      scope: ctx.workspace.id,
+    });
+    expect((await refused(run(tool, CONFIRMED, ctx))).code).toBe(ErrorCode.WriteApprovalDeclined);
+    // Used up: the next call asks again (no channel here).
+    expect((await refused(run(tool, CONFIRMED, ctx))).code).toBe(ErrorCode.WriteApprovalUnavailable);
+    expect(fake.sends).toHaveLength(0);
   });
 
   it('an approval at the page channel answers pending with the link', async () => {
