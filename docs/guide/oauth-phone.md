@@ -24,7 +24,7 @@ the first hour, and disconnecting and connecting again, were not part of that ru
    identifies itself with a client metadata document, nothing is registered by hand.
 3. Choose **Connect**. A browser window opens at your server.
 4. **Sign in** if you are not already (with Cloudflare Access, Access asks first). You come back to the same request.
-5. Check the **Connect an app** page (below) and choose **Allow**.
+5. Check the **Connect an app** page (below) and choose **Allow**. If the page offers **Also allow this app to ask for changes**, leave it unticked unless you want the app to propose changes to work items (each still needs your approval).
 6. The connector shows as connected. Enable it in a chat and ask "who am I in Agility?" (the `whoami` tool).
 
 ## The phone

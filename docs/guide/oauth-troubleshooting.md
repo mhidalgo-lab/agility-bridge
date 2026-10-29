@@ -90,6 +90,7 @@ On the consent page:
 | "You have no access to this workspace" | none | No live grant on it: ask an administrator ([access model](access-model.md)) |
 | "This form was already used" / "for another request" | `oauth.consent.refused` (`handle_used_or_expired`, `handle_mismatch`) | The page was sent twice, is old, or belongs to another connection: start again from the app |
 | The chosen access is not offered | `oauth.consent.refused` (`grant_not_offered`) | The access ended while the page was open: reload |
+| The app asked for changes but the page has no *allow changes* box, or write tools are missing after connecting | the server switch for writes, the workspace's *Allow writes*, the grant's tool list and whether the credential is personal; the `oauth.authorize` row's `scope` shows what was granted | Fix the layer an owner left off, then disconnect the app on My access and connect it again, ticking the box (a refresh never adds the scope) |
 | "Too many connected apps" | none | 25 is the limit: disconnect one on **My access** |
 | The app gets "access denied" | `oauth.authorize` denied (`user_denied`) | You chose **Deny** |
 | The app never shows a page | none | A request with `prompt=none` is never shown a page and is answered `login_required` or `consent_required`: the app must use a normal sign-in |

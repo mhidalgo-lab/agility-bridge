@@ -269,4 +269,21 @@
 - **Context:** The 2026-07-28 round entry and sealed state carried the actor and the hash only, so the THREAT_MODEL sentence "an approval never applies in another workspace" held for page grants (D-165) but not for elicitation rounds. The limiter was optional in the runtime type, and a refused deployment check had already spent the grant's unit, against D-170.
 - **Options:** (a) the sealed state carries the workspace and instance ids and the ledger round entry the workspace (`takeRound(nonce, scope)`); both are checked before the round counts; the type requires `limiter`; the limiter reads the deployment counter (a plain read) before taking the grant's unit, so a full deployment refuses without spending anything (two calls racing past that read can still leave one unit spent); (b) put both ids in the change hash (changes the hash); (c) a decrement on the counter store (storage change).
 - **Recommendation:** (a), built. The extra read is one query per write.
+
+### D-201 — `mcp:write` is advertised per deployment, not per workspace *(P7-24)*
+- **Context:** The protected-resource document is public and the same for every slug of valid syntax, so that it cannot be used to probe which workspaces exist (D-64, T19). "Advertise `mcp:write` only where writes can be enabled" could mean per workspace.
+- **Options:** (a) advertise it (protected-resource and authorization-server `scopes_supported`) exactly when the server switch `AB_WRITE_TOOLS` is on; whether a workspace and grant can write is decided at consent, where the person is signed in; (b) per workspace, which would tell an anonymous caller which workspaces allow writes; (c) always.
+- **Recommendation:** (a), built. The challenge's `scope` stays `mcp:read`, the least a client needs.
+- **Owner:** *(open; built as (a))*
+
+### D-202 — The write scope is asked at connection time; a read connection is not upgraded in place *(P7-24)*
+- **Context:** A refresh must not widen a token, and a consent that is never remembered means each grant of write is a new, visible decision.
+- **Options:** (a) the app requests `mcp:write` in the authorization request; a person who connected read-only disconnects and connects again to add it; a refresh that names it is refused before the token is spent; (b) an in-place upgrade (step-up authorization with `insufficient_scope`), which needs a client that handles it and a consent flow bound to an existing device; (c) a separate device per scope.
+- **Recommendation:** (a), built. Step-up (b) is the natural later improvement once real clients are known (P7-10).
+- **Owner:** *(open; built as (a))*
+
+### D-203 — A write tick that cannot be honoured is refused, not dropped *(P7-24)*
+- **Context:** The person ticks *allow changes* but the app did not ask, the switch is off, or the chosen access cannot write (a shared credential, a workspace that turned writes off while the page was open).
+- **Options:** (a) refuse the approval (`write_unavailable`, no code, the page re-renders with a message), never issue a read-only token the person did not expect; (b) issue a read-only token silently; (c) ignore the tick but show a notice after.
+- **Recommendation:** (a), built. A forged tick for an app that did not ask is ignored by the consent screen (never granted).
 - **Owner:** *(open; built as (a))*

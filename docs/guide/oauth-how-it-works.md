@@ -21,6 +21,16 @@
 
 Each step has its own failure and its own audit row: [troubleshooting](oauth-troubleshooting.md).
 
+## Changes (the `mcp:write` scope)
+
+By default an app connected by OAuth can only **read**. An app that wants to change work items asks for the `mcp:write` scope
+too, and then the consent page shows a separate box, **Also allow this app to ask for changes**, which is **never ticked for
+you** and is asked again at every connection (nothing is remembered). The box appears only if the server owner turned writes
+on and the access you chose can write: its workspace allows writes, its grant names a write tool and it uses your own Agility
+credential. Ticked, the app still cannot change anything without your approval of each change ([write tools](write-tools.md)).
+A refresh never adds the scope: to give a read-only app changes later, disconnect it on **My access** and connect it again.
+Disconnecting removes both reading and changing at once.
+
 ## The short version
 
 An app (claude.ai, Claude on a phone, an IDE) that connects by OAuth does not hold your Agility token or a long-lived

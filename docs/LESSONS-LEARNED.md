@@ -33,7 +33,7 @@ How to use it:
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280, L-304, L-316 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271 |
-| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267, L-345 |
+| [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267, L-345, L-409, L-410 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
@@ -1229,6 +1229,20 @@ unreadable must not read as "idle for ever": a missing row means "start counting
 disconnects everyone at once. Test the decision by moving the stored time, which works on every host, rather than the clock, which
 does not in workerd.
 *Applied in:* P5-14, `server.ts` (`touchDevice`, `checkIssuance`), `suite.ts` (`defineDeviceActivitySuite`).
+
+**L-409 — Do not trust the provider to refuse a scope widening, and refuse before the token is spent.**
+The OAuth provider answered a refresh that asked for `mcp:write` on a read-only authorization with `200` and the narrower scope.
+That never widened anything, but the client got no error, the token was spent, and a check placed after the provider ran (where a
+replayed successor is looked at) never saw the request. A privilege scope that a refresh must not add is refused in front of the
+spend, from the grant's stored scope, so the client keeps its refresh token, and the outcome (no write tool) is what the test pins.
+*Applied in:* P7-24, `server.ts` (`refreshGrant`), `suite.ts` (`defineOAuthWriteScopeSuite`).
+
+**L-410 — A consent choice that cannot be honoured is refused, never downgraded, and its absence from the page is the default.**
+The write box is shown only when the app asked, the server allows writes and the chosen access can write, and is never ticked on
+load or on a re-render. A tick that arrives anyway for something that cannot be granted (a workspace that turned writes off while
+the page was open, a forged field) must not turn into a quietly read-only token the person did not expect: the consent screen
+ignores a tick for an app that did not ask, and `approve()` refuses the rest (`write_unavailable`, nothing issued).
+*Applied in:* P7-24, `consent.ts`, `server.ts` (`approve`), `consent.test.ts`.
 
 ## K. Admin UI
 

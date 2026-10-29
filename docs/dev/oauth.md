@@ -72,7 +72,8 @@ Tests scan `kv`, audit rows, logs and a SQLite file copy for codes, tokens and v
   shape. Every failure is the one `401`. The access cache (keyed by token hash and slug, never past the token's expiry)
   is cleared on RFC 7009 revocation.
 - Discovery (P5-02): `GET /.well-known/oauth-protected-resource/w/{slug}/mcp` answers `{resource, authorization_servers:
-  [issuer], scopes_supported: ["mcp:read"], bearer_methods_supported: ["header"]}` for **every** slug of valid syntax:
+  [issuer], scopes_supported: ["mcp:read"] (plus "mcp:write" when the server switch for writes is on, D-201),
+  bearer_methods_supported: ["header"]}` for **every** slug of valid syntax:
   known, unknown or disabled look the same, because the MCP route's `401` already is one answer and the document must not
   turn into a workspace probe (T19, D-64). An invalid slug, the root document and every other method are the app's `404`.
   The `401` challenge of `/w/{slug}/mcp` with OAuth on is a function of the slug's syntax only (`Bearer realm="agility-bridge",
@@ -118,7 +119,27 @@ refresh(R) ─▶ tombstone of the device?  yes ▶ invalid_grant (and revoke ag
   nothing that opens it (D-70, L-255). It is deleted by expiry after the window; markers expire after the refresh lifetime.
 - Settings: `AB_OAUTH_REFRESH_REUSE_WINDOW` (`refreshReuseWindowSeconds`, 0-120, not above the access lifetime).
 
-- No write scope yet: tokens carry `mcp:read` (+ `offline_access`); the `oauth` principal's `writeScope` is false.
+## The `mcp:write` scope (P7-24, ADR-0013)
+
+- Tokens carry `mcp:read`, optionally `mcp:write`, optionally `offline_access`. `mcp:write` is *requested* by the client
+  (kept in the request only when `AB_WRITE_TOOLS` is on), *given* only by the person at consent, and *used* only through
+  `resolveAccess`: `authenticate` passes `writeScope = token.scope includes mcp:write`, so a token without it never lists or runs
+  a write tool, with or without a workspace that allows writes. The workspace, grant, personal-credential and server-switch
+  layers still apply; the scope is one more, not a replacement.
+- Consent: `grants()` also resolves each access as a token holding the scope would see it (`writeTools`); the page shows a
+  separate unticked *allow changes* box only when the app asked, and only if some access can write. The tick is a field of
+  the post, not of the single-use handle's binding, is never carried to a second render and is not remembered between
+  requests (every authorization shows the page, D-66). `approve({ write: true })` re-resolves with the scope and refuses with
+  `write_unavailable` (nothing issued) when the app did not ask, the server switch is off or the chosen access cannot write:
+  a request the person made is refused, never silently downgraded. The `oauth.authorize` row carries the granted scope.
+- Refresh: the provider keeps the grant's scope and can only narrow it. A refresh that names `mcp:write` on an authorization
+  that lacks it is refused (`invalid_scope`) before the token is spent; the access decision at a refresh passes the scope the
+  successor carries, so write enablement is re-decided on every issuance and a recoverable refusal (P5-21) keeps the device
+  exactly as for a read token.
+- Revocation, disconnect, a revoked client and a workspace that turns writes off all act on the next request: the scope is
+  inert without the other layers (T15, T31).
+- Not built: a `mcp:write` hint in the `WWW-Authenticate` challenge (it names `mcp:read`, the least a client needs), showing the
+  scope on *My access* (P7-32), upgrading a read connection in place (D-202).
 
 ## Sign-in and consent (P5-04)
 

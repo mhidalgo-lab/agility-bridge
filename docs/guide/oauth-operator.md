@@ -17,6 +17,9 @@
 3. **A workspace and a grant** for each person ([access model](access-model.md)). An app gets exactly one access the
    person already has, never more. Check the workspace's **projects**: an item outside the project tree answers "not
    found" ([L-263](oauth-troubleshooting.md#not-found-on-an-item-that-exists)).
+   Writes over OAuth need more: `AB_WRITE_TOOLS=on`, the workspace's *Allow writes* and the grant's tool list naming a write
+   tool, a personal credential, and the person ticking the separate *allow changes* box on the consent page
+   ([write tools](write-tools.md), [how it works](oauth-how-it-works.md#changes-the-mcpwrite-scope)).
 4. **If a proxy or Cloudflare Access sits in front**, leave `/w/*`, `/oauth/*` and `/.well-known/*` outside it. Apps cannot
    pass an Access login page. Only the sign-in paths belong in an Access application.
 5. **On Node behind a reverse proxy, set `AB_TRUSTED_PROXY_HOPS`** ([configuration](configuration.md)). The OAuth limits are
