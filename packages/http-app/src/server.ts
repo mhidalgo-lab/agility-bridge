@@ -19,6 +19,7 @@ import {
 import {
   CORE_TOOLS,
   DEFAULT_LIMITS,
+  DEFAULT_WRITE_RATE_LIMITS,
   type FetchLike,
   type Logger,
   type LogLevel,
@@ -78,6 +79,8 @@ export const SERVER_SETTING_NAMES: readonly string[] = Object.freeze([
   'AB_CREDENTIAL_REVALIDATION_HOURS',
   'AB_PASSTHROUGH',
   'AB_WRITE_TOOLS',
+  'AB_WRITE_RATE_PER_GRANT_HOURLY',
+  'AB_WRITE_RATE_DEPLOYMENT_HOURLY',
   'AB_ALLOW_HTTP_INSTANCES',
   ...IDENTITY_SETTING_NAMES,
   ...OAUTH_SETTING_NAMES,
@@ -111,6 +114,8 @@ export interface ServerSettings {
   readonly allowHttpInstances: boolean;
   /** `AB_WRITE_TOOLS=on` (P7-01, ADR-0013): write tools may be offered; every other layer still has to enable them. */
   readonly writeTools: boolean;
+  /** Writes an hour per grant and per deployment (P7-03, D-169); the counters are shared in `kv`, so they hold across isolates. */
+  readonly writeRates: { readonly perGrant: number; readonly deployment: number };
   /** Sign-in providers and the login policy (P4-01); absent = no `/auth` routes. */
   readonly identity?: IdentitySettings;
   /** Admin session timeouts, cap and logout behaviour (P4-02); only used with sign-in. */
@@ -284,6 +289,22 @@ export function parseServerSettings(
     passthrough: onOff('AB_PASSTHROUGH', env['AB_PASSTHROUGH'], false),
     allowHttpInstances: onOff('AB_ALLOW_HTTP_INSTANCES', env['AB_ALLOW_HTTP_INSTANCES'], false),
     writeTools: onOff('AB_WRITE_TOOLS', env['AB_WRITE_TOOLS'], false),
+    writeRates: {
+      perGrant: int(
+        'AB_WRITE_RATE_PER_GRANT_HOURLY',
+        env['AB_WRITE_RATE_PER_GRANT_HOURLY'],
+        DEFAULT_WRITE_RATE_LIMITS.perGrant,
+        1,
+        1_000,
+      ),
+      deployment: int(
+        'AB_WRITE_RATE_DEPLOYMENT_HOURLY',
+        env['AB_WRITE_RATE_DEPLOYMENT_HOURLY'],
+        DEFAULT_WRITE_RATE_LIMITS.deployment ?? 200,
+        1,
+        10_000,
+      ),
+    },
     ...(identity === null ? {} : { identity }),
     ...(oauth === null ? {} : { oauth }),
     session: parseSessionSettings(env),
@@ -474,6 +495,8 @@ export function assembleServer(parts: ServerParts): AssembledServer {
                   panelOrigin: new URL(settings.identity.publicUrl).origin,
                   auditAdmin: (change: AdminChange) => audit.admin(change),
                 }),
+            limits: { perGrant: settings.writeRates.perGrant, deployment: settings.writeRates.deployment },
+            logger,
           }),
         }
       : {}),

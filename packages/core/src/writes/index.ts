@@ -4,6 +4,15 @@ export { APPROVAL_SCHEMA, renderApproval, shortId } from './approval.ts';
 export { APPROVAL_INPUT_KEY, elicitationChannel, supportsFormElicitation } from './elicitation.ts';
 export { ApprovalLedger, type LedgerEntry, type LedgerStore, memoryLedgerStore } from './ledger.ts';
 export {
+  type CounterStore,
+  createWriteLimiter,
+  DEFAULT_WRITE_RATE_LIMITS,
+  memoryCounterStore,
+  WRITE_LIMIT_WINDOW_MS,
+  type WriteLimiterOptions,
+  type WriteRateLimits,
+} from './limiter.ts';
+export {
   type CanonicalMutation,
   canonicalize,
   type FieldAllowlist,

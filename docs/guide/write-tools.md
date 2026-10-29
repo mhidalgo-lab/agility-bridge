@@ -104,8 +104,18 @@ customer text); the hash lets you match a row to what was approved. Intent and o
 
 ## Limits
 
-The write rate (default 20 an hour per grant, deployment-wide) is P7-03; the pipeline already calls its seam after the
-approval and before the re-read. Until then the only brakes are approval and the per-call budget.
+Every write takes one unit from two counters after the approval and before the re-read: the **grant's** (default 20 an
+hour, `AB_WRITE_RATE_PER_GRANT_HOURLY`) and the **deployment's** (default 200 an hour, `AB_WRITE_RATE_DEPLOYMENT_HOURLY`).
+The counters are fixed hourly windows in the shared `kv` table, so they hold across Workers isolates and Node replicas
+(stdio counts in its own process and has no deployment limit). The write limit cannot be switched off, and it **fails
+closed**: if the counters cannot be reached the write is refused (`AB_WRITE_LIMIT_UNAVAILABLE`), never allowed.
+
+- Over a limit: `AB_LIMIT_RATE` with the scope (`grant` or `deployment`), the limit and the seconds until the next hour.
+  The refusal makes no read of the target and no send, and writes no intent audit row.
+- A unit is spent when the limiter runs and is not refunded: an approved write that turns out to be a conflict, an
+  already-applied no-op or a failed send still counts. A declined or unavailable approval counts nothing.
+- A window is a clock hour, so a burst across a boundary can reach twice the limit; an exact sliding window needs the
+  optional Durable Object limiter (P3-12). The decisions are D-168 to D-171.
 
 ## Errors
 
@@ -118,6 +128,8 @@ approval and before the re-read. Until then the only brakes are approval and the
 | `AB_WRITE_APPROVAL_DECLINED` | the person said no | ask what to change |
 | `AB_WRITE_CONFLICT` | the target changed since the plan | read, plan again, ask again |
 | `AB_WRITE_AUDIT_UNAVAILABLE` | the intent could not be stored, nothing was changed | try later; tell the administrator |
+| `AB_LIMIT_RATE` | the grant or the deployment used its write limit for this hour; nothing was changed | wait for the next hour; do not loop |
+| `AB_WRITE_LIMIT_UNAVAILABLE` | the limiter could not count, so nothing was changed | try later; tell the administrator |
 | `AB_AGILITY_*` | Agility refused or failed; the change may or may not have been applied | look at the item before repeating |
 
 All of them are tool errors (`isError: true`), never a successful result with `applied: false`.

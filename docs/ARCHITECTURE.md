@@ -402,8 +402,10 @@ validate input + metadata (operation allowed, attributes writable, values typed)
 
 Built in P7-01 (`packages/core/src/writes/`, [write tools guide](guide/write-tools.md)): `defineWriteTool` is the only way to make a
 `write` or `destructive` tool (the registry refuses any other) and runs this pipeline; a host supplies a `WriteRuntime` in the
-`ToolContext` (ledger, audit sink, actor, approval mode, state key, and the seams for the write limiter, P7-03, and the approval
-page, P7-02). The server wrapper builds the request's approval channel from its declared capabilities and turns the pipeline's
+`ToolContext` (ledger, audit sink, actor, approval mode, state key, the write limiter and the approval page, P7-02). The write
+limiter (P7-03, `writes/limiter.ts`) runs after the approval and before the re-read: one unit from the grant's counter
+and one from the deployment's, fixed hourly windows in the storage `kv` table (shared by every isolate; process memory
+in stdio), grant first; a store that fails or answers anything but a count refuses the write (`AB_WRITE_LIMIT_UNAVAILABLE`). The server wrapper builds the request's approval channel from its declared capabilities and turns the pipeline's
 `InputRequiredSignal` into a 2026-07-28 `input_required` result.
 
 ## 7. Cross-cutting concerns
@@ -444,6 +446,7 @@ page, P7-02). The server wrapper builds the request's approval channel from its 
 | `AB_WRITE_APPROVAL_DECLINED` | The user declined or did not answer |
 | `AB_WRITE_CONFLICT` | The target changed between plan and apply |
 | `AB_WRITE_AUDIT_UNAVAILABLE` | The intent of a write could not be recorded, so nothing was changed (L-109) |
+| `AB_WRITE_LIMIT_UNAVAILABLE` | The write limiter could not count (its store failed), so nothing was changed; writes fail closed (L-080) |
 | `AB_INTERNAL` | Unexpected error (reference id only) |
 
 - **Observability**: structured JSON logs to stderr (redacted); audit log in remote modes; optional OpenTelemetry

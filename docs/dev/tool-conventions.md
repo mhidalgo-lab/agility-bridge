@@ -195,6 +195,7 @@ described in [Output formats](../guide/output-formats.md).
 | `AB_WRITE_APPROVAL_DECLINED` | The user declined or did not answer |
 | `AB_WRITE_CONFLICT` | The target changed between plan and apply |
 | `AB_WRITE_AUDIT_UNAVAILABLE` | The intent of a write could not be recorded, so nothing was changed (L-109) |
+| `AB_WRITE_LIMIT_UNAVAILABLE` | The write limiter could not count (its store failed), so nothing was changed; writes fail closed (L-080) |
 | `AB_INTERNAL` | Unexpected exception (with a reference id) |
 
 Adding a code is an additive change; renaming or removing one follows [Deprecations](#deprecations).

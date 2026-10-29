@@ -10,9 +10,13 @@ import { KeyPurpose } from '@agility-bridge/auth';
 import {
   ApprovalLedger,
   type Clock,
+  createWriteLimiter,
+  type Logger,
   type WriteActor,
   type WriteAuditRecord,
   type WriteAuditSink,
+  type WriteLimiter,
+  type WriteRateLimits,
   type WriteRuntime,
 } from '@agility-bridge/core';
 import type { Storage } from '@agility-bridge/storage';
@@ -39,6 +43,9 @@ export interface HttpWritesOptions {
   readonly panelOrigin?: string;
   /** Admin audit for the approval page's decisions. */
   readonly auditAdmin?: (change: AdminChange) => Promise<void> | undefined;
+  /** Writes an hour per grant and deployment-wide (P7-03). */
+  readonly limits?: WriteRateLimits;
+  readonly logger?: Logger;
 }
 
 const enc = new TextEncoder();
@@ -83,6 +90,16 @@ export function createHttpWrites(options: HttpWritesOptions): HttpWrites {
           publicOrigin: options.panelOrigin,
           ...(options.auditAdmin === undefined ? {} : { audit: options.auditAdmin }),
         });
+  // The limiter counts in the shared `kv` table (every isolate sees one count) and fails closed (L-080, L-111).
+  const limiter: WriteLimiter = createWriteLimiter({
+    counters: options.storage.kv,
+    clock: options.clock,
+    ...(options.limits === undefined ? {} : { limits: options.limits }),
+    onError: (error) =>
+      options.logger?.error('write limiter failed; the write is refused', {
+        error: error instanceof Error ? error.name : 'unknown',
+      }),
+  });
   let stateKey: Promise<Uint8Array> | undefined;
   const key = (): Promise<Uint8Array> =>
     (stateKey ??= options.keyring
@@ -120,6 +137,7 @@ export function createHttpWrites(options: HttpWritesOptions): HttpWrites {
         ledger,
         audit,
         stateKey: await key(),
+        limiter,
       };
     },
   };

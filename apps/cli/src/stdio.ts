@@ -10,12 +10,14 @@ import {
   CredentialLimiters,
   createBudget,
   createLogger,
+  createWriteLimiter,
   DEFAULT_LIMITS,
   deprecatedEnv,
   ErrorCode,
   type FetchLike,
   type Logger,
   MetadataService,
+  memoryCounterStore,
   memoryLedgerStore,
   Secret,
   type SelectOptions,
@@ -136,6 +138,13 @@ function stdioWrites(config: StdioConfig, logger: Logger, tools: readonly string
     ledger: new ApprovalLedger(memoryLedgerStore(systemClock), systemClock),
     audit,
     stateKey: webCryptoRandom.bytes(32),
+    // One process, one actor: the grant limit is the process limit and nothing is shared (fails closed like the rest).
+    limiter: createWriteLimiter({
+      counters: memoryCounterStore(systemClock),
+      clock: systemClock,
+      limits: { perGrant: config.writeRatePerHour, deployment: null },
+      onError: () => logger.error('write limiter failed; the write is refused'),
+    }),
   };
 }
 
