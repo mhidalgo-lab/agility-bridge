@@ -115,11 +115,13 @@ describe.skipIf(!target)('history tools against the live tenant (read-only)', ()
     timeout: 120_000,
   }, async () => {
     expect(recent.assets.length > 0, 'recently changed assets from the previous check').toBe(true);
-    const fields = ['Name', 'Status.Name', 'Estimate'];
+    // Epics (in list_recent_changes since P6-22) carry their estimate as Swag; backlog items as Estimate.
+    const fieldsOf = (type: string) => ['Name', 'Status.Name', type === 'Epic' ? 'Swag' : 'Estimate'];
     let compared = 0;
     const mismatches: string[] = [];
     // One asset at a time, each with its own request budget.
     for (const { oid, type } of recent.assets) {
+      const fields = fieldsOf(type);
       const { structured, used, cost } = await run('get_asset_history', {
         asset: oid,
         time_range: 'last 365 days',
