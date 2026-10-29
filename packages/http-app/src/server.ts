@@ -488,7 +488,6 @@ export function assembleServer(parts: ServerParts): AssembledServer {
             audit,
             keyring,
             clock: host.clock,
-<<<<<<< HEAD
             // The approval page lives in the signed-in panel: only offered where sign-in is configured (P7-02).
             ...(settings.identity === undefined
               ? {}
@@ -496,10 +495,8 @@ export function assembleServer(parts: ServerParts): AssembledServer {
                   panelOrigin: new URL(settings.identity.publicUrl).origin,
                   auditAdmin: (change: AdminChange) => audit.admin(change),
                 }),
-=======
             limits: { perGrant: settings.writeRates.perGrant, deployment: settings.writeRates.deployment },
             logger,
->>>>>>> 712fa97 (feat(core): deployment-wide write limiter over shared counters, fail closed (P7-03))
           }),
         }
       : {}),
