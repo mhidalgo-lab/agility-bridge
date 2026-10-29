@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // move_to_sprint (P7-04): puts one backlog item or defect into a sprint (`Timebox`). The sprint is resolved through the
 // sprint resolver limited to the item's own Agility project (its schedule must be scheduled for that project), and a
-// closed sprint is refused. The mutation shows the sprint before and after as `Name [Timebox:id]`.
+// closed sprint is refused. The mutation shows the sprint before and after as `Name [Timebox:id]`. `to_backlog` takes the
+// item out of its sprint instead (P7-17): the new value is `null`, sent as a `Timebox` relation set with no child (*unverified*
+// until P7-07).
 import { z } from 'zod';
 import { AbError, ErrorCode } from '../../errors.ts';
 import { resolveSprint, runQuery } from '../../identity/resolve.ts';
@@ -31,7 +33,7 @@ const COST = 14;
 export const moveToSprint: ToolDefinition = defineWriteTool({
   name: 'move_to_sprint',
   title: 'Move to sprint',
-  description: `Move one backlog item or defect into a sprint of its own Agility project, by sprint name, OID token or current, previous or next. A closed sprint is refused. Not paged. Cold call: up to ${COST} Agility requests.`,
+  description: `Move one backlog item or defect into a sprint of its own Agility project, by sprint name, OID token or current, previous or next, or (to_backlog) out of its sprint. A closed sprint is refused. Give sprint or to_backlog, not both. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
   overwrites: true,
   // Resolution, the item read, the sprint (a relative name takes two requests), its state, the re-read and the write.
@@ -39,13 +41,45 @@ export const moveToSprint: ToolDefinition = defineWriteTool({
   idempotent: true,
   inputSchema: z.object({
     asset: assetArg,
-    sprint: z.string().min(1).max(200).describe('Sprint: name, Timebox:<id>, or current, previous or next.'),
+    sprint: z
+      .string()
+      .min(1)
+      .max(200)
+      .optional()
+      .describe('Sprint: name, Timebox:<id>, or current, previous or next.'),
+    to_backlog: z
+      .boolean()
+      .optional()
+      .describe('true takes the item out of its sprint, back to the backlog. Instead of sprint.'),
   }),
   allowedFields: Object.fromEntries(TYPES.map((t) => [t, ['Timebox']])),
   async plan(input, ctx) {
+    const toBacklog = input.to_backlog === true;
+    if (toBacklog === (input.sprint !== undefined)) {
+      throw invalid(
+        toBacklog ? 'Give sprint or to_backlog, not both.' : 'Give a sprint, or to_backlog: true.',
+        'to_backlog: true takes the item out of its sprint; sprint puts it into one.',
+      );
+    }
     assertTypeAllowed(ctx, 'Timebox');
     const target = await planTarget(ctx, input.asset, { types: TYPES, fields: FIELDS });
     await requireWritable(ctx, target.assetType, 'Timebox', { relation: true, multi: false });
+    const mutationFor = (to: string | null) => ({
+      operation: 'move_to_sprint',
+      target: {
+        assetType: target.assetType,
+        oid: target.oid,
+        ...(target.number === undefined ? {} : { number: target.number }),
+      },
+      changes: [{ field: 'Timebox', old: labelFrom(target.row, 'Timebox'), new: to }],
+    });
+    if (input.sprint === undefined) {
+      return {
+        mutation: mutationFor(null),
+        ...(target.version === undefined ? {} : { version: target.version }),
+        ...(target.name === undefined ? {} : { label: target.name }),
+      };
+    }
     const project = oidsOf(target.row['Scope'])[0];
     if (project === undefined) throw invalid(`${target.number ?? target.oid} has no Agility project.`);
     const sprint = await resolveSprint(ctx, input.sprint, { project });
@@ -55,17 +89,7 @@ export const moveToSprint: ToolDefinition = defineWriteTool({
       throw invalid(`The sprint "${sprint.name.slice(0, 80)}" is closed.`, 'Choose an open sprint.');
     }
     return {
-      mutation: {
-        operation: 'move_to_sprint',
-        target: {
-          assetType: target.assetType,
-          oid: target.oid,
-          ...(target.number === undefined ? {} : { number: target.number }),
-        },
-        changes: [
-          { field: 'Timebox', old: labelFrom(target.row, 'Timebox'), new: labelOf(sprint.name, sprint.oid) },
-        ],
-      },
+      mutation: mutationFor(labelOf(sprint.name, sprint.oid)),
       ...(target.version === undefined ? {} : { version: target.version }),
       ...(target.name === undefined ? {} : { label: target.name }),
     };
@@ -80,11 +104,12 @@ export const moveToSprint: ToolDefinition = defineWriteTool({
   },
   async send(plan, ctx) {
     const change = plan.mutation.changes[0];
-    if (change === undefined || typeof change.new !== 'string') {
+    if (change === undefined || (change.new !== null && typeof change.new !== 'string')) {
       throw new AbError(ErrorCode.Internal, 'move_to_sprint lost its change.');
     }
+    // `null` takes the item out of its sprint: the relation is set to nothing.
     return postAsset(ctx, plan.mutation.target.assetType, idOf(plan.mutation.target.oid), [
-      { relation: 'Timebox', act: 'set', oids: [oidOfLabel(change.new)] },
+      { relation: 'Timebox', act: 'set', oids: change.new === null ? [] : [oidOfLabel(change.new)] },
     ]);
   },
 });

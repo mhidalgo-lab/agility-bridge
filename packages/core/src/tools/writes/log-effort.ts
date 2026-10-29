@@ -2,7 +2,8 @@
 // log_effort (P7-04): logs hours worked by the caller on one work item as an `Actual` (RESEARCH 1.5, unverified until
 // P7-07). The mutation shows the item's logged total before and after, the date and the member. An identical entry
 // (same item, member, date and hours) created in the last 10 minutes makes the call a no-op, so a retried call never
-// doubles the hours; an older identical entry does not (D-194). A date left out is the UTC day (D-194).
+// doubles the hours; an older identical entry does not (D-194). A date left out is the UTC day (D-194). `member` logs for
+// someone else (P7-17, D-236): only an owner of the item, shown in the approval as `Actual.Member`.
 import { z } from 'zod';
 import { AbError, ErrorCode } from '../../errors.ts';
 import { resolveMember, runQuery } from '../../identity/resolve.ts';
@@ -12,9 +13,10 @@ import { compileQuery } from '../../query/compiler.ts';
 import { invalid } from '../../query/limits.ts';
 import type { ToolDefinition } from '../../tool.ts';
 import { defineWriteTool } from '../../writes/index.ts';
-import { assetArg, num, text as textOf } from '../common.ts';
+import { assetArg, memberArg, num, text as textOf } from '../common.ts';
 import {
   assertTypeAllowed,
+  conflict,
   labelOf,
   oidOfLabel,
   planTarget,
@@ -26,6 +28,7 @@ import {
 
 const TYPES = ['Story', 'Defect', 'Task', 'Test'] as const;
 const TOTAL = 'Actuals.Value.@Sum';
+const OWNERS = ['Owners'];
 const DAY = 86_400_000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const COST = 14;
@@ -93,7 +96,7 @@ async function sameEntryExists(
 export const logEffort: ToolDefinition = defineWriteTool({
   name: 'log_effort',
   title: 'Log effort',
-  description: `Log hours you worked on one backlog item, defect, task or test, on a date (UTC, today when omitted), as an effort entry for yourself. Not paged. Cold call: up to ${COST} Agility requests.`,
+  description: `Log hours worked on one backlog item, defect, task or test, on a date (UTC, today when omitted), as an effort entry for yourself, or (member) for another member who is an owner of that item. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
   // Resolution, the item with its total, member, existing entries, the re-read (2) and the one write; metadata cold.
   cost: COST,
@@ -102,6 +105,7 @@ export const logEffort: ToolDefinition = defineWriteTool({
     asset: assetArg,
     hours: z.number().min(0.01).max(MAX_HOURS).describe('Hours worked, at most 24 and two decimals.'),
     date: z.string().min(10).max(10).optional().describe('Day worked, YYYY-MM-DD (UTC); today when omitted.'),
+    member: memberArg,
   }),
   allowedFields: Object.fromEntries(TYPES.map((t) => [t, ['Actual.Date', 'Actual.Member', 'Actual.Value']])),
   async plan(input, ctx) {
@@ -109,7 +113,7 @@ export const logEffort: ToolDefinition = defineWriteTool({
     if (hours < 0.01) throw invalid('Hours must be at least 0.01.');
     const date = effortDate(input.date, ctx.clock.now(), ctx.limits.maxTimeRangeDays);
     assertTypeAllowed(ctx, 'Actual');
-    const target = await planTarget(ctx, input.asset, { types: TYPES, fields: [TOTAL] });
+    const target = await planTarget(ctx, input.asset, { types: TYPES, fields: [TOTAL, ...OWNERS] });
     const actual = await metadataFor(ctx).assetType('Actual');
     for (const attribute of ['Value', 'Date', 'Member', 'Workitem']) {
       if (actual.attributes.get(attribute)?.readOnly !== false) {
@@ -117,9 +121,17 @@ export const logEffort: ToolDefinition = defineWriteTool({
       }
     }
     const me = await resolveMember(ctx, 'me');
+    const who = input.member === undefined ? me : await resolveMember(ctx, input.member);
+    // Logging for someone else is allowed only for an owner of the item (D-236): refused before any approval.
+    if (who.oid !== me.oid && !oidsOf(target.row['Owners']).includes(who.oid)) {
+      throw invalid(
+        `${who.name.slice(0, 80)} is not an owner of ${target.number ?? target.oid}, so effort cannot be logged for them.`,
+        'Add them as an owner first (assign_owners), or log your own effort.',
+      );
+    }
     const total = totalOf(target);
-    const duplicate = await sameEntryExists(ctx, target.oid, me.oid, date, hours);
-    const member = labelOf(me.name, me.oid);
+    const duplicate = await sameEntryExists(ctx, target.oid, who.oid, date, hours);
+    const member = labelOf(textOf(who.row['Name']) ?? who.name, who.oid);
     return {
       mutation: {
         operation: 'log_effort',
@@ -146,7 +158,14 @@ export const logEffort: ToolDefinition = defineWriteTool({
   },
   async reread(plan, ctx) {
     const t = plan.mutation.target;
-    const now = await rereadTarget(ctx, t.assetType, t.oid, [TOTAL]);
+    const now = await rereadTarget(ctx, t.assetType, t.oid, [TOTAL, ...OWNERS]);
+    // Someone else's hours were allowed because they own the item (D-236): still true at the moment of the write?
+    const logged = plan.mutation.changes.find((c) => c.field === 'Actual.Member')?.new;
+    if (typeof logged === 'string') {
+      const who = oidOfLabel(logged);
+      const me = await resolveMember(ctx, 'me');
+      if (who !== me.oid && !oidsOf(now.row['Owners']).includes(who)) throw conflict(now.number ?? t.oid);
+    }
     // Date and member have no "current" value on the item: they stay at their old value (null) until written.
     return { values: { 'Actual.Date': null, 'Actual.Member': null, 'Actual.Value': totalOf(now) } };
   },

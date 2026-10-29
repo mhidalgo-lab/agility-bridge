@@ -375,6 +375,10 @@ goes through sign-in again and back, approve once and then nothing; CSP, console
 baseline that starts at a pending approval link with the owner's session. The synthetic Agility serves no write endpoint, so
 those suites stop at the recorded approval.
 
+## 8g-2. Status after P7-17 (2026-10-29)
+
+Wave-1 extensions add arguments to existing tools, not tools: `move_to_sprint.to_backlog`, `log_effort.member` and `update_fields.todo`. A2: still one item, one request per call; effort for another member is accepted only for an owner of the item, checked at the plan and again at the re-read, and shown in the approval as `Actual.Member` (D-236); the to-do is one more field of one request, never a second write (D-237). A6 is unchanged: Agility's history still shows the token's member as the author of the entry. All new request shapes are *unverified* until the sandbox (P7-07).
+
 ## 8h. Status after P7-08 (2026-10-29)
 
 The write documentation ([guide](guide/write-tools.md), [client approval table](reference/client-compatibility.md#write-approval-channels-per-client))

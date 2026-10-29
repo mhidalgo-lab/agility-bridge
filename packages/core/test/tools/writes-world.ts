@@ -148,8 +148,9 @@ export function writeRig(
         row['Status'] = status?.['_oid'];
         row['Status.Name'] = status?.['Name'];
       } else if (name === 'Timebox' && act === 'set') {
-        row['Timebox'] = oids[0];
-        row['Timebox.Name'] = find(oids[0] as string)?.['Name'];
+        // An empty `set` takes the item out of its sprint (P7-17, unverified shape).
+        row['Timebox'] = oids[0] ?? null;
+        row['Timebox.Name'] = oids[0] === undefined ? null : find(oids[0])?.['Name'];
       } else if (name === 'Owners') {
         const now = new Set<string>(((row['Owners'] as string[] | undefined) ?? []).map(String));
         for (const o of oids) act === 'add' ? now.add(o) : now.delete(o);

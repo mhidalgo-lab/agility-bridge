@@ -14,12 +14,12 @@ import { assertTypeAllowed } from './common.ts';
 export const FIELD_TYPES = ['Story', 'Defect', 'Task', 'Test', 'Epic'] as const;
 export type FieldType = (typeof FIELD_TYPES)[number];
 
-/** The attributes `update_fields` may change, and `create_work_item` may set besides the container and the parent. */
+/** The attributes `update_fields` may change (`ToDo`, the remaining hours of a task or test, P7-17), and `create_work_item` may set besides the container and the parent. */
 export const FIELD_ALLOWLIST: Readonly<Record<FieldType, readonly string[]>> = Object.freeze({
   Story: ['Name', 'Description', 'Estimate', 'Priority'],
   Defect: ['Name', 'Description', 'Estimate', 'Priority'],
-  Task: ['Name', 'Description', 'DetailEstimate'],
-  Test: ['Name', 'Description', 'DetailEstimate'],
+  Task: ['Name', 'Description', 'DetailEstimate', 'ToDo'],
+  Test: ['Name', 'Description', 'DetailEstimate', 'ToDo'],
   Epic: ['Name', 'Description'],
 });
 

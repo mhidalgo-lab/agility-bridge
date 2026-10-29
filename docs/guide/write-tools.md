@@ -322,9 +322,9 @@ projects answers "not found"), and refuses a denied asset type before any reques
 |---|---|---|
 | `update_status` | `Status` of a Story, Defect, Task, Test or Epic | `new_status` is a name or OID from the item's own workflow (a status of another team, or an inactive one, is refused). It never closes the item. |
 | `add_comment` | creates a comment (an `Expression` that mentions the item) | At most 4,000 characters of plain text, shown whole in the approval; control, invisible and bidirectional characters are refused. The same text as your own comment from the last 10 minutes is a no-op (a retry); the same text later is a new comment. Allowed on closed items. |
-| `log_effort` | creates an effort entry (`Actual`) for **you** | `hours` (0.01 to 24) and `date` (UTC, not in the future, within the history limit). The mutation shows the item's logged total before and after. An identical entry (item, you, date, hours) created in the last 10 minutes is a no-op; later it is logged again. An omitted `date` is the UTC day, whatever your time zone. |
+| `log_effort` | creates an effort entry (`Actual`) for **you**, or for `member` | `hours` (0.01 to 24) and `date` (UTC, not in the future, within the history limit). Another `member` is accepted only when they are already an **owner of that item** (otherwise refused before anything is asked, [D-236](../pending-decisions/phase-7.md)); the approval names them as `Actual.Member`. The mutation shows the item's logged total before and after. An identical entry (item, you, date, hours) created in the last 10 minutes is a no-op; later it is logged again. An omitted `date` is the UTC day, whatever your time zone. |
 | `assign_owners` | `Owners` of a Story, Defect, Task, Test or Epic | `add` and `remove` (at most five members in all, resolved like `list_members`); only the difference is sent. |
-| `move_to_sprint` | `Timebox` of a Story or Defect | The sprint must belong to the item's own project schedule and be open. |
+| `move_to_sprint` | `Timebox` of a Story or Defect | The sprint must belong to the item's own project schedule and be open. `to_backlog: true` (instead of `sprint`) takes the item out of its sprint: the approval shows the sprint now and `null` after; an item in no sprint is a no-op. |
 
 `update_fields`, `update_status`, `move_to_sprint` and `assign_owners` replace or remove values, so they advertise `destructiveHint` (their kind stays `write`); `update_fields` refuses to replace a description that has links, images, lists, tables or styles (edit it in Agility). A closed, deleted or template item is refused (comments may still be added to a closed one). If the item disappears, closes
 or changes between the plan and the send, the call is `AB_WRITE_CONFLICT`. These request shapes are the documented ones and
@@ -351,7 +351,7 @@ operation names and what they cascade to are *unverified* until the sandbox run 
 | Tool | Changes | Notes |
 |---|---|---|
 | `create_work_item` | creates one Story, Defect, Task, Test or Epic | `item_type`, `name` (one line, at most 200 characters), `project` (or a `parent`), optional `description` (plain text, at most 4,000), `estimate` (story points; hours for a task or test; not for an epic) and `priority` (story and defect). A task or test needs a `parent` story or defect and is created in its project; a story, defect or epic may have an epic as `parent`. The approval shows every field of the new item. Repeating the same call (same title and parent, within 30 minutes) is refused and names the item that exists: read it with `get_work_item`. |
-| `update_fields` | `name`, `description`, `estimate` and `priority` of one open item | Old and new are shown for each field and only fields that differ are sent. A description replaces the old one and is plain text. Custom attributes, the project, status, owners, sprint, team and parent cannot be changed with it. |
+| `update_fields` | `name`, `description`, `estimate`, `priority` and, for a task or test, the remaining hours `todo` of one open item | Old and new are shown for each field and only fields that differ are sent. `todo` is a field here, not part of `log_effort`: it is one request and one approval, never a second write behind another ([D-237](../pending-decisions/phase-7.md)). A description replaces the old one and is plain text. Custom attributes, the project, status, owners, sprint, team and parent cannot be changed with it. |
 
 The project of a create must be open and inside the workspace; a parent or item outside it answers "not found". If the project
 or parent changes or closes between the plan and the send, or the item was created meanwhile, the call is `AB_WRITE_CONFLICT`
@@ -365,7 +365,8 @@ negative authorization. What no test can show is how a real Agility instance and
 ([P7-10](../tasks/phase-7-writes/P7-10-staging-write-pipeline.md)) run, treat these as open:
 
 - The **request shapes** of every tool (XML bodies, operation names, which attributes Agility requires or derives) and the
-  response of a write.
+  response of a write; in particular the empty `Timebox` relation that takes an item out of its sprint (P7-17), an `Actual` for
+  another member, and `ToDo` on a task or test.
 - Whether Agility keeps a **description** as the escaped paragraphs we send, and how comment text and dates are stored (which
   decides the no-op rules for comments and effort).
 - The **close** and **reopen** operation per asset type and what a close does to open children.

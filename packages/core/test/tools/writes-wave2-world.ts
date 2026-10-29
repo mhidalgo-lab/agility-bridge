@@ -72,8 +72,13 @@ export function updateItem(env: Wave2Env, row: Mutable, root: XmlElement): boole
   let handled = false;
   for (const child of root.children) {
     const name = child.attributes['name'] as string;
-    if (child.name === 'Attribute' && ['Name', 'Description', 'Estimate', 'DetailEstimate'].includes(name)) {
-      row[name] = name === 'Estimate' || name === 'DetailEstimate' ? Number(child.text) : (child.text ?? '');
+    if (
+      child.name === 'Attribute' &&
+      ['Name', 'Description', 'Estimate', 'DetailEstimate', 'ToDo'].includes(name)
+    ) {
+      row[name] = ['Estimate', 'DetailEstimate', 'ToDo'].includes(name)
+        ? Number(child.text)
+        : (child.text ?? '');
       handled = true;
     } else if (child.name === 'Relation' && name === 'Priority' && child.attributes['act'] === 'set') {
       const ref = child.children[0]?.attributes['idref'] as string;

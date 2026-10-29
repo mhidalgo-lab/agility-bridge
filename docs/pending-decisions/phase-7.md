@@ -338,6 +338,17 @@
 - **Context:** `MAX_PENDING_PER_USER` (20) drops the oldest request past it. The list reads one key range and at most 20 values (21 queries on D1, only when the page is opened).
 - **Options:** (a) keep 20 and list at most that many; (b) raise it (more values in `kv`, a longer list and a longer page); (c) store a summary row per request (one more write on every ask, on the tight Free-plan write quota).
 - **Recommendation:** (a), built. Real tools may show that 20 is too many or too few; P7-27 (request limits) owns the bound.
+
+### D-236 — Effort for another member: only an owner of the item *(P7-17)*
+- **Context:** `log_effort` logs for the caller. People also want to log hours for a teammate (a stand-up, a pair). Logging for anyone is a way to put time on a person who never worked on the item, and the Agility history then shows the token's member as the author (A6).
+- **Options:** (a) an optional `member`, accepted only when that member is already an owner of the item (re-checked at the re-read), the approval naming them as `Actual.Member`; (b) any member the workspace can see; (c) never (effort for yourself only); (d) a per-workspace switch.
+- **Recommendation:** (a), built: the narrowest policy that still serves the real case (the person who works on the item is its owner), needs no new setting, and keeps the approval honest because the member is a listed change. Adding an owner first (`assign_owners`) is itself an approved write. (b) would let an agent put hours on anyone; (d) can be added later without changing the argument.
+- **Owner:** *(open; built as (a))*
+
+### D-237 — Remaining to-do is a field of `update_fields`, not a second write in `log_effort` *(P7-17)*
+- **Context:** The task asked for an optional remaining `ToDo` update "in the same mutation" as an effort entry. An effort entry is a create of an `Actual`; the to-do is an attribute of the item: two Agility requests behind one approval, with no transaction between them and no retries allowed.
+- **Options:** (a) `todo` is a field of `update_fields` for a task or test (one request, old and new shown, the usual conflict and no-op rules); a person who wants both approves two small changes; (b) two requests behind one approval, with a partial-failure state to report; (c) skip it.
+- **Recommendation:** (a), built. A half-applied change behind one approval is exactly what the single-request rule prevents. `ToDo` is writable only on tasks and tests (it is a roll-up on stories and defects, refused).
 - **Owner:** *(open; built as (a))*
 
 

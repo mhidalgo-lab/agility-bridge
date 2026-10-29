@@ -335,7 +335,7 @@ Status lives in each task file.
 | P7-14 | [A list of my pending approvals](tasks/phase-7-writes/P7-14-pending-approvals-list.md) | low | P7-02 | done |
 | P7-15 | [Per-grant write limit set by an owner](tasks/phase-7-writes/P7-15-per-grant-write-limit.md) | low | P7-03, P4-05 | todo |
 | P7-16 | [Show the remaining write budget](tasks/phase-7-writes/P7-16-write-budget-visibility.md) | low | P7-03 | todo |
-| P7-17 | [Wave-1 extensions: clear the sprint, effort for others, to-do](tasks/phase-7-writes/P7-17-wave-1-extensions.md) | low | P7-04 | todo |
+| P7-17 | [Wave-1 extensions: clear the sprint, effort for others, to-do](tasks/phase-7-writes/P7-17-wave-1-extensions.md) | low | P7-04 | review |
 | P7-18 | [Comments: rich text and mentions](tasks/phase-7-writes/P7-18-comment-rich-text-mentions.md) | low | P7-04, P7-07 | todo |
 | P7-19 | [Optional read-back after a write](tasks/phase-7-writes/P7-19-read-back-after-write.md) | low | P7-04, P7-07 | todo |
 | P7-20 | [Workspace-enabled writable custom fields](tasks/phase-7-writes/P7-20-writable-custom-fields.md) | low | P7-05 | todo |

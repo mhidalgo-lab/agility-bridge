@@ -63,6 +63,11 @@ None beyond the shared rules in AGENTS.md.
 - [ ] `reopen_asset`: `Reactivate` per type; refused when the parent is closed? (P7-23).
 - [ ] The response of an operation with no body, and the read lag before the state shows (L-051).
 
+## Items from P7-17 (wave-1 extensions, unverified request shapes)
+- [ ] `move_to_sprint` with `to_backlog`: `<Relation name="Timebox" act="set"></Relation>` (no child) empties the sprint of a Story and a Defect; or does it need another form (an explicit null, `act="remove"`)? What does the read side show?
+- [ ] `log_effort` with `member`: is an `Actual` for another member of the item's owners accepted with the writer's token, and is it attributed to that member? Does Agility refuse it for a non-member of the project?
+- [ ] `update_fields` with `todo`: `ToDo` set on a Task and a Test; is it writable at every tracking level; does the item's roll-up (`Story.ToDo`) update at once?
+
 ## Items moved from P7-08 (documentation walkthrough)
 - [ ] Walk the [write tools guide](../../guide/write-tools.md) on staging against the sandbox: every command, the enablement steps for stdio and for a device-token HTTP connection, and the operator checklist.
 - [ ] Copy each sandbox-verified fact into the guide's "What is unverified" list (remove what is now verified, with date and instance version) and into RESEARCH §1.5; update THREAT_MODEL T31, A2, A6 from "verified on fakes only" where the sandbox shows it.
