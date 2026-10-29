@@ -138,7 +138,15 @@ built its registry without `allowNonRead`) until P7-09, so the CI baseline holds
 CI/local ratio of the `whoami` row. Storage operations of the approval ledger per call, counted by the benchmark: 0 for the
 dry run and the elicitation write, 3 and 1 for the two page calls (the fake page records the grant itself). A write does the
 same Agility requests whatever the channel; the cost of `renderApproval` and the SHA-256 of the canonical change is inside
-these figures. The approval page's own view and decision are not benchmarked yet (P7-31).
+these figures. The approval page and the limiter are in note 4.
+
+⁴ Approval page and limiter (P7-31), `pnpm bench:worker`, one run on a machine shared with other test runs (load average 6 to 11, so
+the figures are skewed upward; the CI benchmark job's artifact is the history and compares ratios to its own calibration).
+Relative to the calibration workload: the approval page view 0.43, the pending list (five open requests) 0.52, the decision
+POST (approve, CSRF, grant, admin audit row) 0.72, and a write by elicitation with the real deployment limiter 1.47 against
+1.51 without it in the same run, so the limiter's CPU is within noise. The limiter adds **4 storage statements** to a write
+(the deployment counter read, the approval-request unit of P7-27, the grant unit and the deployment unit, all `kv` increments
+or reads), counted by the benchmark. CPU is not the cost that matters on D1; the statements and rows are (the table above).
 
 Warm calls fit the Free plan's 10 ms. **The first request of every new isolate does not.** P3-14 moved what does not
 depend on the environment to module scope (Workers run it at startup, under a separate limit; startup is about
