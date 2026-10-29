@@ -215,8 +215,33 @@ describe.skipIf(!target)('composite reports against the live tenant (read-only)'
     ok(((out['flagged'] as unknown[]) ?? []).length <= 20, 'the flagged list is bounded');
     ok(((out['likelyDuplicates'] as unknown[]) ?? []).length <= 10, 'the duplicate list is bounded');
     ok(!hasNull(out), 'no null in the output');
+    // P6-57: how priority and severity were read, from our own fixed notes (never the attribute names or values).
+    const notes = ((out['notes'] as string[] | undefined) ?? []).map(String);
+    const has = (prefix: string) => notes.some((n) => n.startsWith(prefix));
+    const priority = has('Priority is shown')
+      ? 'read'
+      : has('This instance has no priority')
+        ? 'none'
+        : has('Priority and severity were not read: the request budget')
+          ? 'unread-budget'
+          : has('Priority and severity were not read: this token')
+            ? 'unread-forbidden'
+            : has('Priority and severity could not be read')
+              ? 'unread-failed'
+              : 'unknown';
+    const severity = priority.startsWith('unread')
+      ? 'unread'
+      : has('Several severity-like')
+        ? 'ambiguous'
+        : has('This instance has no severity')
+          ? 'none'
+          : 'read';
     process.stderr.write(
-      `live defect_triage: ${summary(out)}; open ${level(counts?.openRead ?? 0)}; no owner ${level(counts?.noOwner ?? 0)}; no sprint ${level(counts?.noSprint ?? 0)}; duplicates ${level(((out['likelyDuplicates'] as unknown[]) ?? []).length)}\n`,
+      `live defect_triage: ${summary(out)}; open ${level(counts?.openRead ?? 0)}; no owner ${level(counts?.noOwner ?? 0)}; no sprint ${level(counts?.noSprint ?? 0)}; duplicates ${level(((out['likelyDuplicates'] as unknown[]) ?? []).length)}; priority ${priority}; severity ${severity}\n`,
+    );
+    ok(
+      !priority.startsWith('unread') && priority !== 'unknown',
+      'priority and severity were read without an error',
     );
   });
 

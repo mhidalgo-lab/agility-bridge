@@ -940,6 +940,26 @@ describe('defect_triage priority and severity (P6-30)', () => {
     expect(s(r).counts.openRead).toBe(3);
   });
 
+  it('reads priority for more than 50 defects in one request (P6-57)', async () => {
+    const w = withPriorities();
+    const template = (w['Defect'] ?? []).find((r) => r['Number'] === 'D-01103');
+    if (template === undefined) throw new Error('no template defect');
+    for (let i = 0; i < 70; i++)
+      (w['Defect'] as Record<string, unknown>[]).push({
+        ...template,
+        _oid: `Defect:${9000 + i}`,
+        ID: `Defect:${9000 + i}`,
+        Number: `D-0${9000 + i}`,
+        Name: `Synthetic defect ${i}`,
+      });
+    const { call, bodies } = rig({ fake: { assets: w } });
+    const r = await call('defect_triage', {});
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect(text(r)).not.toContain('Priority and severity could not be read');
+    expect(text(r)).toMatch(/Priority is shown for \d+ of \d+ defects read/);
+    expect(bodies.filter((b) => b.includes('Priority.Name'))).toHaveLength(1);
+  });
+
   it('reads priority only for defects of the workspace (a foreign defect never reaches the read)', async () => {
     const { call, bodies } = rig({ fake: { assets: withPriorities() } });
     await call('defect_triage', {});

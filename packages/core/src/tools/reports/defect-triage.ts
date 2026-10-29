@@ -131,7 +131,9 @@ export async function readTriageFields(ctx: ToolContext, oids: readonly string[]
     const compiled = await compileQuery(ctx, {
       assetType: 'Defect',
       fields,
-      filters: [{ field: 'ID', op: 'in', value: [...oids] }],
+      // The OIDs come from this call's own scope-checked search (up to 100 rows), not from the caller: a trusted list,
+      // which the compiler bounds at 2,000 instead of 50 (P6-57, found on the live tenant).
+      filters: [{ field: 'ID', op: 'in', value: [...oids], trusted: true }],
       includeClosed: true,
       limit: Math.min(oids.length, ctx.limits.maxRows),
     });

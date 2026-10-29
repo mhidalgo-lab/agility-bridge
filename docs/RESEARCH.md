@@ -696,3 +696,15 @@ Checked 2026-10-23.
   aggregate follows is not the one the tree reads (`Story.Super`), and no aggregate form was found that equals the rows
   (D-143). Roll-ups stay computed from the rows. Live check: `live/portfolio-aggregates.live.test.ts` (asserts that the forms are
   accepted; the disagreement is recorded on stderr as a level, not asserted). *verified on one tenant; unverified elsewhere*
+
+### Defect priority and severity for `defect_triage` (P6-57)
+
+- **Read-only tenant (2026-10-29), shapes only.** `Defect.Priority` is a relation; `Priority.Name` and `Priority.Order` read
+  with HTTP 200 for 50 defects in one query. Exactly one single-valued relation attribute on `Defect` has "severity" in its
+  name, and `<that>.Name` reads in the same query. With the fix below, `defect_triage` reports priority read and severity read
+  on the tenant (`live/reports.live.test.ts` prints the two states, never the attribute name or values). A text-typed severity
+  and the two-candidate case are verified on fixtures only. *verified on one tenant*
+- **Found by the live check:** the read passed every defect of the page (up to 100) to one `ID in [...]` filter, which the
+  compiler bounds at 50 values for caller input, so on a tenant with more than 50 open defects the read failed and the report
+  said "could not be read". The OIDs come from the call's own scope-checked search, so the filter is now a trusted list
+  (bound 2,000), as the Scope lists of the search tools already are.
