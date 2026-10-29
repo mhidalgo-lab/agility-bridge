@@ -2,7 +2,7 @@
 id: P7-25
 title: "Keep the write guide equal to the registry and the approval renderer"
 phase: 7
-status: todo
+status: done
 priority: low
 depends_on: [P7-08]
 adr: ["0013"]
@@ -18,13 +18,13 @@ owner: ""
 The write guide lists the nine tools and shows an approval text by hand. A test should fail when a write tool is added or renamed, or when the approval layout changes, without the guide changing (L-133).
 
 ## Scope
-- A docs test (`scripts/test/docs.test.ts` style) that reads the write tools from the core registry and checks each name appears in `docs/guide/write-tools.md` and in the approval table, and that the guide's example approval text equals what `renderApproval` produces for the same input (the layout, with the random envelope id fixed).
+- `scripts/test/write-guide.test.ts`: the write tools (every registry tool whose kind is not `read`) equal the rows of the guide's tool table (name and kind), the heading's count word equals their number, every tool except `update_status` (shown in full) has a row in the approval table, and the guide's example approval text equals `renderApproval` for the same input with the envelope id fixed.
 - No change to product code.
 
 ## Acceptance criteria
-- [ ] Adding a write tool to the registry without a guide row fails the test.
-- [ ] Changing the approval layout without updating the guide example fails the test.
-- [ ] The test runs in the normal `pnpm test`.
+- [x] Adding a write tool to the registry without a guide row fails the test.
+- [x] Changing the approval layout without updating the guide example fails the test.
+- [x] The test runs in the normal `pnpm test`.
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.
