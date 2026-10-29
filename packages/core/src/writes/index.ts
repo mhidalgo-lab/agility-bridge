@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // The write framework (P7-01): public surface for hosts and write tools.
-export { APPROVAL_SCHEMA, renderApproval, shortId } from './approval.ts';
+export { APPROVAL_SCHEMA, displayLabel, renderApproval, shortId } from './approval.ts';
 export { APPROVAL_INPUT_KEY, elicitationChannel, supportsFormElicitation } from './elicitation.ts';
 export { ApprovalLedger, type LedgerEntry, type LedgerStore, memoryLedgerStore } from './ledger.ts';
 export {
@@ -15,12 +15,15 @@ export {
 export {
   type CanonicalMutation,
   canonicalize,
+  displayOld,
   type FieldAllowlist,
   type FieldChange,
+  forDisplay,
   isNoop,
   MAX_APPROVAL_CHARS,
   MAX_CHANGES,
   MAX_LIST_ITEMS,
+  MAX_OLD_DISPLAY_CHARS,
   MAX_VALUE_CHARS,
   mutationHash,
   valuesEqual,

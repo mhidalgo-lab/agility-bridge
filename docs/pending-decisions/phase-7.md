@@ -223,3 +223,50 @@
 - **Recommendation:** (a), built. Operators need the channel now; the table must not read as verified for the real approval text.
 - **Owner:** *(open; built as (a))*
 
+### D-191 — A close that cannot count every child is refused *(P7-09, Phase 7 review M2)*
+- **Context:** `close_asset` counted open children only of the types it may read and showed `OpenChildren 0 -> 0` even when a child type was denied or an epic's children sat in projects outside the workspace. Agility's own close operation (`QuickClose` is the one preferred, D-187) might then close children the approver never saw (THREAT_MODEL T3, T31).
+- **Options:** (a) refuse the close, with the reason, when a child type is denied or not allowed, or when the item is an epic in a project-restricted workspace (its children may live elsewhere and cannot all be counted); (b) show `OpenChildren: "not checked"` and let the person decide; (c) prefer `Close` over `QuickClose`.
+- **Recommendation:** (a), built. An epic in a workspace that covers every project (no project restriction) is still counted. Whether `QuickClose` cascades, and the order of preference (c), stay with P7-07 and P7-22.
+- **Owner:** *(open; built as (a))*
+
+### D-192 — Agility's text is cleaned for display; only the caller's text is refused *(P7-09, review quality 2)*
+- **Context:** The mutation check refused any old value or `Name [OID]` label with hidden characters or over 8,000 characters, which made an item with a pasted zero-width character in its title impossible to rename, and an item with a long description impossible to update.
+- **Options:** (a) the hash binds the full old value; for display (the elicitation text, the dry run and the approval page alike) an old value is cleaned of hidden characters and shortened to 2,000 characters, each with a visible note (`[shortened for display, 9000 characters in total]`, `[hidden characters removed for display]`); the name inside a `Name [OID]` label is cleaned and cut at 120 characters where the label is built (the OID is what is bound); the strict refusal stays for values the caller supplied; (b) clean the old value in the tool before it reaches the mutation (the hash then binds the cleaned text); (c) leave it.
+- **Recommendation:** (a), built. The approval page stores the display form (so the pending record stays small) and the Agility title is cleaned and capped on every channel (review L1).
+- **Owner:** *(open; built as (a))*
+
+### D-193 — Zero-width joiners between visible characters are allowed in caller text *(P7-09, review quality 3)*
+- **Context:** U+200C and U+200D were refused with the other invisible characters, which rejected emoji sequences (family, profession) and Persian or Indic text.
+- **Options:** (a) allow a ZWNJ or ZWJ that sits between two visible characters (a letter, mark, number, pictographic symbol or an emoji modifier) in comments, names and descriptions; still refuse a lone one, one next to a space, two in a row, and every other hidden or bidirectional character; (b) keep refusing; (c) show them as visible escapes.
+- **Recommendation:** (a), built (`hasHiddenCharacters`, `output/text.ts`).
+- **Owner:** *(open; built as (a))*
+
+### D-194 — "Same as before" no-ops apply only within 10 minutes; log_effort's default date is the UTC day *(P7-09, review quality 4 and 5)*
+- **Context:** An identical latest comment or an identical effort entry was a no-op at any age, so the same sentence a week later, or two equal sessions on one day, were silently dropped while the agent reported success.
+- **Options:** (a) an identical comment (same text, same author) counts as the same call only when authored in the last 10 minutes, an identical effort entry (item, member, date, hours) only when created in the last 10 minutes (`CreateDateUTC`); outside the window the write proceeds; a time that cannot be read is not a repeat; (b) a caller-supplied `allow_repeat`; (c) keep it unbounded. For the default date: (a) the caller's time zone is unknown, so an omitted `date` is the UTC day, said in the argument text and the description; (b) require the date.
+- **Recommendation:** (a) for both, built. Ten minutes covers a retry after a timeout or a lost answer, which is what the guard is for.
+- **Owner:** *(open; built as (a))*
+
+### D-195 — A creation time that cannot be read is not "recent"; a zone-less one gets the widest skew *(P7-09, review quality 9)*
+- **Context:** The create duplicate check treated an unparseable creation time as recent forever (one odd old item blocked its title) and read a zone-less `CreateDate` as UTC.
+- **Options:** (a) an unreadable time is never recent; a time without a zone is read as UTC and the window is widened by 14 hours, so a repeat is never missed and at worst a little more counts as recent; (b) refuse creates on instances without `CreateDateUTC`.
+- **Recommendation:** (a), built (`withinWindow`, shared with the comment and effort rules).
+- **Owner:** *(open; built as (a))*
+
+### D-196 — `update_fields` refuses to overwrite a description it cannot represent *(P7-09, review security L6)*
+- **Context:** A description is HTML; this tool replaces it with escaped paragraphs, so links, images, lists, tables and styles would be lost under an approval that shows only text.
+- **Options:** (a) refuse the change, before any approval, when the current HTML has any tag other than `p`, `br` or `div` (and the new text differs), naming the reason and pointing to Agility or a comment; other fields of the same item still update; (b) allow it with a note in the approval; (c) accept HTML (against D-182).
+- **Recommendation:** (a), built. Rich text and mentions are P7-18.
+- **Owner:** *(open; built as (a))*
+
+### D-197 — Tools that overwrite a value advertise `destructiveHint` *(P7-09, review security L5)*
+- **Context:** The annotation was true only for kind `destructive`; by the MCP definition (non-additive updates) a rename, a status, a sprint or an owner removal is destructive too, and clients that auto-allow "non-destructive" writes would allow them.
+- **Options:** (a) a tool flag `overwrites`, true for `update_fields`, `update_status`, `move_to_sprint` and `assign_owners`, sets `destructiveHint` while the kind stays `write` (kind drives gating and the opt-in; the hint only informs clients); `add_comment`, `log_effort` and `create_work_item` stay additive; (b) make them kind `destructive`.
+- **Recommendation:** (a), built.
+- **Owner:** *(open; built as (a))*
+
+### D-198 — Rounds are bound to the workspace and instance; the limiter is required and a refusal spends nothing *(P7-09, review security L2 and L8, quality 7)*
+- **Context:** The 2026-07-28 round entry and sealed state carried the actor and the hash only, so the THREAT_MODEL sentence "an approval never applies in another workspace" held for page grants (D-165) but not for elicitation rounds. The limiter was optional in the runtime type, and a refused deployment check had already spent the grant's unit, against D-170.
+- **Options:** (a) the sealed state carries the workspace and instance ids and the ledger round entry the workspace (`takeRound(nonce, scope)`); both are checked before the round counts; the type requires `limiter`; the limiter reads the deployment counter (a plain read) before taking the grant's unit, so a full deployment refuses without spending anything (two calls racing past that read can still leave one unit spent); (b) put both ids in the change hash (changes the hash); (c) a decrement on the counter store (storage change).
+- **Recommendation:** (a), built. The extra read is one query per write.
+- **Owner:** *(open; built as (a))*

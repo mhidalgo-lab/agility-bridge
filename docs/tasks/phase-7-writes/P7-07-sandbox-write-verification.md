@@ -67,3 +67,8 @@ None beyond the shared rules in AGENTS.md.
 - [ ] Walk the [write tools guide](../../guide/write-tools.md) on staging against the sandbox: every command, the enablement steps for stdio and for a device-token HTTP connection, and the operator checklist.
 - [ ] Copy each sandbox-verified fact into the guide's "What is unverified" list (remove what is now verified, with date and instance version) and into RESEARCH §1.5; update THREAT_MODEL T31, A2, A6 from "verified on fakes only" where the sandbox shows it.
 - [ ] Record per client, in the client compatibility reference, which of the *not yet run* write rows were run with a real write tool.
+## Items from the Phase 7 review (P7-09, hypotheses)
+- [ ] `assign_owners`: are `Owners` and `Owners.Name` returned in the same order for a multi-valued relation? If not, resolve names by reading the `Member` rows for the OIDs (review L9). Also: can an inactive member who is still an owner be removed (they are not found by name today), and does a renamed member give a false conflict (compare by OID)? (review Q-10)
+- [ ] `add_comment`: is `Expression.Content` rendered as HTML by Agility? If so, send HTML-escaped paragraphs like descriptions (D-182) instead of raw text, since a comment holding `<a href=...>` would become live markup for other people (review L10). Also how `Content` is stored (escaping, newlines) against the 10-minute no-op comparison.
+- [ ] `close_asset`: does `QuickClose` close open children while plain `Close` is refused? If it cascades, prefer `Close` or keep the refusal (D-191); the cascade question also decides P7-22.
+- [ ] The response of an operation with no body: confirm that a 2xx with an empty body is what Agility sends (the pipeline reports it as applied, D-198, L-404).

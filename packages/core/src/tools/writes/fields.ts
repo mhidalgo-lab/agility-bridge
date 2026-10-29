@@ -7,7 +7,7 @@ import type { ToolContext } from '../../context.ts';
 import { AbError, ErrorCode } from '../../errors.ts';
 import { resolveByName } from '../../identity/resolve.ts';
 import { metadataFor } from '../../metadata/service.ts';
-import { cleanText } from '../../output/text.ts';
+import { hasHiddenCharacters } from '../../output/text.ts';
 import { invalid } from '../../query/limits.ts';
 import { assertTypeAllowed } from './common.ts';
 
@@ -62,7 +62,7 @@ export function itemName(raw: string): string {
   if (value.length > MAX_NAME_CHARS) {
     throw invalid(`The name is ${value.length} characters; at most ${MAX_NAME_CHARS}.`, 'Shorten it.');
   }
-  if (/[\r\n\t\u2028\u2029]/.test(value) || cleanText(value) !== value) {
+  if (/[\r\n\t\u2028\u2029]/.test(value) || hasHiddenCharacters(value)) {
     throw invalid(
       'The name contains line breaks, control, invisible or bidirectional characters.',
       'Use a single plain line; hidden characters would not be visible to the person who approves.',
@@ -81,7 +81,7 @@ export function descriptionText(raw: string): string {
       'Shorten it: the person approves the whole text, so it is never cut.',
     );
   }
-  if (cleanText(value) !== value) {
+  if (hasHiddenCharacters(value)) {
     throw invalid(
       'The description contains control, invisible or bidirectional characters.',
       'Remove them; they would be hidden from the person who approves.',
@@ -107,6 +107,21 @@ export function descriptionHtml(text: string): string {
     .split(/\n{2,}/)
     .map((p) => `<p>${p.split('\n').map(htmlEscape).join('<br>')}</p>`)
     .join('');
+}
+
+/** Tags a description written by this tool can contain (paragraphs and line breaks); everything else is formatting. */
+const PLAIN_TAGS: ReadonlySet<string> = new Set(['p', 'br', 'div']);
+
+/**
+ * True when an existing HTML description holds formatting that plain text cannot represent: links, images, lists, tables,
+ * headings, bold or italic, code, anything but paragraphs and line breaks. Replacing it would silently lose that content,
+ * which the approval cannot show (D-196, L6 of the Phase 7 review).
+ */
+export function hasRichFormatting(html: string): boolean {
+  for (const m of html.matchAll(/<\/?([A-Za-z][A-Za-z0-9]*)/g)) {
+    if (!PLAIN_TAGS.has((m[1] as string).toLowerCase())) return true;
+  }
+  return false;
 }
 
 export const round2 = (n: number): number => Math.round(n * 100) / 100;

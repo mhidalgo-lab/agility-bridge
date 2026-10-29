@@ -6,7 +6,7 @@ import type { Random } from '../context.ts';
 import { AbError, ErrorCode } from '../errors.ts';
 import { envelope, newEnvelopeId } from '../output/envelope.ts';
 import { cleanText } from '../output/text.ts';
-import { type CanonicalMutation, MAX_APPROVAL_CHARS, type WriteValue } from './mutation.ts';
+import { type CanonicalMutation, forDisplay, MAX_APPROVAL_CHARS, type WriteValue } from './mutation.ts';
 
 /** The elicitation form every approval uses: one boolean the person sets. */
 export const APPROVAL_SCHEMA: Readonly<Record<string, unknown>> = Object.freeze({
@@ -16,6 +16,10 @@ export const APPROVAL_SCHEMA: Readonly<Record<string, unknown>> = Object.freeze(
 });
 
 const quote = (v: WriteValue): string => JSON.stringify(v);
+
+/** The target's title as shown next to an approval: Agility text, so cleaned, on one line and capped (every channel). */
+export const displayLabel = (label: string): string =>
+  cleanText(label).replace(/\s+/g, ' ').trim().slice(0, 200);
 
 /** A short, readable form of the hash the person can match against an audit row. */
 export const shortId = (hash: string): string => hash.slice(0, 12);
@@ -35,9 +39,9 @@ export function renderApproval(opts: {
   const id = newEnvelopeId(opts.random);
   const body: string[] = [];
   if (opts.label !== undefined && opts.label !== '') {
-    body.push(`Title: ${quote(cleanText(opts.label).slice(0, 200))}`);
+    body.push(`Title: ${quote(displayLabel(opts.label))}`);
   }
-  m.changes.forEach((c, i) => {
+  forDisplay(m).changes.forEach((c, i) => {
     body.push(`${i + 1}. ${c.field}`, `   old: ${quote(c.old)}`, `   new: ${quote(c.new)}`);
   });
   const target = `${m.target.assetType}${m.target.number === undefined ? '' : ` ${m.target.number}`} (${m.target.oid})`;

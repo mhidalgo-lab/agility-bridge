@@ -159,6 +159,8 @@ export function makeRuntime(overrides: Partial<WriteRuntime> = {}): WriteRuntime
     ledger: new ApprovalLedger(memoryLedgerStore(systemClock), systemClock),
     audit,
     stateKey: new Uint8Array(32).fill(7),
+    // Required by the type: a permissive limiter unless a test brings its own (the limiter has its own tests).
+    limiter: { check: async () => {} },
     ...overrides,
   } as WriteRuntime & { audit: RecordingAudit };
 }

@@ -37,7 +37,7 @@ How to use it:
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
-| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400 |
+| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-407 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382 |
@@ -1635,6 +1635,33 @@ Agility descriptions are HTML that other people open in the web UI. Accept plain
 and send HTML-escaped paragraphs; never sanitise what a person approved into something else. Reading the old value as plain
 text shows the person what will be replaced.
 *Applied in:* P7-05, `tools/writes/fields.ts`.
+
+**L-404 — Test a write's failure through the client that produces it, and treat any 2xx as applied.**
+A hint that is added only when the error has none never fired, because the real client gives every ambiguous failure its own
+"try again" hint; the test passed because its fake error had none. For a write, replace that advice with "may or may not have
+been applied" for every failure after the request started (timeout, unavailable, wrong instance, internal) and keep the
+client's own hint only for refusals that prove nothing happened. A 2xx whose body is empty or unreadable is an applied write
+(operations answer with little), reported as applied with a note, never as an error that invites a repeat.
+*Applied in:* P7-09, `writes/pipeline.ts`, `agility/client.ts`, `test/tools/writes-review7.test.ts`.
+
+**L-405 — Clean what Agility sent, refuse what the caller sent.**
+One check applied to both made an item with a pasted zero-width character in its title impossible to rename. Text from Agility
+(old values, names inside `Name [OID]` labels, titles) is cleaned and shortened for display with a visible note, while the hash
+binds the full value; text the caller supplies keeps the strict refusal, with narrow exceptions that are tested (a joiner between
+two visible characters). Do it once in a shared display function so every channel shows the same thing.
+*Applied in:* P7-09, `writes/mutation.ts` (`forDisplay`), `output/text.ts` (`hasHiddenCharacters`).
+
+**L-406 — A refused limit check must spend nothing: read the shared counter before taking the local unit.**
+Taking the grant's unit first and then finding the deployment full burned the grant's budget on refusals. Where the store has no
+decrement, read the wider counter first (one query), then take the units; say that a race can still leave one unit spent, and
+make the runtime type require the limiter so a host cannot forget it.
+*Applied in:* P7-09, `writes/limiter.ts`, `writes/runtime.ts`.
+
+**L-407 — A scope sentence in the threat model must be tested for every channel that carries an approval.**
+"An approval never applies in another workspace" was true for page grants and false for elicitation rounds, which carried only
+the actor and the hash. Bind every channel (grant, denial, round entry, sealed state) to the workspace and the instance, and
+write one cross-workspace negative test per channel.
+*Applied in:* P7-09, `writes/state.ts`, `writes/ledger.ts`, `test/writes/pipeline.test.ts`.
 
 ## O. Caching, quotas and budgets
 

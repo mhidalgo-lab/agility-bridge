@@ -300,10 +300,15 @@ describe('add_comment', () => {
 
   it('refuses control and invisible characters, empty text and too much text, with no request', async () => {
     const w = writeRig();
-    for (const text of ['bad\u0000text', 'hidden‮text', 'zero​width', '   ', 'x'.repeat(4_001)]) {
+    for (const text of ['bad\u0000text', 'hidden‮text', 'zero​width', '   ']) {
       const error = await refused(w.run('add_comment', { asset: 'B-01002', text, confirm: true }));
       expect(error.code).toBe(ErrorCode.InputInvalid);
     }
+    // Too long: the schema advertises the same maximum the validator enforces, so the schema refuses it first.
+    expect(() =>
+      tool('add_comment').inputSchema.parse({ asset: 'B-01002', text: 'x'.repeat(4_001) }),
+    ).toThrow();
+    expect(() => commentText('x'.repeat(4_001))).toThrow(/at most 4000/);
     expect(w.calls).toHaveLength(0);
     expect(w.posts).toHaveLength(0);
   });

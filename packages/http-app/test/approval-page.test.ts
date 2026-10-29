@@ -105,6 +105,26 @@ describe('the approval page channel with the write pipeline', () => {
     expect(JSON.stringify(r.audit)).not.toContain('In Progress');
   });
 
+  it('the page shows the Agility title and old values cleaned and capped, like the elicitation text (L1, D-192)', async () => {
+    const r = rig();
+    const fake = new FakeItems();
+    const item = fake.items.get('Story:1');
+    if (item) {
+      item.title = `Sign\u202Ein ${'x'.repeat(600)}`;
+      item.status = `Open\u200B${'y'.repeat(5_000)}`;
+    }
+    const { tool, ctx } = pipeline(r, fake);
+    const pending = await refusal(run(tool, CALL, ctx));
+    const link = /(https:\/\/\S+)/.exec(pending.hint ?? '')?.[1] as string;
+    const view = await r.page.port.view({} as never, principal('user-1'), idOf(link));
+    expect(view?.label).not.toMatch(/[\u202E\u200B]/);
+    expect((view?.label ?? '').length).toBeLessThanOrEqual(200);
+    const old = view?.changes[0]?.old ?? '';
+    expect(old).not.toMatch(/[\u202E\u200B]/);
+    expect(old).toContain('shortened for display');
+    expect(old.length).toBeLessThan(2_200);
+  });
+
   it('the agent repeating the call before the person acts gets the same link, not a new one each time', async () => {
     const r = rig();
     const { tool, ctx } = pipeline(r, new FakeItems());

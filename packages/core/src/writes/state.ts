@@ -11,6 +11,10 @@ export interface ApprovalState {
   readonly a: string;
   /** Expiry, epoch ms. */
   readonly e: number;
+  /** Workspace the question was asked in: a round never crosses workspaces (P7-09, THREAT_MODEL T31). */
+  readonly w: string;
+  /** Agility instance the question was asked for. */
+  readonly i: string;
 }
 
 const enc = new TextEncoder();
@@ -66,8 +70,10 @@ export async function openState(key: Uint8Array, sealed: string): Promise<Approv
     return typeof s['n'] === 'string' &&
       typeof s['h'] === 'string' &&
       typeof s['a'] === 'string' &&
-      typeof s['e'] === 'number'
-      ? { n: s['n'], h: s['h'], a: s['a'], e: s['e'] }
+      typeof s['e'] === 'number' &&
+      typeof s['w'] === 'string' &&
+      typeof s['i'] === 'string'
+      ? { n: s['n'], h: s['h'], a: s['a'], e: s['e'], w: s['w'], i: s['i'] }
       : null;
   } catch {
     return null;

@@ -50,18 +50,29 @@ const FIELDS = ['Parent', 'Super'];
 const ALLOWED = Object.fromEntries(ITEM_TYPES.map((t) => [t, ['AssetState', 'OpenChildren']]));
 
 /** Open children of one item, counted with the same scoped, bound-parameter queries the read tools use (capped). */
-async function openChildren(ctx: ToolContext, type: string, oid: string): Promise<number> {
+export async function openChildren(ctx: ToolContext, type: string, oid: string): Promise<number> {
   const md = metadataFor(ctx);
   let count = 0;
   for (const [childType, relation] of CHILDREN[type] ?? []) {
     const meta = await md.findAssetType(childType);
     if (meta === undefined || !meta.attributes.has(relation)) continue;
-    // A child type this workspace may not read cannot be counted here; Agility's own validator decides (D-186).
+    // A child type this workspace may not read cannot be counted, so the close is refused rather than shown as
+    // "0 open children" (D-191, P7-09). Agility's own close operation might close children the approver never saw.
     if (
       ctx.assetTypes.deny.includes(childType) ||
       (ctx.assetTypes.allow !== undefined && !ctx.assetTypes.allow.includes(childType))
     ) {
-      continue;
+      throw invalid(
+        `${type} cannot be closed with this tool: its ${childType} children cannot be counted because ${childType} is not readable in this workspace.`,
+        'Close it in Agility, or ask an owner to allow reading the child type first.',
+      );
+    }
+    // The children of an epic can live in other projects; a project-restricted workspace only sees some of them.
+    if (relation === 'Super' && ctx.projects.allowed.length > 0) {
+      throw invalid(
+        `${type} cannot be closed with this tool: its children may sit in projects outside this workspace, so they cannot all be counted.`,
+        'Close it in Agility, or use a workspace that covers every project the epic reaches.',
+      );
     }
     const compiled = await compileQuery(ctx, {
       assetType: childType,
@@ -171,7 +182,10 @@ function lifecycleTool(cfg: {
         op,
       );
       const id = res.data.attributes['id'];
-      return typeof id === 'string' ? { oid: id.split(':').slice(0, 2).join(':') } : {};
+      return {
+        ...(typeof id === 'string' ? { oid: id.split(':').slice(0, 2).join(':') } : {}),
+        ...(res.unreadable === true ? { unreadable: true } : {}),
+      };
     },
   });
 }

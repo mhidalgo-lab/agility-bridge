@@ -23,6 +23,8 @@ import {
   type CanonicalMutation,
   type Clock,
   DEFAULT_APPROVAL_TTL_MS,
+  displayLabel,
+  forDisplay,
   shortId,
 } from '@agility-bridge/core';
 import type { KvStore } from '@agility-bridge/storage';
@@ -184,8 +186,9 @@ export function createApprovalPage(options: ApprovalPageOptions): ApprovalPage {
           workspaceName: access.workspace.name,
           tool: prompt.tool,
           hash: prompt.hash,
-          mutation: prompt.mutation,
-          label: prompt.label ?? null,
+          // Display forms: Agility's old values cleaned and shortened, the title cleaned and capped (every channel alike).
+          mutation: forDisplay(prompt.mutation),
+          label: prompt.label === undefined ? null : displayLabel(prompt.label),
           expiresAt,
         };
         await kv.set(pendKey(userId, id), JSON.stringify(pending), { expiresAt });

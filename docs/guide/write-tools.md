@@ -146,7 +146,7 @@ grant names a tool its workspace does not enable). Check the result with a **dry
 6. **Intent audit.** The intent is stored durably **before** the change is sent. If it cannot be stored the write is
    refused (`AB_WRITE_AUDIT_UNAVAILABLE`).
 7. **Send once.** One request to Agility. It is never retried, not even after a timeout: the error then says the change
-   may or may not have been applied, and to look at the item before repeating.
+   may or may not have been applied, and to look at the item before repeating (this replaces the client's usual "try again" hint). A 2xx answer with an empty or unreadable body counts as applied: the result says the answer could not be read and not to repeat the write.
 8. **Outcome audit.** The result is recorded next to the intent. The answer notes that Agility may take a moment to show
    the change.
 
@@ -158,7 +158,7 @@ The approval text shows the target (type, number, OID), the number of changes an
 the new value, then a short change id that matches the audit row. Values are JSON-quoted and sit inside the
 untrusted-data envelope, so text from Agility or from the agent cannot pose as part of the question. **A change too large
 to show whole is refused, never truncated** (at most 24,000 characters of approval text, 8,000 per value, 20 changes);
-values with control, invisible or bidirectional characters are refused because the person could not see them.
+values **you** supply with control, invisible or bidirectional characters are refused because the person could not see them (a zero-width joiner between two visible characters, as in emoji sequences or Persian text, is allowed). Text from Agility (the current value, the title, names inside `Name [OID]`) is shown cleaned of such characters and, past 2,000 characters, shortened, each with a visible note; it never blocks a change.
 
 | Situation | Channel |
 |---|---|
@@ -303,12 +303,12 @@ projects answers "not found"), and refuses a denied asset type before any reques
 | Tool | Changes | Notes |
 |---|---|---|
 | `update_status` | `Status` of a Story, Defect, Task, Test or Epic | `new_status` is a name or OID from the item's own workflow (a status of another team, or an inactive one, is refused). It never closes the item. |
-| `add_comment` | creates a comment (an `Expression` that mentions the item) | At most 4,000 characters of plain text, shown whole in the approval; control, invisible and bidirectional characters are refused. The same text as your latest comment on the item is a no-op. Allowed on closed items. |
-| `log_effort` | creates an effort entry (`Actual`) for **you** | `hours` (0.01 to 24) and `date` (UTC, not in the future, within the history limit). The mutation shows the item's logged total before and after. An identical entry (item, you, date, hours) is a no-op. |
+| `add_comment` | creates a comment (an `Expression` that mentions the item) | At most 4,000 characters of plain text, shown whole in the approval; control, invisible and bidirectional characters are refused. The same text as your own comment from the last 10 minutes is a no-op (a retry); the same text later is a new comment. Allowed on closed items. |
+| `log_effort` | creates an effort entry (`Actual`) for **you** | `hours` (0.01 to 24) and `date` (UTC, not in the future, within the history limit). The mutation shows the item's logged total before and after. An identical entry (item, you, date, hours) created in the last 10 minutes is a no-op; later it is logged again. An omitted `date` is the UTC day, whatever your time zone. |
 | `assign_owners` | `Owners` of a Story, Defect, Task, Test or Epic | `add` and `remove` (at most five members in all, resolved like `list_members`); only the difference is sent. |
 | `move_to_sprint` | `Timebox` of a Story or Defect | The sprint must belong to the item's own project schedule and be open. |
 
-A closed, deleted or template item is refused (comments may still be added to a closed one). If the item disappears, closes
+`update_fields`, `update_status`, `move_to_sprint` and `assign_owners` replace or remove values, so they advertise `destructiveHint` (their kind stays `write`); `update_fields` refuses to replace a description that has links, images, lists, tables or styles (edit it in Agility). A closed, deleted or template item is refused (comments may still be added to a closed one). If the item disappears, closes
 or changes between the plan and the send, the call is `AB_WRITE_CONFLICT`. These request shapes are the documented ones and
 are not yet verified against a real instance ([RESEARCH](../RESEARCH.md) §1.5, P7-07).
 
@@ -316,7 +316,7 @@ are not yet verified against a real instance ([RESEARCH](../RESEARCH.md) §1.5, 
 
 | Tool | Does | Notes |
 |---|---|---|
-| `close_asset` | closes one Story, Defect, Task, Test or Epic | **destructive**. Refused while the item has open child items (the count is in the message); the approval shows `OpenChildren 0 -> 0`. Closing a closed item is a no-op. |
+| `close_asset` | closes one Story, Defect, Task, Test or Epic | **destructive**. Refused while the item has open child items (the count is in the message); the approval shows `OpenChildren 0 -> 0`. Also refused when the children cannot all be counted: a child type the workspace does not allow, or an epic in a workspace restricted to some projects. Closing a closed item is a no-op. |
 | `reopen_asset` | reopens one closed item | **destructive**. Reopening an open item is a no-op. |
 
 They are two tools so an owner can enable one without the other (name each in the workspace and grant lists). The state

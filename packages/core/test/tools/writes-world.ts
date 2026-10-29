@@ -123,6 +123,7 @@ export function writeRig(
           Date: op('Date')[0]?.text,
           Member: op('Member')[0]?.children[0]?.attributes['idref'],
           Workitem: itemOid,
+          CreateDateUTC: wave2.now,
           IsDeleted: false,
           Scope: item?.['Scope'],
           AssetState: 64,

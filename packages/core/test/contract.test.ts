@@ -338,7 +338,7 @@ describe('tools/list contract', () => {
         },
         {
           "annotations": {
-            "destructiveHint": false,
+            "destructiveHint": true,
             "idempotentHint": true,
             "openWorldHint": true,
             "readOnlyHint": false,
@@ -358,7 +358,7 @@ describe('tools/list contract', () => {
         },
         {
           "annotations": {
-            "destructiveHint": false,
+            "destructiveHint": true,
             "idempotentHint": true,
             "openWorldHint": true,
             "readOnlyHint": false,
@@ -368,7 +368,7 @@ describe('tools/list contract', () => {
         },
         {
           "annotations": {
-            "destructiveHint": false,
+            "destructiveHint": true,
             "idempotentHint": true,
             "openWorldHint": true,
             "readOnlyHint": false,
@@ -408,7 +408,7 @@ describe('tools/list contract', () => {
         },
         {
           "annotations": {
-            "destructiveHint": false,
+            "destructiveHint": true,
             "idempotentHint": true,
             "openWorldHint": true,
             "readOnlyHint": false,

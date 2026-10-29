@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // log_effort (P7-04): logs hours worked by the caller on one work item as an `Actual` (RESEARCH 1.5, unverified until
 // P7-07). The mutation shows the item's logged total before and after, the date and the member. An identical entry
-// (same item, member, date and hours) already there makes the call a no-op, so a retried call never doubles the hours.
+// (same item, member, date and hours) created in the last 10 minutes makes the call a no-op, so a retried call never
+// doubles the hours; an older identical entry does not (D-194). A date left out is the UTC day (D-194).
 import { z } from 'zod';
 import { AbError, ErrorCode } from '../../errors.ts';
 import { resolveMember, runQuery } from '../../identity/resolve.ts';
@@ -20,6 +21,7 @@ import {
   postAsset,
   rereadTarget,
   type Target,
+  withinWindow,
 } from './common.ts';
 
 const TYPES = ['Story', 'Defect', 'Task', 'Test'] as const;
@@ -50,6 +52,9 @@ export function effortDate(value: string | undefined, now: number, maxAgeDays: n
   return date;
 }
 
+/** An identical entry counts as the same call only when it was created inside this window (D-194). */
+export const EFFORT_REPEAT_WINDOW_MS: number = 10 * 60_000;
+
 async function sameEntryExists(
   ctx: Parameters<typeof planTarget>[0],
   itemOid: string,
@@ -57,9 +62,17 @@ async function sameEntryExists(
   date: string,
   hours: number,
 ): Promise<boolean> {
+  const actual = await metadataFor(ctx).assetType('Actual');
+  const created = actual.attributes.has('CreateDateUTC')
+    ? 'CreateDateUTC'
+    : actual.attributes.has('CreateDate')
+      ? 'CreateDate'
+      : undefined;
+  // Without a creation time an old entry cannot be told from a repeat; a second entry is then Agility's to refuse.
+  if (created === undefined) return false;
   const compiled = await compileQuery(ctx, {
     assetType: 'Actual',
-    fields: ['Value', 'Date', 'Member'],
+    fields: ['Value', 'Date', 'Member', created],
     filters: [
       { field: 'Workitem', op: 'eq', value: itemOid },
       { field: 'Member', op: 'eq', value: memberOid },
@@ -72,7 +85,8 @@ async function sameEntryExists(
     (r) =>
       oidsOf(r['Member'])[0] === memberOid &&
       textOf(r['Date'])?.slice(0, 10) === date &&
-      round2(num(r['Value']) ?? Number.NaN) === hours,
+      round2(num(r['Value']) ?? Number.NaN) === hours &&
+      withinWindow(textOf(r[created]), ctx.clock.now(), EFFORT_REPEAT_WINDOW_MS),
   );
 }
 

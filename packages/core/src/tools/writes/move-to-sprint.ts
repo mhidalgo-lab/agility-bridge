@@ -33,6 +33,7 @@ export const moveToSprint: ToolDefinition = defineWriteTool({
   title: 'Move to sprint',
   description: `Move one backlog item or defect into a sprint of its own Agility project, by sprint name, OID token or current, previous or next. A closed sprint is refused. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
+  overwrites: true,
   // Resolution, the item read, the sprint (a relative name takes two requests), its state, the re-read and the write.
   cost: COST,
   idempotent: true,
