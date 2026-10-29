@@ -1,6 +1,6 @@
 # Write tools
 
-> The write **framework** (P7-01) and the **approval page** (P7-02) are built and tested on fakes; the real write tools arrive in P7-04 – P7-06 and are
+> The write **framework** (P7-01) and the **approval page** (P7-02) are built and tested on fakes, with the wave-1 tools (P7-04) and the lifecycle tools (P7-06); they are
 > verified against a writable sandbox in P7-07. Until then no release offers a write tool, and nothing below changes
 > what a running server does. [ADR-0013](../adr/0013-opt-in-writes-human-approval.md) is the policy this page explains.
 
@@ -160,6 +160,22 @@ projects answers "not found"), and refuses a denied asset type before any reques
 A closed, deleted or template item is refused (comments may still be added to a closed one). If the item disappears, closes
 or changes between the plan and the send, the call is `AB_WRITE_CONFLICT`. These request shapes are the documented ones and
 are not yet verified against a real instance ([RESEARCH](../RESEARCH.md) §1.5, P7-07).
+
+## Closing and reopening (lifecycle tools)
+
+| Tool | Does | Notes |
+|---|---|---|
+| `close_asset` | closes one Story, Defect, Task, Test or Epic | **destructive**. Refused while the item has open child items (the count is in the message); the approval shows `OpenChildren 0 -> 0`. Closing a closed item is a no-op. |
+| `reopen_asset` | reopens one closed item | **destructive**. Reopening an open item is a no-op. |
+
+They are two tools so an owner can enable one without the other (name each in the workspace and grant lists). The state
+change is an Agility *operation* (`POST .../Data/<Type>/<id>?op=<Name>`, no body); the name comes from the instance's
+metadata for that type (close: `QuickClose`, `Close` or `Inactivate`, whichever the type has; reopen: `Reactivate`), is shown
+in the approval as `Operation: close_asset:QuickClose` and is part of what the approval binds. A type that has no such
+operation is refused before anything is asked. The approval shows the item, its state (`Open` to `Closed`) and its open
+child count; if a child is opened, or the item is deleted, before the send, the call is `AB_WRITE_CONFLICT`; if someone else
+already made the change it is an idempotent no-op. Agility's own validators still run when the operation is sent; the
+operation names and what they cascade to are *unverified* until the sandbox run (P7-07, [RESEARCH](../RESEARCH.md) 1.5).
 
 ## For a tool author
 

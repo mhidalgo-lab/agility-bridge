@@ -3,6 +3,7 @@
 import type { ToolDefinition } from '../../tool.ts';
 import { addComment } from './add-comment.ts';
 import { assignOwners } from './assign-owners.ts';
+import { LIFECYCLE_TOOLS } from './lifecycle.ts';
 import { logEffort } from './log-effort.ts';
 import { moveToSprint } from './move-to-sprint.ts';
 import { updateStatus } from './update-status.ts';
@@ -13,4 +14,5 @@ export const WRITE_TOOLS: readonly ToolDefinition[] = Object.freeze([
   logEffort,
   assignOwners,
   moveToSprint,
+  ...LIFECYCLE_TOOLS,
 ] as ToolDefinition[]);

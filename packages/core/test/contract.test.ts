@@ -36,8 +36,8 @@ describe('tools/list contract', () => {
 
   it('counts: every group plus the write tools still planned in Phase 7 stays below 40 tools (L-155)', async () => {
     const all = await toolsListContract(CORE_TOOLS);
-    // Nine write tools are planned in all; wave 1 (P7-04) built five of them, so four are still to come.
-    const PLANNED_WRITE_TOOLS = 4;
+    // Nine write tools are planned in all; wave 1 (P7-04) built five and P7-06 two more, so two are still to come.
+    const PLANNED_WRITE_TOOLS = 2;
     expect(all.count + PLANNED_WRITE_TOOLS).toBeLessThan(40);
   });
 
@@ -375,6 +375,26 @@ describe('tools/list contract', () => {
             "title": "Move to sprint",
           },
           "name": "move_to_sprint",
+        },
+        {
+          "annotations": {
+            "destructiveHint": true,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": false,
+            "title": "Close work item",
+          },
+          "name": "close_asset",
+        },
+        {
+          "annotations": {
+            "destructiveHint": true,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": false,
+            "title": "Reopen work item",
+          },
+          "name": "reopen_asset",
         },
       ]
     `,

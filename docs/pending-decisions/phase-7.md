@@ -151,3 +151,27 @@
 - **Options:** (a) `new_status` (one name or OID); candidates are the type's active statuses that have no team or the item's team; an inactive status is refused; only `Status` changes (closing is a separate, destructive tool); (b) reuse `status` as a string (breaks the lint); (c) accept any status of the list and let Agility refuse.
 - **Recommendation:** (a), built.
 - **Owner:** *(open; built as (a))*
+
+### D-185 — Closing and reopening are two tools, not one with an action *(P7-06)*
+- **Context:** ADR-0013 makes close and reopen `destructive`, off by default and approved per change. An owner may want people to reopen a mistakenly closed item without letting them close anything. A single tool with an `action` argument hides two different effects behind one name in the workspace and grant lists.
+- **Options:** (a) `close_asset` and `reopen_asset`, each its own name in the tool lists (so each is enabled and granted on its own, and a client's confirmation prompt names what it does); (b) one `set_asset_state` with `action: close|reopen` (fewer tools, but one switch for both and a weaker approval prompt); (c) close only, reopen left to Agility.
+- **Recommendation:** (a), built. Both are `destructive`, group `writes`, cost-declared, and take only `asset` (plus the framework's `dry_run` and `confirm`). The catalogue stays under 40 tools with every group on.
+- **Owner:** *(open; built as (a))*
+
+### D-186 — Closing an item that has open children is refused, and the approval binds "none open" *(P7-06)*
+- **Context:** Whether Agility's `QuickClose` closes a story's open tasks and tests as well, or its validator refuses, is not verified (RESEARCH 1.5). One approval must not silently close many assets (ADR-0013: one target).
+- **Options:** (a) refuse before approval when a child is open (tasks and tests of a story or defect; epics, stories and defects under an epic), with the count, and add `OpenChildren 0 -> 0` to the mutation so the approval shows it, the hash binds it and a child that appears before the send is `AB_WRITE_CONFLICT`; (b) allow it and say in the approval that Agility may close the children too (unverifiable now, and more than one asset could change); (c) close the children first, one write each (several writes under one approval).
+- **Recommendation:** (a), built. A child type the workspace denies cannot be counted and is skipped (Agility's own validator then decides); the count is capped at 20 per call. Letting a person close a whole subtree is a follow-up (P7-22), after the sandbox shows what Agility does.
+- **Owner:** *(open; built as (a))*
+
+### D-187 — The operation comes from the type's metadata and is part of what is approved *(P7-06)*
+- **Context:** Closing is an Agility operation, not an attribute value (`AssetState` is read-only). Types differ: `QuickClose`, `Close` and `Inactivate` exist on some, `Reactivate` reopens (RESEARCH 1.5, names *unverified*). The validators themselves are Agility's expressions and cannot be evaluated here.
+- **Options:** (a) pick the first of `QuickClose`, `Close`, `Inactivate` (reopen: `Reactivate`) that the type's `meta.v1` operations list; refuse a type with none before approval; show the chosen name in the approval and bind it in the hash (`close_asset:QuickClose`); `send` accepts only a name from that closed list; (b) hard-code one name per tool (breaks on instances that name them differently); (c) let the caller name the operation (a raw passthrough, against ADR-0012).
+- **Recommendation:** (a), built. "Validators checked before approval" means what we can check: the operation exists for the type, the state, the scope, the children. Agility's own validator runs at send time; if it refuses, the error says the change may not have been applied and is audited. The order of preference is a P7-07 item (P7-23).
+- **Owner:** *(open; built as (a))*
+
+### D-188 — No-op and conflict rules for lifecycle writes *(P7-06)*
+- **Context:** A repeated close must not ask again or send anything; a state that changes while the person decides must not be overwritten.
+- **Options:** (a) already closed (close) or not closed (reopen; a future item counts as open) is a no-op at plan time (no approval, no audit, no request); at the re-read a target already in the new state is a no-op and one that was deleted, removed or whose open-child count changed is `AB_WRITE_CONFLICT`; deleted, template and broken-down items are refused at plan time; (b) treat every repeat as a conflict; (c) force the state regardless.
+- **Recommendation:** (a), built. The state shows as `Open` or `Closed` (not Agility's numeric codes) so the approval reads plainly.
+- **Owner:** *(open; built as (a))*

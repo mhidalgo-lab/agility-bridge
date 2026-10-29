@@ -26,6 +26,8 @@ const CALLS: Record<string, Record<string, unknown>> = {
   log_effort: { asset: 'B-01002', hours: 2.5 },
   assign_owners: { asset: 'B-01002', add: ['bob'] },
   move_to_sprint: { asset: 'B-01002', sprint: 'Empty sprint' },
+  close_asset: { asset: 'B-01004' },
+  reopen_asset: { asset: 'B-01001' },
 };
 
 describe('negative authorization: no layer can be skipped', () => {
@@ -61,7 +63,7 @@ describe('negative authorization: no layer can be skipped', () => {
   it('the tools are write kind in the writes group, never read', async () => {
     const { WRITE_TOOLS } = await import('../../src/tools/writes/index.ts');
     for (const t of WRITE_TOOLS) {
-      expect(t.kind).toBe('write');
+      expect(t.kind).toBe(['close_asset', 'reopen_asset'].includes(t.name) ? 'destructive' : 'write');
       expect(t.group).toBe('writes');
       expect(t.writePipeline).toBe(true);
     }
