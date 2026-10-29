@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
   type CallToolResult,
+  inputRequired,
   McpServer,
   type ReadResourceResult,
   ResourceTemplate,
+  type ServerContext,
   type StandardSchemaWithJSON,
 } from '@modelcontextprotocol/server';
 import { type CompletionEvent, completionShape } from './completion.ts';
@@ -23,6 +25,8 @@ import { PROMPT_MANIFEST, type PromptDefinition } from './prompts.ts';
 import { isTemplate, RESOURCE_MANIFEST, type ResourceDefinition, type ResourceReader } from './resources.ts';
 import { annotationsFor, type ToolDefinition, type ToolOutput } from './tool.ts';
 import { VERSION } from './version.ts';
+import { APPROVAL_INPUT_KEY, elicitationChannel } from './writes/elicitation.ts';
+import { InputRequiredSignal } from './writes/runtime.ts';
 
 export interface ServerInfo {
   readonly name: string;
@@ -326,6 +330,28 @@ export function toCallToolResult(out: ToolOutput): CallToolResult {
 }
 
 /**
+ * The context with this request's approval channel and what it means for `whoami` (P7-01): the channel comes from the
+ * capabilities the request declared (elicitation), else the host's out-of-band channel, else none. No write runtime
+ * (writes off) leaves the context unchanged.
+ */
+function withWriteChannel(
+  ctx: ToolContext,
+  sdk: ServerContext,
+  legacyCapabilities: Parameters<typeof elicitationChannel>[1],
+): ToolContext {
+  const rt = ctx.writes;
+  if (rt === undefined) return ctx;
+  const channel = elicitationChannel(sdk, legacyCapabilities) ?? rt.page;
+  const approval =
+    rt.approval === 'off' ? 'not_required' : channel === undefined ? 'unavailable' : channel.kind;
+  return {
+    ...ctx,
+    writes: { ...rt, ...(channel === undefined ? {} : { channel }) },
+    workspace: { ...ctx.workspace, writes: { ...ctx.workspace.writes, approval } },
+  };
+}
+
+/**
  * Build an MCP server for one request (ADR-0005: stateless, one server per request) or one stdio connection.
  * Tools not in `tools` are not registered, so they are neither listed nor callable. Prompts and resources arrive with
  * P6-08 and P6-09 and follow the same rule (only those whose tools are allowed).
@@ -355,8 +381,11 @@ export function buildMcpServer({
         annotations: annotationsFor(def),
         ...(def.outputSchema ? { outputSchema: withCachedJsonSchema(def.outputSchema) } : {}),
       },
-      async (input: unknown): Promise<CallToolResult> => {
-        const ctx = freezeContext({ ...contextFor(), grantedTools: tools.map((t) => t.name) });
+      async (input: unknown, sdkCtx: ServerContext): Promise<CallToolResult> => {
+        const ctx = freezeContext({
+          ...withWriteChannel(contextFor(), sdkCtx, () => server.server.getClientCapabilities()),
+          grantedTools: tools.map((t) => t.name),
+        });
         const logger = ctx.logger.child({ requestId: ctx.requestId, tool: def.name });
         const started = ctx.clock.now();
         const observe = (
@@ -392,6 +421,18 @@ export function buildMcpServer({
           observe('ok', null, out);
           return toCallToolResult(out);
         } catch (error) {
+          if (error instanceof InputRequiredSignal) {
+            // 2026-07-28 approval: ask the person through the client and have it repeat the call (P7-01).
+            return inputRequired({
+              inputRequests: {
+                [APPROVAL_INPUT_KEY]: inputRequired.elicit({
+                  message: error.text,
+                  requestedSchema: error.requestedSchema as never,
+                }),
+              },
+              requestState: error.state,
+            }) as never;
+          }
           const result = toToolErrorResult(
             error,
             ctx.requestId,

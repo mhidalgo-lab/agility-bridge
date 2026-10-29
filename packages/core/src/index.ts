@@ -240,3 +240,4 @@ export {
 export { CORE_TOOLS } from './tools/index.ts';
 export { COMPOSITE_SIBLINGS, type CompositeWarning, compositeWarnings } from './tools/reports/siblings.ts';
 export { VERSION } from './version.ts';
+export * from './writes/index.ts';

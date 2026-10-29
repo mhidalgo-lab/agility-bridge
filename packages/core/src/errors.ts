@@ -29,6 +29,7 @@ export const ErrorCode = {
   WriteApprovalUnavailable: 'AB_WRITE_APPROVAL_UNAVAILABLE',
   WriteApprovalDeclined: 'AB_WRITE_APPROVAL_DECLINED',
   WriteConflict: 'AB_WRITE_CONFLICT',
+  WriteAuditUnavailable: 'AB_WRITE_AUDIT_UNAVAILABLE',
   Internal: 'AB_INTERNAL',
 } as const;
 
