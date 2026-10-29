@@ -62,3 +62,8 @@ None beyond the shared rules in AGENTS.md.
 - [ ] `close_asset`: which of `QuickClose`, `Close`, `Inactivate` each type has and which is right; does `QuickClose` close open tasks and tests (D-186, P7-22); what the validators refuse.
 - [ ] `reopen_asset`: `Reactivate` per type; refused when the parent is closed? (P7-23).
 - [ ] The response of an operation with no body, and the read lag before the state shows (L-051).
+
+## Items moved from P7-08 (documentation walkthrough)
+- [ ] Walk the [write tools guide](../../guide/write-tools.md) on staging against the sandbox: every command, the enablement steps for stdio and for a device-token HTTP connection, and the operator checklist.
+- [ ] Copy each sandbox-verified fact into the guide's "What is unverified" list (remove what is now verified, with date and instance version) and into RESEARCH §1.5; update THREAT_MODEL T31, A2, A6 from "verified on fakes only" where the sandbox shows it.
+- [ ] Record per client, in the client compatibility reference, which of the *not yet run* write rows were run with a real write tool.

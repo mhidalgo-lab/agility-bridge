@@ -368,3 +368,21 @@ is built and tested with the real panel on fakes. Not yet run in a browser suite
 
 Residual: the pending record holds the change's values (customer text) in `kv` for at most ten minutes, until it is answered
 (D-164); the page in the Playwright and ZAP suites and a run with a client that cannot elicit (P7-13); a list of open requests (P7-14).
+
+## 8h. Status after P7-08 (2026-10-29)
+
+The write documentation ([guide](guide/write-tools.md), [client approval table](reference/client-compatibility.md#write-approval-channels-per-client))
+is written, and these rows were re-checked against the code and tests as they stand. **Everything below is verified on fakes
+only**: no write has run against a real Agility instance, no real client has approved a real write tool, and the approval page
+has not run in a browser suite. Those runs are P7-07, P7-10, P7-12 and P7-13.
+
+| Id | Status | Evidence |
+|---|---|---|
+| T31 | implemented, verified on fakes only | Layers: `packages/auth/test/resolve.test.ts` (no write tool with a shared credential, without the server switch, the workspace switch or the OAuth write scope), `packages/http-app/test/writes.test.ts` (absent and refused when the server switch is off or the grant does not name the tool; audit down; no client to approve; over the grant and deployment limit; limiter down), `apps/cli/test/writes.test.ts` (stdio offers a write tool only with `AB_WRITE_TOOLS=on` and `AB_TOOLS` naming it), `packages/core/test/writes/pipeline.test.ts` (each layer missing refuses before any read; approval bound to tool, actor, target and every old and new value; replay, expiry and other-change refused; `confirm` alone never approves), `packages/http-app/test/write-elicitation.test.ts` (sealed round-trip state), `packages/auth/test/guards-reauth.test.ts` and `p4-review-guards.test.ts` (owner with a recent sign-in only; no widening of a workspace or grant that has write tools). Operator procedure: the guide's checklist. Residual: **OAuth writes are not offered at all** (the OAuth server passes `writeScope: false`, so the consent for `mcp:write` ADR-0013 describes does not exist; this is safe but incomplete, [P7-24](tasks/phase-7-writes/P7-24-oauth-write-scope.md), D-189); the multi-isolate ledger on Workers is untested in workerd (P7-10). |
+| A2 | implemented, verified on fakes only | `packages/core/test/tools/writes-wave1.test.ts`, `writes-wave2.test.ts` and `writes-lifecycle.test.ts` (one target; allowlisted fields; refusals before any request; conflict and no-op; the exact bytes sent by a fake that applies the documented effect), `packages/core/test/writes/limiter.test.ts` and `packages/http-app/test/write-limiter.test.ts` (grant and deployment limits, fail closed). Residual: the request shapes, operation names, whether `QuickClose` closes open children and the read lag are Agility's documented behaviour, **unverified until P7-07**; a window edge allows up to twice the limit (D-168). |
+| A6 | partly, verified on fakes only | A shared credential never writes and the audit row names user, grant, device, client, approval channel and hash (`resolve.test.ts`, `pipeline.test.ts`, the audit assertions in `packages/http-app/test/writes.test.ts`). Residual: Agility's own history shows the **token's member**, so a personal credential is what makes the attribution true; a person who lends their token defeats it, and we cannot detect that. Whether Agility history shows our `Author` and dates as expected is unverified (P7-07). |
+| A13 | implemented, verified on fakes only | `packages/http-app/test/approval-page.test.ts` (another user, other workspace, expired, replayed, double submit, tampered hash, CSRF, cross-site, malformed fields, recent sign-in to approve). Residual: no browser suite or DAST run covers the page (P7-13), and a person can still approve something harmful they did not read: the approval shows the whole change but cannot make anyone read it (T31). |
+
+Docs: the guide now states, per layer, how to enable and disable writes and what is unverified, so the residual list above is
+also what an operator reads (L-010, L-133).
+

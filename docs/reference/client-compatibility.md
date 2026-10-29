@@ -67,6 +67,34 @@ The rows marked "not run" are [P6-14](../tasks/phase-6-tool-breadth/P6-14-oauth-
 used dynamic registration against this release (D-68; MCP Inspector did in the Phase 0 spike, above), and none has needed a
 private-use redirect (D-69). Only what the runs above observed is marked **V**: the guides say "documented only" for the rest.
 
+## Write approval channels per client
+
+How each client can approve a write (Phase 7, [write tools guide](../guide/write-tools.md#approval)). **No client has run a
+real write tool yet**: the real tools are built and tested on fakes, and the sandbox and client runs are
+[P7-07](../tasks/phase-7-writes/P7-07-sandbox-write-verification.md), [P7-12](../tasks/phase-7-writes/P7-12-approval-text-in-clients.md)
+and [P7-13](../tasks/phase-7-writes/P7-13-approval-page-e2e-url-elicitation.md). "Verified (P0-07)" means the Phase 0 spike's
+test write was approved and declined through the client; it says the channel works, not that the real approval text reads well.
+The Phase 0 spike used the code `AB_APPROVAL_UNAVAILABLE`; the product's code is `AB_WRITE_APPROVAL_UNAVAILABLE`.
+
+| Client | Protocol era | stdio | Remote HTTP, device token | Remote, OAuth | Evidence |
+|---|---|---|---|---|---|
+| Claude Code | 2026-07-28 | elicitation | elicitation | no write tools yet (P7-24) | Verified (P0-07, 2.1.304): approve and decline on stdio and HTTP. Real write tool: *not yet run* |
+| GitHub Copilot CLI | 2026-07-28 | elicitation | elicitation | no write tools yet | Verified (P0-07, 1.0.87): approve and decline on both. Real write tool: *not yet run* |
+| GitHub Copilot in VS Code | 2026-07-28 | elicitation | elicitation | no write tools yet | Verified (P0-07, 1.142.0): approve and decline on both. Real write tool: *not yet run* |
+| GitHub Copilot in JetBrains | 2025 era | elicitation (declared by the client, *not yet run*) | **approval page** | no write tools yet | Verified (P0-07, 1.19.2): no approval prompt, the write was refused. Approval page with it: *not yet run* |
+| MCP Inspector CLI | 2025 era by default, 2026-07-28 with `--protocol-era modern` | none in the CLI | approval page (2025 era); an SDK error on 2026-07-28 | no write tools yet | Verified (P0-07, 2.11.0): writes refused. Web UI: *not yet run* |
+| Cursor | 2025 era | elicitation (documented) | approval page | no write tools yet | documented only: *not yet run* |
+| Windsurf / Devin Desktop | 2026-07-28 | refused unless the operator relaxes approval (`AB_WRITE_APPROVAL=off`) | approval page | no write tools yet | documented only: *not yet run* |
+| Claude Desktop | via Code tab / connectors | Code tab: elicitation (*not yet run*) | not applicable (Chat tab connectors are OAuth) | no write tools yet | *not yet run* |
+| claude.ai web, Claude mobile | hosted | not applicable | not applicable (connector is OAuth) | no write tools yet | *not yet run* |
+| Copilot cloud agent | tools only | not applicable | none: refused | not applicable | documented only (no approval step in the client) |
+
+Notes. A remote client on the 2025 era cannot be asked at all, because a stateless HTTP request carries no capabilities
+(P0-07), so the page is its only channel. OAuth connections (claude.ai, mobile, connectors, and every client that signs in
+through OAuth) do not offer write tools until P7-24 wires the `mcp:write` scope; until then those clients reach a write only
+through a device token or stdio. Which client shows which channel is also reported by every dry run (`elicitation`, `page`,
+`not_required` or `unavailable`).
+
 ## v0.1 client snippets (P1-14)
 
 The snippets in the [client setup guide](../guide/clients.md) for VS Code, Claude Code, Copilot CLI and JetBrains are

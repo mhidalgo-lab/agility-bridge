@@ -2,7 +2,7 @@
 id: P7-08
 title: Write documentation and threat-model update
 phase: 7
-status: todo
+status: review
 priority: medium
 depends_on: [P7-07]
 adr: ["0013"]

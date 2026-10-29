@@ -42,7 +42,7 @@ How to use it:
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
-| [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241 |
+| [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241, L-402 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297, L-335 |
 | [Top 20](#top-20) | the lessons that save the most time |
 
@@ -1926,6 +1926,13 @@ repeat is pinned as the only accepted one. `scripts/test/numbering.test.ts` fail
 index entry without a lesson and on any new repeated decision number: take the next free number after rebasing, and add the
 index entry in the same edit as the heading.
 *Applied in:* P4-11 review, `scripts/test/numbering.test.ts`.
+
+**L-402 — Check an enablement table against the code that enforces it, not against the ADR.**
+Writing the write guide's "who enables what" table from ADR-0013 listed an OAuth `mcp:write` scope that the access layer
+honours but the OAuth server never issues (`writeScope: false`), so no OAuth connection could write. A layer that exists in the
+policy and in a unit test but is not wired end to end reads as a feature and is a gap. List each layer from the call site that
+sets it, and file what is missing as a task instead of documenting the intent.
+*Applied in:* P7-08, `docs/guide/write-tools.md`, P7-24.
 
 ## T. Agility platform behaviours
 
