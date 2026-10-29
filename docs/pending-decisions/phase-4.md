@@ -249,28 +249,28 @@
 - **Context:** The metadata prefix cache is per instance and lasts about an hour; the stored prefixes can change at any time in the panel.
 - **Options:** (a) cache discovery only and merge the stored overrides on every call; (b) cache the merged map and invalidate on a panel change; (c) cache the merged map and document the delay.
 - **Recommendation:** (a): no cross-request invalidation channel (the Worker has none), the merge is a few entries, and an edit applies at once.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-127 — The users list is paged on the server with offset and limit *(P4-28)*
 - **Context:** `/admin/users` fetched, validated and parsed every user to show 25. Users are a bounded admin list (hundreds), unlike the audit log.
 - **Options:** (a) `limit` and `offset` (and `ids`) on `GET /users`, sliced before the rows are serialized; (b) a keyset cursor on `(created_at, id)`; (c) keep the full list and cache it per request.
 - **Recommendation:** (a): the panel's pager is page-numbered, the list is small, and authorization is unchanged (a member still sees only their own row). Revisit (b) if user counts reach the thousands.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-128 — The audit user filter lists at most 100 users *(P4-28)*
 - **Context:** the audit page loaded every workspace and every user for the filter dropdowns and to turn ids into names.
 - **Options:** (a) the first 100 users in the dropdown, the names of the page's users (and the filtered user) fetched by id; (b) a free-text user filter resolved by email; (c) keep loading everyone.
 - **Recommendation:** (a): bounded cost with no change for teams under 100 users; the filtered user stays selectable. Past 100 users a person is reached through the audit URL or by (b), a candidate follow-up.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-129 — Defaults and limits of the named-provider claim *(P4-24)*
 - **Context:** the owner may name the provider the next binding must come from; how long should that last when no time is given?
 - **Options:** (a) 24 hours by default, at most 7 days; (b) no expiry until the bind; (c) 1 hour.
 - **Recommendation:** (a): long enough for a person to sign in the next working day, short enough that a forgotten claim does not lock the account for good (the owner can unbind again).
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-130 — The provider is a free `idp` name, not a list of configured providers *(P4-24)*
 - **Context:** the admin API and panel do not know which providers the deployment configured; an `idp` is `google`, `github`, `cf-access` or `oidc:<name>`.
 - **Options:** (a) accept an `idp`-shaped name and refuse any other provider's sign-in; a name nobody configured only blocks until expiry; (b) plumb the configured providers into the admin API and validate or offer a select.
 - **Recommendation:** (a) now: a wrong name fails closed (nobody binds) and needs no new plumbing; (b) is a small follow-up if mistyped names turn out to matter.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-29):** Decided: (b), validate the provider against the configured providers (deviates from the recommendation); built in [P4-39](../tasks/phase-4-identity-admin/P4-39-unbind-provider-must-be-configured.md).
