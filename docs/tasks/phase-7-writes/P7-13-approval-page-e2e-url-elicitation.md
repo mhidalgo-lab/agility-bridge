@@ -18,16 +18,20 @@ owner: ""
 The parts of the approval page that need a real browser, a real client or a deployment, which P7-02 could not verify on fakes.
 
 ## Scope
-- Playwright: run the E2E server with write tools on and a test write tool, and cover `/admin/approve/<id>` (the change is shown whole, approve and decline, a stale sign-in is sent to sign in again and returns, another user's link is a 404, CSP and axe stay clean).
-- The DAST (ZAP) scan reaches the page with the same server and finds nothing new.
-- URL-mode elicitation (MCP 2025-11) for clients that declare `elicitation.url`: the pending answer also opens the link in the client; a plain link otherwise. Check which clients declare it (P7-12 matrix) before building.
-- End to end over HTTP on staging with a client that cannot elicit (Copilot in JetBrains, or the MCP Inspector CLI): pending, approve on the page, repeat, applied once (needs P7-04 for a real tool and the writable sandbox).
+Built now (on fakes, in the existing browser suites):
+- `e2e/writes.ts`: a throwaway server with `AB_WRITE_TOOLS=on`, a personal credential, a workspace that allows writes and names `update_status`, a grant for the owner with that tool and a device token. A client without elicitation calls `update_status` over HTTP and gets the pending answer with the link; that link is the page under test.
+- Playwright spec `e2e/approval.spec.ts` (Chromium, 1280 px and 320 px): the change is shown whole (target, every field old and new, change id), approve and decline answer and nothing is left to approve twice, a stale sign-in is sent to sign in again and returns to the page, another person's link and an unknown id are the same 404, a tampered hash approves nothing, CSP and axe stay clean, no horizontal scroll.
+- The ZAP baseline (`e2e/zap.ts`) gets a fourth run that starts at the approval link with the owner's session; no new finding.
+
+Not doable now (left as unchecked items):
+- URL-mode elicitation (MCP 2025-11) for clients that declare `elicitation.url`: no client of the P7-12 matrix is known to declare it, so there is nothing to test it against; follow-up P7-46 records the check and builds it when one does.
+- A staging run with a client that cannot elicit: needs a deployment and the writable sandbox (P7-10, P7-07). The synthetic Agility serves no write endpoint, so the browser suites stop at the recorded approval (the repeat that applies it is covered by the unit tests and by P7-07).
 
 ## Acceptance criteria
 - [ ] E2E spec for the approval page, run in CI (Chromium).
 - [ ] The DAST scan covers the page; no new finding.
-- [ ] URL-mode elicitation built, or a recorded decision that no client declares it yet.
-- [ ] Staging run with a non-eliciting client recorded in the client compatibility reference.
+- [ ] URL-mode elicitation built, or a recorded decision that no client declares it yet (follow-up P7-46).
+- [ ] Staging run with a non-eliciting client recorded in the client compatibility reference (P7-10, P7-07).
 
 ## Security notes
 THREAT_MODEL A13, T31.
