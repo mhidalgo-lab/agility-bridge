@@ -231,6 +231,10 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Recommendation:** (a) now, (c) when evals or usage show an agent failing with the generic route (follow-up P6-28).
 - **Built:** (a).
 - **Owner (2026-10-27):** Decided: as recommended, (a).
+- **Evidence (P6-28, 2026-10-29):** the generic questions for requests, issues, goals, themes, retrospectives and regression
+  tests (Q070 – Q076) were answered through `query_assets` or lookups before it in every run; the misses are lookup chains
+  (`list_asset_types`, `list_projects`), with one wrong answering tool in 14 answers (themes to `list_portfolio_items`).
+  No typed tool: D-98 holds ([evals](../dev/evals.md)).
 
 ### D-99 — Four recipe resources, grouped by what is read together *(P6-06)*
 - **Context:** five types, and the manifest lists every resource to every client, so the list should stay short.

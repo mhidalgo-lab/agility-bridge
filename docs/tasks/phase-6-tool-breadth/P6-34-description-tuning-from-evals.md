@@ -2,7 +2,7 @@
 id: P6-34
 title: Tune tool descriptions from the eval misses
 phase: 6
-status: in-progress
+status: done
 priority: low
 depends_on: [P6-33]
 adr: ["0015"]
@@ -35,7 +35,7 @@ Raise tool-choice accuracy where the LLM eval and the lexical router agree a des
 
 ## Acceptance criteria
 - [x] Router top-1 and top-3 do not fall and the baseline is raised where they improved (78.9 % / 90.8 %; floors unchanged after rounding).
-- [ ] The LLM eval is rerun on the changed descriptions and its report attached.
+- [x] The LLM eval is rerun on the changed descriptions and its report attached ([Sonnet](../../dev/eval-reports/2026-10-29-sonnet-5-5.md), [Opus](../../dev/eval-reports/2026-10-29-opus-5-5.md)).
 - [x] Lints and the `tools/list` size test stay green; tool reference regenerated.
 
 ## Security notes

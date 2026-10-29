@@ -70,7 +70,7 @@ export const turnText = (turn: ModelTurn): string =>
 
 /**
  * Tools an agent reasonably calls first to resolve a name or a type before the tool that answers (P6-33): who "my" is,
- * which project or member a name means, which asset types and attributes exist. A first call to one of these that is not
+ * which project, member or sprint a name means, which asset types and attributes exist. A first call to one of these that is not
  * itself expected gets a scripted lookup result and the second call is scored too (`passAfterLookup`).
  */
 export const LOOKUP_TOOLS: ReadonlySet<string> = new Set([
@@ -78,6 +78,7 @@ export const LOOKUP_TOOLS: ReadonlySet<string> = new Set([
   'list_projects',
   'list_members',
   'list_teams',
+  'list_sprints',
   'list_asset_types',
   'describe_asset_type',
 ]);

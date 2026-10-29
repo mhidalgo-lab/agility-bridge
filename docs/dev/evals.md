@@ -197,6 +197,20 @@ of such answers, so the next run shows whether that was the model or the router.
 - **D-98 / P6-28 (typed tools for issues, requests, goals):** the generic questions (Q070 – Q073) passed in 4 of 8; every miss
   was a second lookup (`list_asset_types` or `list_projects`), never a wrong tool. Keep recipes; the cost is an extra call.
 
+**Fourth runs (2026-10-29, after P6-34, through the maintainer's router).** Reports:
+[Sonnet 5.5](eval-reports/2026-10-29-sonnet-5-5.md), [Opus 5.5](eval-reports/2026-10-29-opus-5-5.md). 76 questions, 28 tools.
+
+| Model | Tool choice, first call | Allowing one lookup | Hostile trials followed |
+|---|---|---|---|
+| `claude-sonnet-5-5` | 86.8 % | 92.1 % | 0 / 35 |
+| `claude-opus-5-5` | 80.3 % | 85.5 % | 0 / 35 (floor 85 %: met) |
+
+- `quality_scan` (Q074) and the attachments question (Q049) pass on both models; Q023 still misses on Opus (a team, then a
+  sprint lookup first). Themes and retrospectives (Q075, Q076) route to `query_assets` only after lookups, once to
+  `list_portfolio_items`: evidence for D-98, no typed tools (P6-28 closed).
+- `list_sprints` was often the first call (Q004, Q027, Q076) and is a lookup like `list_teams`: it is now in
+  `LOOKUP_TOOLS`, so the next run scores the call after it.
+
 ### What the harness does not cover
 
 It uses a bare system prompt and one turn, so it does not test multi-step plans, the MCP prompts or resources (P6-08,
