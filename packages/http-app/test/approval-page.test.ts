@@ -306,6 +306,7 @@ describe('the panel page', () => {
         runtimeFor: () => Promise.reject(new Error('not used')),
         approvals: {
           view: (...a) => page.port.view(...a),
+          list: (...a) => page.port.list(...a),
           decide: (...a) => page.port.decide(...a),
         },
       },
@@ -322,7 +323,7 @@ describe('the panel page', () => {
     const alice = await s.session('alice@example.test');
     const bob = await s.session('bob@example.test');
     const aliceId = s.w.ids.alice;
-    const ask = async (over: { value?: string; userId?: string } = {}) => {
+    const ask = async (over: { value?: string; userId?: string; hash?: string; workspace?: string } = {}) => {
       const userId = over.userId ?? aliceId;
       const channel = page.channelFor({
         grant: { id: 'g', userId, label: null },
@@ -331,7 +332,7 @@ describe('the panel page', () => {
       const reply = await channel?.ask({
         message: 'm',
         requestedSchema: {},
-        hash: 'b'.repeat(64),
+        hash: over.hash ?? 'b'.repeat(64),
         tool: 'update_test_item',
         actor: { id: userId },
         expiresAt: 0,
@@ -344,7 +345,7 @@ describe('the panel page', () => {
         label: '<img src=x onerror=alert(1)>',
       });
       if (reply?.status !== 'pending') throw new Error('expected pending');
-      return { path: new URL(reply.link).pathname, hash: 'b'.repeat(64) };
+      return { path: new URL(reply.link).pathname, hash: over.hash ?? 'b'.repeat(64) };
     };
     const get = (path: string, who: { cookie: string }) =>
       s.send('GET', path, { cookie: who.cookie, site: 'none' });
@@ -369,6 +370,49 @@ describe('the panel page', () => {
     expect(html).not.toContain('<script>alert(1)');
     expect(html).not.toContain('<img src=x');
     expect(html).toContain('Approve this change');
+  });
+
+  it("lists only the signed-in person's open requests, without values, and the list is not another person's", async () => {
+    const p = await panel();
+    const mine = await p.ask({ hash: '1'.repeat(64) });
+    const mine2 = await p.ask({ hash: '2'.repeat(64) });
+    const bobs = await p.ask({ hash: '3'.repeat(64), userId: p.s.w.ids.bob });
+    const res = await p.get('/admin/approve', p.alice);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toContain('no-store');
+    const html = await res.text();
+    expect(html).toContain(mine.path.split('/').pop() as string);
+    expect(html).toContain(mine2.path.split('/').pop() as string);
+    expect(html).not.toContain(bobs.path.split('/').pop() as string);
+    expect(html).toContain('B-00001');
+    expect(html).toContain('Description');
+    // Names only: not the title, not an old or new value.
+    expect(html).not.toContain('alert(1)');
+    expect(html).not.toContain('onerror');
+    const bobHtml = await (await p.get('/admin/approve', p.bob)).text();
+    expect(bobHtml).toContain(bobs.path.split('/').pop() as string);
+    expect(bobHtml).not.toContain(mine.path.split('/').pop() as string);
+    // Nothing waiting, and a request that was answered or has expired, are not listed.
+    await p.post(mine.path, p.alice, { decision: 'decline', hash: mine.hash });
+    const after = await (await p.get('/admin/approve', p.alice)).text();
+    expect(after).not.toContain(mine.path.split('/').pop() as string);
+    expect(after).toContain(mine2.path.split('/').pop() as string);
+    p.s.w.now.t += PENDING_TTL_MS + 1;
+    // A fresh sign-in is not needed to look; an expired request is simply gone.
+    const expired = await p.get('/admin/approve', p.alice);
+    expect(expired.status).toBe(200);
+    expect(await expired.text()).toContain('Nothing is waiting for you.');
+  });
+
+  it('the list needs a sign-in and a bad method changes nothing', async () => {
+    const p = await panel();
+    await p.ask();
+    const anon = await p.s.send('GET', '/admin/approve', { site: 'none' });
+    expect(anon.status).toBe(303);
+    expect(anon.headers.get('location')).toContain('/auth/login');
+    const post = await p.post('/admin/approve', p.alice, { decision: 'approve' });
+    expect([404, 405]).toContain(post.status);
+    expect(await p.ledger.takeGrant(p.aliceId, 'b'.repeat(64), 'ws')).toBeNull();
   });
 
   it('is a 404 for another signed-in person and for a signed-out visitor goes to sign-in', async () => {

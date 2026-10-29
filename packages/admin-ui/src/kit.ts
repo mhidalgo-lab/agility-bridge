@@ -101,12 +101,32 @@ export interface ApprovalView {
   readonly expiresAt: number;
 }
 
+/**
+ * One open request in the list (P7-14): where and what, never a value. The title and the old and new values are only on
+ * the request's own page. The tool, workspace name and asset number are text from the server and Agility: escaped.
+ */
+export interface ApprovalSummary {
+  readonly id: string;
+  readonly tool: string;
+  readonly operation: string;
+  readonly workspaceName: string | null;
+  readonly target: { readonly assetType: string; readonly oid: string; readonly number: string | null };
+  /** Names of the fields the change sets. */
+  readonly fields: readonly string[];
+  readonly changeId: string;
+  /** Epoch ms. */
+  readonly requestedAt: number;
+  readonly expiresAt: number;
+}
+
 /** `gone`: unknown, used, expired or another person's (one answer for all, so nothing is learned from it). */
 export type ApprovalOutcome = 'approved' | 'declined' | 'gone' | 'mismatch';
 
 /** The pending write approvals of the signed-in person (P7-02). The server looks them up by the principal's own id. */
 export interface ApprovalsPort {
   view(c: Context, principal: UiPrincipal, id: string): Promise<ApprovalView | null>;
+  /** The signed-in person's own open requests, soonest to expire first (P7-14); never another person's. */
+  list(c: Context, principal: UiPrincipal): Promise<readonly ApprovalSummary[]>;
   decide(
     c: Context,
     principal: UiPrincipal,

@@ -67,6 +67,7 @@ export {
   type AdminCallResult,
   type AdminUiDeps,
   type ApprovalOutcome,
+  type ApprovalSummary,
   type ApprovalsPort,
   type ApprovalView,
   adminPath,

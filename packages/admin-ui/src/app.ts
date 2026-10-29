@@ -8,6 +8,7 @@
 //   /admin/oauth/*                 connected apps of everyone (owner, admin) and registered OAuth apps (owner), P5-08
 //   /admin/instances, /credentials, /workspaces, /grants (with their device tokens) and /users: P4-04, owners and admins
 //   GET /admin/assets/:file        static assets (public, hashed names, immutable)
+//   GET       /admin/approve       the signed-in person's own open requests (P7-14)
 //   GET, POST /admin/approve/:id   a write waiting for the person's approval (P7-02; only with write tools on)
 //   ALL /admin/*                   signed-in 404 page (everyone else: sign-in redirect)
 //

@@ -15,7 +15,7 @@
 // - The grant lives a few minutes and is for one actor, one workspace and one hash (the pipeline checks all three and
 //   takes it once). Values are never written to the audit (D-160); the audit rows hold ids, field names and the hash.
 // - Only requests with a person behind them (a grant with a user) get this channel: a service grant has nobody to sign in.
-import type { ApprovalOutcome, ApprovalsPort, ApprovalView } from '@agility-bridge/admin-ui';
+import type { ApprovalOutcome, ApprovalSummary, ApprovalsPort, ApprovalView } from '@agility-bridge/admin-ui';
 import type { EffectiveAccess } from '@agility-bridge/auth';
 import {
   type ApprovalChannelPort,
@@ -219,6 +219,35 @@ export function createApprovalPage(options: ApprovalPageOptions): ApprovalPage {
         changeId: shortId(p.hash),
         expiresAt: p.expiresAt,
       };
+    },
+
+    async list(_c, principal): Promise<readonly ApprovalSummary[]> {
+      // The prefix holds the signed-in person's own id, so another person's requests are never in the range. Keys sort by
+      // expiry (the id starts with it); one list and at most MAX_PENDING_PER_USER reads.
+      const now = clock.now();
+      const keys = await kv.list(pendPrefix(principal.userId), { limit: MAX_PENDING_PER_USER });
+      const found = await Promise.all(keys.map(async (key) => parse(await kv.get(key))));
+      return found.flatMap((p): ApprovalSummary[] =>
+        p === null || p.userId !== principal.userId || p.expiresAt <= now
+          ? []
+          : [
+              {
+                id: p.id,
+                tool: p.tool,
+                operation: p.mutation.operation,
+                workspaceName: p.workspaceName,
+                target: {
+                  assetType: p.mutation.target.assetType,
+                  oid: p.mutation.target.oid,
+                  number: p.mutation.target.number ?? null,
+                },
+                fields: p.mutation.changes.map((ch) => ch.field),
+                changeId: shortId(p.hash),
+                requestedAt: p.expiresAt - PENDING_TTL_MS,
+                expiresAt: p.expiresAt,
+              },
+            ],
+      );
     },
 
     async decide(c, principal, id, input): Promise<ApprovalOutcome> {

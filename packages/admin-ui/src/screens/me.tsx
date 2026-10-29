@@ -369,6 +369,11 @@ export function registerMe(ui: Hono, kit: UiKit): void {
               )}
             </section>
           ) : null}
+          {kit.deps.approvals === undefined ? null : (
+            <p>
+              <a href="/admin/approve">Changes waiting for my approval</a>
+            </p>
+          )}
           {audit.ok && audit.value.length > 0 ? (
             <section aria-labelledby="audit-heading">
               <h2 id="audit-heading">My recent changes</h2>
