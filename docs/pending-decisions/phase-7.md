@@ -399,3 +399,22 @@
 - **Options:** (a) write the first letter of each look-alike as a JSON escape in the already JSON-quoted value (`\u0075ntrusted data`) with one fixed note line; the envelope and `neutralise()` stay as they are; (b) refuse caller text with the phrase (blocks honest titles such as "Handle untrusted data in the importer") and rewrite Agility text with a visible note; (c) leave the rewrite and document it.
 - **Recommendation:** (a), built. It shows exactly what is sent (decoding the quoted value as JSON gives the value), refuses nothing, and does not touch the envelope. The cost is a slightly odd-looking `\u0075` in a rare value, explained by the note.
 - **Owner:** *(open; built as (a))*
+
+### D-227 — A caller is told its own grant's count and whether the deployment is spent, not the deployment's number *(P7-16)*
+- **Context:** The task asks that `whoami` and the dry run report the grant's remaining writes without showing another grant's count. The deployment counter is the sum of every grant's use.
+- **Options:** (a) the caller's grant `limit`, `used`, `remaining`, `resetsAt`, plus `deploymentFull: true` when the deployment is spent (so a refusal is explained); the deployment's numbers only to owners and admins; (b) also the deployment's remaining count (shows how busy the others are); (c) the grant's count only (a refusal for a full deployment would be unexplained).
+- **Recommendation:** (a), built.
+- **Owner:** *(open; built as (a))*
+
+### D-228 — Budget reads are two plain `get`s per read, and are not cached *(P7-16)*
+- **Context:** `whoami` and every dry run now read the grant's counter and the deployment's (two `kv` reads, none written). On D1 each is a query.
+- **Options:** (a) read each time, in parallel, only when writes are enabled for the caller; (b) cache for a few seconds (stale counts that mislead exactly when the limit is close); (c) put the count in the access cache.
+- **Recommendation:** (a), built. Two cheap reads on two calls that already make Agility requests; the admin overview adds one read per owner or admin page view.
+- **Owner:** *(open; built as (a))*
+
+### D-229 — The member's own count is in `whoami` and the API, not on My access *(P7-16)*
+- **Context:** A member has no grants page in the panel; My access lists their grants and tokens.
+- **Options:** (a) the member reads their grant's count through `whoami` (the agent) and `GET /grants/{id}/write-budget`; no new panel element; (b) one budget read per grant on My access (a query per grant on every page view).
+- **Recommendation:** (a), built; (b) is easy to add if people ask.
+- **Owner:** *(open; built as (a))*
+

@@ -252,6 +252,13 @@ closed**: if the counters cannot be reached the write is refused (`AB_WRITE_LIMI
   changing or removing it needs an **owner** with a recent sign-in (an administrator cannot loosen what an owner set, and the
   form keeps the value when an administrator saves it); the `grant.update` audit row records the new `rateLimit` and
   `previousWritesPerHour`. It applies from the next write in the current hour (the counter is not reset).
+- **How many are left.** `whoami` (`writes.budget`) and every dry run (`writeBudget`) tell the caller its **own grant's**
+  limit, writes used this hour, writes left and when the hour ends (`resetsAt`), and say `deploymentFull: true` when the whole
+  deployment has used its writes (the deployment's number is not shown to a caller). Reading takes no unit; a dry run with
+  none left says a real call would be refused. If the counters cannot be read the answer is `unknown`, never "unlimited" (the
+  write itself still fails closed). Owners and administrators see the deployment's use on the panel's overview and one
+  grant's use on its page; the same numbers are `GET /api/admin/v1/writes/budget` (owner, admin) and
+  `GET /api/admin/v1/grants/<id>/write-budget` (a member can read only their own grant's).
 - Over a limit: `AB_LIMIT_RATE` with the scope (`grant` or `deployment`), the limit and the seconds until the next hour.
   The refusal makes no read of the target and no send, and writes no intent audit row.
 - **Approval requests are counted too.** Before a person is asked (a prompt in the client, a question round, a new pending

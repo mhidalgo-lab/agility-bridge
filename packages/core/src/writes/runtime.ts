@@ -52,6 +52,29 @@ export interface WriteAuditSink {
   outcome(record: WriteAuditRecord): Promise<void>;
 }
 
+/** One counter of a window: the limit, the writes taken and what is left (never below zero). */
+export interface WriteBudgetCount {
+  readonly limit: number;
+  readonly used: number;
+  readonly remaining: number;
+}
+
+/**
+ * The write budget of the current window (P7-16), read without taking a unit. `unknown`: the counters could not be read
+ * or held something that is not a count; never to be shown as "unlimited" (the write itself still fails closed).
+ */
+export type WriteBudget =
+  | { readonly status: 'unknown' }
+  | {
+      readonly status: 'ok';
+      /** Epoch ms: when the window ends and the counters start again. */
+      readonly windowEndsAt: number;
+      /** The grant's counter, against the lower of the configured limit and the grant's own cap. */
+      readonly grant: WriteBudgetCount;
+      /** The deployment's counter; `null` where there is none (stdio). */
+      readonly deployment: WriteBudgetCount | null;
+    };
+
 /** Write rate limit seam (P7-03): throws `AB_LIMIT_RATE` / `AB_LIMIT_QUOTA` to refuse. Fails closed. */
 export interface WriteLimiter {
   check(info: {
@@ -66,6 +89,8 @@ export interface WriteLimiter {
     /** The grant's own hourly cap (P7-15): the limiter uses the lower of this and its configured value. */
     readonly grantLimit?: number;
   }): Promise<void>;
+  /** The budget of this window for the actor's grant, read only (P7-16). Absent where a limiter cannot say. */
+  budget?(info: { readonly actor: WriteActor; readonly grantLimit?: number }): Promise<WriteBudget>;
 }
 
 /** What to show the person and how to ask. */

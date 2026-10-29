@@ -493,6 +493,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
           ...(sessions === undefined ? {} : { sessions }),
         }),
         ...(sessions === undefined ? {} : { revokeUserSessions: (id: string) => sessions.revokeUser(id) }),
+        ...(options.writes?.budget === undefined ? {} : { writeBudget: options.writes.budget }),
         storage: options.storage,
         tools: options.access.tools,
         onChange: () => cache.clear(),

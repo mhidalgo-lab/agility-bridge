@@ -64,6 +64,31 @@ export function writeLimiterContract(name: string, make: () => Promise<LimiterWo
       }
     });
 
+    it('reads the budget without taking a unit, on every store (P7-16)', async () => {
+      const w = await make();
+      const l = build(w, { perGrant: 3, deployment: 5 });
+      const read = async (id: string) =>
+        (l.budget as NonNullable<WriteLimiter['budget']>)({ actor: grant(id).actor });
+      expect(await read('g1')).toMatchObject({
+        status: 'ok',
+        grant: { limit: 3, used: 0, remaining: 3 },
+        deployment: { limit: 5, used: 0, remaining: 5 },
+      });
+      expect(await outcome(l.check(grant('g1')))).toBe('ok');
+      expect(await outcome(l.check(grant('g1')))).toBe('ok');
+      for (let i = 0; i < 4; i++) await read('g1');
+      expect(await read('g1')).toMatchObject({
+        grant: { used: 2, remaining: 1 },
+        deployment: { used: 2, remaining: 3 },
+      });
+      // Reading took nothing: the third write is admitted, the fourth is refused.
+      expect(await outcome(l.check(grant('g1')))).toBe('ok');
+      expect(await outcome(l.check(grant('g1')))).toBe(`${ErrorCode.LimitRate}:grant`);
+      expect(await read('g2')).toMatchObject({ grant: { used: 0 }, deployment: { used: 3 } });
+      w.advance(WRITE_LIMIT_WINDOW_MS);
+      expect(await read('g1')).toMatchObject({ grant: { used: 0, remaining: 3 }, deployment: { used: 0 } });
+    });
+
     it('refuses at the deployment limit, across grants, and a grant over its limit does not spend it', async () => {
       const w = await make();
       const l = build(w, { perGrant: 2, deployment: 4 });

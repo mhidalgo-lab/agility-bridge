@@ -26,6 +26,7 @@ import {
 import { adminPath, type UiKit, type UiPrincipal } from '../kit.ts';
 import { errorPage, htmlResponse } from '../pages.tsx';
 import {
+  budgetText,
   type Credential,
   type Grant,
   isId,
@@ -36,6 +37,7 @@ import {
   parseTool,
   parseUser,
   parseWorkspace,
+  parseWriteBudget,
   rows,
   type Tool,
   type User,
@@ -618,12 +620,15 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
       const g = await loadGrant(c, principal, id);
       if ('status' in g) return loadFailed(c, g, principal);
       const ws = await loadWorkspace(c, principal, g.workspaceId);
-      const [tokens, users, creds, tools] = await Promise.all([
+      const [tokens, users, creds, tools, budget] = await Promise.all([
         load(kit, c, principal, adminPath`/grants/${id}/tokens`, (b) => rows(b, parseToken)),
         usersOf(c, principal),
         'status' in ws ? Promise.resolve([] as Credential[]) : credentialsOf(c, principal, ws.instanceId),
         catalogue(c, principal),
+        // This grant's writes this hour (P7-16); a failed read is shown as unknown.
+        kit.callAdmin(c, principal, { method: 'GET', path: adminPath`/grants/${id}/write-budget` }),
       ]);
+      const writeBudget = isOk(budget) ? parseWriteBudget(budget.body, 'grant') : null;
       const person = users.find((u) => u.id === g.userId);
       const credential = creds.find((k) => k.id === g.credentialId);
       const t = now();
@@ -685,6 +690,9 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
                 ],
                 ['Limits', limitsSummary(g.limits).join('; ') || 'inherited from the workspace'],
                 ['Rate', g.perMinute === null ? "the server's default" : `${g.perMinute} requests a minute`],
+                ...(writeBudget !== null && writeBudget.state === 'off'
+                  ? []
+                  : ([['Writes this hour', budgetText(writeBudget)]] as [string, string][])),
                 [
                   'Writes per hour',
                   g.writesPerHour === null ? "the server's limit" : `${g.writesPerHour} (an owner's cap)`,

@@ -15,6 +15,7 @@ import {
   type WriteActor,
   type WriteAuditRecord,
   type WriteAuditSink,
+  type WriteBudget,
   type WriteLimiter,
   type WriteRateLimits,
   type WriteRuntime,
@@ -29,6 +30,11 @@ export interface HttpWrites {
   runtimeFor(access: EffectiveAccess): Promise<WriteRuntime>;
   /** The approval page's side of the panel (P7-02); absent when sign-in is not configured (no page channel then). */
   readonly approvals?: ApprovalsPort;
+  /**
+   * The write budget of this hour for one grant (its counter and the deployment's), read without taking a unit
+   * (P7-16). For the admin API; never throws (a failing store is `unknown`).
+   */
+  readonly budget?: (grantId: string, grantLimit?: number) => Promise<WriteBudget>;
 }
 
 export interface HttpWritesOptions {
@@ -113,6 +119,14 @@ export function createHttpWrites(options: HttpWritesOptions): HttpWrites {
       }));
   return {
     ...(page === undefined ? {} : { approvals: page.port }),
+    async budget(grantId, grantLimit) {
+      return (
+        (await limiter.budget?.({
+          actor: { id: grantId, grantId },
+          ...(grantLimit === undefined ? {} : { grantLimit }),
+        })) ?? { status: 'unknown' }
+      );
+    },
     async runtimeFor(access) {
       const actor: WriteActor = {
         id: access.grant.userId ?? access.grant.id,
@@ -134,7 +148,13 @@ export function createHttpWrites(options: HttpWritesOptions): HttpWrites {
       const own = (access.rateLimit as { writesPerHour?: unknown } | null | undefined)?.writesPerHour;
       const grantLimit = typeof own === 'number' ? own : undefined;
       const grantLimiter: WriteLimiter =
-        grantLimit === undefined ? limiter : { check: (info) => limiter.check({ ...info, grantLimit }) };
+        grantLimit === undefined
+          ? limiter
+          : {
+              check: (info) => limiter.check({ ...info, grantLimit }),
+              budget: (info) =>
+                limiter.budget?.({ ...info, grantLimit }) ?? Promise.resolve({ status: 'unknown' }),
+            };
       return {
         approval: 'required',
         ...(channel === undefined ? {} : { page: channel }),

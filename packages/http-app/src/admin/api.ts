@@ -16,7 +16,13 @@ import {
   type TokenListItem,
   type ToolInfo,
 } from '@agility-bridge/auth';
-import { type Clock, COMPOSITE_SIBLINGS, CORE_TOOLS, type Logger } from '@agility-bridge/core';
+import {
+  type Clock,
+  COMPOSITE_SIBLINGS,
+  CORE_TOOLS,
+  type Logger,
+  type WriteBudget,
+} from '@agility-bridge/core';
 import type {
   AccessToken,
   AuditEntry,
@@ -183,6 +189,8 @@ export interface AdminApiOptions {
    * owner-only unbind may name (P4-39). Absent = none can be named.
    */
   readonly configuredIdps?: readonly string[];
+  /** Reads the write budget of a grant (and the deployment's) without taking a unit; absent when write tools are off (P7-16). */
+  readonly writeBudget?: (grantId: string, grantLimit?: number) => Promise<WriteBudget>;
   /** `AB_WRITE_RATE_PER_GRANT_HOURLY`: the most a grant's own hourly write limit may be (P7-15). */
   readonly writeRateCap?: number;
   /** OAuth is on (P5-04): the signed-in person's connected apps. Absent = the `/me/oauth-devices` routes answer 404. */
@@ -494,6 +502,16 @@ const AuditStatsQuery = z.object({
   to: z.coerce.number().int().min(0).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
+const BudgetCount = z.object({ limit: z.number(), used: z.number(), remaining: z.number() });
+const WriteBudgetOut = z
+  .object({
+    enabled: z.boolean(),
+    status: z.enum(['ok', 'unknown']).optional(),
+    windowEndsAt: z.number().optional(),
+    grant: BudgetCount.optional(),
+    deployment: BudgetCount.nullable().optional(),
+  })
+  .openapi('WriteBudget');
 const WriteStatsQuery = z.object({
   workspaceId: z.string().max(128).optional(),
   from: z.coerce.number().int().min(0).optional(),
@@ -1393,6 +1411,26 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
   );
   add(
     {
+      method: 'get',
+      path: '/grants/{id}/write-budget',
+      ...gr,
+      params: true,
+      summary:
+        "One grant's writes used this hour and its limit (the lower of the server's and the grant's own cap), read without taking a unit. Owners and admins any grant, a member only their own (another is a 404). `{ enabled: false }` when write tools are off.",
+      out: WriteBudgetOut,
+    },
+    async (c, { id }) => {
+      // The guarded read decides visibility: a member's other grants are "not found".
+      const grant = found(await services(c).grants.get(id), 'grant');
+      const own = (grant.rateLimit as { writesPerHour?: unknown } | null)?.writesPerHour;
+      return budgetOut(await options.writeBudget?.(id, typeof own === 'number' ? own : undefined), {
+        grant: true,
+        deployment: false,
+      });
+    },
+  );
+  add(
+    {
       method: 'post',
       path: '/grants/{id}/revoke',
       ...gr,
@@ -1960,6 +1998,36 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
         ...(q.limit === undefined ? {} : { limit: q.limit }),
       });
       return { data: stats.rows, scanned: stats.scanned, truncated: stats.truncated };
+    },
+  );
+
+  /** The shape both budget routes answer: only what the route asks for is in it. */
+  const budgetOut = (b: WriteBudget | undefined, parts: { grant: boolean; deployment: boolean }) =>
+    b === undefined
+      ? { enabled: false }
+      : b.status !== 'ok'
+        ? { enabled: true, status: 'unknown' as const }
+        : {
+            enabled: true,
+            status: 'ok' as const,
+            windowEndsAt: b.windowEndsAt,
+            ...(parts.grant ? { grant: b.grant } : {}),
+            ...(parts.deployment ? { deployment: b.deployment } : {}),
+          };
+  add(
+    {
+      method: 'get',
+      path: '/writes/budget',
+      tag: 'audit',
+      summary:
+        'The deployment\'s writes used this hour and its limit, read without taking a unit (owner, admin). `{ enabled: false }` when write tools are off; `unknown` when the counters cannot be read, never "unlimited".',
+      out: WriteBudgetOut,
+    },
+    async (c) => {
+      const actor = c.get('actor' as never) as Actor;
+      if (actor.kind === 'user' && actor.role === 'member')
+        throw new AdminError('forbidden', 'This needs an owner or an admin.');
+      return budgetOut(await options.writeBudget?.('-'), { grant: false, deployment: true });
     },
   );
 

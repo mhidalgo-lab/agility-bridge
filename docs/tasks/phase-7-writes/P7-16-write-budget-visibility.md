@@ -2,7 +2,7 @@
 id: P7-16
 title: Show the remaining write budget
 phase: 7
-status: in-progress
+status: done
 priority: low
 depends_on: [P7-03]
 adr: ["0013"]

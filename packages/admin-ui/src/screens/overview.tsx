@@ -5,6 +5,7 @@
 import type { Hono } from 'hono';
 import { DataTable, Facts, Layout, LinkButton, SignOut, Time } from '../components.tsx';
 import type { UiKit } from '../kit.ts';
+import { budgetText, parseWriteBudget } from './data.ts';
 
 interface UserRow {
   readonly email: string;
@@ -31,9 +32,13 @@ export function registerOverview(ui: Hono, kit: UiKit): void {
     kit.page('member', async (c, page) => {
       const { principal } = page;
       let users: ReturnType<typeof userRows> | undefined;
+      let writes: ReturnType<typeof parseWriteBudget> | undefined;
       if (principal.role !== 'member') {
         const res = await kit.callAdmin(c, principal, { method: 'GET', path: '/users' });
         users = res.status === 200 ? userRows(res.body) : null;
+        // The deployment's writes this hour (P7-16): shown only where write tools exist; a failed read says unknown.
+        const budget = await kit.callAdmin(c, principal, { method: 'GET', path: '/writes/budget' });
+        writes = budget.status === 200 ? parseWriteBudget(budget.body, 'deployment') : null;
       }
       return page.html(
         <Layout title="Overview" viewer={principal} current="/admin" flash={page.flash}>
@@ -56,6 +61,19 @@ export function registerOverview(ui: Hono, kit: UiKit): void {
               <SignOut viewer={principal} everywhere />
             </div>
           </section>
+          {writes === undefined || (writes !== null && writes.state === 'off') ? null : (
+            <section class="card" aria-labelledby="writes-heading">
+              <h2 id="writes-heading">Writes this hour</h2>
+              <Facts
+                items={[
+                  ['Whole server', budgetText(writes)],
+                  ...(writes !== null && writes.state === 'ok'
+                    ? ([['Resets', <Time at={writes.windowEndsAt} />]] as const)
+                    : []),
+                ]}
+              />
+            </section>
+          )}
           {users === undefined ? null : users === null ? (
             <p class="flash flash-error" role="alert">
               The user list could not be loaded.

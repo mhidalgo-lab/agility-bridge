@@ -4,13 +4,14 @@ import { resolveMember } from '../../identity/resolve.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { shapeOutput, untrusted } from '../../output/result.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
+import { callerWriteBudget } from '../../writes/budget.ts';
 import { compositeWarnings } from '../reports/siblings.ts';
 
 export const whoami: ToolDefinition = defineTool({
   name: 'whoami',
   title: 'Who am I',
   description:
-    'Show who you are connected as: the Agility instance and version, the member behind the token, the workspace, which projects and asset types you can see, enabled tool groups, limits, the per-call request budget and write availability. Not paged.',
+    'Show who you are connected as: the Agility instance and version, the member behind the token, the workspace, which projects and asset types you can see, enabled tool groups, limits, the per-call request budget, write availability and budget. Not paged.',
   kind: 'read',
   group: 'core',
   // Member metadata (cold cache) and the member query.
@@ -24,7 +25,11 @@ export const whoami: ToolDefinition = defineTool({
     assetTypes: z.looseObject({ allow: z.array(z.string()).optional(), deny: z.array(z.string()) }),
     limits: z.looseObject({ maxRows: z.number() }),
     budget: z.looseObject({ requestsPerCall: z.number() }),
-    writes: z.looseObject({ enabled: z.boolean(), approval: z.string() }),
+    writes: z.looseObject({
+      enabled: z.boolean(),
+      approval: z.string(),
+      budget: z.looseObject({ status: z.string() }).optional(),
+    }),
     notes: z.array(z.string()).optional(),
   }),
   handler: async (_input, ctx) => {
@@ -34,6 +39,8 @@ export const whoami: ToolDefinition = defineTool({
     const username = typeof member.row['Username'] === 'string' ? member.row['Username'] : undefined;
     const warnings = compositeWarnings(ctx.grantedTools ?? []);
     const hidden = ctx.hiddenByBudget ?? [];
+    // The grant's own write budget for this hour, read without taking a unit (P7-16).
+    const writeBudget = workspace.writes.enabled ? await callerWriteBudget(ctx) : undefined;
     const structured = {
       member: { oid: member.oid, name: member.name, ...(username === undefined ? {} : { username }) },
       instance: {
@@ -57,6 +64,8 @@ export const whoami: ToolDefinition = defineTool({
         ...((workspace.writes.customFields?.length ?? 0) > 0
           ? { customFields: workspace.writes.customFields?.length }
           : {}),
+        // The grant's own writes left this hour (P7-16).
+        ...(writeBudget === undefined ? {} : { budget: writeBudget }),
       },
       ...(warnings.length === 0 ? {} : { warnings }),
       ...(hidden.length === 0 ? {} : { hiddenByBudget: hidden.map((t) => t.name) }),
@@ -72,7 +81,13 @@ export const whoami: ToolDefinition = defineTool({
         ? 'Every Agility project the member can see is in scope (no project restriction).'
         : `${projects.allowed.length} allowed Agility project(s)${projects.includeChildren ? ' and their sub-projects' : ''}; list_projects shows their names.`,
       workspace.writes.enabled
-        ? `Writes are enabled; approval: ${workspace.writes.approval}.`
+        ? `Writes are enabled; approval: ${workspace.writes.approval}.${
+            writeBudget === undefined
+              ? ''
+              : writeBudget.status === 'ok'
+                ? ` ${writeBudget.remaining} of ${writeBudget.limit} writes left this hour (resets ${writeBudget.resetsAt}).${writeBudget.deploymentFull === true ? ' The whole deployment has used its writes for this hour, so a write would be refused.' : ''}`
+                : ' The writes left this hour are unknown right now.'
+          }`
         : 'Writes are off: every tool is read-only.',
       'Agility access tokens act fully as their member and do not expire: revoke the token on the Agility Applications page when it is no longer needed.',
     ];
