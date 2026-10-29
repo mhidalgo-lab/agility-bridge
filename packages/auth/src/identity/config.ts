@@ -301,6 +301,11 @@ export function providerRouteId(p: ProviderSettings): string {
   return p.name === 'oidc' ? 'oidc' : `oidc-${p.name}`;
 }
 
+/** The identity (`idp`) a provider's sign-ins carry: its kind, or `oidc:<name>` for a generic OIDC provider. */
+export function providerIdp(p: ProviderSettings): string {
+  return p.kind === 'oidc' ? `oidc:${p.name}` : p.kind;
+}
+
 /** Build the providers of `settings`. `fetch` reaches the IdPs (tests inject a mock IdP). */
 export function createIdentityProviders(
   settings: Pick<IdentitySettings, 'providers' | 'policy'>,
@@ -330,7 +335,7 @@ export function createIdentityProviders(
         return createOidcProvider({
           id: providerRouteId(p),
           label: p.label,
-          idp: `oidc:${p.name}`,
+          idp: providerIdp(p),
           issuer: p.issuer,
           clientId: p.clientId,
           clientSecret: p.clientSecret,

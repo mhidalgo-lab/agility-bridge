@@ -2,7 +2,7 @@
 id: P4-39
 title: An unbind claim names only a configured provider
 phase: 4
-status: todo
+status: done
 priority: medium
 depends_on: [P4-24]
 adr: []
@@ -26,9 +26,9 @@ configured ones.
 - The CLI `user unbind --to` gets the same refusal through the API (local mode validates against the same list).
 
 ## Acceptance criteria
-- [ ] An unknown provider is refused before anything is written; a configured one behaves as in P4-24.
-- [ ] Negative authorization tests unchanged and passing; a test for the refusal on the API, the panel and the CLI.
-- [ ] Docs (identity-providers guide, admin API reference) say the provider must be configured.
+- [x] An unknown provider is refused before anything is written; a configured one behaves as in P4-24.
+- [x] Negative authorization tests unchanged and passing; a test for the refusal on the API, the panel and the CLI.
+- [x] Docs (identity-providers guide, admin API reference) say the provider must be configured.
 
 ## Security notes
 THREAT_MODEL T14: the claim narrows who can bind; a refused claim must leave the account as it was.

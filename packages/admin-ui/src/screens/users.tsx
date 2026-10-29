@@ -30,6 +30,7 @@ import {
   FormError,
   field,
   formErrors,
+  formMessage,
   isOk,
   isOwner,
   load,
@@ -138,6 +139,7 @@ function UnbindPage(props: {
   readonly viewer: UiPrincipal;
   readonly user: User;
   readonly message?: string | undefined;
+  readonly providers: readonly { readonly idp: string; readonly label: string }[];
 }) {
   const { viewer, user } = props;
   const self = adminPath`/admin/users/${user.id}`;
@@ -164,13 +166,15 @@ function UnbindPage(props: {
           maxlength={MAX_EMAIL}
           spellcheck={false}
         />
-        <TextField
+        <SelectField
           name="provider"
           label="Only this provider may bind next (optional)"
-          hint="google, github, cf-access or oidc:name. Leave empty to allow any configured provider. A sign-in at another provider is refused for 24 hours."
-          autocomplete="off"
-          maxlength={64}
-          spellcheck={false}
+          hint="Leave it on 'Any configured provider' to allow all of them. A sign-in at another provider is refused for 24 hours."
+          value=""
+          options={[
+            { value: '', label: 'Any configured provider' },
+            ...props.providers.map((p) => ({ value: p.idp, label: `${p.label} (${p.idp})` })),
+          ]}
         />
         <div class="actions">
           <Button variant="danger">Clear the identity</Button>
@@ -568,7 +572,9 @@ export function registerUsers(ui: Hono, kit: UiKit): void {
       if ('status' in u) return loadFailed(c, u, principal);
       // The API refuses these as well; the page is not offered for them.
       if (!canUnbind(principal, u)) return errorPage(404, undefined, principal);
-      return page.html(<UnbindPage viewer={principal} user={u} />);
+      return page.html(
+        <UnbindPage viewer={principal} user={u} providers={kit.deps.identityProviders ?? []} />,
+      );
     }),
   );
 
@@ -584,7 +590,12 @@ export function registerUsers(ui: Hono, kit: UiKit): void {
       // Nothing changes without the confirmation and the retyped email; the typed value is never shown back.
       if (!confirmed(form) || email === null || email.length > MAX_EMAIL) {
         return htmlResponse(
-          <UnbindPage viewer={principal} user={u} message="Type the person's email address to confirm." />,
+          <UnbindPage
+            viewer={principal}
+            user={u}
+            providers={kit.deps.identityProviders ?? []}
+            message="Type the person's email address to confirm."
+          />,
           422,
         );
       }
@@ -602,8 +613,16 @@ export function registerUsers(ui: Hono, kit: UiKit): void {
       if (isOk(res)) return kit.redirect(self, 'identity_cleared');
       const problem = problemOf(res);
       if (problem.status === 422) {
+        // A provider this deployment does not have (a stale form): the API's own sentence, which lists the configured ones.
+        const message =
+          problem.field === 'provider' ? formMessage(problem) : "That is not this person's email address.";
         return htmlResponse(
-          <UnbindPage viewer={principal} user={u} message="That is not this person's email address." />,
+          <UnbindPage
+            viewer={principal}
+            user={u}
+            providers={kit.deps.identityProviders ?? []}
+            message={message}
+          />,
           422,
         );
       }

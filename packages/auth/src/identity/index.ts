@@ -17,6 +17,7 @@ export {
   identitySettingsFromEnv,
   type ProviderSettings,
   parsePublicUrl,
+  providerIdp,
   providerRouteId,
 } from './config.ts';
 export {

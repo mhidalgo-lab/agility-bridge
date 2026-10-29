@@ -213,7 +213,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       {
         name: 'to',
         kind: 'string',
-        help: 'Only this provider may bind the account next (google, github, cf-access or oidc:<name>); a sign-in at another provider is refused',
+        help: 'Only this provider may bind the account next: one this deployment configured (google, github, cf-access or oidc:<name>), otherwise refused with exit 1 before anything changes; a sign-in at another provider is refused',
       },
       {
         name: 'ttl-minutes',

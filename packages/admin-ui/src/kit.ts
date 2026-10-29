@@ -74,6 +74,11 @@ export interface AdminUiDeps {
    * button on the one-time device token page) carries a handle stored here, and the post takes it.
    */
   readonly onceStore: OnceStore;
+  /**
+   * The sign-in providers this deployment configured (`idp` is what a person's identity carries: `google`, `github`,
+   * `cf-access`, `oidc:<name>`; `label` is the name shown). The unbind page offers exactly these (P4-39, D-130).
+   */
+  readonly identityProviders?: readonly { readonly idp: string; readonly label: string }[];
 }
 
 /** Single-use keys with a lifetime (`kv` with an atomic `take` on the server, L-073). */

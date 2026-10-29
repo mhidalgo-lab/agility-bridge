@@ -22,6 +22,8 @@ export interface Opts {
   validate?: { reject?: (token: string) => boolean };
   /** The OAuth server with the built-in consent screen (P5-04; the provider reads the real clock, L-243). */
   oauth?: OAuthOptions;
+  /** A second configured provider, `oidc:other`, nobody signs in with (P4-39: a claim for a configured provider). */
+  secondProvider?: boolean;
 }
 
 export async function setup(options: Opts = {}) {
@@ -41,6 +43,18 @@ export async function setup(options: Opts = {}) {
           clientId: idp.clientId,
           clientSecret: new Secret(idp.clientSecret),
         },
+        ...(options.secondProvider === true
+          ? [
+              {
+                kind: 'oidc' as const,
+                name: 'other',
+                label: 'Other login',
+                issuer: idp.issuer,
+                clientId: idp.clientId,
+                clientSecret: new Secret(idp.clientSecret),
+              },
+            ]
+          : []),
       ],
       policy: EMPTY_LOGIN_POLICY,
     },
