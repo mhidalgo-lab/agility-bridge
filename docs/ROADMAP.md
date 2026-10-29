@@ -326,7 +326,7 @@ Status lives in each task file.
 | P7-05 | [Writes wave 2: create work items and update fields](tasks/phase-7-writes/P7-05-writes-wave-2.md) | medium | P7-04 | review |
 | P7-06 | [Lifecycle operations: close and reopen](tasks/phase-7-writes/P7-06-lifecycle-operations.md) | medium | P7-04 | review |
 | P7-07 | [Sandbox write verification](tasks/phase-7-writes/P7-07-sandbox-write-verification.md) | high | P7-02, P7-05, P7-06 | todo |
-| P7-08 | [Write documentation and threat-model update](tasks/phase-7-writes/P7-08-write-docs-threat-model.md) | medium | P7-07 | todo |
+| P7-08 | [Write documentation and threat-model update](tasks/phase-7-writes/P7-08-write-docs-threat-model.md) | medium | P7-07 | review |
 | P7-09 | [Phase 7 review](tasks/phase-7-writes/P7-09-phase-7-review.md) | high | P7-08, P5-10 | todo |
 | P7-10 | [Write pipeline on staging Workers](tasks/phase-7-writes/P7-10-staging-write-pipeline.md) | medium | P7-01 | todo |
 | P7-11 | [Write rows in the audit viewer, CSV and statistics](tasks/phase-7-writes/P7-11-write-audit-viewer.md) | low | P7-01, P4-05 | todo |
@@ -342,6 +342,8 @@ Status lives in each task file.
 | P7-21 | [Create and update with owners, team, sprint and defaults from New](tasks/phase-7-writes/P7-21-create-update-relations.md) | low | P7-05 | todo |
 | P7-22 | [Close an item together with its open children](tasks/phase-7-writes/P7-22-close-with-children.md) | low | P7-06, P7-07 | todo |
 | P7-23 | [Reopen preconditions: closed parent and per-type operations](tasks/phase-7-writes/P7-23-reopen-preconditions.md) | low | P7-06, P7-07 | todo |
+| P7-24 | [OAuth `mcp:write` scope and non-remembered write consent](tasks/phase-7-writes/P7-24-oauth-write-scope.md) | medium | P7-02, P7-07 | todo |
+| P7-25 | [Keep the write guide equal to the registry and the approval renderer](tasks/phase-7-writes/P7-25-write-docs-drift-test.md) | low | P7-08 | todo |
 
 ### Phase 8
 

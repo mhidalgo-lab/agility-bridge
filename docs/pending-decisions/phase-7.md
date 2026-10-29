@@ -210,3 +210,16 @@
 - **Options:** (a) `item_type` (Story, Defect, Task, Test, Epic) and `name` for the title; `project`, `parent`, `description`, `estimate`, `priority` and `asset` as in the shared vocabulary; (b) reuse `asset_type`.
 - **Recommendation:** (a), built; `project` keeps its shared description.
 - **Owner:** *(open; built as (a))*
+
+### D-189 — Document OAuth writes as "not offered yet" instead of changing the scope here *(P7-08)*
+- **Context:** Writing the guide showed that ADR-0013's OAuth `mcp:write` scope is honoured by the access layer but never issued: the OAuth server advertises `mcp:read` only and always passes `writeScope: false`. A doc that listed the scope as an enablement layer would be wrong (L-133).
+- **Options:** (a) document that OAuth connections never offer write tools today, and file the scope and consent work as P7-24; (b) wire the scope and consent inside this docs task (code in a docs task, a security-relevant OAuth change without its own review); (c) say nothing and keep the ADR's wording.
+- **Recommendation:** (a), built. The current behaviour is safe (fail closed) and P7-24 needs its own tests and a consent design. Owners who need writes from claude.ai or mobile wait for P7-24; IDE and CLI clients use a device token or stdio.
+- **Owner:** *(open; built as (a))*
+
+### D-190 — The per-client approval table says what was run, row by row *(P7-08)*
+- **Context:** The client facts come from the P0-07 spike (a test write approved and declined) and documentation. No client has run a real write tool.
+- **Options:** (a) one row per client with the channel, and the evidence cell separating "verified (P0-07)" from "*not yet run*" for the real tools; (b) a single "approval works" column; (c) wait for P7-12 and P7-13 before publishing the table.
+- **Recommendation:** (a), built. Operators need the channel now; the table must not read as verified for the real approval text.
+- **Owner:** *(open; built as (a))*
+
