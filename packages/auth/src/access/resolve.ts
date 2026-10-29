@@ -106,6 +106,8 @@ export interface EffectiveAccess {
   readonly tools: readonly string[];
   /** Write tools among them (empty unless every write condition holds). */
   readonly writeTools: readonly string[];
+  /** Custom attributes the owner enabled for writing in the workspace; empty unless `writeTools` is (P7-20). */
+  readonly writeCustomFields: readonly string[];
   readonly projects: { readonly allowed: readonly string[]; readonly includeChildren: boolean };
   readonly assetTypes: { readonly allow?: readonly string[]; readonly deny: readonly string[] };
   readonly limits: EffectiveLimits;
@@ -294,6 +296,8 @@ export function resolveAccess(
       },
       tools: Object.freeze(tools),
       writeTools: Object.freeze(writeTools),
+      // Custom attributes are writable only where a write tool is: an empty list otherwise (P7-20).
+      writeCustomFields: Object.freeze(writeTools.length > 0 ? [...(ws.writePolicy.customFields ?? [])] : []),
       projects: { allowed: Object.freeze([...projects]), includeChildren: ws.includeChildScopes },
       assetTypes,
       limits,
@@ -355,6 +359,7 @@ export function resolvePassthroughAccess(
       credential: { id: `pt:${id}`, kind: 'personal' as const, sealed: null },
       tools: Object.freeze(tools),
       writeTools: Object.freeze([]),
+      writeCustomFields: Object.freeze([]),
       projects: { allowed: Object.freeze([...ws.allowedScopeIds]), includeChildren: ws.includeChildScopes },
       assetTypes: effectiveAssetTypes(ws.assetTypes as AssetTypePolicy | null, null),
       limits,

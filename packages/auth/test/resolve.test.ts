@@ -358,6 +358,37 @@ describe('resolveAccess: write tools (ADR-0008, ADR-0013)', () => {
     expect(allowed(writeRecords(), oauth(true)).writeTools).toEqual(['add_comment']);
   });
 
+  it("carries the workspace's writable custom attributes only where a write tool is granted (P7-20)", () => {
+    const ws = { writePolicy: { enabled: true, customFields: ['Custom_A', 'Custom_B'] } };
+    expect(allowed(writeRecords({ ws })).writeCustomFields).toEqual(['Custom_A', 'Custom_B']);
+    // No write tool granted: nothing to carry, whatever the workspace lists.
+    expect(allowed(writeRecords({ ws, g: { tools: ['whoami'] } })).writeCustomFields).toEqual([]);
+    // A shared credential, the missing server switch, OAuth without mcp:write: the same.
+    expect(
+      allowed(writeRecords({ ws }), device(), { ...SETTINGS, writesEnabled: false }).writeCustomFields,
+    ).toEqual([]);
+    expect(allowed(writeRecords()).writeCustomFields).toEqual([]);
+  });
+
+  it('a malformed list of custom attributes makes the workspace policy malformed (the request is refused)', () => {
+    for (const customFields of [
+      ['Name'],
+      ['Custom_'],
+      ['custom_a'],
+      'Custom_A',
+      Array(21).fill('Custom_A'),
+    ]) {
+      const d = resolveAccess(
+        { kind: 'device_token', token: token() },
+        'team-a',
+        writeRecords({ ws: { writePolicy: { enabled: true, customFields } as never } }),
+        SETTINGS,
+        NOW,
+      );
+      expect(d.ok).toBe(false);
+    }
+  });
+
   it('a tool the deployment does not know is ignored with a warning', () => {
     const a = allowed(records({ grant: grant({ tools: ['whoami', 'drop_everything'] }) }));
     expect(a.tools).toEqual(['whoami']);

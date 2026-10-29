@@ -68,6 +68,8 @@ export interface WriteToolSpec<I extends InputSchema> {
   readonly inputSchema: I;
   /** Fields the tool may change, per asset type. A mutation outside it is refused. */
   readonly allowedFields: FieldAllowlist;
+  /** The tool may change the custom attributes the workspace enabled (`ctx.workspace.writes.customFields`, P7-20). */
+  readonly customFields?: boolean;
   /** Repeating the call has no further effect (true for set-a-field operations, false for creates and comments). */
   readonly idempotent?: boolean;
   /** The call replaces or removes an existing value: advertised as `destructiveHint` (the kind stays `write`, D-197). */
@@ -354,7 +356,11 @@ export function defineWriteTool<I extends InputSchema>(spec: WriteToolSpec<I>): 
     const rt = assertEnabled(ctx, spec.name);
     const { dry_run: dryRun, confirm, ...rest } = input as Record<string, unknown>;
     const plan0 = await spec.plan(rest as z.infer<I>, ctx);
-    const mutation = canonicalize(plan0.mutation, spec.allowedFields);
+    const mutation = canonicalize(
+      plan0.mutation,
+      spec.allowedFields,
+      spec.customFields === true ? (ctx.workspace.writes.customFields ?? []) : [],
+    );
     const plan: WritePlan = {
       mutation,
       ...(plan0.version === undefined ? {} : { version: plan0.version }),

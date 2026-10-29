@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // update_fields (P7-05): changes the title, description, estimate, priority or (task and test, P7-17) remaining to-do of one
-// work item, and nothing else. The
+// work item, plus the custom attributes the workspace owner enabled (P7-20), and nothing else. The
 // field allowlist is typed per asset type (fields.ts); custom attributes, the project, the status, owners, parent and every
 // other attribute have no argument and no allowlist entry, so they cannot be reached (D-181). The approval shows old ->
 // new for each field; the re-read compares them. Only fields that actually differ are sent. The shapes are *unverified*
@@ -10,7 +10,7 @@ import { AbError, ErrorCode } from '../../errors.ts';
 import { richText } from '../../output/text.ts';
 import { invalid } from '../../query/limits.ts';
 import type { ToolDefinition } from '../../tool.ts';
-import { defineWriteTool } from '../../writes/index.ts';
+import { CUSTOM_FIELD_RE, defineWriteTool } from '../../writes/index.ts';
 import { assetArg, num, text as textOf } from '../common.ts';
 import type { XmlOp } from './asset-xml.ts';
 import {
@@ -23,6 +23,15 @@ import {
   requireWritable,
   rereadTarget,
 } from './common.ts';
+import {
+  assertReplaceable,
+  checkCustomNames,
+  customArg,
+  customCurrent,
+  customKinds,
+  customOp,
+  planCustom,
+} from './custom.ts';
 import {
   descriptionHtml,
   descriptionText,
@@ -79,7 +88,7 @@ function currentValues(
 export const updateFields: ToolDefinition = defineWriteTool({
   name: 'update_fields',
   title: 'Update fields',
-  description: `Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic, or the remaining to-do hours of a task or test. Give only what changes; the person approves old and new for each. Not paged. Cold call: up to ${COST} Agility requests.`,
+  description: `Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic, the remaining to-do hours of a task or test, or an enabled custom attribute. Give only what changes; the person approves old and new for each. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
   overwrites: true,
   // Resolution, the item read, metadata (cold), the priority (1 to 3), the re-read and the one write.
@@ -114,7 +123,9 @@ export const updateFields: ToolDefinition = defineWriteTool({
       .max(10_000)
       .optional()
       .describe('Remaining hours, for a task or test. Not for a backlog item, defect or epic.'),
+    custom: customArg,
   }),
+  customFields: true,
   allowedFields: Object.fromEntries(FIELD_TYPES.map((t) => [t, FIELD_ALLOWLIST[t]])),
   async plan(input, ctx) {
     if (
@@ -122,17 +133,23 @@ export const updateFields: ToolDefinition = defineWriteTool({
       input.description === undefined &&
       input.estimate === undefined &&
       input.priority === undefined &&
-      input.todo === undefined
+      input.todo === undefined &&
+      (input.custom ?? []).length === 0
     ) {
       throw invalid(
         'Give at least one field to change.',
-        'Fields: name, description, estimate, priority, todo.',
+        'Fields: name, description, estimate, priority, todo, custom.',
       );
     }
     // Check the cheap arguments before any request.
     const name = input.name === undefined ? undefined : itemName(input.name);
     const description = input.description === undefined ? undefined : descriptionText(input.description);
-    const target = await planTarget(ctx, input.asset, { types: FIELD_TYPES, fields: READ_FIELDS });
+    // The caller's custom names are checked against the workspace's list before any request.
+    const customNames = checkCustomNames(ctx, input.custom);
+    const target = await planTarget(ctx, input.asset, {
+      types: FIELD_TYPES,
+      fields: [...READ_FIELDS, ...customNames],
+    });
     if (!isFieldType(target.assetType))
       throw invalid(`${target.assetType} cannot be changed with this tool.`);
     const type = target.assetType;
@@ -179,6 +196,11 @@ export const updateFields: ToolDefinition = defineWriteTool({
         new: labelOf(priority.name, priority.oid),
       });
     }
+    for (const c of await planCustom(ctx, type, input.custom)) {
+      const was = customCurrent(target.row, c.field, c.kind);
+      assertReplaceable(target.row, c, was, target.number ?? target.oid);
+      changes.push({ field: c.field, old: was as string | number | null, new: c.value });
+    }
     return {
       mutation: {
         operation: 'update_fields',
@@ -196,14 +218,23 @@ export const updateFields: ToolDefinition = defineWriteTool({
   async reread(plan, ctx) {
     const t = plan.mutation.target;
     const type = t.assetType as FieldType;
-    const now = await rereadTarget(ctx, t.assetType, t.oid, READ_FIELDS);
-    const current = currentValues(now.row, type);
+    const customFields = plan.mutation.changes.map((c) => c.field).filter((f) => CUSTOM_FIELD_RE.test(f));
+    const now = await rereadTarget(ctx, t.assetType, t.oid, [...READ_FIELDS, ...customFields]);
+    const current: Record<string, string | number | null> = currentValues(now.row, type);
+    for (const [field, kind] of await customKinds(ctx, t.assetType, customFields)) {
+      current[field] = customCurrent(now.row, field, kind) as string | number | null;
+    }
     return {
       values: Object.fromEntries(plan.mutation.changes.map((c) => [c.field, current[c.field] ?? null])),
       ...(now.version === undefined ? {} : { version: now.version }),
     };
   },
   async send(plan, ctx) {
+    const kinds = await customKinds(
+      ctx,
+      plan.mutation.target.assetType,
+      plan.mutation.changes.map((c) => c.field).filter((f) => CUSTOM_FIELD_RE.test(f)),
+    );
     const ops = plan.mutation.changes.flatMap((c): XmlOp[] => {
       if (c.old === c.new) return [];
       switch (c.field) {
@@ -221,8 +252,15 @@ export const updateFields: ToolDefinition = defineWriteTool({
           return typeof c.new === 'string'
             ? [{ relation: 'Priority', act: 'set' as const, oids: [oidOfLabel(c.new)] }]
             : [];
-        default:
-          return [];
+        default: {
+          const kind = kinds.get(c.field);
+          return kind === undefined ||
+            c.new === null ||
+            typeof c.new === 'object' ||
+            typeof c.new === 'boolean'
+            ? []
+            : [customOp(c.field, kind, c.new)];
+        }
       }
     });
     if (ops.length === 0) throw new AbError(ErrorCode.Internal, 'update_fields lost its changes.');

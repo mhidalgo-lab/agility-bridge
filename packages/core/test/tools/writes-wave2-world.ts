@@ -80,6 +80,10 @@ export function updateItem(env: Wave2Env, row: Mutable, root: XmlElement): boole
         ? Number(child.text)
         : (child.text ?? '');
       handled = true;
+    } else if (child.name === 'Attribute' && name.startsWith('Custom_')) {
+      // A custom attribute (P7-20): numeric ones are named so in the test metadata, the rest are text.
+      row[name] = name === 'Custom_SyntheticHours' ? Number(child.text) : (child.text ?? '');
+      handled = true;
     } else if (child.name === 'Relation' && name === 'Priority' && child.attributes['act'] === 'set') {
       const ref = child.children[0]?.attributes['idref'] as string;
       row['Priority'] = ref;

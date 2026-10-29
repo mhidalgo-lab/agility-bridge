@@ -363,7 +363,27 @@ operation names and what they cascade to are *unverified* until the sandbox run 
 | Tool | Changes | Notes |
 |---|---|---|
 | `create_work_item` | creates one Story, Defect, Task, Test or Epic | `item_type`, `name` (one line, at most 200 characters), `project` (or a `parent`), optional `description` (plain text, at most 4,000), `estimate` (story points; hours for a task or test; not for an epic) and `priority` (story and defect). A task or test needs a `parent` story or defect and is created in its project; a story, defect or epic may have an epic as `parent`. The approval shows every field of the new item. Repeating the same call (same title and parent, within 30 minutes) is refused and names the item that exists: read it with `get_work_item`. |
-| `update_fields` | `name`, `description`, `estimate`, `priority` and, for a task or test, the remaining hours `todo` of one open item | Old and new are shown for each field and only fields that differ are sent. `todo` is a field here, not part of `log_effort`: it is one request and one approval, never a second write behind another ([D-237](../pending-decisions/phase-7.md)). A description replaces the old one and is plain text. Custom attributes, the project, status, owners, sprint, team and parent cannot be changed with it. |
+| `update_fields` | `name`, `description`, `estimate`, `priority`, for a task or test the remaining hours `todo`, and `custom` attributes of one open item | Old and new are shown for each field and only fields that differ are sent. `todo` is a field here, not part of `log_effort`: it is one request and one approval, never a second write behind another ([D-237](../pending-decisions/phase-7.md)). A description replaces the old one and is plain text. The project, status, owners, sprint, team and parent cannot be changed with it, and a custom attribute only when the workspace owner enabled it (below). |
+
+### Custom attributes (P7-20)
+
+Both tools take a `custom` argument, a list of `{ attribute, value }` (at most five), but **only for attributes the workspace
+owner enabled** for writing. An owner names them per workspace, with a recent sign-in: in the panel (*Owner settings*, "Custom
+attributes agents may write"), through `PATCH /workspaces/{id}` with `writePolicy: { "enabled": true, "customFields":
+["Custom_Risk"] }` (the policy is replaced as a whole, so send both settings), or for stdio with `AB_WRITE_CUSTOM_FIELDS`
+(`writes.custom_fields` in the YAML). At most 20 names, each `Custom_` plus letters, digits and underscores; none by default.
+
+- An attribute that is not on the workspace's list is refused **before any request and before any approval**; the refusal never
+  lists what the owner did enable. A shared credential, a workspace without writes or a grant without the tool has no custom
+  attributes either.
+- Each one is also checked against the instance: it must exist on that item type, be custom, writable, single-valued and of kind
+  text (one line, at most 400 characters), long text (plain text, at most 4,000, sent as escaped paragraphs like a description; an
+  old value with links, lists or styles is not replaced) or number (typed: text for a number is refused, and the other way round).
+  Lists, dates, booleans and rich relations are refused.
+- The approval shows each as `Custom_X` old to new, so the person who approves reads it and the approval binds it; the re-read,
+  conflict and no-op rules are those of the other fields.
+- No tool description names an attribute of any instance (THREAT_MODEL A12). Read the attribute names with `describe_asset_type`;
+  `whoami` says only how many are enabled.
 
 The project of a create must be open and inside the workspace; a parent or item outside it answers "not found". If the project
 or parent changes or closes between the plan and the send, or the item was created meanwhile, the call is `AB_WRITE_CONFLICT`
@@ -378,7 +398,7 @@ negative authorization. What no test can show is how a real Agility instance and
 
 - The **request shapes** of every tool (XML bodies, operation names, which attributes Agility requires or derives) and the
   response of a write; in particular the empty `Timebox` relation that takes an item out of its sprint (P7-17), an `Actual` for
-  another member, and `ToDo` on a task or test.
+  another member, `ToDo` on a task or test, and a custom attribute of each kind (text, long text, number) on create and update (P7-20).
 - Whether Agility keeps a **description** as the escaped paragraphs we send, and how comment text and dates are stored (which
   decides the no-op rules for comments and effort).
 - The **close** and **reopen** operation per asset type and what a close does to open children.

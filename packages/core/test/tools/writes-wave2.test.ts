@@ -148,7 +148,8 @@ describe('the typed field allowlist', () => {
         expect(['Name', 'Description', 'Estimate', 'DetailEstimate', 'ToDo', 'Priority']).toContain(f);
     }
     for (const n of NAMES) {
-      const keys = Object.keys(tool(n).inputSchema.shape);
+      // `custom` is the one deliberate argument that names attributes (P7-20): enabled per workspace, never listed here.
+      const keys = Object.keys(tool(n).inputSchema.shape).filter((k) => k !== 'custom');
       expect(
         keys.filter((k) => /custom|scope|status|owner|sprint|team|attribute|field|where|delete/i.test(k)),
       ).toEqual([]);

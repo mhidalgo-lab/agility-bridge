@@ -95,6 +95,7 @@ function workspaceValues(ws: Workspace): URLSearchParams {
   if (ws.defaultCredentialId !== null) v.set('credential', ws.defaultCredentialId);
   v.set('source', ws.credentialSource);
   if (ws.writesEnabled) v.set('writes', '1');
+  if (ws.customFields.length > 0) v.set('customfields', ws.customFields.join(', '));
   toolValues(ws.enabledTools, v);
   assetTypeValues(ws.assetTypes, v);
   limitValues(ws.limits, v);
@@ -105,6 +106,19 @@ const sameList = (a: readonly string[] | null, b: readonly string[] | null): boo
   a === null || b === null
     ? a === b
     : a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
+
+const CUSTOM_FIELD = /^Custom_[A-Za-z0-9_]{1,80}$/;
+
+/** `Custom_Name` attributes from a text field (P7-20): at most 20, each a plain identifier. */
+function customFieldsFrom(v: string | null): { value: string[] } | { error: string } {
+  const out = [...new Set(words(v))];
+  if (out.length > 20 || out.some((s) => !CUSTOM_FIELD.test(s)))
+    return {
+      error:
+        'Use at most 20 custom attribute names written as Custom_Name (letters, digits and underscores), separated by commas.',
+    };
+  return { value: out };
+}
 
 /** `Scope:123` tokens from a text field; a bare number is taken as a project id. */
 function scopesFrom(v: string | null): { value: string[] } | { error: string } {
@@ -237,6 +251,15 @@ function WorkspaceForm(props: WorkspaceFormProps) {
               hint="Write tools also need the server's write switch, listing in the tools above, and a grant."
               checked={v.has('writes')}
             />
+            <TextField
+              name="customfields"
+              label="Custom attributes agents may write"
+              hint="Optional. Names written as Custom_Name, separated by commas, at most 20. Only create and update tools use them; each is still checked against the instance's own attribute (it must be writable text or a number) and every value needs the person's approval."
+              value={v.get('customfields') ?? ''}
+              maxlength={2_000}
+              spellcheck={false}
+              error={errors['customfields']}
+            />
             <SelectField
               name="source"
               label="Credential source"
@@ -337,8 +360,18 @@ export function registerWorkspaces(ui: Hono, kit: UiKit): void {
     }
     if (owner) {
       const writes = form.fields.has('writes');
-      if (current === null ? writes : writes !== current.writesEnabled)
-        body['writePolicy'] = { enabled: writes };
+      const custom = customFieldsFrom(field(form, 'customfields'));
+      if ('error' in custom) errors['customfields'] = custom.error;
+      // The policy is replaced as a whole, so both settings travel together; nothing is sent when neither changed.
+      else if (
+        current === null
+          ? writes || custom.value.length > 0
+          : writes !== current.writesEnabled || !sameList(custom.value, current.customFields)
+      )
+        body['writePolicy'] = {
+          enabled: writes,
+          ...(custom.value.length > 0 ? { customFields: custom.value } : {}),
+        };
       const source = form.fields.get('source') === 'passthrough' ? 'passthrough' : 'stored';
       if (current === null ? source === 'passthrough' : source !== current.credentialSource)
         body['credentialSource'] = source;
@@ -569,6 +602,10 @@ export function registerWorkspaces(ui: Hono, kit: UiKit): void {
                 ],
                 ['Limits', limitsSummary(ws.limits).join('; ') || "the server's defaults"],
                 ['Writes', ws.writesEnabled ? 'allowed (with the right tools and grants)' : 'off'],
+                [
+                  'Writable custom attributes',
+                  ws.customFields.length === 0 ? 'none' : ws.customFields.join(', '),
+                ],
                 ['Created', <When at={ws.createdAt} />],
               ]}
             />

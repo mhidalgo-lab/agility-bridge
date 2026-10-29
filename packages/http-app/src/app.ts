@@ -943,7 +943,13 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         id: resolved.workspace.id,
         name: resolved.workspace.name,
         groups,
-        writes: { enabled: writes !== undefined, approval: 'unavailable' },
+        writes: {
+          enabled: writes !== undefined,
+          approval: 'unavailable',
+          ...(writes !== undefined && resolved.writeCustomFields.length > 0
+            ? { customFields: [...resolved.writeCustomFields] }
+            : {}),
+        },
       },
       credential: { id: resolved.credential.id, kind: resolved.credential.kind, token: new Secret(token) },
       projects: {

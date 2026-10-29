@@ -150,6 +150,8 @@ export interface Workspace {
   readonly limits: Limits;
   readonly defaultCredentialId: string | null;
   readonly writesEnabled: boolean;
+  /** Custom attributes an agent may write through this workspace (P7-20). */
+  readonly customFields: string[];
   readonly credentialSource: 'stored' | 'passthrough';
   readonly createdAt: number;
   readonly disabledAt: number | null;
@@ -170,6 +172,7 @@ export function parseWorkspace(r: Row): Workspace | null {
     limits: parseLimits(r['limits']),
     defaultCredentialId: strOrNull(r['defaultCredentialId']),
     writesEnabled: obj(r['writePolicy'])['enabled'] === true,
+    customFields: strs(obj(r['writePolicy'])['customFields']),
     credentialSource: r['credentialSource'] === 'passthrough' ? 'passthrough' : 'stored',
     createdAt: int(r['createdAt']),
     disabledAt: intOrNull(r['disabledAt']),

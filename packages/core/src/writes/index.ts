@@ -15,6 +15,7 @@ export {
 } from './limiter.ts';
 export {
   type CanonicalMutation,
+  CUSTOM_FIELD_RE,
   canonicalize,
   displayOld,
   type FieldAllowlist,
@@ -23,6 +24,8 @@ export {
   isNoop,
   MAX_APPROVAL_CHARS,
   MAX_CHANGES,
+  MAX_CUSTOM_FIELDS,
+  MAX_CUSTOM_PER_CALL,
   MAX_LIST_ITEMS,
   MAX_OLD_DISPLAY_CHARS,
   MAX_VALUE_CHARS,

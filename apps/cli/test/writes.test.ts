@@ -31,6 +31,50 @@ describe('configuration', () => {
   });
 });
 
+describe('custom attributes for writing (P7-20)', () => {
+  it('has none by default and reads AB_WRITE_CUSTOM_FIELDS', () => {
+    expect(configured({}).writeCustomFields).toEqual([]);
+    expect(configured({ AB_WRITE_CUSTOM_FIELDS: 'Custom_A, Custom_B,Custom_A' }).writeCustomFields).toEqual([
+      'Custom_A',
+      'Custom_B',
+    ]);
+  });
+
+  it('refuses names that are not custom attributes and more than twenty', () => {
+    for (const bad of ['Name', 'Custom_', 'Custom_a b', 'custom_a', 'Custom_A;drop']) {
+      expect(() => loadConfig({ ...base, AB_WRITE_CUSTOM_FIELDS: bad }), bad).toThrow(ConfigError);
+    }
+    const many = Array.from({ length: 21 }, (_, i) => `Custom_X${i}`).join(',');
+    expect(() => loadConfig({ ...base, AB_WRITE_CUSTOM_FIELDS: many })).toThrow(ConfigError);
+  });
+
+  it('reaches the tools only when a write runtime exists', () => {
+    const env = { AB_WRITE_CUSTOM_FIELDS: 'Custom_A' };
+    const config = configured({ ...env, AB_WRITE_TOOLS: 'on', AB_TOOLS: `whoami,${TEST_TOOL}` });
+    const tools = selectTools(config, [write()]);
+    const on = contextFactory(
+      config,
+      {
+        fetch: () => Promise.reject(new Error('no network')),
+        logger: createLogger({ sink: () => undefined }),
+      },
+      tools,
+    )();
+    expect(on.workspace.writes.customFields).toEqual(['Custom_A']);
+    const off = configured(env);
+    const none = contextFactory(
+      off,
+      {
+        fetch: () => Promise.reject(new Error('no network')),
+        logger: createLogger({ sink: () => undefined }),
+      },
+      selectTools(off, [write()]),
+    )();
+    expect(none.workspace.writes.enabled).toBe(false);
+    expect(none.workspace.writes.customFields).toBeUndefined();
+  });
+});
+
 describe('tool selection', () => {
   const names = (env: Record<string, string>) => selectTools(configured(env), [write()]).map((t) => t.name);
 
