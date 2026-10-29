@@ -14,6 +14,8 @@ export interface ConsentGrantOption {
   readonly label: string;
   /** Tool names the grant allows (effective access, all read-only). */
   readonly tools: readonly string[];
+  /** Write tools the access would give if the person allows changes (P7-24); empty when it cannot write. */
+  readonly writeTools: readonly string[];
   /** Agility projects the grant is limited to (effective access). */
   readonly projectCount: number;
   /** Epoch ms, or null. */
@@ -41,6 +43,8 @@ export interface ConsentPageProps {
   readonly grants: readonly ConsentGrantOption[];
   /** The client asked for a refresh token (stays connected until disconnected or expired). */
   readonly offline: boolean;
+  /** The app asked for `mcp:write`: show the separate "allow changes" choice (never pre-ticked, never remembered). */
+  readonly writeRequested: boolean;
   /** Pre-selected grant id. */
   readonly selected?: string | undefined;
   /** Device name field value. */
@@ -57,7 +61,14 @@ export const CONSENT_FIELDS: {
   readonly grant: 'grant';
   readonly label: 'label';
   readonly handle: 'handle';
-} = Object.freeze({ decision: 'decision', grant: 'grant', label: 'label', handle: 'handle' } as const);
+  readonly write: 'write';
+} = Object.freeze({
+  decision: 'decision',
+  grant: 'grant',
+  label: 'label',
+  handle: 'handle',
+  write: 'write',
+} as const);
 
 /** Longest device name the form accepts. */
 export const CONSENT_LABEL_MAX = 60;
@@ -92,7 +103,7 @@ function GrantChoice(props: {
     <fieldset class="field">
       <legend>Access to give</legend>
       <p class="hint">
-        Read-only tools. The app acts as you, with exactly this access, and loses it when the access is
+        Tools that read. The app acts as you, with exactly this access, and loses it when the access is
         revoked, expires or you disconnect the app.
       </p>
       {props.grants.map((g, i) => {
@@ -122,6 +133,39 @@ function GrantChoice(props: {
           </div>
         );
       })}
+    </fieldset>
+  );
+}
+
+/**
+ * The write choice (P7-24): its own box, never ticked when the page loads or loads again, separate from the access
+ * choice, because changing work items is a different kind of trust than reading them.
+ */
+function WriteChoice(props: { readonly grants: readonly ConsentGrantOption[] }): JSX.Element {
+  const writable = props.grants.filter((g) => g.writeTools.length > 0);
+  if (writable.length === 0) {
+    return (
+      <p class="flash flash-info">
+        The app also asked to make changes. None of your accesses on this workspace allows that, so it will
+        only be able to read.
+      </p>
+    );
+  }
+  return (
+    <fieldset class="field consent-write">
+      <legend>Changes</legend>
+      <p class="hint">
+        Optional, and asked every time. Off, the app can only read. On, it can ask to change work items as you
+        with the access you chose; every change still needs your approval before it is made.
+      </p>
+      <div class="check">
+        <input type="checkbox" id="allow-write" name={CONSENT_FIELDS.write} value="1" />
+        <label for="allow-write">Also allow this app to ask for changes</label>
+        <span class="hint">
+          {writable.map((g) => `${g.label}: ${g.writeTools.join(', ')}.`).join(' ')} Accesses not listed here
+          cannot make changes.
+        </span>
+      </div>
     </fieldset>
   );
 }
@@ -157,6 +201,7 @@ export function ConsentPage(props: ConsentPageProps): JSX.Element {
         {usable ? (
           <>
             <GrantChoice grants={props.grants} selected={props.selected} />
+            {props.writeRequested ? <WriteChoice grants={props.grants} /> : null}
             <TextField
               name={CONSENT_FIELDS.label}
               label="Device name (optional)"

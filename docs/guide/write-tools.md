@@ -70,7 +70,7 @@ shown whole):
 | Workspace | `writePolicy.enabled` (panel: *Allow writes*) and the tool named in the workspace's tool list | admin API or panel, **owners only**, recent sign-in |
 | Grant | the tool named in the grant's tool list ("all tools" never includes a write) | admin API, CLI or panel; **owners only** for a write tool |
 | Credential | the user's **personal** Agility credential (a shared credential never writes) | the grant's credential |
-| Connection | a **device token** (static header). OAuth connections do not offer write tools yet, see below | the client's configuration |
+| Connection | a **device token** (static header), or an **OAuth** connection whose consent ticked the separate *allow changes* box (`mcp:write`), see below | the client's configuration, or the consent screen |
 | stdio | `AB_WRITE_TOOLS=on` and the tool named in `AB_TOOLS` | the MCP client's `env` block |
 
 Remove any one and the tool is not in `tools/list`. If a client calls it anyway the answer is `AB_TOOL_DISABLED`, before
@@ -78,10 +78,16 @@ anything is read from or sent to Agility. Where an owner has enabled writes, the
 an administrator cannot add projects or asset types to such a workspace, or widen such a grant
 ([THREAT_MODEL](../THREAT_MODEL.md) T31).
 
-> **OAuth and writes.** ADR-0013 plans a separate `mcp:write` OAuth scope with its own consent. The access layer honours
-> that scope (tested), but the OAuth server issues only `mcp:read` and passes no write scope, so **a connection made with
-> OAuth never offers a write tool today**. Writes work over a device token (static header) and over stdio. Wiring the scope
-> and its consent is [P7-24](../tasks/phase-7-writes/P7-24-oauth-write-scope.md).
+> **OAuth and writes** ([P7-24](../tasks/phase-7-writes/P7-24-oauth-write-scope.md)). An app that signs in with OAuth
+> (claude.ai, mobile, connectors) can use write tools only when it asks for the `mcp:write` scope **and** the person ticks a
+> separate *allow changes* box on the consent screen. The box is never ticked when the page opens, is never remembered from an
+> earlier consent (every authorization shows the page) and appears only when the server switch is on, the app asked for the
+> scope and the chosen access can write (its workspace allows writes, its grant names a write tool, its credential is
+> personal). Otherwise the app gets `mcp:read` only: no write tool is listed or runs, and no call reaches Agility. A refresh
+> keeps the scope the token had and cannot add `mcp:write`; to give an app changes later, disconnect it on *My access* and
+> connect it again. Disconnecting, revoking the grant or turning writes off for the workspace removes write at once. Every
+> change still needs the approval described below. Scopes are per token, not per user: a person who connected a read-only
+> app and a write app has two different devices.
 
 ## How to turn writes on
 
@@ -354,7 +360,7 @@ negative authorization. What no test can show is how a real Agility instance and
 - The **read lag** after a write.
 - What each **client renders** of the approval text and form (P7-12), and the approval page in a browser suite (P7-13).
 - The write path over the **Workers** `kv` ledger with several isolates (P7-10).
-- **OAuth** writes: not offered at all yet (P7-24).
+- **OAuth** writes: the consent with a real client (claude.ai or Claude Code) on staging (P7-24, P7-10).
 
 ## For a tool author
 

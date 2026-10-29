@@ -78,21 +78,22 @@ The Phase 0 spike used the code `AB_APPROVAL_UNAVAILABLE`; the product's code is
 
 | Client | Protocol era | stdio | Remote HTTP, device token | Remote, OAuth | Evidence |
 |---|---|---|---|---|---|
-| Claude Code | 2026-07-28 | elicitation | elicitation | no write tools yet (P7-24) | Verified (P0-07, 2.1.304): approve and decline on stdio and HTTP. Real write tool: *not yet run* |
-| GitHub Copilot CLI | 2026-07-28 | elicitation | elicitation | no write tools yet | Verified (P0-07, 1.0.87): approve and decline on both. Real write tool: *not yet run* |
-| GitHub Copilot in VS Code | 2026-07-28 | elicitation | elicitation | no write tools yet | Verified (P0-07, 1.142.0): approve and decline on both. Real write tool: *not yet run* |
-| GitHub Copilot in JetBrains | 2025 era | elicitation (declared by the client, *not yet run*) | **approval page** | no write tools yet | Verified (P0-07, 1.19.2): no approval prompt, the write was refused. Approval page with it: *not yet run* |
-| MCP Inspector CLI | 2025 era by default, 2026-07-28 with `--protocol-era modern` | none in the CLI | approval page (2025 era); an SDK error on 2026-07-28 | no write tools yet | Verified (P0-07, 2.11.0): writes refused. Web UI: *not yet run* |
-| Cursor | 2025 era | elicitation (documented) | approval page | no write tools yet | documented only: *not yet run* |
-| Windsurf / Devin Desktop | 2026-07-28 | refused unless the operator relaxes approval (`AB_WRITE_APPROVAL=off`) | approval page | no write tools yet | documented only: *not yet run* |
-| Claude Desktop | via Code tab / connectors | Code tab: elicitation (*not yet run*) | not applicable (Chat tab connectors are OAuth) | no write tools yet | *not yet run* |
-| claude.ai web, Claude mobile | hosted | not applicable | not applicable (connector is OAuth) | no write tools yet | *not yet run* |
+| Claude Code | 2026-07-28 | elicitation | elicitation | `mcp:write` consent (P7-24) | Verified (P0-07, 2.1.304): approve and decline on stdio and HTTP. Real write tool: *not yet run* |
+| GitHub Copilot CLI | 2026-07-28 | elicitation | elicitation | `mcp:write` consent (P7-24) | Verified (P0-07, 1.0.87): approve and decline on both. Real write tool: *not yet run* |
+| GitHub Copilot in VS Code | 2026-07-28 | elicitation | elicitation | `mcp:write` consent (P7-24) | Verified (P0-07, 1.142.0): approve and decline on both. Real write tool: *not yet run* |
+| GitHub Copilot in JetBrains | 2025 era | elicitation (declared by the client, *not yet run*) | **approval page** | `mcp:write` consent (P7-24) | Verified (P0-07, 1.19.2): no approval prompt, the write was refused. Approval page with it: *not yet run* |
+| MCP Inspector CLI | 2025 era by default, 2026-07-28 with `--protocol-era modern` | none in the CLI | approval page (2025 era); an SDK error on 2026-07-28 | `mcp:write` consent (P7-24) | Verified (P0-07, 2.11.0): writes refused. Web UI: *not yet run* |
+| Cursor | 2025 era | elicitation (documented) | approval page | `mcp:write` consent (P7-24) | documented only: *not yet run* |
+| Windsurf / Devin Desktop | 2026-07-28 | refused unless the operator relaxes approval (`AB_WRITE_APPROVAL=off`) | approval page | `mcp:write` consent (P7-24) | documented only: *not yet run* |
+| Claude Desktop | via Code tab / connectors | Code tab: elicitation (*not yet run*) | not applicable (Chat tab connectors are OAuth) | `mcp:write` consent, own box (P7-24) | *not yet run* |
+| claude.ai web, Claude mobile | hosted | not applicable | not applicable (connector is OAuth) | `mcp:write` consent (P7-24) | *not yet run* |
 | Copilot cloud agent | tools only | not applicable | none: refused | not applicable | documented only (no approval step in the client) |
 
 Notes. A remote client on the 2025 era cannot be asked at all, because a stateless HTTP request carries no capabilities
 (P0-07), so the page is its only channel. OAuth connections (claude.ai, mobile, connectors, and every client that signs in
-through OAuth) do not offer write tools until P7-24 wires the `mcp:write` scope; until then those clients reach a write only
-through a device token or stdio. Which client shows which channel is also reported by every dry run (`elicitation`, `page`,
+through OAuth) offer write tools only when the app asked for the `mcp:write` scope and the person ticked the separate *allow
+changes* box on the consent screen (P7-24, verified on fakes; no real client has run it); an app that does not ask, or a
+person who does not tick, gets a read-only connection. Otherwise a write goes through a device token or stdio. Which client shows which channel is also reported by every dry run (`elicitation`, `page`,
 `not_required` or `unavailable`).
 
 ## v0.1 client snippets (P1-14)

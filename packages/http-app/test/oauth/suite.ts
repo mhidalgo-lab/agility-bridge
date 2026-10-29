@@ -21,7 +21,7 @@ import {
 } from '@modelcontextprotocol/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OAuthRegistrations } from '../../src/index.ts';
-import { APPROVE_HEADER } from './consent.ts';
+import { APPROVE_HEADER, WRITE_HEADER } from './consent.ts';
 import type { FakeDocuments } from './documents.ts';
 
 /** What the suite needs from a running server with OAuth on, two workspaces and the users of `world()`. */
@@ -2121,5 +2121,228 @@ export function defineDeviceActivitySuite(
         expect(Number(await h.storage.kv.get(key))).toBeGreaterThan(Number(first));
       });
     }
+  });
+}
+
+/** The write tool the suite looks for; a real one, so no host needs a test tool. */
+const WRITE_TOOL = 'add_comment';
+const ADD_COMMENT = {
+  jsonrpc: '2.0',
+  id: 3,
+  method: 'tools/call',
+  params: { name: WRITE_TOOL, arguments: { item: 'B-00001', text: 'hello', confirm: true } },
+};
+
+/** Like `authorize`, with the separate write box ticked or not (the test consent reads `x-test-write`). */
+async function authorizeTicked(
+  h: OAuthHost,
+  client: OAuthClientInformationFull,
+  scope: string,
+  tick: boolean,
+): Promise<Authorized> {
+  const { authorizationUrl, codeVerifier } = await startAuthorization(h.origin, {
+    metadata: await metadata(h),
+    clientInformation: client,
+    redirectUrl: REDIRECT,
+    scope,
+    state: 'state-write',
+    resource: resourceOf(h, 'team-a'),
+  });
+  const response = await h.call(authorizationUrl.href, {
+    redirect: 'manual',
+    headers: {
+      [APPROVE_HEADER]: `${h.ids.alice}|${h.ids.aliceGrantA}`,
+      ...(tick ? { [WRITE_HEADER]: '1' } : {}),
+    },
+  });
+  const location =
+    response.headers.get('location') === null ? null : new URL(response.headers.get('location') as string);
+  return {
+    response,
+    location,
+    code: location?.searchParams.get('code') ?? null,
+    state: 'state-write',
+    verifier: codeVerifier,
+    client,
+    redirect: REDIRECT,
+  };
+}
+
+/**
+ * The OAuth `mcp:write` scope (P7-24, ADR-0013, THREAT_MODEL T31 and T9), on every host: requested with `mcp:read`,
+ * ticked separately at consent, carried by the token into the access layer, never widened by a refresh. Every refusal
+ * is a negative test: no write tool listed, no upstream call. Each response is read at once (L-321).
+ */
+export function defineOAuthWriteScopeSuite(
+  name: string,
+  makeHost: (shape: { writes: boolean }) => Promise<OAuthHost>,
+): void {
+  describe(`OAuth mcp:write scope: ${name}`, () => {
+    const open: OAuthHost[] = [];
+    afterEach(async () => {
+      vi.useRealTimers();
+      await Promise.all(open.splice(0).map((h) => h.close()));
+    });
+    /** Owners' side: the workspace and Alice's grant name the write tool explicitly. */
+    async function enableWrites(h: OAuthHost): Promise<void> {
+      await h.storage.workspaces.update(h.ids.workspaceA, {
+        enabledTools: ['whoami', 'get_work_item', 'search_work_items', WRITE_TOOL],
+        writePolicy: { enabled: true },
+      });
+      await h.storage.grants.update(h.ids.aliceGrantA, { tools: ['whoami', WRITE_TOOL] });
+    }
+    const host = async (writes: boolean, enable = true): Promise<OAuthHost> => {
+      const h = await makeHost({ writes });
+      open.push(h);
+      if (writes && enable) await enableWrites(h);
+      return h;
+    };
+    const listed = async (h: OAuthHost, token: string): Promise<string[]> => {
+      const res = await mcp(h, 'team-a', token);
+      const text = await res.text();
+      expect(res.status, text).toBe(200);
+      const json = text.includes('data:') ? (text.split('data:')[1] as string) : text;
+      const body = JSON.parse(json) as { result?: { tools?: { name: string }[] } };
+      return (body.result?.tools ?? []).map((t) => t.name);
+    };
+    /** Authorize with `scope`, the write box ticked or not, and exchange. */
+    async function issue(h: OAuthHost, scope: string, tick: boolean) {
+      const client = await register(h);
+      const a = await authorizeTicked(h, client, scope, tick);
+      expect(a.code, `authorize answered ${a.response.status}`).not.toBeNull();
+      const res = await tokenEndpoint(h, exchangeParams(a, 'team-a', h));
+      const text = await res.text();
+      expect(res.status, text).toBe(200);
+      return { tokens: JSON.parse(text) as OAuthTokens & { scope?: string }, client, a };
+    }
+
+    it('advertises mcp:write only where the server switch for writes is on', async () => {
+      const off = await host(false);
+      const on = await host(true);
+      for (const [h, expected] of [
+        [off, ['mcp:read']],
+        [on, ['mcp:read', 'mcp:write']],
+      ] as const) {
+        const prm = await h.call(`${h.origin}/.well-known/oauth-protected-resource/w/team-a/mcp`);
+        expect(((await prm.json()) as { scopes_supported: string[] }).scopes_supported).toEqual(expected);
+        const meta = await h.call(`${h.origin}/.well-known/oauth-authorization-server`);
+        expect(((await meta.json()) as { scopes_supported: string[] }).scopes_supported).toEqual([
+          ...expected,
+          'offline_access',
+        ]);
+      }
+    });
+
+    it('gives a write tool only to a token whose consent ticked mcp:write', async () => {
+      const h = await host(true);
+      const withWrite = await issue(h, 'mcp:read mcp:write offline_access', true);
+      expect(withWrite.tokens.scope?.split(' ')).toEqual(expect.arrayContaining(['mcp:read', 'mcp:write']));
+      expect(await listed(h, withWrite.tokens.access_token)).toContain(WRITE_TOOL);
+      // Asked for, not ticked: a read-only token; the write tool is neither listed nor runnable.
+      const readOnly = await issue(h, 'mcp:read mcp:write offline_access', false);
+      expect(readOnly.tokens.scope?.split(' ')).not.toContain('mcp:write');
+      expect(await listed(h, readOnly.tokens.access_token)).not.toContain(WRITE_TOOL);
+      const before = h.agilityRequests();
+      const called = await mcp(h, 'team-a', readOnly.tokens.access_token, ADD_COMMENT);
+      expect(await called.text()).not.toContain('"isError":false');
+      expect(h.agilityRequests()).toBe(before);
+      // A plain read consent never lists it, and a tick the app never asked for is refused (no code).
+      const plain = await issue(h, 'mcp:read offline_access', false);
+      expect(plain.tokens.scope?.split(' ')).not.toContain('mcp:write');
+      expect(await listed(h, plain.tokens.access_token)).not.toContain(WRITE_TOOL);
+      const unasked = await authorizeTicked(h, await register(h), 'mcp:read offline_access', true);
+      expect(unasked.code).toBeNull();
+      expect(unasked.response.status).toBe(403);
+    });
+
+    it('refuses the write tick when the workspace does not allow writes or the credential is shared', async () => {
+      const h = await host(true, false);
+      const client = await register(h);
+      const upstream = h.agilityRequests();
+      // Server switch on, workspace and grant not enabled: nothing to allow.
+      const notEnabled = await authorizeTicked(h, client, 'mcp:read mcp:write', true);
+      expect(notEnabled.code).toBeNull();
+      expect(notEnabled.response.status).toBe(403);
+      expect(((await notEnabled.response.json()) as { refused: string }).refused).toBe('write_unavailable');
+      // Enabled, but the grant's credential is shared: shared credentials never write.
+      await enableWrites(h);
+      const shared = (await h.storage.credentials.list({ ownerUserId: null }))[0];
+      expect(shared).toBeDefined();
+      await h.storage.grants.update(h.ids.aliceGrantA, { credentialId: (shared as { id: string }).id });
+      const viaShared = await authorizeTicked(h, client, 'mcp:read mcp:write', true);
+      expect(viaShared.code).toBeNull();
+      expect(viaShared.response.status).toBe(403);
+      expect(h.agilityRequests()).toBe(upstream);
+    });
+
+    it('does not carry mcp:write where the server switch is off, even if asked and ticked', async () => {
+      const h = await host(false);
+      const issued = await issue(h, 'mcp:read mcp:write offline_access', false);
+      expect(issued.tokens.scope?.split(' ')).not.toContain('mcp:write');
+      // The box would not have been offered: a tick is refused, not silently dropped.
+      const ticked = await authorizeTicked(h, await register(h), 'mcp:read mcp:write offline_access', true);
+      expect(ticked.code).toBeNull();
+      expect(ticked.response.status).toBe(403);
+      expect(await listed(h, issued.tokens.access_token)).not.toContain(WRITE_TOOL);
+    });
+
+    it('a refresh keeps the scope the token had and cannot add mcp:write', async () => {
+      const h = await host(true);
+      const write = await issue(h, 'mcp:read mcp:write offline_access', true);
+      const kept = await tokenEndpoint(h, {
+        grant_type: 'refresh_token',
+        refresh_token: write.tokens.refresh_token as string,
+        client_id: write.client.client_id,
+      });
+      const keptText = await kept.text();
+      expect(kept.status, keptText).toBe(200);
+      const keptBody = JSON.parse(keptText) as { access_token: string; scope?: string };
+      expect(keptBody.scope?.split(' ')).toContain('mcp:write');
+      expect(await listed(h, keptBody.access_token)).toContain(WRITE_TOOL);
+      // The read-only authorization asks to widen: refused, and it stays read-only.
+      const read = await issue(h, 'mcp:read offline_access', false);
+      const widen = await tokenEndpoint(h, {
+        grant_type: 'refresh_token',
+        refresh_token: read.tokens.refresh_token as string,
+        client_id: read.client.client_id,
+        scope: 'mcp:read mcp:write',
+      });
+      const widenText = await widen.text();
+      expect(widen.status, widenText).toBe(400);
+      const plain = await tokenEndpoint(h, {
+        grant_type: 'refresh_token',
+        refresh_token: read.tokens.refresh_token as string,
+        client_id: read.client.client_id,
+      });
+      const plainText = await plain.text();
+      expect(plain.status, plainText).toBe(200);
+      const plainBody = JSON.parse(plainText) as { access_token: string; scope?: string };
+      expect(plainBody.scope?.split(' ')).not.toContain('mcp:write');
+      expect(await listed(h, plainBody.access_token)).not.toContain(WRITE_TOOL);
+    });
+
+    it('loses write at once when the workspace turns writes off, and the token at once when the grant is revoked', async () => {
+      const h = await host(true);
+      const write = await issue(h, 'mcp:read mcp:write offline_access', true);
+      expect(await listed(h, write.tokens.access_token)).toContain(WRITE_TOOL);
+      await h.storage.workspaces.update(h.ids.workspaceA, { writePolicy: { enabled: false } });
+      expect(await listed(h, write.tokens.access_token)).not.toContain(WRITE_TOOL);
+      await enableWrites(h);
+      expect(await listed(h, write.tokens.access_token)).toContain(WRITE_TOOL);
+      const before = h.agilityRequests();
+      await h.storage.grants.update(h.ids.aliceGrantA, { revokedAt: Date.now() });
+      const res = await mcp(h, 'team-a', write.tokens.access_token, ADD_COMMENT);
+      await res.text();
+      expect(res.status).toBe(401);
+      expect(h.agilityRequests()).toBe(before);
+    });
+
+    it('audits the scope that was approved', async () => {
+      const h = await host(true);
+      await issue(h, 'mcp:read mcp:write offline_access', true);
+      const rows = await auditRows(h, (r) => r.action === 'oauth.authorize');
+      const scopes = rows.map((r) => (r as { details?: { scope?: string } }).details?.scope ?? '');
+      expect(scopes.some((d) => d.split(' ').includes('mcp:write'))).toBe(true);
+    });
   });
 }

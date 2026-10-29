@@ -245,10 +245,14 @@ export function createConsentScreen(deps: ConsentScreenDeps): ConsentScreen {
           id: g.id,
           label: g.label ?? 'Your access',
           tools: g.tools,
+          writeTools: g.writeTools,
           projectCount: g.projectCount,
           expiresAt: g.expiresAt,
         })),
         offline: r.scope.includes('offline_access'),
+        // The app asked for `mcp:write`: the page then carries a separate, unticked box (P7-24). The tick is never
+        // carried over to a second render.
+        writeRequested: r.scope.includes('mcp:write'),
         selected: state.selected,
         label: state.label,
         error: state.error,
@@ -369,16 +373,37 @@ export function createConsentScreen(deps: ConsentScreenDeps): ConsentScreen {
         refusedRow(c, principal, api, 'grant_not_offered');
         return again(422, 'Choose one of your accesses on this workspace.', undefined, label ?? undefined);
       }
+      // The separate write box: exactly `1` and nothing else counts as ticked, and only when the app asked for it.
+      const write =
+        api.request.scope.includes('mcp:write') && single(fields, mod.CONSENT_FIELDS.write) === '1';
+      if (write && chosen.writeTools.length === 0) {
+        refusedRow(c, principal, api, 'write_unavailable');
+        return again(
+          422,
+          'This access does not allow changes. Leave “allow changes” unticked or choose another access.',
+          chosen.id,
+          label ?? undefined,
+        );
+      }
       const result: OAuthApproval = await api.approve({
         userId: principal.userId,
         grantId: chosen.id,
         label,
+        write,
       });
       if (!result.ok) {
         if (result.reason === 'busy') {
           return again(
             409,
             'Another approval for your account was in progress. Check your choices and allow again.',
+            chosen.id,
+            label ?? undefined,
+          );
+        }
+        if (result.reason === 'write_unavailable') {
+          return again(
+            422,
+            'Changes can no longer be allowed for this access. Leave “allow changes” unticked or choose another access.',
             chosen.id,
             label ?? undefined,
           );

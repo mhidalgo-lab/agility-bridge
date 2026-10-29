@@ -2,10 +2,10 @@
 // A complete server with sign-in for the panel's tests (P4-03): a local fake identity provider, real sessions, and
 // helpers that behave like a browser (fetch metadata, `Origin`, cookies). Same shape as the session tests' own setup.
 import { createIdentityProviders, EMPTY_LOGIN_POLICY, type ToolInfo } from '@agility-bridge/auth';
-import { Secret } from '@agility-bridge/core';
+import { DEFAULT_LIMITS, Secret } from '@agility-bridge/core';
 import { type FakeOidc, fakeOidc, route } from '../../../auth/test/helpers/fake-idp.ts';
 import { ADMIN_BASE, type HttpWrites, type OAuthOptions, type SessionOptions } from '../../src/index.ts';
-import { type World, world } from './world.ts';
+import { TOOL_INFO, type World, world } from './world.ts';
 
 export const MIN = 60_000;
 const ISSUER = 'https://login.example.test';
@@ -26,6 +26,8 @@ export interface Opts {
   secondProvider?: boolean;
   /** The write wiring (P7-02): the approval page needs only `approvals`. */
   writes?: HttpWrites;
+  /** The server switch for write tools is on (`AB_WRITE_TOOLS=on`); the consent screen then offers `mcp:write` (P7-24). */
+  writeSwitch?: boolean;
 }
 
 export async function setup(options: Opts = {}) {
@@ -77,6 +79,24 @@ export async function setup(options: Opts = {}) {
       ...(options.isolation === undefined ? {} : { isolation: options.isolation }),
       ...(options.oauth === undefined ? {} : { oauth: options.oauth }),
       ...(options.writes === undefined ? {} : { writes: options.writes }),
+      ...(options.writeSwitch === true
+        ? {
+            access: {
+              tools: options.tools ?? TOOL_INFO,
+              writesEnabled: true,
+              environment: 'live' as const,
+              limits: {
+                defaults: {
+                  ...DEFAULT_LIMITS,
+                  maxResponseBytes: 8 * 1024 * 1024,
+                  callBudget: 1_000,
+                  genericQuery: true,
+                },
+                ceilings: {},
+              },
+            },
+          }
+        : {}),
     },
     {
       admin: true,
