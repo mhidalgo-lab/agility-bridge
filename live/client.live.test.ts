@@ -284,6 +284,7 @@ describe.skipIf(!target)('production client against the live tenant (read-only)'
       // sibling reads are in reports.live.test.ts. They still need valid arguments.
       release_readiness: { asset: epic },
       work_item_quality: { asset: defect },
+      quality_scan: { epic },
     };
     for (const tool of CORE_TOOLS) {
       // The guard allows no attachment content request, and the download is off by default: `get_attachment` is
