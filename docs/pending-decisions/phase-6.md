@@ -547,3 +547,9 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Options:** (a) one guarded compiler read of `Priority.Name`, `Priority.Order` and, when exactly one single-valued text or relation attribute of Defect has a name containing "severity", that attribute, for the page's OIDs (scope predicate and recheck kept; declared cost 24 to 28; flagged list ordered by priority rank, unprioritised last; failures named as budget, permission or failed); several candidates read none and say so; (b) add the fields to every work-item row (changes four tools and their budgets); (c) leave priority and severity unread.
 - **Recommendation:** (a), built. Live verification of the severity discovery on a real instance is follow-up P6-57 (L-148).
 - **Owner:** *(open; built as a)*
+
+### D-150 — The quality scan is its own tool, scores open items, and reads the epic's own backlog items *(P6-29)*
+- **Context:** `work_item_quality` scores one item through `get_work_item`. The task allows extending it or adding a sibling report, and leaves open which items count and what an epic's items are.
+- **Options:** (a) a new report `quality_scan` (input `sprint` or `epic`, never both) with one batched read of the text fields of open stories and defects, scored by the same `assess` and `summarise`; at most 50 items per type per call, more is partial and says so; for an epic the items whose `Super` is that epic (items below sub-epics are named as not read); gated by the `get_work_item` grant, declared cost 30; (b) add `sprint` and `epic` inputs to `work_item_quality` (one tool with three modes and a mixed output); (c) walk the whole epic tree (up to four levels, several requests more).
+- **Recommendation:** (a), built.
+- **Owner:** *(open; built as a)*

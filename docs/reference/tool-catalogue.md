@@ -33,7 +33,7 @@
 | `collaboration` | on | `get_conversations`, `list_attachments` |
 | `history` | on | `get_asset_history`, `list_recent_changes` |
 | `attachments` | **off** (workspace limit `attachmentDownload`, which a grant can only turn off; `AB_ATTACHMENT_DOWNLOAD` in stdio) | `get_attachment` |
-| `reports` | **off** (workspace limit `reports`, which a grant can only turn off; `AB_REPORTS` in stdio) | `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage`, `work_item_quality` |
+| `reports` | **off** (workspace limit `reports`, which a grant can only turn off; `AB_REPORTS` in stdio) | `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage`, `work_item_quality`, `quality_scan` |
 | `writes` | **off** | `add_comment`, `update_status`, `log_effort`, `assign_owners`, `move_to_sprint`, `create_work_item`, `update_fields`, `close_asset`, `reopen_asset` |
 
 ### Counts and `tools/list` size
@@ -45,13 +45,13 @@ Measured by the contract test (`packages/core/test/contract.test.ts`) on the reg
 |---|---|---|---|---|
 | Default (no opt-in group): `core` 4, `query` 2, `work` 3, `planning` 5, `people` 1, `portfolio` 2, `collaboration` 2, `history` 2 | 21 | **37,498** (35,892 after P6-12, +1,315 for `get_velocity`, the rest from other Phase 6 tasks) | 40,000 (test target 37,600) | 39,179 |
 | `attachments` (opt-in) | +1 | +1,335 | | |
-| `reports` (opt-in) | +5 | +6,952 | | |
-| Every read group | 27 | about **45,500** (44,157 + 1,315) | 72,000 | 47,946 |
+| `reports` (opt-in) | +6 | +8,480 (includes `quality_scan`, P6-29) | | |
+| Every read group | 28 | **47,577** | 72,000 | 47,946 |
 | Every read group + the nine Phase 7 write tools | 35 | about 60,000 (estimate: about 1.8 KB per write tool; measured when Phase 7 lands) | 72,000 | |
 
-Tool count with everything on: 21 default + 1 attachments + 5 reports = 27 read tools, plus the 9 planned write tools
+Tool count with everything on: 21 default + 1 attachments + 6 reports = 28 read tools, plus the 9 planned write tools
 (`add_comment`, `update_status`, `log_effort`, `assign_owners`, `move_to_sprint`, `create_work_item`, `update_fields`,
-`close_asset`, `reopen_asset`) = **36, four below the cap of 40** (L-155). The largest entry is `query_assets` (3.8 KB, the
+`close_asset`, `reopen_asset`) = **37, three below the cap of 40** (L-155). The largest entry is `query_assets` (3.8 KB, the
 generic tool with filters and sort); a test caps one tool at 4,000 bytes and the default catalogue at 37,600 (raised from 36,500 for `get_velocity`, D-140), so a tool
 that does not fit is redesigned or pays for it in the same PR (D-116).
 
@@ -93,6 +93,7 @@ that does not fit is redesigned or pays for it in the same PR (D-116).
 | `release_readiness` | reports | 20 | For an epic (release or initiative): open items, open defects, unestimated open items and sub-epics short of done, from `get_portfolio_tree`. Verdict `ready` only when everything was read and nothing is open, `not_ready` when open work was seen, otherwise `unknown`. Tests are not read. | `asset` (epic), `depth` | `sections[]`, `verdict`, `epic`, `partial`, `notes` |
 | `defect_triage` | reports | 28 | Open defects of a project, team or sprint (first page, at most 100): no owner, no sprint, unchanged for 14 days, and likely duplicates by name similarity. Priority (in the instance’s own rank order, which orders the flagged list) and severity are shown where the instance has them. | `project`, `team`, `sprint` | `sections[]`, `counts`, `partial`, `notes` |
 | `work_item_quality` | reports | 28 | One backlog item or defect scored with the versioned rubric (`agility-bridge://rubrics/backlog-item-quality`, cited by version): mechanical checks with the evidence per criterion, `null` for what could not be assessed, a score range and a level only when the range stays in one. Dependencies are not read. | `asset` | `sections[]`, `rubric`, `criteria[]`, `score`, `scoreMin`, `scoreMax`, `level`, `partial`, `notes` |
+| `quality_scan` | reports | 30 | The open stories and defects of a sprint or an epic (its own backlog items) scored with the same rubric as `work_item_quality`, weakest first, from one batched read of their text. At most 50 per type, more is partial. | `sprint` or `epic` | `sections[]`, `rubric`, `target`, `items[]`, `levels`, `partial`, `notes` |
 
 Reports skip any section whose underlying tool the caller was not granted, with a note (L-037), and are offered as
 MCP Tasks to clients that support them (Phase 8). The `reports` group is absent from `tools/list` and refused by name

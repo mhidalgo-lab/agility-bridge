@@ -6,6 +6,7 @@
 /** Composite tool name -> the tools its sections read (sorted). */
 export const COMPOSITE_SIBLINGS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   defect_triage: Object.freeze(['search_work_items']),
+  quality_scan: Object.freeze(['get_work_item']),
   release_readiness: Object.freeze(['get_portfolio_tree']),
   sprint_health: Object.freeze(['get_sprint', 'search_work_items']),
   standup_summary: Object.freeze(['search_work_items']),

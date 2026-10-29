@@ -2,7 +2,7 @@
 
 # Tool reference
 
-27 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
+28 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
 later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a cold metadata cache.
 
 | Tool | Group | Cost | Title |
@@ -34,6 +34,7 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 | [`release_readiness`](#release_readiness) | reports | 20 | Release readiness |
 | [`defect_triage`](#defect_triage) | reports | 28 | Defect triage |
 | [`work_item_quality`](#work_item_quality) | reports | 28 | Work item quality |
+| [`quality_scan`](#quality_scan) | reports | 30 | Quality scan |
 
 ## `whoami`
 
@@ -511,3 +512,18 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 | `asset` | string | yes |  | Backlog item or defect number (B-01234, D-00012) or OID token (Story:1234). |
 
 `structuredContent`: `sections`, `partial`, `notes`, `rubric`, `criteria` (open: more fields may be added).
+
+## `quality_scan`
+
+**Quality scan** · group `reports` · read · cost 30 Agility requests at most
+
+Rank all the open stories and defects of a sprint or an epic by how ready they are for refinement, weakest first, using the versioned rubric (resource backlog-item-quality) over one read of their text. Give a sprint or an epic. For one item use work_item_quality. An item below a sub-epic is not included. At most 50 items per type; more are reported as partial. Not paged. Cold call: up to 30 Agility requests.
+
+Annotations: read-only true, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `sprint` | string |  |  | Sprint: name, Timebox:<id>, or current, previous or next. |
+| `epic` | string |  |  | Epic number or OID token (its direct backlog items). |
+
+`structuredContent`: `sections`, `rubric`, `items`, `truncated`, `partial`, `notes` (open: more fields may be added).

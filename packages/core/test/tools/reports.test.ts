@@ -8,6 +8,7 @@ import { BACKLOG_ITEM_QUALITY_RUBRIC } from '../../src/rubric.ts';
 import { CORE_TOOLS } from '../../src/tools/index.ts';
 import { defectTriage, nameSimilarity } from '../../src/tools/reports/defect-triage.ts';
 import { assess, type Facts, hasGivenWhenThen, summarise } from '../../src/tools/reports/quality.ts';
+import { SCAN_CAP } from '../../src/tools/reports/quality-scan.ts';
 import { readinessVerdict } from '../../src/tools/reports/release-readiness.ts';
 import { classifySiblingNotes, SPRINT_NOTES } from '../../src/tools/reports/sibling-notes.ts';
 import { paceStatus } from '../../src/tools/reports/sprint-health.ts';
@@ -21,6 +22,7 @@ const ARGS: Record<string, Record<string, unknown>> = {
   release_readiness: { asset: 'E-00001' },
   defect_triage: {},
   work_item_quality: { asset: 'B-01002' },
+  quality_scan: { sprint: 'current' },
 };
 const sections = (
   r: Record<string, unknown>,
@@ -31,7 +33,7 @@ const queried = (bodies: string[], type: string) =>
   bodies.filter((b) => b.includes(`"from":"${type}"`)).length;
 
 describe('the catalogue: reports are in their own opt-in group', () => {
-  it('registers the five reports in group reports, read-only, with a declared cost above their siblings', () => {
+  it('registers the six reports in group reports, read-only, with a declared cost above their siblings', () => {
     for (const name of REPORTS) {
       const tool = toolByName(name);
       expect(tool.group).toBe('reports');
@@ -39,7 +41,7 @@ describe('the catalogue: reports are in their own opt-in group', () => {
       for (const sibling of SIBLINGS[name] ?? [])
         expect(tool.cost).toBeGreaterThanOrEqual(toolByName(sibling).cost);
     }
-    expect(CORE_TOOLS.filter((t) => t.group === 'reports')).toHaveLength(5);
+    expect(CORE_TOOLS.filter((t) => t.group === 'reports')).toHaveLength(6);
   });
 });
 
@@ -944,5 +946,104 @@ describe('defect_triage priority and severity (P6-30)', () => {
     const reads = bodies.filter((b) => b.includes('Priority.Name'));
     expect(reads.length).toBeGreaterThan(0);
     expect(reads.every((b) => !b.includes('Defect:2101'))).toBe(true);
+  });
+});
+
+describe('quality_scan (P6-29)', () => {
+  type Item = {
+    number: string;
+    assetType: string;
+    score?: number;
+    scoreMin: number;
+    scoreMax: number;
+    level?: string;
+  };
+  const one = async (number: string) => {
+    const { call } = rig();
+    return s(await call('work_item_quality', { asset: number }));
+  };
+
+  it('scores the open items of a sprint, weakest first, as one-by-one calls do', async () => {
+    const { call } = rig();
+    const r = await call('quality_scan', { sprint: 'current' });
+    expect(r['isError'], text(r)).toBeUndefined();
+    const out = s(r);
+    const items: Item[] = out.items;
+    // Open stories and defects of the sprint; the done story, the task and the foreign rows are not scored.
+    expect(items.map((i) => i.number).sort()).toEqual(['B-01002', 'B-01004', 'D-01101']);
+    const mins = items.map((i) => i.scoreMin);
+    expect([...mins].sort((a, b) => a - b)).toEqual(mins);
+    expect(out.rubric).toEqual({
+      id: BACKLOG_ITEM_QUALITY_RUBRIC.id,
+      version: BACKLOG_ITEM_QUALITY_RUBRIC.version,
+    });
+    for (const i of items) {
+      const single = await one(i.number);
+      expect(i, i.number).toMatchObject({
+        scoreMin: single.scoreMin,
+        scoreMax: single.scoreMax,
+        ...(single.score === undefined ? {} : { score: single.score }),
+        ...(single.level === undefined ? {} : { level: single.level }),
+      });
+    }
+    expect(sections(r).map((x) => [x.key, x.status])).toEqual([['items', 'ok']]);
+    expect(text(r)).not.toContain('Row from another project');
+    expect(out.partial).not.toBe(true);
+  });
+
+  it('scores the backlog items of an epic the same way and says sub-epics are not read', async () => {
+    const { call } = rig();
+    const r = await call('quality_scan', { epic: 'E-00002' });
+    expect(r['isError'], text(r)).toBeUndefined();
+    const items: Item[] = s(r).items;
+    expect(items.map((i) => i.number).sort()).toEqual(['B-01002', 'B-01004']);
+    for (const i of items) {
+      const single = await one(i.number);
+      expect([i.scoreMin, i.scoreMax]).toEqual([single.scoreMin, single.scoreMax]);
+    }
+    expect(text(r)).toContain('items below its sub-epics are not read');
+  });
+
+  it('refuses a call without exactly one of sprint and epic, and an asset that is not an epic, with no request', async () => {
+    const { call } = rig();
+    for (const args of [{}, { sprint: 'current', epic: 'E-00002' }, { epic: 'B-01002' }]) {
+      const r = await call('quality_scan', args);
+      expect(r['isError'], JSON.stringify(args)).toBe(true);
+      expect(text(r)).toContain('AB_INPUT_INVALID');
+    }
+    const quiet = rig();
+    await quiet.call('quality_scan', {});
+    expect(quiet.fake.requests).toBe(0);
+  });
+
+  it('reports more items than the cap as partial and scores no more than the cap', async () => {
+    const { call } = rig({ extraStories: 60, extraOpen: true });
+    const r = await call('quality_scan', { epic: 'E-00002' });
+    expect(r['isError'], text(r)).toBeUndefined();
+    const out = s(r);
+    expect(out.items).toHaveLength(SCAN_CAP);
+    expect(out.partial).toBe(true);
+    expect(text(r)).toContain(`More than ${SCAN_CAP} open items`);
+  });
+
+  it('reads nothing without get_work_item and names the section as skipped', async () => {
+    const { call, fake } = rig();
+    const r = await call('quality_scan', { sprint: 'current' }, { granted: ['quality_scan'] });
+    expect(r['isError']).toBeUndefined();
+    expect(fake.requests).toBe(0);
+    expect(sections(r).map((x) => x.status)).toEqual(['skipped']);
+    expect(s(r)).not.toHaveProperty('items');
+    expect(s(r).partial).toBe(true);
+  });
+
+  it('is refused with no read when the workspace allows neither stories nor defects', async () => {
+    const { call, fake } = rig();
+    const r = await call(
+      'quality_scan',
+      { sprint: 'current' },
+      { ctx: { assetTypes: { deny: ['Story', 'Defect'] } } },
+    );
+    expect(r['isError']).toBe(true);
+    expect(fake.requests).toBe(0);
   });
 });
