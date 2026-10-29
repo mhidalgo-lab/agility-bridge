@@ -304,3 +304,8 @@
 - **Recommendation:** (a), built: a request without a page cannot hold a grant or denial, so skipping the reads cannot approve anything and fails closed; the range is exact for the printable-ASCII keys the store allows (contract test at the edges: `~`, `%`, `_`, the next character). (b) is P7-30 together with a Free-plan ceiling for the deployment write cap. The memory adapter still filters its map: it is not a database.
 - **Owner (2026-10-29):** Decided: as recommended, (a).
 
+### D-235 — The approval page runs in the browser suites against the synthetic Agility, up to the recorded approval *(P7-13)*
+- **Context:** The browser suites run the built server against a synthetic Agility that serves reads only (`query.v1`, metadata). A real `update_status` ends in a write request to `rest-1.v1/Data`, which the fixture does not answer, and the shape of that request is *unverified* until the sandbox (P7-07).
+- **Options:** (a) drive the real write tool with a client that cannot elicit as far as the pending answer, test the page (view, decline, approve, 404s, stale sign-in, tampering) and stop at the recorded approval; (b) add a fake write endpoint to the fixture so the repeat applies the change (a second copy of the write shapes, tested nowhere against a real Agility); (c) a test-only tool that does not touch Agility.
+- **Recommendation:** (a), built: the page and its approval ledger are what the browser suites can verify; the apply is covered by the unit tests on the fake write endpoint and by P7-07. (c) would test a tool that ships nowhere. URL-mode elicitation is deferred to P7-46 until a client that declares `elicitation.url` is known.
+- **Owner:** *(open; built as (a))*

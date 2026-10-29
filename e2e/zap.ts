@@ -5,7 +5,8 @@
 // server only:
 //   1. /auth/login          not signed in (the pages an attacker sees first)
 //   2. /admin               signed in as the owner (session cookie), spidered through the links of the panel
-//   3. /api/admin/v1        every operation of the OpenAPI document, with the bootstrap admin token, passive only (`-S`)
+//   3. /admin/approve/<id>  a pending write approval (P7-13), signed in as the owner it belongs to
+//   4. /api/admin/v1        every operation of the OpenAPI document, with the bootstrap admin token, passive only (`-S`)
 // A run fails on any unreviewed alert of risk Medium or High. Accepted alerts live in `.zap/rules.tsv` with a reason.
 import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -13,6 +14,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import globalSetup from './global-setup.ts';
 import { startServer, type TestServer } from './server.ts';
+import { requestApproval, setupWrites, WRITES_ENV } from './writes.ts';
 
 /** Pinned by digest (the `stable` tag moves). Update with `docker pull ghcr.io/zaproxy/zaproxy:stable`. */
 export const ZAP_IMAGE =
@@ -168,7 +170,7 @@ async function main(): Promise<number> {
   mkdirSync(OUT, { recursive: true });
   chmodSync(OUT, 0o777); // the container's `zap` user writes the reports
   const cleanup = globalSetup();
-  const server = await startServer({ env: { AB_OAUTH: 'on' } });
+  const server = await startServer({ env: { AB_OAUTH: 'on', ...WRITES_ENV } });
   const desktop = dockerIsDesktop();
   if (desktop) startRelay(Number(new URL(server.base).port));
   const secrets: string[] = [server.adminToken];
@@ -189,6 +191,12 @@ async function main(): Promise<number> {
     const issued = await server.api('POST', `/grants/${grantId}/tokens`, { label: 'scan device' });
     if (issued.status !== 201) throw new Error(`seed token: ${issued.status}`);
     secrets.push(...server.seededTokens(), (issued.json as { token: string }).token);
+
+    // A pending write approval for the owner (P7-13): the page `/admin/approve/<id>` is linked from nowhere in the panel,
+    // so a scan that only spiders from `/admin` would never see it. The client that asked cannot elicit.
+    const writes = await setupWrites(server, cookie);
+    const approvalPath = await requestApproval(server, writes.deviceToken);
+    secrets.push(writes.deviceToken);
 
     // The API description needs the admin token too (it is not public): fetch it here and hand ZAP the file, so the scan
     // imports every operation instead of stopping at a 401.
@@ -225,6 +233,23 @@ async function main(): Promise<number> {
           'admin.json',
           '-r',
           'admin.html',
+          '-z',
+          header(0, 'Cookie', cookie).join(' '),
+        ],
+      },
+      {
+        // The approval page of a pending write, signed in as the person it belongs to. The spider may answer its form (it is
+        // the throwaway server's own record, and the synthetic Agility serves no write), so nothing real is ever changed.
+        name: 'approval',
+        args: [
+          'zap-baseline.py',
+          '-t',
+          `${server.base}${approvalPath}`,
+          ...common,
+          '-J',
+          'approval.json',
+          '-r',
+          'approval.html',
           '-z',
           header(0, 'Cookie', cookie).join(' '),
         ],

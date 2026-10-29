@@ -2,7 +2,7 @@
 id: P7-13
 title: Approval page in the browser suites, URL-mode elicitation and a non-eliciting client on staging
 phase: 7
-status: todo
+status: review
 priority: medium
 depends_on: [P7-02, P7-04]
 adr: ["0013"]
@@ -28,8 +28,8 @@ Not doable now (left as unchecked items):
 - A staging run with a client that cannot elicit: needs a deployment and the writable sandbox (P7-10, P7-07). The synthetic Agility serves no write endpoint, so the browser suites stop at the recorded approval (the repeat that applies it is covered by the unit tests and by P7-07).
 
 ## Acceptance criteria
-- [ ] E2E spec for the approval page, run in CI (Chromium).
-- [ ] The DAST scan covers the page; no new finding.
+- [x] E2E spec for the approval page, run in CI (Chromium).
+- [x] The DAST scan covers the page; no new finding.
 - [ ] URL-mode elicitation built, or a recorded decision that no client declares it yet (follow-up P7-46).
 - [ ] Staging run with a non-eliciting client recorded in the client compatibility reference (P7-10, P7-07).
 

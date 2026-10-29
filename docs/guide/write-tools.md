@@ -358,7 +358,7 @@ negative authorization. What no test can show is how a real Agility instance and
   decides the no-op rules for comments and effort).
 - The **close** and **reopen** operation per asset type and what a close does to open children.
 - The **read lag** after a write.
-- What each **client renders** of the approval text and form (P7-12), and the approval page in a browser suite (P7-13).
+- What each **client renders** of the approval text and form (P7-12), and the approval page with a client that cannot elicit on a deployment (P7-10). The page itself runs in the Playwright and ZAP suites against a synthetic Agility (P7-13).
 - The write path over the **Workers** `kv` ledger with several isolates (P7-10).
 - **OAuth** writes: the consent with a real client (claude.ai or Claude Code) on staging (P7-24, P7-10).
 

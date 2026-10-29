@@ -331,7 +331,7 @@ Status lives in each task file.
 | P7-10 | [Write pipeline on staging Workers](tasks/phase-7-writes/P7-10-staging-write-pipeline.md) | medium | P7-01 | todo |
 | P7-11 | [Write rows in the audit viewer, CSV and statistics](tasks/phase-7-writes/P7-11-write-audit-viewer.md) | low | P7-01, P4-05 | todo |
 | P7-12 | [What real clients render of the approval text](tasks/phase-7-writes/P7-12-approval-text-in-clients.md) | medium | P7-01 | todo |
-| P7-13 | [Approval page in the browser suites, URL-mode elicitation and a non-eliciting client on staging](tasks/phase-7-writes/P7-13-approval-page-e2e-url-elicitation.md) | medium | P7-02, P7-04 | todo |
+| P7-13 | [Approval page in the browser suites, URL-mode elicitation and a non-eliciting client on staging](tasks/phase-7-writes/P7-13-approval-page-e2e-url-elicitation.md) | medium | P7-02, P7-04 | review |
 | P7-14 | [A list of my pending approvals](tasks/phase-7-writes/P7-14-pending-approvals-list.md) | low | P7-02 | todo |
 | P7-15 | [Per-grant write limit set by an owner](tasks/phase-7-writes/P7-15-per-grant-write-limit.md) | low | P7-03, P4-05 | todo |
 | P7-16 | [Show the remaining write budget](tasks/phase-7-writes/P7-16-write-budget-visibility.md) | low | P7-03 | todo |
@@ -352,6 +352,7 @@ Status lives in each task file.
 | P7-31 | [Bench the approval page and the write limiter; take the outcome audit off the hot path](tasks/phase-7-writes/P7-31-write-path-bench-and-audit-latency.md) | low | P7-09 | todo |
 | P7-32 | [Show the OAuth write scope on My access and the administrators' device list](tasks/phase-7-writes/P7-32-oauth-write-scope-on-my-access.md) | low | P7-24 | todo |
 | P7-33 | [Step-up consent for mcp:write instead of reconnecting](tasks/phase-7-writes/P7-33-oauth-write-step-up.md) | low | P7-24, P7-10 | todo |
+| P7-46 | [URL-mode elicitation for the approval page](tasks/phase-7-writes/P7-46-url-mode-elicitation.md) | low | P7-13, P7-12 | todo |
 
 ### Phase 8
 
