@@ -47,6 +47,23 @@ export function writeLimiterContract(name: string, make: () => Promise<LimiterWo
       expect(await outcome(l.check(grant('g1')))).toBe('ok');
     });
 
+    it("a grant's own cap lowers the configured limit and can never raise it (P7-15)", async () => {
+      const w = await make();
+      const l = build(w, { perGrant: 3, deployment: null });
+      const own = (id: string, grantLimit: number) => ({ ...grant(id), grantLimit });
+      expect(await outcome(l.check(own('low', 1)))).toBe('ok');
+      expect(await outcome(l.check(own('low', 1)))).toBe(`${ErrorCode.LimitRate}:grant`);
+      // Above the configured value: the configured value still applies.
+      for (let i = 0; i < 3; i++) expect(await outcome(l.check(own('high', 50)))).toBe('ok');
+      expect(await outcome(l.check(own('high', 50)))).toBe(`${ErrorCode.LimitRate}:grant`);
+      // Nonsense is ignored, not trusted.
+      for (const bad of [0, -1, 1.5, Number.NaN]) {
+        const fresh = `bad${String(bad)}`;
+        for (let i = 0; i < 3; i++) expect(await outcome(l.check(own(fresh, bad)))).toBe('ok');
+        expect(await outcome(l.check(own(fresh, bad)))).toBe(`${ErrorCode.LimitRate}:grant`);
+      }
+    });
+
     it('refuses at the deployment limit, across grants, and a grant over its limit does not spend it', async () => {
       const w = await make();
       const l = build(w, { perGrant: 2, deployment: 4 });

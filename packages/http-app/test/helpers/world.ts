@@ -88,6 +88,8 @@ export async function world(
   options: {
     auditStorage?: (s: Storage) => Storage;
     admin?: boolean;
+    /** The deployment's writes per grant per hour, for the admin API's cap on a grant's own limit (P7-15). */
+    writeRateCap?: number;
     /** Agility rows by asset type (default: a small world in Scope:1001 and Scope:2001). */
     assets?: Record<string, Record<string, unknown>[]>;
     /** `ignore-filters`: a hostile upstream that returns rows outside the scope (L-064). */
@@ -252,6 +254,7 @@ export async function world(
           admin: {
             services: svc,
             audit,
+            ...(options.writeRateCap === undefined ? {} : { writeRateCap: options.writeRateCap }),
             // Tests pick the actor with a header; production uses the admin token (and sessions from P4-02).
             authenticate: async (c) => {
               const who = c.req.header('x-test-actor');

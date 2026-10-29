@@ -190,6 +190,8 @@ export interface Grant {
   readonly assetTypes: AssetTypes | null;
   readonly limits: Limits;
   readonly perMinute: number | null;
+  /** The grant's own hourly write limit, set by an owner (P7-15); null = the server's. */
+  readonly writesPerHour: number | null;
   readonly createdAt: number;
   readonly expiresAt: number | null;
   readonly revokedAt: number | null;
@@ -210,6 +212,7 @@ export function parseGrant(r: Row): Grant | null {
     assetTypes: parseAssetTypes(r['assetTypes']),
     limits: parseLimits(r['limits']),
     perMinute: rate === null ? null : intOrNull(rate['perMinute']),
+    writesPerHour: rate === null ? null : intOrNull(rate['writesPerHour']),
     createdAt: int(r['createdAt']),
     expiresAt: intOrNull(r['expiresAt']),
     revokedAt: intOrNull(r['revokedAt']),

@@ -111,6 +111,7 @@ function grantValues(g: Grant): URLSearchParams {
   assetTypeValues(g.assetTypes, v);
   limitValues(g.limits, v);
   if (g.perMinute !== null) v.set('perMinute', String(g.perMinute));
+  if (g.writesPerHour !== null) v.set('writesPerHour', String(g.writesPerHour));
   v.set('expiry', 'keep');
   return v;
 }
@@ -248,6 +249,19 @@ function GrantForm(props: GrantFormProps) {
           value={v.get('perMinute') ?? ''}
           error={errors['perMinute']}
         />
+        {owner ? (
+          <TextField
+            name="writesPerHour"
+            label="Writes per hour (optional)"
+            hint="1 to 1000, and never above the server's own limit (AB_WRITE_RATE_PER_GRANT_HOURLY). Blank: the server's limit. Only an owner can set this."
+            type="number"
+            inputmode="numeric"
+            min={1}
+            max={1_000}
+            value={v.get('writesPerHour') ?? ''}
+            error={errors['writesPerHour']}
+          />
+        ) : null}
         <SelectField
           name="expiry"
           label="Expiry"
@@ -279,7 +293,7 @@ function formFieldOf(apiField: string | undefined): string | undefined {
       credentialId: 'credential',
       tools: 'tools',
       scopeIds: 'scopes',
-      rateLimit: 'perMinute',
+      rateLimit: apiField.startsWith('rateLimit.writesPerHour') ? 'writesPerHour' : 'perMinute',
       userId: 'who',
       expiresAt: 'expiry',
     }[apiField.split('.')[0] ?? '']
@@ -386,7 +400,18 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
     else body['limits'] = limits.limits;
     const rate = wholeNumber(form, 'perMinute', 1, 100_000);
     if (rate === null) errors['perMinute'] = 'Enter a whole number from 1 to 100000, or leave it blank.';
-    else body['rateLimit'] = rate === undefined ? null : { perMinute: rate };
+    // The hourly write limit is an owner's setting (P7-15): for anyone else the form keeps what is stored.
+    const writes = isOwner(principal)
+      ? wholeNumber(form, 'writesPerHour', 1, 1_000)
+      : (current?.writesPerHour ?? undefined);
+    if (writes === null) errors['writesPerHour'] = 'Enter a whole number from 1 to 1000, or leave it blank.';
+    if (rate !== null && writes !== null) {
+      const parts = {
+        ...(rate === undefined ? {} : { perMinute: rate }),
+        ...(writes === undefined ? {} : { writesPerHour: writes }),
+      };
+      body['rateLimit'] = Object.keys(parts).length === 0 ? null : parts;
+    }
     const expiry = form.fields.get('expiry') ?? (current === null ? 'never' : 'keep');
     if (expiry === 'never') body['expiresAt'] = null;
     else if (/^(30|90|180|365)$/.test(expiry)) body['expiresAt'] = now() + Number(expiry) * DAY;
@@ -660,6 +685,10 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
                 ],
                 ['Limits', limitsSummary(g.limits).join('; ') || 'inherited from the workspace'],
                 ['Rate', g.perMinute === null ? "the server's default" : `${g.perMinute} requests a minute`],
+                [
+                  'Writes per hour',
+                  g.writesPerHour === null ? "the server's limit" : `${g.writesPerHour} (an owner's cap)`,
+                ],
                 ['Expires', <When at={g.expiresAt} none="never" />],
                 ['Created', <When at={g.createdAt} />],
               ]}

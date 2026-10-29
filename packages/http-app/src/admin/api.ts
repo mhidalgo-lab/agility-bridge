@@ -183,6 +183,8 @@ export interface AdminApiOptions {
    * owner-only unbind may name (P4-39). Absent = none can be named.
    */
   readonly configuredIdps?: readonly string[];
+  /** `AB_WRITE_RATE_PER_GRANT_HOURLY`: the most a grant's own hourly write limit may be (P7-15). */
+  readonly writeRateCap?: number;
   /** OAuth is on (P5-04): the signed-in person's connected apps. Absent = the `/me/oauth-devices` routes answer 404. */
   readonly oauthDevices?: AdminOAuthDevices;
   /** OAuth is on (P5-08): every person's apps and the registered clients. Absent = the `/oauth/*` routes answer 404. */
@@ -715,6 +717,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
         ...(options.keyring === undefined ? {} : { keyring: options.keyring }),
         now: () => options.clock.now(),
         ...(options.configuredIdps === undefined ? {} : { configuredIdps: options.configuredIdps }),
+        ...(options.writeRateCap === undefined ? {} : { writeRateCap: options.writeRateCap }),
       },
       c.get('actor' as never) as Actor,
     );
@@ -1356,7 +1359,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       out: GrantWithWarnings,
       status: 201,
       audit: { action: 'grant.create', targetType: 'grant' },
-      auditBody: ['userId', 'credentialId', 'tools', 'scopeIds', 'assetTypes', 'expiresAt'],
+      auditBody: ['userId', 'credentialId', 'tools', 'scopeIds', 'assetTypes', 'expiresAt', 'rateLimit'],
     },
     (c, { body }) => services(c).grants.create(body as never),
   );
@@ -1371,13 +1374,22 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       ...gr,
       params: true,
       summary:
-        'Change a grant (owners and admins; write tools, and widening the projects, asset types or end date of a grant that has them: an owner with a recent sign-in)',
+        "Change a grant (owners and admins; write tools, widening the projects, asset types or end date of a grant that has them, and the grant's own hourly write limit `rateLimit.writesPerHour`, which can only lower the server's: an owner with a recent sign-in)",
       body: GrantPatch,
       out: GrantWithWarnings,
       audit: { action: 'grant.update', targetType: 'grant' },
-      auditBody: ['credentialId', 'tools', 'scopeIds', 'assetTypes', 'expiresAt'],
+      auditBody: ['credentialId', 'tools', 'scopeIds', 'assetTypes', 'expiresAt', 'rateLimit'],
     },
-    (c, { id, body }) => services(c).grants.update(id, body as never),
+    async (c, { id, body }) => {
+      // The hourly write limit before the change, so a loosening can be told from a tightening in the audit log (P7-15).
+      const before = (await services(c).grants.get(id))?.rateLimit as
+        | { writesPerHour?: unknown }
+        | null
+        | undefined;
+      if (typeof before?.writesPerHour === 'number')
+        c.set('auditDetails' as never, { previousWritesPerHour: before.writesPerHour } as never);
+      return services(c).grants.update(id, body as never);
+    },
   );
   add(
     {

@@ -75,6 +75,7 @@ export async function localClient(
     clock: systemClock,
     via: 'cli',
     keyring,
+    writeRateCap: config.writeRates.perGrant,
     ...(config.identity === undefined
       ? {}
       : {

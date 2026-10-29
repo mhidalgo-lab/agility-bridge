@@ -514,6 +514,7 @@ export function assembleServer(parts: ServerParts): AssembledServer {
           admin: {
             services,
             audit,
+            writeRateCap: settings.writeRates.perGrant,
             authenticate:
               parts.adminVerifier === undefined
                 ? async () => null
