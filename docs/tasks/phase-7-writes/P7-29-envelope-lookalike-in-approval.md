@@ -2,7 +2,7 @@
 id: P7-29
 title: "Approval text: values that contain the envelope phrase"
 phase: 7
-status: todo
+status: done
 priority: low
 depends_on: [P7-02]
 adr: ["0013"]
@@ -12,16 +12,26 @@ owner: ""
 
 # P7-29 — Approval text: values that contain the envelope phrase
 
-> Filed by the Phase 7 review ([P7-09](P7-09-phase-7-review.md)). Refine scope and acceptance criteria before starting.
+> Filed by the Phase 7 review ([P7-09](P7-09-phase-7-review.md)). Refined 2026-10-29 (lane A).
 
 ## Goal
 `neutralise()` rewrites `untrusted data` to `untrusted~data` inside the approval, so a title or comment containing that phrase is shown differently from what is sent (review L7).
 
 ## Scope
-- Reject such values in the mutation check (like hidden characters) for caller text, and show Agility text unchanged outside the rewritten form, or mark the rewrite visibly.
+- Refusing caller text that contains the phrase would block honest titles ("Handle untrusted data in the importer"), so the
+  approval text writes the first letter of each look-alike (`untrusted data`, any case, with spaces, underscores or hyphens)
+  as a JSON escape (`\u0075ntrusted data`). The values are already JSON-quoted, so this is the same text once read as JSON;
+  `neutralise()` finds nothing left to rewrite and is not touched. One fixed line ("\uXXXX inside a quoted value stands for
+  that exact character") is added only when an escape was used.
+- Applies to every value in the elicitation text: old values, new values and the title. The approval page already shows
+  `JSON.stringify` of the exact value (HTML-escaped) and needs no change; a test pins it.
+- The hash still binds the real value; nothing is refused, so no caller-facing error changes.
 
 ## Acceptance criteria
-- [ ] What is read is what is sent for a value containing the phrase (test), or the value is refused with a reason.
+- [x] What is read is what is sent for a value containing the phrase in each spelling (test: JSON-decoding the shown value
+      gives the sent value; no `untrusted~data` in the text).
+- [x] The envelope is not weakened: a forged closing marker inside a value is not a marker (test).
+- [x] The page shows the same value (test).
 
 ## Security notes
 THREAT_MODEL T31, A2, A13.

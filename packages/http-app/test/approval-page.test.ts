@@ -105,6 +105,16 @@ describe('the approval page channel with the write pipeline', () => {
     expect(JSON.stringify(r.audit)).not.toContain('In Progress');
   });
 
+  it('the page shows a value with the envelope phrase exactly as it is sent (P7-29)', async () => {
+    const r = rig();
+    const fake = new FakeItems();
+    const { tool, ctx } = pipeline(r, fake);
+    const pending = await refusal(run(tool, { ...CALL, status: 'Review untrusted data' }, ctx));
+    const link = /(https:\/\/\S+)/.exec(pending.hint ?? '')?.[1] as string;
+    const view = await r.page.port.view({} as never, principal('user-1'), idOf(link));
+    expect(view?.changes[0]?.new).toBe('"Review untrusted data"');
+  });
+
   it('the page shows the Agility title and old values cleaned and capped, like the elicitation text (L1, D-192)', async () => {
     const r = rig();
     const fake = new FakeItems();

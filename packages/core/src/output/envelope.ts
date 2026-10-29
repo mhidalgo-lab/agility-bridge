@@ -37,6 +37,14 @@ export function neutralise(text: string): string {
   return text.replace(LOOKALIKE_RE, 'untrusted~data');
 }
 
+/**
+ * Rewrites every look-alike of the marker's tag name with `replace`. For a text that must show a value exactly (the
+ * approval, P7-29): the caller returns a form that no longer matches `neutralise` and still reads as the same text.
+ */
+export function replaceLookalikes(text: string, replace: (match: string) => string): string {
+  return text.replace(LOOKALIKE_RE, replace);
+}
+
 /** An `UntrustedRenderer` for error details (P1-01) with one marker for the whole call. */
 export function envelopeRenderer(id: string): UntrustedRenderer {
   // Cleaned like row values: no control, bidi or zero-width characters in error details either (review L).
