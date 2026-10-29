@@ -309,7 +309,7 @@ Status lives in each task file.
 | P6-52 | [Sprint burndown by aggregation for very large sprints](tasks/phase-6-tool-breadth/P6-52-sprint-burndown-by-aggregation.md) | low | P6-18 | todo |
 | P6-55 | [Filter standup_summary on the change date instead of reading the newest page](tasks/phase-6-tool-breadth/P6-55-standup-change-date-filter.md) | low | P6-40, P6-27 | todo |
 | P6-56 | [Check whether a sprint is still current on its end date](tasks/phase-6-tool-breadth/P6-56-sprint-end-date-inclusive-check.md) | low | P6-47, P6-27 | todo |
-| P6-57 | [Verify the defect priority and severity read live](tasks/phase-6-tool-breadth/P6-57-verify-defect-severity-discovery-live.md) | low | P6-30, P6-27 | todo |
+| P6-57 | [Verify the defect priority and severity read live](tasks/phase-6-tool-breadth/P6-57-verify-defect-severity-discovery-live.md) | low | P6-30, P6-27 | done |
 | P6-58 | [Show the budget-hidden tools note for an inherited call budget in the panel](tasks/phase-6-tool-breadth/P6-58-panel-inherited-call-budget-note.md) | low | P6-36 | todo |
 | P6-60 | [Fix the flaky tests behind the CI reruns](tasks/phase-6-tool-breadth/P6-60-flaky-tests.md) | high | — | done |
 

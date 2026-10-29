@@ -27,7 +27,7 @@ How to use it:
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
-| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315, L-317 – L-320, L-324 – L-326, L-328, L-333, L-360, L-366 |
+| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315, L-317 – L-320, L-324 – L-326, L-328, L-333, L-360, L-366, L-367 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282, L-323 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280, L-304, L-316 |
@@ -476,6 +476,13 @@ Examples use only attributes of the product model and synthetic values; statuses
 **L-366 — A sibling's note is the report's own text only when the whole text matches a fixed template; the rest stays in the envelope.**
 Notes cross a tool boundary as plain text, so a composite cannot tell wording of ours from text that carries an Agility name. `sprint_health` takes a `get_sprint` note over as its own (with a stable code in `sprintNoteCodes`) only when the entire note matches a template of fixed words and digits, which a name cannot satisfy; everything else is forwarded untrusted. A test runs `get_sprint` on the shared worlds and requires every note to match, so rewording a note fails the test instead of quietly moving it into the envelope.
 *Applied in:* P6-48, `tools/reports/sibling-notes.ts`, `test/tools/reports.test.ts`, L-038.
+
+**L-367 — A bound sized for caller input fails silently on a list the server built: test with real volumes.**
+`defect_triage` read priority and severity with an `ID in [...]` filter over every defect of its page. The compiler caps caller
+lists at 50 values, the synthetic worlds had a handful of defects, and the read's failure was turned into a note ("could not be
+read"), so every test passed while the live tenant, with more than 50 open defects, never showed a priority. A list the server
+builds from its own scope-checked rows is marked trusted (the compiler's 2,000 bound), and the regression test uses 70 defects.
+*Applied in:* P6-57, `tools/reports/defect-triage.ts`, `test/tools/reports.test.ts`, L-330.
 
 **L-360 — A continuation that carries running totals is bound to what the totals were taken over.**
 The portfolio tree reads three item pages per type; a very large epic continues with a cursor that carries the totals per epic
