@@ -37,7 +37,7 @@ How to use it:
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
-| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-396, L-400 |
+| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382 |
@@ -1617,6 +1617,24 @@ informational change whose old and new are equal (`OpenChildren 0 -> 0`): the ap
 re-read compares it (a child that appears is a conflict), and it never counts toward "something to change". The operation
 name goes in the mutation's operation for the same reason.
 *Applied in:* P7-06, `tools/writes/lifecycle.ts`.
+
+**L-397 — A create's one target is the container; the new item's fields and parent are the change.**
+The approval hash binds one target, and a new item has no OID. Use the project that will hold it as the target, check it is
+visible, open and in scope again after the approval, and list every field of the new item (type, title, parent as `Name [OID]`)
+with an empty old value. The re-read of a create is a validity check, not a comparison of values.
+*Applied in:* P7-05, `tools/writes/create-work-item.ts`.
+
+**L-398 — Check "already created" twice: in the plan, and again after the approval.**
+A repeat can arrive while the first call waits for a person. Derive the key from what a retry repeats (caller, type, project,
+parent, normalised title, a short window) and test both places, with a repeat that interleaves with the first approval. Say that
+two calls in the same instant cannot be excluded without an atomic check in the upstream, and why that is acceptable.
+*Applied in:* P7-05, D-179.
+
+**L-399 — Rich-text fields take plain text in and escaped markup out.**
+Agility descriptions are HTML that other people open in the web UI. Accept plain text, show that exact text in the approval,
+and send HTML-escaped paragraphs; never sanitise what a person approved into something else. Reading the old value as plain
+text shows the person what will be replaced.
+*Applied in:* P7-05, `tools/writes/fields.ts`.
 
 ## O. Caching, quotas and budgets
 

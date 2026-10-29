@@ -323,7 +323,7 @@ Status lives in each task file.
 | P7-02 | [Out-of-band approval page](tasks/phase-7-writes/P7-02-approval-page.md) | high | P7-01, P4-02 | review |
 | P7-03 | [Deployment-wide write limiter](tasks/phase-7-writes/P7-03-write-limiter.md) | high | P7-01 | done |
 | P7-04 | [Writes wave 1: comment, status, effort, owners, sprint](tasks/phase-7-writes/P7-04-writes-wave-1.md) | high | P7-01, P7-03 | review |
-| P7-05 | [Writes wave 2: create work items and update fields](tasks/phase-7-writes/P7-05-writes-wave-2.md) | medium | P7-04 | todo |
+| P7-05 | [Writes wave 2: create work items and update fields](tasks/phase-7-writes/P7-05-writes-wave-2.md) | medium | P7-04 | review |
 | P7-06 | [Lifecycle operations: close and reopen](tasks/phase-7-writes/P7-06-lifecycle-operations.md) | medium | P7-04 | review |
 | P7-07 | [Sandbox write verification](tasks/phase-7-writes/P7-07-sandbox-write-verification.md) | high | P7-02, P7-05, P7-06 | todo |
 | P7-08 | [Write documentation and threat-model update](tasks/phase-7-writes/P7-08-write-docs-threat-model.md) | medium | P7-07 | todo |
@@ -338,6 +338,8 @@ Status lives in each task file.
 | P7-17 | [Wave-1 extensions: clear the sprint, effort for others, to-do](tasks/phase-7-writes/P7-17-wave-1-extensions.md) | low | P7-04 | todo |
 | P7-18 | [Comments: rich text and mentions](tasks/phase-7-writes/P7-18-comment-rich-text-mentions.md) | low | P7-04, P7-07 | todo |
 | P7-19 | [Optional read-back after a write](tasks/phase-7-writes/P7-19-read-back-after-write.md) | low | P7-04, P7-07 | todo |
+| P7-20 | [Workspace-enabled writable custom fields](tasks/phase-7-writes/P7-20-writable-custom-fields.md) | low | P7-05 | todo |
+| P7-21 | [Create and update with owners, team, sprint and defaults from New](tasks/phase-7-writes/P7-21-create-update-relations.md) | low | P7-05 | todo |
 | P7-22 | [Close an item together with its open children](tasks/phase-7-writes/P7-22-close-with-children.md) | low | P7-06, P7-07 | todo |
 | P7-23 | [Reopen preconditions: closed parent and per-type operations](tasks/phase-7-writes/P7-23-reopen-preconditions.md) | low | P7-06, P7-07 | todo |
 

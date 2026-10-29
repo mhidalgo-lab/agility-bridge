@@ -36,8 +36,8 @@ describe('tools/list contract', () => {
 
   it('counts: every group plus the write tools still planned in Phase 7 stays below 40 tools (L-155)', async () => {
     const all = await toolsListContract(CORE_TOOLS);
-    // Nine write tools are planned in all; wave 1 (P7-04) built five and P7-06 two more, so two are still to come.
-    const PLANNED_WRITE_TOOLS = 2;
+    // Nine write tools were planned in all; waves 1 and 2 (P7-04, P7-05) and the lifecycle tools (P7-06) built every one.
+    const PLANNED_WRITE_TOOLS = 0;
     expect(all.count + PLANNED_WRITE_TOOLS).toBeLessThan(40);
   });
 
@@ -395,6 +395,26 @@ describe('tools/list contract', () => {
             "title": "Reopen work item",
           },
           "name": "reopen_asset",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": false,
+            "openWorldHint": true,
+            "readOnlyHint": false,
+            "title": "Create work item",
+          },
+          "name": "create_work_item",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": false,
+            "title": "Update fields",
+          },
+          "name": "update_fields",
         },
       ]
     `,

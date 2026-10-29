@@ -38,6 +38,11 @@ Check each against the sandbox and fix the tool's `send` (not its plan) if a sha
 - [ ] The response of each write (`<Asset id="Type:id:moment">`?) and the read lag before the change is visible (L-051).
 - [ ] The comment and effort no-op rules (identical latest entry) against how Agility stores text and dates.
 
+## Wave-2 items from P7-05 (unverified request shapes)
+- [ ] `create_work_item`: `POST /Data/<Type>` for Story, Defect, Task, Test, Epic with `Name`, `Description`, `Estimate` or `DetailEstimate`, `Scope`, `Priority`, `Super` or `Parent`; which attributes Agility requires without a default; whether `Scope` is derived from `Parent` for a Task or Test; what `rest-1.v1/New` returns (D-180); the response shape and the read lag.
+- [ ] `update_fields`: `Name`, `Description`, `Estimate`, `DetailEstimate` and `Priority` sets; whether `Description` HTML written as escaped paragraphs is kept as sent or re-sanitised, and how `<br>` renders (D-182).
+- [ ] The duplicate check (D-179): `CreatedBy` and `CreateDateUTC` are readable and sortable on every type, and a new item is visible to `query.v1` in time for a repeat within seconds.
+
 ## Security notes
 None beyond the shared rules in AGENTS.md.
 
