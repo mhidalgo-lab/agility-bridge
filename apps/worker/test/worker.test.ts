@@ -248,6 +248,17 @@ describe('plan presets (P3-03)', () => {
     expect(text).toContain(`"maxResponseBytes":${512 * 1024}`);
   });
 
+  it('Free takes a deployment write cap up to 60 an hour; Paid takes the default 200 (P7-30)', async () => {
+    for (const bindings of [
+      { AB_MASTER_KEY: generateMasterKey(1), AB_WRITE_RATE_DEPLOYMENT_HOURLY: '60' },
+      { AB_MASTER_KEY: generateMasterKey(1) },
+      { AB_MASTER_KEY: generateMasterKey(1), AB_PLAN: 'paid', AB_WRITE_RATE_DEPLOYMENT_HOURLY: '200' },
+    ]) {
+      const mf = worker(bindings);
+      expect((await call(mf, '/health')).status).toBe(200);
+    }
+  });
+
   it('paid allows a budget above 45', async () => {
     const mf = worker({ AB_MASTER_KEY: generateMasterKey(1), AB_PLAN: 'paid', AB_CALL_BUDGET: '500' });
     expect((await call(mf, '/health')).status).toBe(200);
@@ -297,6 +308,8 @@ describe('boot failures', () => {
       { AB_MASTER_KEY: generateMasterKey(1), AB_ADMIN_TOKEN: 'ab_admin_letmein' },
       { AB_MASTER_KEY: generateMasterKey(1), AB_PLAN: 'enterprise' },
       { AB_MASTER_KEY: generateMasterKey(1), AB_CALL_BUDGET: '46' },
+      { AB_MASTER_KEY: generateMasterKey(1), AB_WRITE_RATE_DEPLOYMENT_HOURLY: '61' },
+      { AB_MASTER_KEY: generateMasterKey(1), AB_WRITE_RATE_DEPLOYMENT_HOURLY: '200', AB_PLAN: 'free' },
       { AB_MASTER_KEY: generateMasterKey(1), AB_LIMITS_MAX_RESPONSE_BYTES: String(1024 * 1024) },
     ]) {
       const mf = worker({ ...bindings, AB_PUBLIC_URL: 'https://mcp.example.test' });

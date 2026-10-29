@@ -24,6 +24,8 @@ export interface LedgerStore {
   set(key: string, value: string, options?: { expiresAt?: number | null }): Promise<void>;
   /** The live value without removing it (a read; P7-28). */
   get(key: string): Promise<string | null>;
+  /** The live values of several keys in one statement, without removing them (P7-30). */
+  getMany(keys: readonly string[]): Promise<Map<string, string>>;
   /** Removes and returns a live value in one step: of concurrent callers exactly one gets it. */
   take(key: string): Promise<string | null>;
 }
@@ -62,6 +64,24 @@ export class ApprovalLedger {
     return this.#take(`wr:ok:${part(actor)}:${part(scope)}:${hash}`, scope, false);
   }
 
+  /**
+   * Reads the grant and the denial of one change in a single statement, using neither up (P7-30): the pipeline then
+   * consumes the one it acts on with `takeGrant` or `takeDenial`, so single use and the binding are unchanged.
+   */
+  async peekDecision(
+    actor: string,
+    hash: string,
+    scope = '',
+  ): Promise<{ grant: LedgerEntry | null; denial: LedgerEntry | null }> {
+    const grantKey = `wr:ok:${part(actor)}:${part(scope)}:${hash}`;
+    const denialKey = `wr:no:${part(actor)}:${part(scope)}:${hash}`;
+    const found = await this.#store.getMany([grantKey, denialKey]);
+    return {
+      grant: this.#parse(found.get(grantKey) ?? null, scope),
+      denial: this.#parse(found.get(denialKey) ?? null, scope),
+    };
+  }
+
   /** Reads an open round without using it up (P7-28). */
   peekRound(nonce: string, scope = ''): Promise<LedgerEntry | null> {
     return this.#take(`wr:round:${part(nonce)}`, scope, false);
@@ -81,7 +101,10 @@ export class ApprovalLedger {
   }
 
   async #take(key: string, scope?: string, consume = true): Promise<LedgerEntry | null> {
-    const raw = await (consume ? this.#store.take(key) : this.#store.get(key));
+    return this.#parse(await (consume ? this.#store.take(key) : this.#store.get(key)), scope);
+  }
+
+  #parse(raw: string | null, scope?: string): LedgerEntry | null {
     if (raw === null) return null;
     try {
       const e = JSON.parse(raw) as Record<string, unknown>;
@@ -126,6 +149,14 @@ export function memoryLedgerStore(clock: Clock, maxEntries = 1_000): LedgerStore
     async get(key) {
       const entry = data.get(key);
       return entry !== undefined && entry.expiresAt > clock.now() ? entry.value : null;
+    },
+    async getMany(keys) {
+      const out = new Map<string, string>();
+      for (const key of keys) {
+        const entry = data.get(key);
+        if (entry !== undefined && entry.expiresAt > clock.now()) out.set(key, entry.value);
+      }
+      return out;
     },
     async take(key) {
       const entry = data.get(key);

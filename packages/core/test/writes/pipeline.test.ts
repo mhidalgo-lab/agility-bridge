@@ -488,6 +488,10 @@ describe('the out-of-band grant (seam for P7-02): bound to the change, the actor
         reads.push(key);
         return inner.get(key);
       },
+      getMany: async (keys: readonly string[]) => {
+        reads.push(...keys);
+        return inner.getMany(keys);
+      },
       take: async (key: string) => {
         reads.push(key);
         return inner.take(key);
@@ -500,6 +504,51 @@ describe('the out-of-band grant (seam for P7-02): bound to the change, the actor
     await run(makeTestWriteTool(fake), CONFIRMED, writeContext(runtime));
     expect(fake.sends).toHaveLength(1);
     expect(reads.filter((k) => k.startsWith('wr:ok:') || k.startsWith('wr:no:'))).toEqual([]);
+  });
+
+  it('on the page path the grant and the denial are one read, and a use costs one more statement (P7-30)', async () => {
+    const fake = new FakeItems();
+    const statements: string[] = [];
+    const inner = memoryLedgerStore(systemClock);
+    const store = {
+      set: inner.set,
+      get: async (key: string) => (statements.push('get'), inner.get(key)),
+      getMany: async (keys: readonly string[]) => (statements.push('getMany'), inner.getMany(keys)),
+      take: async (key: string) => (statements.push('take'), inner.take(key)),
+    };
+    const runtime = makeRuntime({
+      ledger: new ApprovalLedger(store, systemClock),
+      page: answeringChannel(true, 'page'),
+      channel: answeringChannel(
+        () => ({ status: 'pending', link: 'https://x.test/a', expiresAt: 1 }),
+        'page',
+      ),
+    });
+    const tool = makeTestWriteTool(fake);
+    const ctx = writeContext(runtime);
+    // First call: nothing recorded yet: one statement for both, then the question.
+    await refused(run(tool, CONFIRMED, ctx));
+    expect(statements).toEqual(['getMany']);
+    // The person approves; the repeated call reads once and takes the grant once.
+    const m = canonicalize(
+      {
+        operation: 'update_status',
+        target: { assetType: 'Story', oid: 'Story:1', number: 'B-00001' },
+        changes: [{ field: 'Status', old: 'In Progress', new: 'Done' }],
+      },
+      { Story: ['Status'] },
+    );
+    await runtime.ledger.grant({
+      hash: await mutationHash(TEST_TOOL, ACTOR.id, m),
+      actor: ACTOR.id,
+      tool: TEST_TOOL,
+      expiresAt: systemClock.now() + 60_000,
+      scope: 'ws-1',
+    });
+    statements.length = 0;
+    await run(tool, CONFIRMED, ctx);
+    expect(statements).toEqual(['getMany', 'take']);
+    expect(fake.sends).toHaveLength(1);
   });
 
   it('an approval at the page channel answers pending with the link', async () => {

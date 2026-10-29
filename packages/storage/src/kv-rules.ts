@@ -13,6 +13,16 @@ export function checkKey(key: unknown): asserts key is string {
   }
 }
 
+/** Up to this many keys in one `getMany` (a bound on the statement, P7-30). */
+export const MAX_KEYS_PER_READ = 10;
+
+export function checkKeys(keys: unknown): asserts keys is readonly string[] {
+  if (!Array.isArray(keys) || keys.length > MAX_KEYS_PER_READ) {
+    throw new InvalidInputError(`kv.getMany takes at most ${MAX_KEYS_PER_READ} keys.`);
+  }
+  for (const key of keys) checkKey(key);
+}
+
 export function checkPrefix(prefix: unknown): asserts prefix is string {
   if (typeof prefix !== 'string' || (prefix !== '' && !KEY.test(prefix))) {
     throw new InvalidInputError('kv prefixes are printable ASCII characters without spaces.');

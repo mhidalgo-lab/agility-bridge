@@ -1080,6 +1080,29 @@ export function storageContract(name: string, factory: StorageFactory): void {
         await expect(s.kv.set('k', 'v', { expiresAt: 1.5 })).rejects.toThrow(InvalidInputError);
       });
 
+      it('getMany reads the live entries of up to ten keys in one call, and removes nothing (P7-30)', async () => {
+        await s.kv.set('a', '1');
+        await s.kv.set('b', '2', { expiresAt: clock.now() + 5 });
+        await s.kv.set('c', '3', { expiresAt: clock.now() + 50 });
+        expect(await s.kv.getMany([])).toEqual(new Map());
+        expect(await s.kv.getMany(['a', 'b', 'missing'])).toEqual(
+          new Map([
+            ['a', '1'],
+            ['b', '2'],
+          ]),
+        );
+        // A read: the entries are still there, and one read changes nothing.
+        expect(await s.kv.take('a')).toBe('1');
+        clock.advance(5);
+        expect(await s.kv.getMany(['a', 'b', 'c'])).toEqual(new Map([['c', '3']]));
+        // The same key twice is one entry; bad or too many keys are refused.
+        expect(await s.kv.getMany(['c', 'c'])).toEqual(new Map([['c', '3']]));
+        await expect(s.kv.getMany(['ok', 'with space'])).rejects.toThrow(InvalidInputError);
+        await expect(s.kv.getMany(Array.from({ length: 11 }, (_, i) => `k${i}`))).rejects.toThrow(
+          InvalidInputError,
+        );
+      });
+
       it('setIfAbsent stores only when absent or expired', async () => {
         expect(await s.kv.setIfAbsent('k', 'first', { expiresAt: clock.now() + 10 })).toBe(true);
         expect(await s.kv.setIfAbsent('k', 'second')).toBe(false);

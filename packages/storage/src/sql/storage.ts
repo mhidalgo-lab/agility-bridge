@@ -18,7 +18,15 @@ import {
   preparePatch,
   type TableName,
 } from '../fields.ts';
-import { checkIncrement, checkKey, checkKvValue, checkPrefix, isLive, prefixRange } from '../kv-rules.ts';
+import {
+  checkIncrement,
+  checkKey,
+  checkKeys,
+  checkKvValue,
+  checkPrefix,
+  isLive,
+  prefixRange,
+} from '../kv-rules.ts';
 import * as schema from '../schema.ts';
 import type {
   AccessBundle,
@@ -518,6 +526,17 @@ GROUP BY k`,
       checkKey(key);
       const rows = await raw(`SELECT value FROM kv WHERE key = ? AND ${LIVE}`, [key, now()]);
       return (rows[0]?.[0] as string | undefined) ?? null;
+    },
+    async getMany(keys) {
+      checkKeys(keys);
+      const out = new Map<string, string>();
+      if (keys.length === 0) return out;
+      const rows = await raw(
+        `SELECT key, value FROM kv WHERE key IN (${keys.map(() => '?').join(', ')}) AND ${LIVE}`,
+        [...keys, now()],
+      );
+      for (const row of rows) out.set(row[0] as string, row[1] as string);
+      return out;
     },
     async set(key, value, options: KvSetOptions = {}) {
       const expiresAt = checkKvValue(key, value, options);

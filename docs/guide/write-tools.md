@@ -250,7 +250,7 @@ customer text); the hash lets you match a row to what was approved. Intent and o
 ## Limits
 
 Every write takes one unit from two counters after the approval and before the re-read: the **grant's** (default 20 an
-hour, `AB_WRITE_RATE_PER_GRANT_HOURLY`) and the **deployment's** (default 200 an hour, `AB_WRITE_RATE_DEPLOYMENT_HOURLY`).
+hour, `AB_WRITE_RATE_PER_GRANT_HOURLY`) and the **deployment's** (default 200 an hour, 60 on Workers Free, `AB_WRITE_RATE_DEPLOYMENT_HOURLY`).
 The counters are fixed hourly windows in the shared `kv` table, so they hold across Workers isolates and Node replicas
 (stdio counts in its own process and has no deployment limit). The write limit cannot be switched off, and it **fails
 closed**: if the counters cannot be reached the write is refused (`AB_WRITE_LIMIT_UNAVAILABLE`), never allowed.

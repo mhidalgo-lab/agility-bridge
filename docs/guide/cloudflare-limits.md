@@ -70,14 +70,16 @@ unverified**: it is computed from the schema, not read from `meta.rows_written` 
 | Confirmed call, elicitation by multi round-trip (two calls: ledger round open and take, the same) | 8 | 20 |
 | Approval page (the ask, the page, the decision with its admin audit row, the repeated call) | 18 over 4 requests | 31 |
 
-The two grant and denial reads of a confirmed call run only where the approval page exists (P7-09, D-200); a read that
-finds nothing writes nothing, so this saves latency, not rows. The deployment-wide cap (`AB_WRITE_RATE_DEPLOYMENT_HOURLY`,
+The grant and the denial of a confirmed call are read with **one** statement (`kv.getMany`, P7-30, D-210), and only where
+the approval page exists (P7-09, D-200); a read that finds nothing writes nothing, so this saves latency, not rows. The
+page flow stays at 18 statements: the first call saves one, the repeat costs one more for the read that lets a limiter
+refusal or a conflict keep the approval (P7-28). The deployment-wide cap (`AB_WRITE_RATE_DEPLOYMENT_HOURLY`,
 default 200 an hour) bounds the writes, not the rows: a deployment that really sustained 200 page-approved writes an hour
-would write about 4,800 x 31 = 149,000 rows a day, **above the Free plan's 100,000** (about 62,000 a day with push
-elicitation), and the counters, OAuth limits and read-tool audit rows compete for the same budget. Realistic use stays far
-below: one grant at its default 20 an hour is about 15,000 rows a day. On the Free plan with several busy grants, lower
-`AB_WRITE_RATE_DEPLOYMENT_HOURLY` to about 100, or use the Paid plan (50 million rows a day included). A Free-plan ceiling
-for the cap is planned (P7-30). The `tool_call` audit rows of reads are in the same budget (three rows each).
+would write about 4,800 x 31 = 149,000 rows a day, **above the Free plan's 100,000**, and the counters, OAuth limits and
+read-tool audit rows compete for the same budget. So **on the Free plan (`AB_PLAN=free`, the default) the cap is 60 an hour**:
+unset it is 60, and a larger value stops the Worker at its first request, like the call-budget and response-size ceilings
+(P7-30, D-211). 60 an hour is at most 1,440 writes and about 45,000 rows a day, under half the budget. One grant at its
+default 20 an hour is about 15,000 rows a day. The Paid plan (50 million rows a day included) keeps the default of 200. The `tool_call` audit rows of reads are in the same budget (three rows each).
 
 ## Where usage shows
 
