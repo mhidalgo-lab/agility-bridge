@@ -309,3 +309,22 @@
 - **Options:** (a) drive the real write tool with a client that cannot elicit as far as the pending answer, test the page (view, decline, approve, 404s, stale sign-in, tampering) and stop at the recorded approval; (b) add a fake write endpoint to the fixture so the repeat applies the change (a second copy of the write shapes, tested nowhere against a real Agility); (c) a test-only tool that does not touch Agility.
 - **Recommendation:** (a), built: the page and its approval ledger are what the browser suites can verify; the apply is covered by the unit tests on the fake write endpoint and by P7-07. (c) would test a tool that ships nowhere. URL-mode elicitation is deferred to P7-46 until a client that declares `elicitation.url` is known.
 - **Owner:** *(open; built as (a))*
+
+### D-220 — Write statistics are computed from the newest write rows, not by a new storage aggregate *(P7-11)*
+- **Context:** `audit.stats` aggregates `tool_call` rows in SQL in three adapters. Pairing an intent with its outcome needs `details.intentId`, which is inside the JSON column.
+- **Options:** (a) `GET /audit/write-stats` reads the newest `write` rows of the window (three pages of 1,000, so at most three queries, no new index) and pairs them in the API, saying when it stopped at the cap; (b) a new storage method with `json_extract` in the SQL adapters (exact over any window, three adapters and a contract test, and a scan of every write row); (c) a column or index for the pair key (one more written row per audit row, the tight quota on the Cloudflare free plan).
+- **Recommendation:** (a), built. Writes are rare (a per-grant hourly cap and human approval), so 3,000 rows is many weeks; the page says when the window held more.
+- **Owner:** *(open; built as (a))*
+
+### D-221 — An intent with no outcome is flagged after ten minutes *(P7-11)*
+- **Context:** The two rows are written seconds apart, but a write in flight has an intent and no outcome yet, and the outcome write is best effort.
+- **Options:** (a) flag an intent as "no outcome recorded" only after a ten minute grace period, and show "in progress" before; (b) flag at once (false alarms for every write in flight); (c) never flag (a lost outcome stays invisible).
+- **Recommendation:** (a), built. Ten minutes is longer than the longest write (the Worker limit, the approval is not inside it) and short enough to act on.
+- **Owner:** *(open; built as (a))*
+
+### D-222 — The viewer pairs inside the page and says so at the edges *(P7-11)*
+- **Context:** The log is keyset-paged newest first and cannot be filtered by `details.intentId`; a filter on the outcome status hides the intent rows.
+- **Options:** (a) pair within the rows of the page; an intent at the top of a continued page says its outcome is on the previous page, an outcome at the bottom of a page with a next page says its intent is on the next, and no row claims a missing partner while an outcome filter is set; (b) fetch the partner of every edge row (an extra query per page, and a filter on details that the storage does not have); (c) pair only in the statistics.
+- **Recommendation:** (a), built. The statistics are the authoritative count; the viewer never reports a false "missing".
+- **Owner:** *(open; built as (a))*
+

@@ -2,7 +2,7 @@
 id: P7-11
 title: Write rows in the audit viewer, CSV and statistics
 phase: 7
-status: in-progress
+status: done
 priority: low
 depends_on: [P7-01, P4-05]
 adr: ["0013"]
@@ -27,10 +27,10 @@ Refined 2026-10-29 (a write is two `write` rows that share `details.intentId`: t
 - Out of scope here: a filter on `details` (needs a storage column or JSON index), the CLI (`audit tail` already prints write rows).
 
 ## Acceptance criteria
-- [ ] Viewer, CSV and statistics tests with intent-only, intent+ok and intent+error pairs.
-- [ ] A member sees only their own write rows (same scope rule as tool calls); a member is refused the write statistics and nothing is read.
-- [ ] The audit guide describes the pair and what an unpaired intent means.
-- [ ] Hostile strings in a write row's fields, target and tool stay inert on the page and in the CSV.
+- [x] Viewer, CSV and statistics tests with intent-only, intent+ok and intent+error pairs.
+- [x] A member sees only their own write rows (same scope rule as tool calls); a member is refused the write statistics and nothing is read.
+- [x] The audit guide describes the pair and what an unpaired intent means.
+- [x] Hostile strings in a write row's fields, target and tool stay inert on the page and in the CSV.
 
 ## Security notes
 THREAT_MODEL T17.

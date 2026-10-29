@@ -152,6 +152,126 @@ export function Actor(props: {
   );
 }
 
+/** An intent younger than this has no outcome yet because the write may still be running (P7-11). */
+export const WRITE_GRACE_MS: number = 10 * 60_000;
+
+/** How a write row relates to its partner (`details.intentId` links an outcome to its intent row). */
+export type WritePair =
+  | { readonly kind: 'outcome'; readonly status: string; readonly errorCode: string | null }
+  | { readonly kind: 'intent'; readonly id: string }
+  | { readonly kind: 'in_progress' }
+  /** An intent with no outcome after the grace period: a crash between the two rows, or an outcome that was not stored. */
+  | { readonly kind: 'missing' }
+  /** The partner is on a neighbouring page or outside the filter, so nothing is claimed. */
+  | { readonly kind: 'elsewhere'; readonly where: string };
+
+const phaseOf = (r: AuditRow): string | null => {
+  const p = r.details?.['phase'];
+  return p === 'intent' || p === 'outcome' ? p : null;
+};
+const intentIdOf = (r: AuditRow): string | null => {
+  const v = r.details?.['intentId'];
+  return typeof v === 'string' && v !== '' ? v : null;
+};
+
+/**
+ * Pairs the write rows of `all` (newest first) by `intentId`. `edge` says which side of the list continues on another
+ * page: an outcome is newer than its intent, so an intent at the top of a continued page has its outcome on the previous
+ * page, and an outcome at the bottom of a page that has a next page has its intent there. `complete` is false when the
+ * filter hides rows (an outcome filter drops the intents), and then no row claims its partner is missing.
+ */
+export function pairWrites(
+  all: readonly AuditRow[],
+  opts: {
+    readonly now: number;
+    readonly continued: boolean;
+    readonly hasNext: boolean;
+    readonly complete: boolean;
+  },
+): Map<string, WritePair> {
+  const intents = new Set(all.filter((r) => r.kind === 'write' && phaseOf(r) === 'intent').map((r) => r.id));
+  const outcomes = new Map<string, AuditRow>();
+  for (const r of all) {
+    const id = r.kind === 'write' && phaseOf(r) === 'outcome' ? intentIdOf(r) : null;
+    if (id !== null) outcomes.set(id, r);
+  }
+  const pairs = new Map<string, WritePair>();
+  const firstWrite = all.findIndex((r) => r.kind === 'write');
+  const lastWrite = all.findLastIndex((r) => r.kind === 'write');
+  all.forEach((r, i) => {
+    const phase = r.kind === 'write' ? phaseOf(r) : null;
+    if (phase === 'intent') {
+      const out = outcomes.get(r.id);
+      if (out !== undefined)
+        pairs.set(r.id, { kind: 'outcome', status: out.status, errorCode: out.errorCode });
+      else if (!opts.complete) pairs.set(r.id, { kind: 'elsewhere', where: 'hidden by the filter' });
+      else if (i === firstWrite && opts.continued)
+        pairs.set(r.id, { kind: 'elsewhere', where: 'on the previous page' });
+      else if (opts.now - r.ts < WRITE_GRACE_MS) pairs.set(r.id, { kind: 'in_progress' });
+      else pairs.set(r.id, { kind: 'missing' });
+    } else if (phase === 'outcome') {
+      const id = intentIdOf(r);
+      if (id !== null && intents.has(id)) pairs.set(r.id, { kind: 'intent', id });
+      else if (i === lastWrite && opts.hasNext)
+        pairs.set(r.id, { kind: 'elsewhere', where: 'on the next page' });
+      else pairs.set(r.id, { kind: 'elsewhere', where: 'outside this view' });
+    }
+  });
+  return pairs;
+}
+
+const pairText = (p: WritePair): string => {
+  switch (p.kind) {
+    case 'outcome':
+      return `outcome: ${p.status}${p.errorCode === null ? '' : ` ${p.errorCode}`}`;
+    case 'intent':
+      return `outcome of intent ${p.id}`;
+    case 'in_progress':
+      return 'no outcome yet (in progress)';
+    case 'missing':
+      return 'NO OUTCOME RECORDED: the change may or may not have been applied';
+    case 'elsewhere':
+      return `partner row ${p.where}`;
+  }
+};
+
+/** The write-specific lines of the Result cell: phase, operation, field names, channel, hash and the pair. */
+function WriteResult(props: {
+  readonly row: AuditRow;
+  readonly pair: WritePair | undefined;
+}): JSX.Element | null {
+  const { row, pair } = props;
+  if (row.kind !== 'write' || phaseOf(row) === null) return null;
+  const d = row.details ?? {};
+  const fields = Array.isArray(d['fields'])
+    ? d['fields'].filter((f): f is string => typeof f === 'string')
+    : [];
+  const hash = typeof d['hash'] === 'string' ? d['hash'].slice(0, 12) : '';
+  const parts = [
+    `${String(d['phase'])} ${typeof d['operation'] === 'string' ? d['operation'] : ''}`.trim(),
+    fields.length === 0 ? '' : `fields: ${cut(fields.join(', '), 200)}`,
+    typeof d['approval'] === 'string' ? `approval: ${d['approval']}` : '',
+    hash === '' ? '' : `change ${hash}`,
+    typeof d['note'] === 'string' ? `note: ${cut(d['note'], 120)}` : '',
+  ].filter((x) => x !== '');
+  return (
+    <>
+      <br />
+      <span class="muted">{parts.join(' · ')}</span>
+      {pair === undefined ? null : (
+        <>
+          <br />
+          {pair.kind === 'missing' ? (
+            <Badge tone="error">{pairText(pair)}</Badge>
+          ) : (
+            <span>{pairText(pair)}</span>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
 const STATUS_TONE: Readonly<Record<string, BadgeTone>> = { ok: 'ok', error: 'error', denied: 'error' };
 
 export const MAX_DETAILS = 300;
@@ -168,7 +288,7 @@ export function detailsText(details: AuditRow['details']): string {
   return cut(text, MAX_DETAILS);
 }
 
-function Result(props: { readonly row: AuditRow }): JSX.Element {
+function Result(props: { readonly row: AuditRow; readonly pair?: WritePair | undefined }): JSX.Element {
   const r = props.row;
   const bits: string[] = [];
   if (r.errorCode !== null) bits.push(r.errorCode);
@@ -180,7 +300,8 @@ function Result(props: { readonly row: AuditRow }): JSX.Element {
   return (
     <>
       {bits.join(' · ') || '—'}
-      {details === '' ? null : (
+      <WriteResult row={r} pair={props.pair} />
+      {details === '' || (r.kind === 'write' && phaseOf(r) !== null) ? null : (
         <>
           <br />
           <span class="muted">{details}</span>
@@ -253,14 +374,21 @@ export function registerAudit(ui: Hono, kit: UiKit): void {
         ? null
         : await loadNames(kit, c, principal, [f.userId || null, ...shown.map((r) => r.userId)]);
       const names = loaded?.names ?? NO_NAMES;
+      const pairs = pairWrites(shown, {
+        now: now(),
+        continued: cursor !== null,
+        hasNext,
+        complete: f.status === '',
+      });
       const params = filterParams(member ? { ...f, userId: '' } : f);
       return page.html(
         <Layout title="Audit log" viewer={principal} current={BASE} flash={page.flash}>
           <p>
             {member
               ? 'Your own activity: tool calls made with your devices and changes you made.'
-              : 'Every tool call, refused request and administrative change, newest first.'}{' '}
-            Queries are shown as stored: every literal value is masked.
+              : 'Every tool call, write, refused request and administrative change, newest first.'}{' '}
+            A write is two rows, its intent and its outcome, paired below; field names are shown, never
+            values. Queries are shown as stored: every literal value is masked.
           </p>
           <QueryForm action={BASE} label="Filter the audit log">
             <SelectField
@@ -356,7 +484,7 @@ export function registerAudit(ui: Hono, kit: UiKit): void {
                 header: 'Workspace',
                 cell: (r) => (r.workspaceId === null ? '—' : named(r.workspaceId, names.workspaces)),
               },
-              { header: 'Result', cell: (r) => <Result row={r} /> },
+              { header: 'Result', cell: (r) => <Result row={r} pair={pairs.get(r.id)} /> },
               {
                 header: 'Query',
                 cell: (r) => (r.query === null ? '—' : <code>{cut(r.query, MAX_QUERY)}</code>),
@@ -395,7 +523,7 @@ export function registerAudit(ui: Hono, kit: UiKit): void {
       const all = isOk(res) ? rows(res.body, parseAudit) : null;
       if (all === null) return loadFailed(c, res, principal);
       const day = new Date(now()).toISOString().slice(0, 10);
-      return new Response(auditCsv(all), {
+      return new Response(auditCsv(all, { now: now(), complete: f.status === '' }), {
         status: 200,
         headers: {
           ...UI_PAGE_HEADERS,
@@ -429,6 +557,13 @@ export const CSV_COLUMNS = [
   'asset_numbers',
   'query',
   'details',
+  'write_phase',
+  'write_operation',
+  'write_approval',
+  'write_hash',
+  'write_fields',
+  'write_intent_id',
+  'write_pair',
 ] as const;
 
 /**
@@ -451,9 +586,35 @@ const isoTime = (ts: number): string => {
   }
 };
 
-export function auditCsv(all: readonly AuditRow[]): string {
+/** The `write_pair` cell: how this write row relates to its partner in the export (empty for other rows). */
+const PAIR_CELL: Readonly<Record<WritePair['kind'], string>> = {
+  outcome: 'outcome_found',
+  intent: 'intent_found',
+  in_progress: 'in_progress',
+  missing: 'outcome_missing',
+  elsewhere: 'partner_not_in_export',
+};
+
+const textDetail = (r: AuditRow, key: string): string | null => {
+  const v = r.details?.[key];
+  return typeof v === 'string' ? v : null;
+};
+
+export function auditCsv(
+  all: readonly AuditRow[],
+  opts: { readonly now?: number; readonly complete?: boolean } = {},
+): string {
   const lines = [CSV_COLUMNS.join(',')];
+  const pairs = pairWrites(all, {
+    now: opts.now ?? Number.POSITIVE_INFINITY,
+    continued: false,
+    hasNext: false,
+    complete: opts.complete ?? true,
+  });
   for (const r of all) {
+    const write = r.kind === 'write' && phaseOf(r) !== null;
+    const fields = r.details?.['fields'];
+    const pair = pairs.get(r.id);
     lines.push(
       [
         isoTime(r.ts),
@@ -475,6 +636,13 @@ export function auditCsv(all: readonly AuditRow[]): string {
         r.assetNumbers === null ? null : r.assetNumbers.join(' '),
         r.query,
         r.details === null ? null : JSON.stringify(r.details),
+        write ? phaseOf(r) : null,
+        write ? textDetail(r, 'operation') : null,
+        write ? textDetail(r, 'approval') : null,
+        write ? textDetail(r, 'hash') : null,
+        write && Array.isArray(fields) ? fields.filter((f) => typeof f === 'string').join(' ') : null,
+        write ? (phaseOf(r) === 'outcome' ? intentIdOf(r) : r.id) : null,
+        pair === undefined ? null : PAIR_CELL[pair.kind],
       ]
         .map(csvCell)
         .join(','),

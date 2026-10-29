@@ -214,13 +214,23 @@ and a cell a spreadsheet could run as a formula (it starts with `=`, `+`, `-`, `
 signs after spaces) gets a leading apostrophe. A link from another site to the CSV lands on the audit page instead of
 downloading.
 
+**Write rows** (kind `write`, [write tools](write-tools.md)) show the phase (`intent` or `outcome`), the operation, the
+**names** of the changed fields, the approval channel, the first characters of the change hash and the pair: an intent says
+what its outcome was, an outcome names its intent. An intent older than ten minutes with no outcome is flagged **NO OUTCOME
+RECORDED** (the change may or may not have been applied; see [reading a write](audit-log.md#reading-a-write-intent-and-outcome)).
+At a page edge the partner can be on the next or previous page and the row says so. A member sees only their own write rows.
+The CSV adds `write_phase`, `write_operation`, `write_approval`, `write_hash`, `write_fields`, `write_intent_id` and
+`write_pair` (`outcome_found`, `intent_found`, `outcome_missing`, `in_progress`, `partner_not_in_export`).
+
 **Usage** (`/admin/usage`, owners and admins) counts `tool_call` rows over the last 24 hours, 7 days or 30 days, grouped by
 tool, workspace, grant, user or UTC day: calls, errors (with the share of calls), denied, Agility requests, mean and
 slowest time. Refused requests and administrative changes are not tool calls and are not counted. To stay inside the free
 Cloudflare limits the statistics read at most the **newest 10,000 rows** of the window; when the window holds more, the page
-says so and the numbers cover only the newest rows (choose a shorter window for exact figures).
+says so and the numbers cover only the newest rows (choose a shorter window for exact figures). Below it, **Writes** counts
+each change once (its intent paired with its outcome) by tool and by approval channel: applied, failed, no outcome and in
+progress, and lists the intents with no outcome. It reads the newest 3,000 write rows of the window and says when it stopped there.
 
-Both pages call the admin API (`GET /api/admin/v1/audit`, `GET /api/admin/v1/audit/stats`), so the CLI
+Both pages call the admin API (`GET /api/admin/v1/audit`, `GET /api/admin/v1/audit/stats`, `GET /api/admin/v1/audit/write-stats`), so the CLI
 (`agility-bridge audit tail`) and scripts see the same rows with the same rules.
 
 ## When the page asks you to sign in again

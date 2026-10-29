@@ -521,3 +521,69 @@ export function parseUsage(body: unknown): Usage | null {
     truncated: o['truncated'] === true,
   };
 }
+
+/** One group of `GET /audit/write-stats` (P7-11). */
+export interface WriteStatsRow {
+  readonly key: string;
+  readonly writes: number;
+  readonly ok: number;
+  readonly error: number;
+  readonly noOutcome: number;
+  readonly inProgress: number;
+}
+
+export interface UnpairedIntentRow {
+  readonly intentId: string;
+  readonly ts: number;
+  readonly tool: string;
+  readonly targetType: string | null;
+  readonly targetId: string | null;
+  readonly workspaceId: string | null;
+  readonly userId: string | null;
+}
+
+export interface WriteStatsView {
+  readonly byTool: WriteStatsRow[];
+  readonly byChannel: WriteStatsRow[];
+  readonly total: WriteStatsRow;
+  readonly unpaired: UnpairedIntentRow[];
+  readonly scanned: number;
+  readonly truncated: boolean;
+}
+
+function writeStatsRow(d: unknown): WriteStatsRow {
+  const r = obj(d);
+  return {
+    key: str(r['key']),
+    writes: int(r['writes']),
+    ok: int(r['ok']),
+    error: int(r['error']),
+    noOutcome: int(r['noOutcome']),
+    inProgress: int(r['inProgress']),
+  };
+}
+
+export function parseWriteStats(body: unknown): WriteStatsView | null {
+  const o = obj(body);
+  if (!Array.isArray(o['byTool']) || !Array.isArray(o['byChannel']) || !Array.isArray(o['unpaired']))
+    return null;
+  return {
+    byTool: (o['byTool'] as unknown[]).map(writeStatsRow),
+    byChannel: (o['byChannel'] as unknown[]).map(writeStatsRow),
+    total: writeStatsRow(o['total']),
+    unpaired: (o['unpaired'] as unknown[]).map((d) => {
+      const r = obj(d);
+      return {
+        intentId: str(r['intentId']),
+        ts: int(r['ts']),
+        tool: str(r['tool']),
+        targetType: strOrNull(r['targetType']),
+        targetId: strOrNull(r['targetId']),
+        workspaceId: strOrNull(r['workspaceId']),
+        userId: strOrNull(r['userId']),
+      };
+    }),
+    scanned: int(o['scanned']),
+    truncated: o['truncated'] === true,
+  };
+}

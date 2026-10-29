@@ -21,6 +21,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 |---|---|---|---|---|
 | `GET` | `/audit` | Read the audit log, newest first (owner and admin: every row; a member: only their own rows, and another userId is refused) | — | 200 AuditEntry[] |
 | `GET` | `/audit/stats` | Usage statistics from tool calls: calls, errors, denials, Agility requests and durations per tool, workspace, grant, user or day (owner, admin). Reads at most the newest 10,000 rows of the window and says when it stopped there. | — | 200 AuditStats |
+| `GET` | `/audit/write-stats` | Write statistics (P7-11): writes by tool and approval channel, and by outcome (ok, error, no outcome recorded), counting each intent with its outcome once, and the intents with no outcome (owner, admin). Reads at most the newest 3,000 write rows of the window and says when it stopped there. | — | 200 WriteStats |
 
 ## credentials
 
@@ -150,3 +151,4 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 - **Tool**: `name`: string, `kind`: "read" \| "write" \| "destructive", `group`: string, `cost`?: integer, `siblings`?: string[]
 - **User**: `id`: string, `email`: string, `displayName`: string \| null, `idp`: string \| null, `idpSubject`: string \| null, `role`: "owner" \| "admin" \| "member", `createdAt`: number, `updatedAt`: number, `disabledAt`: number \| null
 - **Workspace**: `id`: string, `slug`: string, `name`: string, `instanceId`: string, `allowedScopeIds`: string[], `includeChildScopes`: boolean, `assetTypes`: object \| null, `enabledTools`: array \| null, `limits`: object, `defaultCredentialId`: string \| null, `writePolicy`: object, `credentialSource`: "stored" \| "passthrough", `createdAt`: number, `updatedAt`: number, `disabledAt`: number \| null
+- **WriteStats**: `byTool`: object[], `byChannel`: object[], `total`: object, `unpaired`: object[], `scanned`: number, `truncated`: boolean
