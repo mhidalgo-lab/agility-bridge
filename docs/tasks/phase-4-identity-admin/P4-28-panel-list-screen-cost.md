@@ -45,3 +45,9 @@ The two list screens fit the Free plan's CPU budget at a few hundred users, with
 - Benchmark: relative to the overview in the same run, users list went from 3.0x to about 1.2x and audit from 2.5x to about
   1.7x. The baseline entries were set from those ratios, not from absolute numbers (this machine was too busy for a clean
   `--update`); refresh them from CI.
+
+## Baseline correction (2026-10-29)
+The two baseline entries were first set from ratios measured under heavy local load. Six CI runs of the Worker benchmark put
+`warm: admin: users list` at 0.84× to 1.76× calibration (median about 1.25×, about 2.5× the overview page) and `warm: admin:
+audit` at about 1.1×, so the first entries (0.58×, 0.82×) flagged a regression on half the runs. The baseline now holds the CI
+medians; the users list improved less than the first estimate said.
