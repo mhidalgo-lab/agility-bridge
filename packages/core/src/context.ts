@@ -3,6 +3,7 @@ import { AbError, ErrorCode } from './errors.ts';
 import type { Logger } from './logger.ts';
 import type { MetadataService } from './metadata/service.ts';
 import type { Secret } from './secret.ts';
+import type { WriteRuntime } from './writes/runtime.ts';
 
 /** The Agility instance a request talks to. Defined by an owner or admin, never by a caller (ADR-0008). */
 export interface InstanceRef {
@@ -253,6 +254,11 @@ export interface ToolContext {
    * them; `whoami` says so instead of leaving a silent gap (P6-36, L-115).
    */
   readonly hiddenByBudget?: ReadonlyArray<{ readonly name: string; readonly cost: number }>;
+  /**
+   * The write runtime (ADR-0013, P7-01): present only when the server switch is on and this caller has write tools.
+   * Absent means no write can run.
+   */
+  readonly writes?: WriteRuntime;
   /** The host's metadata service (P1-03); tools use `metadataFor(ctx)`. */
   readonly metadata?: MetadataService;
   readonly logger: Logger;

@@ -194,6 +194,7 @@ described in [Output formats](../guide/output-formats.md).
 | `AB_WRITE_APPROVAL_UNAVAILABLE` | Approval required but neither elicitation nor the approval page is available to this client |
 | `AB_WRITE_APPROVAL_DECLINED` | The user declined or did not answer |
 | `AB_WRITE_CONFLICT` | The target changed between plan and apply |
+| `AB_WRITE_AUDIT_UNAVAILABLE` | The intent of a write could not be recorded, so nothing was changed (L-109) |
 | `AB_INTERNAL` | Unexpected exception (with a reference id) |
 
 Adding a code is an additive change; renaming or removing one follows [Deprecations](#deprecations).

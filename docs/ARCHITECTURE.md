@@ -400,6 +400,12 @@ validate input + metadata (operation allowed, attributes writable, values typed)
  → audit outcome; result notes possible read lag (L-051)
 ```
 
+Built in P7-01 (`packages/core/src/writes/`, [write tools guide](guide/write-tools.md)): `defineWriteTool` is the only way to make a
+`write` or `destructive` tool (the registry refuses any other) and runs this pipeline; a host supplies a `WriteRuntime` in the
+`ToolContext` (ledger, audit sink, actor, approval mode, state key, and the seams for the write limiter, P7-03, and the approval
+page, P7-02). The server wrapper builds the request's approval channel from its declared capabilities and turns the pipeline's
+`InputRequiredSignal` into a 2026-07-28 `input_required` result.
+
 ## 7. Cross-cutting concerns
 
 - **Budget** ([ADR-0010](adr/0010-platform-limits-strategy.md)): Agility requests per tool call. Presets: Node/stdio
@@ -437,6 +443,7 @@ validate input + metadata (operation allowed, attributes writable, values typed)
 | `AB_WRITE_APPROVAL_UNAVAILABLE` | Approval required but neither elicitation nor the approval page is available |
 | `AB_WRITE_APPROVAL_DECLINED` | The user declined or did not answer |
 | `AB_WRITE_CONFLICT` | The target changed between plan and apply |
+| `AB_WRITE_AUDIT_UNAVAILABLE` | The intent of a write could not be recorded, so nothing was changed (L-109) |
 | `AB_INTERNAL` | Unexpected error (reference id only) |
 
 - **Observability**: structured JSON logs to stderr (redacted); audit log in remote modes; optional OpenTelemetry

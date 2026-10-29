@@ -61,8 +61,19 @@ describe('ToolRegistry.register refuses', () => {
     ['write', 'add_comment'],
     ['destructive', 'close_asset'],
   ] as const)('a %s tool without allowNonRead', (kind, name) => {
-    refuses(base({ kind, name }), /allowNonRead/);
-    expect(() => new ToolRegistry({ allowNonRead: true }).register(base({ kind, name }))).not.toThrow();
+    const write = base({ kind, name, group: 'writes', writePipeline: true });
+    refuses(write, /allowNonRead/);
+    expect(() => new ToolRegistry({ allowNonRead: true }).register(write)).not.toThrow();
+  });
+
+  it('a non-read tool that was not built by defineWriteTool, or is outside the writes group (L-105)', () => {
+    const open = () => new ToolRegistry({ allowNonRead: true });
+    refuses(base({ kind: 'write', name: 'add_comment', group: 'writes' }), /defineWriteTool/, open());
+    refuses(
+      base({ kind: 'write', name: 'add_comment', group: 'work', writePipeline: true }),
+      /writes group/,
+      open(),
+    );
   });
 
   it.each([
@@ -84,7 +95,7 @@ describe('ToolRegistry.select', () => {
   const r = new ToolRegistry({ allowNonRead: true })
     .register(base())
     .register(base({ name: 'get_thing', group: 'work' }))
-    .register(base({ name: 'add_comment', kind: 'write', group: 'writes' }));
+    .register(base({ name: 'add_comment', kind: 'write', group: 'writes', writePipeline: true }));
 
   it('returns read tools by default, filtered by names and groups', () => {
     expect(r.select().map((t) => t.name)).toEqual(['list_things', 'get_thing']);

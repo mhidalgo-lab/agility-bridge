@@ -45,6 +45,8 @@ export interface ToolDefinition<I extends InputSchema = InputSchema, O = unknown
   readonly outputSchema?: z.ZodType<O>;
   /** For `write` / `destructive` tools: repeating the same call has no further effect. Reads are always idempotent. */
   readonly idempotent?: boolean;
+  /** Set by `defineWriteTool` only: the tool runs the write pipeline. The registry refuses a non-read tool without it. */
+  readonly writePipeline?: true;
   readonly handler: (input: z.infer<I>, ctx: ToolContext) => Promise<ToolOutput<O>>;
 }
 

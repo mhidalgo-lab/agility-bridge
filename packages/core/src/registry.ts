@@ -93,6 +93,16 @@ export class ToolRegistry {
         `Tool "${def.name}" is "${def.kind}": non-read tools need allowNonRead (ADR-0013).`,
       );
     }
+    if (def.kind !== 'read') {
+      // Writes are a separate product (L-105): only the framework can build one, and it lives in its own group.
+      if (def.writePipeline !== true) {
+        throw new RegistryError(
+          `Tool "${def.name}" is "${def.kind}" but was not built with defineWriteTool: every write goes through the write pipeline (ADR-0013).`,
+        );
+      }
+      if (def.group !== 'writes')
+        throw new RegistryError(`Write tool "${def.name}" must be in the writes group.`);
+    }
     if (typeof def.group !== 'string' || !NAME_RE.test(def.group)) {
       throw new RegistryError(`Tool "${def.name}" needs a snake_case group.`);
     }

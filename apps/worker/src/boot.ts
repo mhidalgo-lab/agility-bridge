@@ -62,7 +62,7 @@ export const PLAN_PRESETS: Readonly<Record<WorkersPlan, SettingDefaults & { read
  * its own limit, not in the first request's CPU budget (P3-14, L-020). A completed value, shared by every request.
  */
 const REGISTRY = (() => {
-  const registry = new ToolRegistry();
+  const registry = new ToolRegistry({ allowNonRead: true });
   for (const tool of CORE_TOOLS) registry.register(tool);
   // And the JSON Schemas `tools/list` hands out, cached per isolate (L-020).
   prewarmToolSchemas(CORE_TOOLS);
