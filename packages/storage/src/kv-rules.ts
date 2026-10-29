@@ -51,3 +51,14 @@ export function checkIncrement(
 export function isLive(expiresAt: number | null, now: number): boolean {
   return expiresAt === null || expiresAt > now;
 }
+
+/**
+ * The key range `[low, high)` that holds exactly the keys starting with `prefix`: `high` is the prefix with its last
+ * character incremented (`null` for the empty prefix: no upper bound). Keys are printable ASCII (`KEY`), so a binary
+ * comparison on the primary key agrees with `startsWith` and the database can use the key's index instead of reading
+ * every row (P7-09).
+ */
+export function prefixRange(prefix: string): readonly [low: string, high: string | null] {
+  if (prefix === '') return ['', null];
+  return [prefix, prefix.slice(0, -1) + String.fromCharCode(prefix.charCodeAt(prefix.length - 1) + 1)];
+}

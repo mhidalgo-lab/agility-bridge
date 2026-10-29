@@ -18,7 +18,7 @@ import {
   preparePatch,
   type TableName,
 } from '../fields.ts';
-import { checkIncrement, checkKey, checkKvValue, checkPrefix, isLive } from '../kv-rules.ts';
+import { checkIncrement, checkKey, checkKvValue, checkPrefix, isLive, prefixRange } from '../kv-rules.ts';
 import * as schema from '../schema.ts';
 import type {
   AccessBundle,
@@ -565,19 +565,23 @@ GROUP BY k`,
     async list(prefix, options = {}) {
       checkPrefix(prefix);
       const limit = clampLimit(options.limit, 100, 1_000);
+      // A range on the primary key (`key >= prefix AND key < prefix with its last character incremented`), so the
+      // database walks only the matching keys instead of every row of the table (P7-09).
+      const [low, high] = prefixRange(prefix);
       const rows = await raw(
-        `SELECT key FROM kv WHERE substr(key, 1, ?) = ? AND key > ? AND ${LIVE} ORDER BY key LIMIT ?`,
-        [prefix.length, prefix, options.after ?? '', now(), limit],
+        `SELECT key FROM kv WHERE key >= ? ${high === null ? '' : 'AND key < ? '}AND key > ? AND ${LIVE} ORDER BY key LIMIT ?`,
+        [low, ...(high === null ? [] : [high]), options.after ?? '', now(), limit],
       );
       return rows.map((r) => r[0] as string);
     },
     async deletePrefix(prefix) {
       checkPrefix(prefix);
       if (prefix === '') throw new InvalidInputError('kv.deletePrefix needs a non-empty prefix.');
-      const rows = await raw('DELETE FROM kv WHERE substr(key, 1, ?) = ? RETURNING key', [
-        prefix.length,
-        prefix,
-      ]);
+      const [low, high] = prefixRange(prefix);
+      const rows = await raw(
+        `DELETE FROM kv WHERE key >= ? ${high === null ? '' : 'AND key < ? '}RETURNING key`,
+        [low, ...(high === null ? [] : [high])],
+      );
       return rows.length;
     },
     async purgeExpired(limit) {

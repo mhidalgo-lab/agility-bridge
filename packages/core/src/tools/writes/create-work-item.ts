@@ -6,7 +6,7 @@
 // is derived: the same caller creating the same title under the same parent in the same project within 30 minutes is a
 // repeat and is refused, naming the item that exists (D-179). The write shape is *unverified* until the sandbox (P7-07).
 import { z } from 'zod';
-import type { ToolContext } from '../../context.ts';
+import { type ToolContext, withMemo } from '../../context.ts';
 import { AbError, ErrorCode } from '../../errors.ts';
 import { resolveMember, resolveProject, runQuery } from '../../identity/resolve.ts';
 import { oidsOf } from '../../identity/scope.ts';
@@ -46,7 +46,7 @@ import {
 
 /** A repeat of the same create inside this window is refused (D-179). */
 export const DUPLICATE_WINDOW_MS: number = 30 * 60_000;
-const COST = 28;
+const COST = 20;
 
 /** Everything `create_work_item` may write: the type's fields and its parent relation; the project is the target. */
 const CREATE_FIELDS: readonly string[] = [
@@ -124,7 +124,7 @@ const newValue = (
   field: string,
 ): unknown => changes.find((c) => c.field === field)?.new;
 
-export const createWorkItem: ToolDefinition = defineWriteTool({
+const defined: ToolDefinition = defineWriteTool({
   name: 'create_work_item',
   title: 'Create work item',
   description: `Create one backlog item, defect, task, test or epic in an Agility project. A task or test needs a parent item; a backlog item, defect or epic may have an epic as parent. Sets only title, description, estimate and priority. Not paged. Cold call: up to ${COST} Agility requests.`,
@@ -313,3 +313,12 @@ export const createWorkItem: ToolDefinition = defineWriteTool({
     ]);
   },
 });
+
+/**
+ * The plan and the re-read of one call share a resolution memo, so the caller's member (the duplicate scan) is looked up
+ * once, not twice (P7-09). The memo lives for this call only (L-096).
+ */
+export const createWorkItem: ToolDefinition = {
+  ...defined,
+  handler: (input, ctx) => defined.handler(input, withMemo(ctx)),
+};

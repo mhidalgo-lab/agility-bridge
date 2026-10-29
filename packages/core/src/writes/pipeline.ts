@@ -178,13 +178,17 @@ async function obtainApproval(
     new AbError(ErrorCode.WriteApprovalDeclined, 'The change was not approved, so nothing was changed.', {
       hint: 'Ask the person what to change instead; do not repeat the same call unprompted.',
     });
-  const grant = await rt.ledger.takeGrant(rt.actor.id, hash, scope);
-  if (grant !== null && grant.tool === tool && grant.actor === rt.actor.id && grant.hash === hash) {
-    return 'page';
-  }
-  const denial = await rt.ledger.takeDenial(rt.actor.id, hash, scope);
-  if (denial !== null && denial.tool === tool && denial.actor === rt.actor.id && denial.hash === hash) {
-    throw declined();
+  // A grant or a denial can exist only where the approval page does (P7-02): without it these two reads (each a storage
+  // round trip) can never hit, so they are skipped (P7-09). Fail closed: no entry read, no approval from one.
+  if (rt.page !== undefined || rt.channel?.kind === 'page') {
+    const grant = await rt.ledger.takeGrant(rt.actor.id, hash, scope);
+    if (grant !== null && grant.tool === tool && grant.actor === rt.actor.id && grant.hash === hash) {
+      return 'page';
+    }
+    const denial = await rt.ledger.takeDenial(rt.actor.id, hash, scope);
+    if (denial !== null && denial.tool === tool && denial.actor === rt.actor.id && denial.hash === hash) {
+      throw declined();
+    }
   }
   const channel = rt.channel;
   if (channel === undefined) {

@@ -29,8 +29,12 @@ Why these numbers:
 ## Tools that cannot fit
 
 Every tool declares the most Agility requests one call can cost ([tool reference](../reference/tools.md)). A tool
-whose cost is above the caller's budget is **not listed** in `tools/list` and is refused if called anyway (L-115). All
-tools fit the Free budget today (the largest declares 24); a workspace or grant with a smaller budget hides more.
+whose cost is above the caller's budget is **not listed** in `tools/list` and is refused if called anyway (L-115). The largest declared costs
+are `sprint_health` (54) and `standup_summary` (48), the report composites: above the Free budget of 45, so they are listed only
+where the budget is larger (Paid, or a raised grant on a self-hosted server); every other read tool declares 30 or less.
+**Every write tool fits Free**: the largest is `create_work_item` at 20, then `assign_owners` and `add_comment` at 18, each
+the measured worst case on a cold cache plus a margin of 2 to 8 requests (D-199); a workspace or grant with a smaller
+budget hides more.
 
 ## OAuth endpoints and the D1 write budget
 
@@ -47,6 +51,33 @@ The panel's **Connected apps** and **OAuth apps** pages (P5-08) read one databas
 the device counts of the OAuth apps page read at most 100 grants (the page says "at least" beyond that, or "unknown" when
 the plan's 50 queries per request run out). Revoking a client reads at most 1,000 grants; the client is blocked first, so a
 cut-short revoke still refuses everything and pressing it again ends the rest.
+
+## Write tools and the D1 row budget
+
+Write tools ([write tools](write-tools.md)) are small in requests (a write is 5 to 15 Agility requests cold, one of them
+the one POST) but they write to D1: the approval ledger and the write limiter live in the `kv` table, and every write is
+audited. On the Free plan the limit that matters is the **100,000 D1 rows written a day**, not the 50 subrequests (a
+confirmed call makes 5 to 7 D1 queries, a page-approved write about 18 over its four requests, all far below 50 a request).
+
+Rows written per approved write, counting secondary indexes as the D1 documentation describes them (`audit_log` has two, so
+an audit row is about three rows; a `kv` insert or delete is two with `kv_expires`). **The index accounting is
+unverified**: it is computed from the schema, not read from `meta.rows_written` of a real D1 (P7-30).
+
+| Flow | D1 queries | Rows written (about) |
+|---|---|---|
+| Dry run, or a read tool (the `tool_call` audit row only) | 1 | 3 |
+| Confirmed call, push elicitation (one call: two limiter counters, intent and outcome audit, `tool_call` audit) | 5 | 13 |
+| Confirmed call, elicitation by multi round-trip (two calls: ledger round open and take, the same) | 8 | 20 |
+| Approval page (the ask, the page, the decision with its admin audit row, the repeated call) | 18 over 4 requests | 31 |
+
+The two grant and denial reads of a confirmed call run only where the approval page exists (P7-09, D-200); a read that
+finds nothing writes nothing, so this saves latency, not rows. The deployment-wide cap (`AB_WRITE_RATE_DEPLOYMENT_HOURLY`,
+default 200 an hour) bounds the writes, not the rows: a deployment that really sustained 200 page-approved writes an hour
+would write about 4,800 x 31 = 149,000 rows a day, **above the Free plan's 100,000** (about 62,000 a day with push
+elicitation), and the counters, OAuth limits and read-tool audit rows compete for the same budget. Realistic use stays far
+below: one grant at its default 20 an hour is about 15,000 rows a day. On the Free plan with several busy grants, lower
+`AB_WRITE_RATE_DEPLOYMENT_HOURLY` to about 100, or use the Paid plan (50 million rows a day included). A Free-plan ceiling
+for the cap is planned (P7-30). The `tool_call` audit rows of reads are in the same budget (three rows each).
 
 ## Where usage shows
 
@@ -78,6 +109,8 @@ isolation as on Workers, Agility-shaped fake responses. *Staging*: `agility-brid
 | `/admin/assets/<css>`, warm | < 0.1 ms (0.03×) ¹ | — | 0 |
 | Form POST (create a user through the in-process admin API), warm | about 0.8 ms (0.3×) ¹ | — | 0 |
 | `prompts/list`, warm | about 2 ms (0.5×) | — | 0 |
+| `update_status` dry run / approved by elicitation, warm metadata ³ | about 1.6 ms (0.47×) / about 3.1 ms (0.93×) | — | 2 / 4 |
+| `update_status` by the approval page, call 1 (ask) / call 2 (apply) ³ | about 1.3 ms (0.40×) / about 2.9 ms (0.87×) | — | 2 / 4 |
 | `get_sprint` (worst-case fixture), cold isolate / types from D1 / warm ² | 11 / 7 / 5 ms (2.8× / 1.7× / 1.3×) | — | 17 / 7 / 5 |
 | `get_asset_history`, cold / from D1 / warm ² | 4.9 / 2.8 / 2.5 ms (1.2× / 0.7× / 0.6×) | — | 13 / 4 / 2 |
 | `get_portfolio_tree`, cold / from D1 / warm ² | 6.7 / 8.1 / 3.4 ms (1.7× / 2.0× / 0.85×) | — | 16 / 7 / 4 |
@@ -95,6 +128,15 @@ committed snapshot is 228 KB for all types; a live type list parses 1.9 MB), so 
 and the saving is the requests (here 17 to 7, 13 to 4, 16 to 7, 24 to 8), not only CPU: against D1 the saving in CPU is
 smaller and, for `get_portfolio_tree`, within noise. D1 reads are not Agility requests; whether they count toward the Free
 plan's 50 subrequests is *unverified*. No Cloudflare measurement of these paths was made (no staging call reaches Agility, D-01).
+
+³ Write paths (P7-09), `pnpm bench:worker`: the handler of one write tool on the fakes (no JSON-RPC, no HTTP, no D1), the
+item's status toggled between samples. The figures are the quietest of three local runs (the machine was shared, so the
+others were two to five times slower); no CI run could record them because the benchmark job failed from P7-04 (the bench
+built its registry without `allowNonRead`) until P7-09, so the CI baseline holds these local ratios scaled by 1.35, the
+CI/local ratio of the `whoami` row. Storage operations of the approval ledger per call, counted by the benchmark: 0 for the
+dry run and the elicitation write, 3 and 1 for the two page calls (the fake page records the grant itself). A write does the
+same Agility requests whatever the channel; the cost of `renderApproval` and the SHA-256 of the canonical change is inside
+these figures. The approval page's own view and decision are not benchmarked yet (P7-31).
 
 Warm calls fit the Free plan's 10 ms. **The first request of every new isolate does not.** P3-14 moved what does not
 depend on the environment to module scope (Workers run it at startup, under a separate limit; startup is about

@@ -1132,6 +1132,26 @@ export function storageContract(name: string, factory: StorageFactory): void {
         await expect(s.kv.deletePrefix('has space')).rejects.toThrow(InvalidInputError);
       });
 
+      it('lists and deletes by prefix exactly at the edges of the key range (P7-09)', async () => {
+        // Keys just below, inside and just above the range of the prefix `a:`, wildcards and the last printable character.
+        for (const k of ['a9', 'a:', 'a:%', 'a:_x', 'a:~', 'a:~~z', 'a;', 'a;:', 'b:', 'A:x', 'a:\\z'])
+          await s.kv.set(k, '1');
+        expect(await s.kv.list('a:')).toEqual(['a:', 'a:%', 'a:\\z', 'a:_x', 'a:~', 'a:~~z']);
+        expect(await s.kv.list('a:', { after: 'a:%', limit: 2 })).toEqual(['a:\\z', 'a:_x']);
+        expect(await s.kv.list('a:', { after: 'a;' })).toEqual([]);
+        expect(await s.kv.list('a:~')).toEqual(['a:~', 'a:~~z']);
+        expect(await s.kv.list('a:%')).toEqual(['a:%']);
+        expect(await s.kv.list('a:_')).toEqual(['a:_x']);
+        expect(await s.kv.list('~')).toEqual([]);
+        await s.kv.set('~', '1');
+        await s.kv.set('~~', '1');
+        expect(await s.kv.list('~')).toEqual(['~', '~~']);
+        expect(await s.kv.deletePrefix('a:~')).toBe(2);
+        expect(await s.kv.deletePrefix('~')).toBe(2);
+        expect(await s.kv.deletePrefix('a:')).toBe(4);
+        expect(await s.kv.list('')).toEqual(['A:x', 'a9', 'a;', 'a;:', 'b:']);
+      });
+
       it('increments counters atomically with a cap and an expiry window', async () => {
         const window = { expiresAt: clock.now() + 1_000, max: 3 };
         expect(await s.kv.increment('rl', window)).toBe(1);

@@ -37,7 +37,7 @@ How to use it:
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
-| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-407 |
+| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382 |
@@ -1631,6 +1631,14 @@ informational change whose old and new are equal (`OpenChildren 0 -> 0`): the ap
 re-read compares it (a child that appears is a conflict), and it never counts toward "something to change". The operation
 name goes in the mutation's operation for the same reason.
 *Applied in:* P7-06, `tools/writes/lifecycle.ts`.
+
+**L-408 — Count storage operations and rows written per path, and keep a prefix scan a range.**
+On D1 the budget that matters for writes is rows written a day (about 30 per approved write by the approval page, indexes
+counted), not Agility requests. Two wasted `DELETE ... RETURNING` takes on every confirmed call and a `substr(key, 1, ?) = ?`
+prefix scan (which cannot use the key's index and reads the whole table) were invisible to the request counts. Count storage
+operations beside requests in the benchmark, skip a read that cannot hit, and write a prefix as a key range
+(`key >= p AND key < p with its last character incremented`), with a contract test at the edges of the range.
+*Applied in:* P7-09, `scripts/worker-bench.ts`, `packages/storage/src/sql/storage.ts`.
 
 **L-397 — A create's one target is the container; the new item's fields and parent are the change.**
 The approval hash binds one target, and a new item has no OID. Use the project that will hold it as the target, check it is

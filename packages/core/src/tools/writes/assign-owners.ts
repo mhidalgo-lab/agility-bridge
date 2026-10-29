@@ -40,7 +40,7 @@ function ownersOf(row: Readonly<Record<string, unknown>>): readonly string[] {
   return sortedLabels(oids.map((oid, i) => labelOf(text(names[i]) ?? oid, oid)));
 }
 
-const COST = 26;
+const COST = 18;
 
 export const assignOwners: ToolDefinition = defineWriteTool({
   name: 'assign_owners',

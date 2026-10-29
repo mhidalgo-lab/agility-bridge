@@ -582,5 +582,16 @@ describe('worst-case cost of every write tool (L-114)', () => {
     // Every request of the call counts: the plan's reads, the re-read and the one send (the fake counts them all).
     expect(w.calls.length, `${t.name} made ${w.calls.length} requests`).toBeLessThanOrEqual(t.cost);
     expect(w.calls.length).toBeGreaterThan(1);
+    // The declared cost is an upper bound with honest headroom, not a guess (P7-09, D-199): at least 2 requests above
+    // the measured worst case (a branch the fixture misses must not exhaust the budget after the approval was spent),
+    // and at most 8 above it (an over-declared tool is hidden from workspaces and grants with a smaller call budget).
+    expect(
+      t.cost - w.calls.length,
+      `${t.name} declares ${t.cost}, measured ${w.calls.length}`,
+    ).toBeGreaterThanOrEqual(2);
+    expect(
+      t.cost - w.calls.length,
+      `${t.name} declares ${t.cost}, measured ${w.calls.length}`,
+    ).toBeLessThanOrEqual(8);
   });
 });

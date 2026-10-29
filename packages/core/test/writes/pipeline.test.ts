@@ -5,9 +5,11 @@ import { describe, expect, it } from 'vitest';
 import {
   AbError,
   type ApprovalChannelPort,
+  ApprovalLedger,
   canonicalize,
   ErrorCode,
   InputRequiredSignal,
+  memoryLedgerStore,
   mutationHash,
   Secret,
   systemClock,
@@ -388,7 +390,7 @@ describe('the out-of-band grant (seam for P7-02): bound to the change, the actor
 
   it('applies once with the exact approved change and refuses a replay', async () => {
     const fake = new FakeItems();
-    const runtime = makeRuntime();
+    const runtime = makeRuntime({ page: answeringChannel(true, 'page') });
     const ctx = writeContext(runtime);
     const tool = makeTestWriteTool(fake);
     await grantFor(runtime, 'Done');
@@ -405,7 +407,7 @@ describe('the out-of-band grant (seam for P7-02): bound to the change, the actor
 
   it('does not apply an approval given for a different value', async () => {
     const fake = new FakeItems();
-    const runtime = makeRuntime();
+    const runtime = makeRuntime({ page: answeringChannel(true, 'page') });
     await grantFor(runtime, 'Blocked');
     const error = await refused(run(makeTestWriteTool(fake), CONFIRMED, writeContext(runtime)));
     expect(error.code).toBe(ErrorCode.WriteApprovalUnavailable);
@@ -414,7 +416,7 @@ describe('the out-of-band grant (seam for P7-02): bound to the change, the actor
 
   it('does not apply an approval given for a different target', async () => {
     const fake = new FakeItems();
-    const runtime = makeRuntime();
+    const runtime = makeRuntime({ page: answeringChannel(true, 'page') });
     await grantFor(runtime, 'Done');
     // Same value, other item: its hash differs.
     const error = await refused(
@@ -431,7 +433,7 @@ describe('the out-of-band grant (seam for P7-02): bound to the change, the actor
   it('does not apply an approval recorded for another actor or an expired one', async () => {
     for (const over of [{ actor: 'someone-else' }, { expiresAt: systemClock.now() - 1 }]) {
       const fake = new FakeItems();
-      const runtime = makeRuntime();
+      const runtime = makeRuntime({ page: answeringChannel(true, 'page') });
       await grantFor(runtime, 'Done', over);
       const error = await refused(run(makeTestWriteTool(fake), CONFIRMED, writeContext(runtime)));
       expect(error.code).toBe(ErrorCode.WriteApprovalUnavailable);
@@ -441,7 +443,7 @@ describe('the out-of-band grant (seam for P7-02): bound to the change, the actor
 
   it('does not apply an approval recorded for another workspace', async () => {
     const fake = new FakeItems();
-    const runtime = makeRuntime();
+    const runtime = makeRuntime({ page: answeringChannel(true, 'page') });
     await grantFor(runtime, 'Done', { scope: 'another-workspace' });
     const error = await refused(run(makeTestWriteTool(fake), CONFIRMED, writeContext(runtime)));
     expect(error.code).toBe(ErrorCode.WriteApprovalUnavailable);
@@ -450,7 +452,7 @@ describe('the out-of-band grant (seam for P7-02): bound to the change, the actor
 
   it('a denial recorded on the page refuses the repeated call once, as declined', async () => {
     const fake = new FakeItems();
-    const runtime = makeRuntime();
+    const runtime = makeRuntime({ page: answeringChannel(true, 'page') });
     const ctx = writeContext(runtime);
     const tool = makeTestWriteTool(fake);
     const m = canonicalize(
@@ -473,6 +475,26 @@ describe('the out-of-band grant (seam for P7-02): bound to the change, the actor
     // Used up: the next call asks again (no channel here).
     expect((await refused(run(tool, CONFIRMED, ctx))).code).toBe(ErrorCode.WriteApprovalUnavailable);
     expect(fake.sends).toHaveLength(0);
+  });
+
+  it('reads no grant or denial from storage where there is no approval page (P7-09)', async () => {
+    const fake = new FakeItems();
+    const reads: string[] = [];
+    const inner = memoryLedgerStore(systemClock);
+    const store = {
+      set: inner.set,
+      take: async (key: string) => {
+        reads.push(key);
+        return inner.take(key);
+      },
+    };
+    const runtime = makeRuntime({
+      ledger: new ApprovalLedger(store, systemClock),
+      channel: answeringChannel(true),
+    });
+    await run(makeTestWriteTool(fake), CONFIRMED, writeContext(runtime));
+    expect(fake.sends).toHaveLength(1);
+    expect(reads.filter((k) => k.startsWith('wr:ok:') || k.startsWith('wr:no:'))).toEqual([]);
   });
 
   it('an approval at the page channel answers pending with the link', async () => {

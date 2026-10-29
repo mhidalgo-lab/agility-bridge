@@ -287,3 +287,16 @@
 - **Options:** (a) refuse the approval (`write_unavailable`, no code, the page re-renders with a message), never issue a read-only token the person did not expect; (b) issue a read-only token silently; (c) ignore the tick but show a notice after.
 - **Recommendation:** (a), built. A forged tick for an app that did not ask is ignored by the consent screen (never granted).
 - **Owner:** *(open; built as (a))*
+
+### D-199 — Declared costs are the measured worst case plus 2 to 8 requests, and the cost test says so *(P7-09)*
+- **Context:** The write tools' declared costs (`cost`) decide which tools a call budget lists (L-115) and what the budget reserves. Review: `assign_owners` declared 26 for a measured 11, `reopen_asset` 22 for 7, `create_work_item` 28 for 16, while `update_status` had 1 and `add_comment` 2 requests of headroom. A tool declared above a workspace's or grant's budget is hidden for no reason; a tool declared below its true worst case fails with `AB_BUDGET_EXHAUSTED` after the approval was spent.
+- **Options:** (a) measure each fixture on a cold cache, declare the measured value plus a stated margin (at least 2, at most 8), and make the worst-case test assert both bounds; (b) keep generous round numbers; (c) derive the cost from the code (sum of the lookups) at registration.
+- **Recommendation:** (a), built: `add_comment` 18 (14 measured), `update_status` 15 (11), `update_fields` 14 (10), `assign_owners` 18 (11 with three members; five members add at most four requests), `create_work_item` 20 (15), `close_asset` 16 (11 for a story, an epic reads metadata of two more child types), `reopen_asset` 10 (7); `log_effort` and `move_to_sprint` stay 14 (11). All fit the Free budget of 45. The margin is a judgement: a fixture can miss a branch (a second status metadata fetch, an extra candidate lookup).
+- **Owner:** *(open; built as (a))*
+
+### D-200 — Fewer storage round trips per write, not a different approval design *(P7-09)*
+- **Context:** An approved write costs 8 to 13 D1 queries and about 18 to 30 rows written (indexes counted, *unverified*). `takeGrant` and `takeDenial` ran on every confirmed call although only the approval page writes grants and denials; `kv.list(prefix)` on D1 used `substr(key, 1, ?) = ?`, which reads every row of the `kv` table.
+- **Options:** (a) skip the two takes where no page exists for the request (no page runtime and not the page channel), and use a key range (`key >= prefix AND key < prefix with the last character incremented`) for `kv.list` and `kv.deletePrefix` on SQL adapters; (b) also merge the two takes into one `DELETE ... WHERE key IN (...) RETURNING` (a new `KvStore` method in three adapters); (c) store grants and denials as one entry.
+- **Recommendation:** (a), built: a request without a page cannot hold a grant or denial, so skipping the reads cannot approve anything and fails closed; the range is exact for the printable-ASCII keys the store allows (contract test at the edges: `~`, `%`, `_`, the next character). (b) is P7-30 together with a Free-plan ceiling for the deployment write cap. The memory adapter still filters its map: it is not a database.
+- **Owner:** *(open; built as (a))*
+
