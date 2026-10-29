@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// update_fields (P7-05): changes the title, description, estimate or priority of one work item, and nothing else. The
+// update_fields (P7-05): changes the title, description, estimate, priority or (task and test, P7-17) remaining to-do of one
+// work item, and nothing else. The
 // field allowlist is typed per asset type (fields.ts); custom attributes, the project, the status, owners, parent and every
 // other attribute have no argument and no allowlist entry, so they cannot be reached (D-181). The approval shows old ->
 // new for each field; the re-read compares them. Only fields that actually differ are sent. The shapes are *unverified*
@@ -42,7 +43,15 @@ import {
 const COST = 14;
 
 /** Read for every type; attributes the type lacks are left out by the reader. */
-const READ_FIELDS = ['Name', 'Description', 'Estimate', 'DetailEstimate', 'Priority', 'Priority.Name'];
+const READ_FIELDS = [
+  'Name',
+  'Description',
+  'Estimate',
+  'DetailEstimate',
+  'ToDo',
+  'Priority',
+  'Priority.Name',
+];
 
 /** The item's current values of the allowlisted fields; a description is read as plain text (it is HTML in Agility). */
 function currentValues(
@@ -59,6 +68,10 @@ function currentValues(
     const n = num(row[estimate]);
     out[estimate] = n === undefined ? null : round2(n);
   }
+  if (FIELD_ALLOWLIST[type].includes('ToDo')) {
+    const todo = num(row['ToDo']);
+    out['ToDo'] = todo === undefined ? null : round2(todo);
+  }
   if (FIELD_ALLOWLIST[type].includes('Priority')) out['Priority'] = labelFrom(row, 'Priority');
   return out;
 }
@@ -66,7 +79,7 @@ function currentValues(
 export const updateFields: ToolDefinition = defineWriteTool({
   name: 'update_fields',
   title: 'Update fields',
-  description: `Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic. Give only what changes; the person approves old and new for each. Not paged. Cold call: up to ${COST} Agility requests.`,
+  description: `Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic, or the remaining to-do hours of a task or test. Give only what changes; the person approves old and new for each. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
   overwrites: true,
   // Resolution, the item read, metadata (cold), the priority (1 to 3), the re-read and the one write.
@@ -95,6 +108,12 @@ export const updateFields: ToolDefinition = defineWriteTool({
       .max(200)
       .optional()
       .describe('Priority name or OID token, for a story or defect.'),
+    todo: z
+      .number()
+      .min(0)
+      .max(10_000)
+      .optional()
+      .describe('Remaining hours, for a task or test. Not for a backlog item, defect or epic.'),
   }),
   allowedFields: Object.fromEntries(FIELD_TYPES.map((t) => [t, FIELD_ALLOWLIST[t]])),
   async plan(input, ctx) {
@@ -102,9 +121,13 @@ export const updateFields: ToolDefinition = defineWriteTool({
       input.name === undefined &&
       input.description === undefined &&
       input.estimate === undefined &&
-      input.priority === undefined
+      input.priority === undefined &&
+      input.todo === undefined
     ) {
-      throw invalid('Give at least one field to change.', 'Fields: name, description, estimate, priority.');
+      throw invalid(
+        'Give at least one field to change.',
+        'Fields: name, description, estimate, priority, todo.',
+      );
     }
     // Check the cheap arguments before any request.
     const name = input.name === undefined ? undefined : itemName(input.name);
@@ -118,6 +141,7 @@ export const updateFields: ToolDefinition = defineWriteTool({
     if (input.priority !== undefined && !FIELD_ALLOWLIST[type].includes('Priority')) {
       throw notAllowed(type, 'priority');
     }
+    if (input.todo !== undefined && !FIELD_ALLOWLIST[type].includes('ToDo')) throw notAllowed(type, 'todo');
     const old = currentValues(target.row, type);
     const changes: Array<{ field: string; old: string | number | null; new: string | number }> = [];
     if (name !== undefined) {
@@ -142,6 +166,10 @@ export const updateFields: ToolDefinition = defineWriteTool({
         old: old[estimateAttribute] ?? null,
         new: estimateValue(input.estimate, 'estimate'),
       });
+    }
+    if (input.todo !== undefined) {
+      await requireWritable(ctx, type, 'ToDo');
+      changes.push({ field: 'ToDo', old: old['ToDo'] ?? null, new: estimateValue(input.todo, 'todo') });
     }
     if (input.priority !== undefined) {
       const priority = await resolvePriority(ctx, type, input.priority);
@@ -187,6 +215,7 @@ export const updateFields: ToolDefinition = defineWriteTool({
             : [];
         case 'Estimate':
         case 'DetailEstimate':
+        case 'ToDo':
           return typeof c.new === 'number' ? [{ attribute: c.field, value: c.new }] : [];
         case 'Priority':
           return typeof c.new === 'string'

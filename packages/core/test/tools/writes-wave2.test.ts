@@ -145,7 +145,7 @@ describe('the typed field allowlist', () => {
   it('names no custom attribute, no project, status, owner or sprint, and no argument can name an attribute', () => {
     for (const fields of Object.values(FIELD_ALLOWLIST)) {
       for (const f of fields)
-        expect(['Name', 'Description', 'Estimate', 'DetailEstimate', 'Priority']).toContain(f);
+        expect(['Name', 'Description', 'Estimate', 'DetailEstimate', 'ToDo', 'Priority']).toContain(f);
     }
     for (const n of NAMES) {
       const keys = Object.keys(tool(n).inputSchema.shape);

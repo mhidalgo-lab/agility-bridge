@@ -2,7 +2,7 @@
 id: P7-17
 title: "Wave-1 extensions: clear the sprint, effort for others, to-do"
 phase: 7
-status: todo
+status: review
 priority: low
 depends_on: [P7-04]
 adr: ["0013"]

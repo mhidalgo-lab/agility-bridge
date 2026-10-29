@@ -571,7 +571,7 @@ Annotations: read-only false, destructive true, idempotent true, open world true
 
 **Log effort** · group `writes` · write · cost 14 Agility requests at most
 
-Log hours you worked on one backlog item, defect, task or test, on a date (UTC, today when omitted), as an effort entry for yourself. Not paged. Cold call: up to 14 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+Log hours worked on one backlog item, defect, task or test, on a date (UTC, today when omitted), as an effort entry for yourself, or (member) for another member who is an owner of that item. Not paged. Cold call: up to 14 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
 Annotations: read-only false, destructive false, idempotent false, open world true.
 
@@ -580,6 +580,7 @@ Annotations: read-only false, destructive false, idempotent false, open world tr
 | `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
 | `hours` | number (≥ 0.01, ≤ 24) | yes |  | Hours worked, at most 24 and two decimals. |
 | `date` | string |  |  | Day worked, YYYY-MM-DD (UTC); today when omitted. |
+| `member` | string |  |  | Member: me, a username, a name or Member:<id>. |
 | `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
 | `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |
 
@@ -603,14 +604,15 @@ Annotations: read-only false, destructive true, idempotent true, open world true
 
 **Move to sprint** · group `writes` · write · cost 14 Agility requests at most
 
-Move one backlog item or defect into a sprint of its own Agility project, by sprint name, OID token or current, previous or next. A closed sprint is refused. Not paged. Cold call: up to 14 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+Move one backlog item or defect into a sprint of its own Agility project, by sprint name, OID token or current, previous or next, or (to_backlog) out of its sprint. A closed sprint is refused. Give sprint or to_backlog, not both. Not paged. Cold call: up to 14 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
 Annotations: read-only false, destructive true, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
-| `sprint` | string | yes |  | Sprint: name, Timebox:<id>, or current, previous or next. |
+| `sprint` | string |  |  | Sprint: name, Timebox:<id>, or current, previous or next. |
+| `to_backlog` | boolean |  |  | true takes the item out of its sprint, back to the backlog. Instead of sprint. |
 | `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
 | `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |
 
@@ -666,7 +668,7 @@ Annotations: read-only false, destructive false, idempotent false, open world tr
 
 **Update fields** · group `writes` · write · cost 14 Agility requests at most
 
-Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic. Give only what changes; the person approves old and new for each. Not paged. Cold call: up to 14 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic, or the remaining to-do hours of a task or test. Give only what changes; the person approves old and new for each. Not paged. Cold call: up to 14 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
 Annotations: read-only false, destructive true, idempotent true, open world true.
 
@@ -677,5 +679,6 @@ Annotations: read-only false, destructive true, idempotent true, open world true
 | `description` | string |  |  | New description, plain text, at most 4,000 characters; it replaces the old one, which must be plain (no links, lists or images). |
 | `estimate` | number (≥ 0, ≤ 10000) |  |  | Story points for a story or defect; hours for a task or test. Not for an epic. |
 | `priority` | string |  |  | Priority name or OID token, for a story or defect. |
+| `todo` | number (≥ 0, ≤ 10000) |  |  | Remaining hours, for a task or test. Not for a backlog item, defect or epic. |
 | `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
 | `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |

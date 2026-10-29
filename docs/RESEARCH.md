@@ -213,6 +213,7 @@ except `group`, and adds `op` (POST only). *docs*
   returns for each type, whether `Description` HTML is kept or re-sanitised, whether `Estimate` applies to epics and
   `DetailEstimate` to stories on this instance, and how soon `CreateDateUTC` and `CreatedBy` make the new item visible to the
   duplicate check (L-051).
+- **Wave-1 extension shapes (P7-17, 2026-10-29), *unverified* until P7-07.** `move_to_sprint` with `to_backlog` sends the `Timebox` relation as `<Relation name="Timebox" act="set"></Relation>` with no child (the documented way to empty a single-valued relation; not yet seen to be accepted for `Timebox`). `log_effort` with `member` sends the `Actual` with that member's `Member` relation; whether Agility accepts an `Actual` for a member other than the token's one (permissions, project membership) is open. `update_fields` with `todo` sets the `ToDo` attribute of a Task or Test (a rollup on a Story or Defect, which the tool refuses); whether `ToDo` is writable on every instance (it can be turned off with the tracking level) is open.
 - **Idempotency**: no idempotency keys; each `rest-1.v1` POST is atomic for one asset. *docs / inferred*
 
 ### 1.6 Asset model
