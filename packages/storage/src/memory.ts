@@ -18,7 +18,7 @@ import {
   statsKey,
   type TableName,
 } from './fields.ts';
-import { checkIncrement, checkKey, checkKvValue, checkPrefix, isLive } from './kv-rules.ts';
+import { checkIncrement, checkKey, checkKeys, checkKvValue, checkPrefix, isLive } from './kv-rules.ts';
 import type {
   AccessToken,
   AccessTokenRepository,
@@ -512,6 +512,15 @@ export function createMemoryStorage(options: MemoryStorageOptions = {}): Storage
     async get(key) {
       checkKey(key);
       return live(key)?.value ?? null;
+    },
+    async getMany(keys) {
+      checkKeys(keys);
+      const out = new Map<string, string>();
+      for (const key of keys) {
+        const entry = live(key);
+        if (entry !== undefined) out.set(key, entry.value);
+      }
+      return out;
     },
     async set(key, value, options = {}) {
       const expiresAt = checkKvValue(key, value, options);

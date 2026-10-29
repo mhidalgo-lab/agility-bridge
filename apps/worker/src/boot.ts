@@ -53,7 +53,9 @@ export type WorkersPlan = 'free' | 'paid';
  */
 export const PLAN_PRESETS: Readonly<Record<WorkersPlan, SettingDefaults & { readonly ceiling: boolean }>> =
   Object.freeze({
-    free: { callBudget: 45, maxResponseBytes: 512 * 1024, ceiling: true },
+    // 60 writes an hour is 1,440 a day, about 45,000 D1 rows at 31 rows per page-approved write (docs/guide/cloudflare-limits.md):
+    // under half of the Free plan's 100,000 rows a day, the rest being left to reads, OAuth counters and the audit (P7-30).
+    free: { callBudget: 45, maxResponseBytes: 512 * 1024, writeDeploymentRate: 60, ceiling: true },
     paid: { callBudget: 1_000, maxResponseBytes: 8 * 1024 * 1024, ceiling: false },
   });
 
@@ -130,6 +132,17 @@ export async function boot(
   if (preset.ceiling && settings.maxResponseBytes > preset.maxResponseBytes) {
     throw new BootError(
       `AB_LIMITS_MAX_RESPONSE_BYTES above ${preset.maxResponseBytes} does not fit the Workers ${plan} plan.`,
+    );
+  }
+  // The Free plan's D1 row budget (100,000 rows a day) cannot carry the default 200 writes an hour: unset it is 60, and an
+  // explicit value above that stops the Worker at its first request, like the other Free ceilings (P7-30, D-211).
+  if (
+    preset.ceiling &&
+    preset.writeDeploymentRate !== undefined &&
+    settings.writeRates.deployment > preset.writeDeploymentRate
+  ) {
+    throw new BootError(
+      `AB_WRITE_RATE_DEPLOYMENT_HOURLY above ${preset.writeDeploymentRate} does not fit the Workers ${plan} plan's D1 row budget.`,
     );
   }
   const logger = createLogger({
@@ -222,6 +235,7 @@ export async function boot(
   logger.info('booted', {
     plan,
     callBudget: settings.callBudget,
+    writeDeploymentPerHour: settings.writeRates.deployment,
     adminApi: adminVerifier !== undefined || settings.identity !== undefined,
     publicUrl: settings.publicUrl ?? null,
   });

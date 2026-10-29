@@ -258,6 +258,7 @@ export async function writePaths(): Promise<{
     const store = {
       set: (...a: Parameters<typeof inner.set>) => (ops++, inner.set(...a)),
       get: (...a: Parameters<typeof inner.get>) => (ops++, inner.get(...a)),
+      getMany: (...a: Parameters<typeof inner.getMany>) => (ops++, inner.getMany(...a)),
       take: (...a: Parameters<typeof inner.take>) => (ops++, inner.take(...a)),
     };
     const ledger = new core.ApprovalLedger(store, core.systemClock);

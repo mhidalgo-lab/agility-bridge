@@ -208,7 +208,8 @@ async function obtainApproval(
   // (P7-09). Fail closed: no entry read, no approval from one.
   const channel = rt.channel;
   if (rt.page !== undefined || channel?.kind === 'page' || channel?.sameCall === true) {
-    const grant = await rt.ledger.peekGrant(rt.actor.id, hash, scope);
+    // One read for both (P7-30); the one acted on is then taken, so single use is unchanged.
+    const { grant, denial } = await rt.ledger.peekDecision(rt.actor.id, hash, scope);
     if (mine(grant)) {
       return {
         kind: grant.via ?? 'page',
@@ -217,7 +218,7 @@ async function obtainApproval(
       };
     }
     // A denial is final: used up at once.
-    if (mine(await rt.ledger.takeDenial(rt.actor.id, hash, scope))) throw declined();
+    if (mine(denial) && mine(await rt.ledger.takeDenial(rt.actor.id, hash, scope))) throw declined();
   }
   if (channel === undefined) {
     throw new AbError(

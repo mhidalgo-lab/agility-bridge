@@ -447,3 +447,14 @@
 - **Recommendation:** (a), built. The badge cannot be forged by a client (it comes from the grant record the server wrote), and (c) is cost and meaning the person cannot act on: the way to remove it is the disconnect button either way (D-202).
 - **Owner:** *(open; built as (a))*
 
+### D-210 — One read for the grant and the denial (`kv.getMany`), not one delete of both *(P7-30)*
+- **Context:** P7-30 asked for one statement (`DELETE ... WHERE key IN (?, ?) RETURNING`) for the grant and denial take. Since P7-28 a grant is read before the limiter and used up just before the send, so that a limiter refusal or conflict keeps it; a delete of both would use the grant up at the first look.
+- **Options:** (a) a new `KvStore.getMany(keys)` (one `SELECT ... IN`, at most 10 keys, memory and SQL adapters, contract test) used for the grant and the denial together, then `take` on the one acted on: single use unchanged; (b) the `DELETE ... RETURNING` of both, giving up P7-28; (c) leave two reads.
+- **Recommendation:** (a), built. Statements for the page flow stay at 18 (one fewer on the first call, one more on the repeat, which P7-28 added); both are reads, so rows written are unchanged. It does not reduce the total; it keeps P7-28's guarantee while removing the read the first call made twice.
+- **Owner:** *(open; built as (a))*
+
+### D-211 — Workers Free caps the deployment write cap at 60 an hour, and 60 is also its default *(P7-30)*
+- **Context:** A page-approved write writes about 31 D1 rows (unverified, computed from the schema); the default deployment cap of 200 an hour could use 149,000 rows a day against the Free plan's 100,000.
+- **Options:** (a) on Free, default 60 and refuse a larger explicit value at boot, like the other Free ceilings: 1,440 writes and about 45,000 rows a day at most, under half the budget; (b) cap the value silently and show it in `whoami`; (c) keep 200 and only document.
+- **Recommendation:** (a), built; the effective value is in the `booted` log line. Half the budget is left for reads (three rows each), OAuth counters and audit. The number is a judgement until the row count is read from a real D1 (P7-10); Paid keeps 200.
+- **Owner:** *(open; built as (a))*

@@ -128,6 +128,11 @@ export interface ServerSettings {
 export interface SettingDefaults {
   readonly callBudget: number;
   readonly maxResponseBytes: number;
+  /**
+   * The deployment-wide writes an hour used when `AB_WRITE_RATE_DEPLOYMENT_HOURLY` is not set, and the most the host
+   * allows when it has a ceiling (Workers Free, P7-30). Absent: the server's own default.
+   */
+  readonly writeDeploymentRate?: number;
 }
 
 export function settingList(value: string | undefined): string[] {
@@ -300,7 +305,7 @@ export function parseServerSettings(
       deployment: int(
         'AB_WRITE_RATE_DEPLOYMENT_HOURLY',
         env['AB_WRITE_RATE_DEPLOYMENT_HOURLY'],
-        DEFAULT_WRITE_RATE_LIMITS.deployment ?? 200,
+        defaults.writeDeploymentRate ?? DEFAULT_WRITE_RATE_LIMITS.deployment ?? 200,
         1,
         10_000,
       ),

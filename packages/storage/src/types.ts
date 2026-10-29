@@ -420,6 +420,11 @@ export interface KvIncrementOptions {
 /** Short-lived state: single-use markers, OAuth provider records, counters (ADR-0006). Values are opaque strings. */
 export interface KvStore {
   get(key: string): Promise<string | null>;
+  /**
+   * Several live values in one statement (P7-30): the entries that exist, by key; absent or expired keys are left out.
+   * At most 10 keys. Nothing is removed (a read).
+   */
+  getMany(keys: readonly string[]): Promise<Map<string, string>>;
   set(key: string, value: string, options?: KvSetOptions): Promise<void>;
   /** Stores only when the key is absent or expired; `true` when it stored. */
   setIfAbsent(key: string, value: string, options?: KvSetOptions): Promise<boolean>;

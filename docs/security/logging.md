@@ -37,7 +37,7 @@ carry `requestId`.
 |---|---|---|---|
 | info | `serving` | `url`, `publicUrl`, `database`, `adminApi` (serve); `tools`, `source`, `workspace`, `projects` (stdio) | [serve.ts](../../apps/cli/src/serve.ts), [stdio.ts](../../apps/cli/src/stdio.ts) |
 | info | `request` | `requestId`, `workspace` (slug), `status`, `method`, `kind`, `tool`, `durationMs`, `refusal` | [server.ts](../../packages/http-app/src/server.ts) |
-| info | `booted` | `plan`, `callBudget`, `adminApi`, `publicUrl` (Worker) | [boot.ts](../../apps/worker/src/boot.ts) |
+| info | `booted` | `plan`, `callBudget`, `writeDeploymentPerHour`, `adminApi`, `publicUrl` (Worker) | [boot.ts](../../apps/worker/src/boot.ts) |
 | error | `boot failed` | `error` (class), `reason` (names a setting, never a value) (Worker; written directly, the logger may not exist yet) | [index.ts](../../apps/worker/src/index.ts) |
 | debug | `tool ok` | `tool`, `ms`, `requests` | [server.ts](../../packages/core/src/server.ts) |
 | warn | `tool error` | `tool`, `ms`, `code`, `error` (class, redacted message) | [server.ts](../../packages/core/src/server.ts) |

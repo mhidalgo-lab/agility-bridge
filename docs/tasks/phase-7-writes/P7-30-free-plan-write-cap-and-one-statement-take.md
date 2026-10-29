@@ -2,7 +2,7 @@
 id: P7-30
 title: "Free-plan ceiling for the deployment write cap; one statement for the grant and denial take"
 phase: 7
-status: todo
+status: review
 priority: low
 depends_on: [P7-03, P7-02]
 adr: ["0013"]
@@ -12,7 +12,7 @@ owner: ""
 
 # P7-30 — Free-plan ceiling for the deployment write cap; one statement for the grant and denial take
 
-> Filed by P7-09 (performance review, D-199, D-200). Refine scope and acceptance criteria before starting.
+> Filed by P7-09 (performance review, D-199, D-200). Refined 2026-10-29 (lane A).
 
 ## Goal
 On D1, one approved write by the approval page costs about 30 rows written, and the default deployment cap
@@ -21,16 +21,26 @@ On D1, one approved write by the approval page costs about 30 rows written, and 
 default and take two more round trips out of the page flow.
 
 ## Scope
-- With `AB_PLAN=free`, treat the deployment write cap as a ceiling like the other Free ceilings (a value above it stops the
-  Worker at its first request, or is capped and shown in `whoami`); choose the number from the verified row accounting.
-- One storage statement for the grant and denial take (`DELETE ... WHERE key IN (?, ?) RETURNING`) behind a `KvStore`
-  method with memory, SQLite and D1 adapters and a shared contract test; single use, binding and fail closed unchanged.
-- Verify the row accounting on the staging Worker (the index writes are *unverified*, D-200) and correct the guide.
+- **Free ceiling.** `AB_PLAN=free` has a deployment write cap of at most 60 an hour: unset it is 60 (the Paid and Node default
+  stays 200), and an explicit `AB_WRITE_RATE_DEPLOYMENT_HOURLY` above 60 stops the Worker at its first request, like the
+  call-budget and response-size ceilings. 60 an hour is 1,440 writes a day, about 45,000 D1 rows at 31 rows per
+  page-approved write: under half of the 100,000 a day, the rest being for reads, OAuth counters and audit rows. The
+  startup log line carries the effective value.
+- **One statement for the grant and the denial.** Since P7-28 a grant is read before the limiter and used up just before the
+  send, so a single `DELETE ... RETURNING` of both keys would consume a grant that a later refusal must keep. The built form
+  is `KvStore.getMany(keys)`: one `SELECT ... WHERE key IN (...)` (memory, SQLite and D1 share the SQL adapter, plus the
+  memory store, with a contract test) for the grant and the denial together; the entry acted on is then taken once, so single
+  use, binding and fail closed are unchanged (D-210). Net statements for the page flow stay 18 (the first call saves one, the
+  repeat costs one for the peek P7-28 added); both extra statements are reads.
+- **Row accounting on the staging Worker** needs the write pipeline running there (P7-10) and the owner's sandbox for the
+  Agility side; it cannot be done now. The guide keeps the table marked *unverified*; the item moves to P7-10.
 
 ## Acceptance criteria
-- [ ] The Free default cannot exceed the daily row limit by write traffic alone; a test shows the ceiling.
-- [ ] The take of a grant or denial is one statement; the contract test covers single use and concurrent takers.
-- [ ] The guide's row table is checked against the D1 `meta.rows_written` of a staging write, or still marked unverified.
+- [x] The Free default cannot exceed the daily row limit by write traffic alone; a test shows the ceiling (plan preset test,
+      worker boot refusal above 60, and the row arithmetic).
+- [x] The grant and the denial are read with one statement (`getMany`); the contract test covers live, expired, absent and
+      bounded keys, and the pipeline test counts statements on the page path.
+- [ ] The guide's row table checked against `meta.rows_written` of a staging write (blocked on P7-10; stays *unverified*).
 
 ## Security notes
 THREAT_MODEL T31 (single use of approvals), A2.
