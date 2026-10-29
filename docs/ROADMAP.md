@@ -321,7 +321,7 @@ Status lives in each task file.
 |---|---|---|---|---|
 | P7-01 | [Write framework (enablement, approval, dry run, audit intent)](tasks/phase-7-writes/P7-01-write-framework.md) | high | P2-17, P0-07 | review |
 | P7-02 | [Out-of-band approval page](tasks/phase-7-writes/P7-02-approval-page.md) | high | P7-01, P4-02 | review |
-| P7-03 | [Deployment-wide write limiter](tasks/phase-7-writes/P7-03-write-limiter.md) | high | P7-01 | todo |
+| P7-03 | [Deployment-wide write limiter](tasks/phase-7-writes/P7-03-write-limiter.md) | high | P7-01 | done |
 | P7-04 | [Writes wave 1: comment, status, effort, owners, sprint](tasks/phase-7-writes/P7-04-writes-wave-1.md) | high | P7-01, P7-03 | todo |
 | P7-05 | [Writes wave 2: create work items and update fields](tasks/phase-7-writes/P7-05-writes-wave-2.md) | medium | P7-04 | todo |
 | P7-06 | [Lifecycle operations: close and reopen](tasks/phase-7-writes/P7-06-lifecycle-operations.md) | medium | P7-04 | todo |
@@ -333,6 +333,8 @@ Status lives in each task file.
 | P7-12 | [What real clients render of the approval text](tasks/phase-7-writes/P7-12-approval-text-in-clients.md) | medium | P7-01 | todo |
 | P7-13 | [Approval page in the browser suites, URL-mode elicitation and a non-eliciting client on staging](tasks/phase-7-writes/P7-13-approval-page-e2e-url-elicitation.md) | medium | P7-02, P7-04 | todo |
 | P7-14 | [A list of my pending approvals](tasks/phase-7-writes/P7-14-pending-approvals-list.md) | low | P7-02 | todo |
+| P7-15 | [Per-grant write limit set by an owner](tasks/phase-7-writes/P7-15-per-grant-write-limit.md) | low | P7-03, P4-05 | todo |
+| P7-16 | [Show the remaining write budget](tasks/phase-7-writes/P7-16-write-budget-visibility.md) | low | P7-03 | todo |
 
 ### Phase 8
 

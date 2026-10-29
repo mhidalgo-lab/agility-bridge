@@ -2,7 +2,7 @@
 // Write tools behind the HTTP host (P7-01): offered only when the server switch and every access layer enable them, the
 // approval ledger in `kv`, the intent and the outcome in durable audit rows, and a failed intent write stops the write.
 import { generateMasterKey, Keyring } from '@agility-bridge/auth';
-import { CORE_TOOLS, ERROR_META_KEY, ErrorCode } from '@agility-bridge/core';
+import { CORE_TOOLS, ERROR_META_KEY, ErrorCode, type WriteRateLimits } from '@agility-bridge/core';
 import type { Storage } from '@agility-bridge/storage';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { describe, expect, it } from 'vitest';
@@ -19,7 +19,12 @@ interface Setup {
 }
 
 async function setup(
-  opts: { switch?: boolean; auditStorage?: (s: Storage) => Storage } = {},
+  opts: {
+    switch?: boolean;
+    auditStorage?: (s: Storage) => Storage;
+    limits?: WriteRateLimits;
+    limiterStorage?: (s: Storage) => Storage;
+  } = {},
 ): Promise<Setup> {
   const fake = new FakeItems();
   const tool = makeTestWriteTool(fake);
@@ -43,8 +48,9 @@ async function setup(
     { tools: toolInfo, ...(opts.auditStorage === undefined ? {} : { auditStorage: opts.auditStorage }) },
   );
   writes = createHttpWrites({
-    storage: w.storage,
+    storage: opts.limiterStorage?.(w.storage) ?? w.storage,
     audit: w.audit,
+    ...(opts.limits === undefined ? {} : { limits: opts.limits }),
     keyring: await Keyring.create(generateMasterKey(1)),
     clock: { now: () => w.now.t },
   });
@@ -208,5 +214,63 @@ describe('write tools over HTTP', () => {
     expect(codeOf(result)).toBe(ErrorCode.WriteApprovalUnavailable);
     expect(fake.sends).toHaveLength(0);
     expect(await w.storage.audit.query({ kind: 'write' })).toHaveLength(0);
+  });
+
+  const writeRows = (w: World) => w.storage.audit.query({ kind: 'write' });
+
+  it('refuses over the per-grant write limit: no re-read, no send and no intent row (P7-03)', async () => {
+    const { w, fake } = await setup({ limits: { perGrant: 1, deployment: 100 } });
+    const { client: c } = await client(w, w.tokens.alice);
+    expect((await c.callTool(CALL)).isError).not.toBe(true);
+    expect(fake.sends).toHaveLength(1);
+    await w.audit.flush();
+    const rowsBefore = (await writeRows(w)).length;
+    // Put the item back so the second call is a real change again, not an idempotent no-op.
+    const item = fake.items.get('Story:1');
+    if (item !== undefined) item.status = 'In Progress';
+    const readsBefore = fake.reads;
+    const result = await c.callTool(CALL);
+    expect(result.isError).toBe(true);
+    expect(codeOf(result)).toBe(ErrorCode.LimitRate);
+    expect(fake.sends).toHaveLength(1);
+    expect(fake.reads - readsBefore).toBe(2); // the plan runs on both rounds; no re-read
+    await w.audit.flush();
+    expect(await writeRows(w)).toHaveLength(rowsBefore);
+  });
+
+  it('refuses over the deployment limit even for a grant that has not written (P7-03)', async () => {
+    const { w, fake } = await setup({ limits: { perGrant: 5, deployment: 1 } });
+    // Another grant already spent the deployment's hour (the counters are shared in kv).
+    const window = Math.floor(w.now.t / 3_600_000);
+    await w.storage.kv.increment(`wl:all:${window}`, { expiresAt: (window + 1) * 3_600_000, max: 1 });
+    const { client: c } = await client(w, w.tokens.alice);
+    const result = await c.callTool(CALL);
+    expect(codeOf(result)).toBe(ErrorCode.LimitRate);
+    expect(fake.sends).toHaveLength(0);
+    expect(await writeRows(w)).toHaveLength(0);
+  });
+
+  it('fails closed when the counters cannot be reached: nothing is sent or audited (P7-03, L-080)', async () => {
+    const { w, fake } = await setup({
+      limiterStorage: (s) => ({
+        ...s,
+        kv: {
+          ...s.kv,
+          take: s.kv.take.bind(s.kv),
+          set: s.kv.set.bind(s.kv),
+          get: s.kv.get.bind(s.kv),
+          increment: async () => {
+            throw new Error('kv is down');
+          },
+        },
+      }),
+    });
+    const { client: c } = await client(w, w.tokens.alice);
+    const result = await c.callTool(CALL);
+    expect(result.isError).toBe(true);
+    expect(codeOf(result)).toBe(ErrorCode.WriteLimitUnavailable);
+    expect(fake.sends).toHaveLength(0);
+    await w.audit.flush();
+    expect(await writeRows(w)).toHaveLength(0);
   });
 });

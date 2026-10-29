@@ -85,3 +85,27 @@
 - **Recommendation:** (a), built; filed as P7-13 with the browser suites and the staging run.
 - **Owner:** *(open; built as (a))*
 
+
+### D-168 — What the deployment-wide write limit counts in *(P7-03)*
+- **Context:** ADR-0013 asks for a deployment-wide limit on Workers "through a shared limiter that fails closed". A per-isolate counter lets bursts through (L-081, L-111). The exact answer is a Durable Object (P3-12), which needs a new Cloudflare resource only the owner may create.
+- **Options:** (a) fixed hourly counters in the storage `kv` table with the atomic capped `increment` (already used by the OAuth abuse limits, P5-09), shared by every isolate and replica on Workers (D1) and Node (SQLite); (b) the Workers Rate Limiting binding (approximate, per location, not a hard count: wrong for a limit that must hold); (c) a Durable Object limiter (exact and sliding, new resource, P3-12).
+- **Recommendation:** (a), built. It is exact within a window and needs nothing new. Costs: one storage write per counter per write (two), and up to twice the limit across an hour boundary. Move to (c) when the owner creates the Durable Object and wants a sliding window.
+- **Owner:** *(open; built as (a))*
+
+### D-169 — Default limits and their settings *(P7-03)*
+- **Context:** ADR-0013 names 20 writes an hour per grant; it gives no deployment figure.
+- **Options:** (a) 20 per grant, 200 per deployment, as `AB_WRITE_RATE_PER_GRANT_HOURLY` (1-1,000) and `AB_WRITE_RATE_DEPLOYMENT_HOURLY` (1-10,000); stdio uses the grant variable for the process and has no deployment limit; (b) no deployment default (only when configured); (c) a per-grant override stored with the grant (admin UI and API work, filed as P7-15).
+- **Recommendation:** (a), built; every limit is always on (the limit cannot be turned off, unlike reads, because writes are the highest-risk path). (c) is P7-15.
+- **Owner:** *(open; built as (a))*
+
+### D-170 — Which writes use a unit *(P7-03)*
+- **Context:** The limiter runs after the approval and before the re-read (D-157), so a unit is taken before it is known that the write will happen.
+- **Options:** (a) the unit is spent at the limiter and never refunded: an approved write that then turns out to be a conflict, an already-applied no-op or a failed send still counts; a refused call (declined, unavailable, over a limit) counts nothing; (b) refund on conflict or no-op (a second storage write, and a refund is an increment below the cap that cannot be made atomic across the two counters); (c) count only sent writes (the limiter would run after the intent audit, so a refused write would leave an intent row).
+- **Recommendation:** (a), built: simple, errs on the side of fewer writes, and keeps "a refused write makes no upstream call and no intent audit".
+- **Owner:** *(open; built as (a))*
+
+### D-171 — Error codes of the limiter *(P7-03)*
+- **Context:** A refusal for rate and a refusal because the limiter is broken need different advice: wait, or tell the administrator.
+- **Options:** (a) `AB_LIMIT_RATE` (existing, with scope, limit and seconds in its local details) for the limit and a new `AB_WRITE_LIMIT_UNAVAILABLE` for an outage or an untrustworthy counter value; (b) `AB_LIMIT_QUOTA` for the deployment scope; (c) `AB_INTERNAL` for the outage.
+- **Recommendation:** (a), built; codes are only ever added. Both say nothing was changed.
+- **Owner:** *(open; built as (a))*

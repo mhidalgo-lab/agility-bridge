@@ -37,7 +37,7 @@ How to use it:
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
-| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388 |
+| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382 |
@@ -1573,6 +1573,19 @@ The change hash covers tool, actor, target and values; an approval recorded on a
 also carries the workspace it was given for and is checked on take. A decline is stored the same way, so the agent hears "no"
 instead of being asked again.
 *Applied in:* P7-02, `ledger.ts`.
+
+**L-390 — A deployment-wide write limit needs no new resource: count in the shared store, grant first, and say what it costs.**
+Fixed hourly counters in the `kv` table (atomic `increment` with a cap) are shared by every isolate and replica, and the
+cap is checked by the store, not by the isolate that read a number. Take the grant's unit before the deployment's so a
+caller over its own limit cannot drain the shared budget. The costs are one storage write per counter per write and up to
+twice the limit across a window boundary; an exact limit needs a Durable Object (P3-12).
+*Applied in:* P7-03.
+
+**L-391 — Test a shared limiter with several instances over one store, on every store, and with a store that lies.**
+Separate limiter instances stand for isolates; the same suite runs on process memory, memory and SQLite storage and D1 in
+workerd. Also make the store throw and answer garbage (0, a string, above the cap): a limiter that trusts what it reads
+opens the write on a bad answer (L-080).
+*Applied in:* P7-03.
 
 ## O. Caching, quotas and budgets
 

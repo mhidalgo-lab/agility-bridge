@@ -97,6 +97,7 @@ carry `requestId`.
 | error | `credential revalidation failed` | `error` (class) | [serve.ts](../../apps/cli/src/serve.ts), [server.ts](../../packages/http-app/src/server.ts) |
 | warn | `AB_WRITE_TOOLS is on: owners can enable write tools per workspace and grant; every write needs a person to approve it.` | — | [server.ts](../../packages/http-app/src/server.ts) |
 | info | `write intent`, `write outcome` (stdio: the whole write audit, P7-01) | `phase`, `requestId`, `tool`, `operation`, `actor`, `workspaceId`, `instanceId`, `hash`, `target`, `fields` (names), `approval`, `status`, `errorCode` | [stdio.ts](../../apps/cli/src/stdio.ts) |
+| error | `write limiter failed; the write is refused` | `error` (class; none in stdio) | [writes.ts](../../packages/http-app/src/writes.ts), [stdio.ts](../../apps/cli/src/stdio.ts) |
 | info | `write applied` | `tool`, `change` (short hash), `approval` | [pipeline.ts](../../packages/core/src/writes/pipeline.ts) |
 | error | `write refused: intent audit failed`, `write outcome audit failed` | `tool`, `error` | [pipeline.ts](../../packages/core/src/writes/pipeline.ts) |
 | warn | `AB_WRITE_APPROVAL=off: write tools change Agility without asking a person first…` | — | [stdio.ts](../../apps/cli/src/stdio.ts) |

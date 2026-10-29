@@ -2,7 +2,7 @@
 id: P7-03
 title: Deployment-wide write limiter
 phase: 7
-status: todo
+status: done
 priority: high
 depends_on: [P7-01]
 adr: ["0010"]
@@ -32,18 +32,18 @@ Write limits hold across processes and isolates.
 - Docs: write-tools guide, configuration reference, THREAT_MODEL T31 and A2, ARCHITECTURE write pipeline.
 
 ## Acceptance criteria
-- [ ] The limiter refuses the (limit+1)th write of a grant in a window and the (limit+1)th of the deployment, with
+- [x] The limiter refuses the (limit+1)th write of a grant in a window and the (limit+1)th of the deployment, with
       `AB_LIMIT_RATE` naming the scope; a new window allows again.
-- [ ] A refused write makes no upstream call (no re-read, no send) and writes no intent audit row.
-- [ ] Concurrency: parallel checks (separate limiter instances over one store, standing for isolates) never admit more
+- [x] A refused write makes no upstream call (no re-read, no send) and writes no intent audit row.
+- [x] Concurrency: parallel checks (separate limiter instances over one store, standing for isolates) never admit more
       than the limit, on memory, SQLite and workerd/D1.
-- [ ] Limiter outage (store throws, or returns garbage) refuses the write with `AB_WRITE_LIMIT_UNAVAILABLE`, no upstream
+- [x] Limiter outage (store throws, or returns garbage) refuses the write with `AB_WRITE_LIMIT_UNAVAILABLE`, no upstream
       call, no intent audit; the outage does not open the write.
-- [ ] A grant over its limit does not spend the deployment budget; one grant's use does not spend another grant's.
-- [ ] Both hosts are wired (HTTP: `kv`; stdio: memory) and the limits are settings with validated ranges.
-- [ ] Docs, threat model and error table updated; error code in the contract snapshot.
-- [ ] Not verifiable here: behaviour under real Workers traffic (P7-10 staging) and a per-grant override set by an owner
-      (P7-15).
+- [x] A grant over its limit does not spend the deployment budget; one grant's use does not spend another grant's.
+- [x] Both hosts are wired (HTTP: `kv`; stdio: memory) and the limits are settings with validated ranges.
+- [x] Docs, threat model and error table updated; error code in the contract snapshot.
+- Not verifiable here (follow-ups): behaviour under real Workers traffic (P7-10, staging); a per-grant override (P7-15);
+  showing the remaining writes to the caller and the owner (P7-16).
 
 ## Out of scope
 - Exact sliding windows, a Durable Object limiter (P3-12) and per-grant limits editable in the admin UI (P7-15).

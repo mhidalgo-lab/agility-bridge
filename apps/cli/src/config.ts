@@ -44,6 +44,8 @@ export interface StdioConfig {
   readonly writeTools: boolean;
   /** `required` (default): a person approves every write. `off`: stdio only, your own token (D-10); warned at start. */
   readonly writeApproval: 'required' | 'off';
+  /** Writes an hour for this process (P7-03); the same variable limits a grant on the remote hosts. */
+  readonly writeRatePerHour: number;
   readonly attachmentMaxBytes: number;
   readonly attachmentTypes: readonly string[];
   readonly maxRows: number;
@@ -83,10 +85,12 @@ const KNOWN_ENV = new Set([
   'AB_CA_FILE',
   'AB_WRITE_TOOLS',
   'AB_WRITE_APPROVAL',
+  'AB_WRITE_RATE_PER_GRANT_HOURLY',
   'AB_LOG_LEVEL',
   // Remote and Worker settings: valid names, not used by stdio.
   'AB_DATA_DIR',
   'AB_HOST',
+  'AB_WRITE_RATE_DEPLOYMENT_HOURLY',
   'AB_RATE_LIMIT',
   'AB_RATE_LIMIT_IP_PER_MINUTE',
   'AB_RATE_LIMIT_AUTH_FAILURES',
@@ -498,6 +502,13 @@ function fromYaml(env: Readonly<Record<string, string | undefined>>, options: Lo
     reports: resolved.reports ?? false,
     writeTools: resolved.writes?.enabled ?? false,
     writeApproval: resolved.writes?.approval ?? 'required',
+    writeRatePerHour: int(
+      'AB_WRITE_RATE_PER_GRANT_HOURLY',
+      env['AB_WRITE_RATE_PER_GRANT_HOURLY'],
+      20,
+      1,
+      1_000,
+    ),
     attachmentDownload: resolved.attachments?.download ?? false,
     attachmentMaxBytes: resolved.attachments?.max_bytes ?? DEFAULTS.attachmentMaxBytes,
     attachmentTypes: attachmentTypes(`workspaces.${id}.attachments.types`, resolved.attachments?.types),
@@ -564,6 +575,13 @@ export function loadConfig(
     reports: bool('AB_REPORTS', env['AB_REPORTS'], false),
     writeTools: bool('AB_WRITE_TOOLS', env['AB_WRITE_TOOLS'], false),
     writeApproval: writeApproval(env['AB_WRITE_APPROVAL']),
+    writeRatePerHour: int(
+      'AB_WRITE_RATE_PER_GRANT_HOURLY',
+      env['AB_WRITE_RATE_PER_GRANT_HOURLY'],
+      20,
+      1,
+      1_000,
+    ),
     attachmentDownload: bool('AB_ATTACHMENT_DOWNLOAD', env['AB_ATTACHMENT_DOWNLOAD'], false),
     attachmentMaxBytes: int(
       'AB_ATTACHMENT_MAX_BYTES',
