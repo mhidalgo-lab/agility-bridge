@@ -10,6 +10,8 @@
 // store the Worker uses), and warm. Requests per call are recorded beside the CPU.
 // Write path (P7-09): update_status on the fakes, a dry run and an approved write by elicitation and by the approval page
 // (two calls), with the Agility requests and the approval-ledger storage operations per call beside the CPU.
+// Approval page and limiter (P7-31): the page view, the pending list and the decision POST in the panel world, and a write
+// with the real deployment limiter over counted counters (one read and two increments per write).
 //   pnpm bench:worker            measure and compare with scripts/bench/worker-baseline.json
 //   pnpm bench:worker --update   rewrite the baseline
 import { execFileSync } from 'node:child_process';
@@ -249,6 +251,7 @@ export async function writePaths(): Promise<{
     elicitation: 'write: update_status approved (elicitation)',
     pageAsk: 'write: update_status approval page, call 1 (ask)',
     pageApply: 'write: update_status approval page, call 2 (apply)',
+    limited: 'write: update_status approved (elicitation) with the deployment limiter',
   } as const;
 
   const scenario = async (kind: keyof typeof names): Promise<void> => {
@@ -262,11 +265,22 @@ export async function writePaths(): Promise<{
       take: (...a: Parameters<typeof inner.take>) => (ops++, inner.take(...a)),
     };
     const ledger = new core.ApprovalLedger(store, core.systemClock);
+    // A D1-shaped counter store for the limiter: every call is a statement, counted with the ledger's (P7-31).
+    const innerCounters = core.memoryCounterStore(core.systemClock);
+    const limiter = core.createWriteLimiter({
+      clock: core.systemClock,
+      limits: { perGrant: 1_000_000, deployment: 1_000_000 },
+      counters: {
+        get: (key) => (ops++, innerCounters.get(key)),
+        increment: (key, o) => (ops++, innerCounters.increment(key, o)),
+      },
+    });
     const page = answeringChannel(
       () => ({ status: 'pending', link: 'https://bench.example/approve/x', expiresAt: Date.now() + 60_000 }),
       'page',
     );
-    const channel = kind === 'elicitation' || kind === 'dry' ? answeringChannel(true) : page;
+    const channel =
+      kind === 'elicitation' || kind === 'dry' || kind === 'limited' ? answeringChannel(true) : page;
     // The approval page records the grant when the person approves; here the page's `ask` does it at once.
     const ask = page.ask.bind(page);
     (page as { ask: typeof page.ask }).ask = async (prompt) => {
@@ -283,6 +297,7 @@ export async function writePaths(): Promise<{
       ledger,
       channel,
       ...(kind === 'pageAsk' || kind === 'pageApply' ? { page } : {}),
+      ...(kind === 'limited' ? { limiter } : {}),
       tools: ['update_status'],
     });
     const ctx = w.context({ writes: runtime });
@@ -299,7 +314,7 @@ export async function writePaths(): Promise<{
         const t = cpu();
         await run({ dry_run: true });
         samples.push(cpu() - t);
-      } else if (kind === 'elicitation') {
+      } else if (kind === 'elicitation' || kind === 'limited') {
         const t = cpu();
         const out = await run({ confirm: true });
         samples.push(cpu() - t);
@@ -424,6 +439,94 @@ async function warmPanel(): Promise<{ ms: Record<string, number>; requests: Reco
   return { ms, requests };
 }
 
+/** The approval page in the panel world (P7-31): a pending request per sample, the person signed in as the owner. */
+async function warmApprovals(): Promise<Record<string, number>> {
+  register('./bench/admin-ui-dist-hook.mjs', import.meta.url);
+  const core = await import('../packages/core/src/index.ts');
+  const { setup } = await import('../packages/http-app/test/helpers/panel.ts');
+  const { createApprovalPage } = await import('../packages/http-app/src/approval-page.ts');
+  // biome-ignore lint/style/useConst: assigned once the world (and its storage) exists
+  let page: ReturnType<typeof createApprovalPage>;
+  const s = await setup({
+    isolation: 'request',
+    publicUrl: 'http://127.0.0.1:8787',
+    writes: {
+      runtimeFor: () => Promise.reject(new Error('not used')),
+      approvals: {
+        view: (...a) => page.port.view(...a),
+        list: (...a) => page.port.list(...a),
+        decide: (...a) => page.port.decide(...a),
+      },
+    },
+  });
+  const clock = { now: () => s.w.now.t };
+  page = createApprovalPage({
+    kv: s.w.storage.kv,
+    ledger: new core.ApprovalLedger(s.w.storage.kv, clock),
+    clock,
+    publicOrigin: s.publicUrl,
+    audit: (c) => s.w.audit.admin(c),
+  });
+  const owner = await s.session('alice@example.test');
+  const channel = page.channelFor({
+    grant: { id: 'g', userId: s.w.ids.alice, label: null },
+    workspace: { id: 'ws', name: 'Team A' },
+  } as never);
+  let n = 0;
+  const ask = async (): Promise<{ path: string; hash: string }> => {
+    const hash = String(n++).padStart(64, '0');
+    const reply = await channel?.ask({
+      message: 'm',
+      requestedSchema: {},
+      hash,
+      tool: 'update_status',
+      actor: { id: s.w.ids.alice },
+      expiresAt: 0,
+      workspaceId: 'ws',
+      mutation: {
+        operation: 'update_status',
+        target: { assetType: 'Story', oid: 'Story:1', number: 'B-00001' },
+        changes: [{ field: 'Status', old: 'In Progress', new: 'Done' }],
+      },
+      label: 'Sign-in page',
+    });
+    if (reply?.status !== 'pending') throw new Error('expected a pending approval');
+    return { path: new URL(reply.link).pathname, hash };
+  };
+  const view = await ask();
+  // A person with a few open requests (the page lists at most 20).
+  for (let i = 0; i < 5; i++) await ask();
+  const get = (path: string) => s.send('GET', path, { cookie: owner.cookie, site: 'none' });
+  const ms: Record<string, number> = {};
+  const time = async (name: string, run: () => Promise<Response>, prepare?: () => Promise<void>) => {
+    const samples: number[] = [];
+    for (let i = 0; i < 25; i++) {
+      await prepare?.();
+      const t = cpu();
+      const res = await run();
+      await res.text();
+      samples.push(cpu() - t);
+      if (res.status >= 400) throw new Error(`${name} answered ${res.status}`);
+    }
+    ms[name] = median(samples.slice(3));
+  };
+  await time('admin: approval page (view)', () => get(view.path));
+  await time('admin: approvals list', () => get('/admin/approve'));
+  let current = view;
+  await time(
+    'admin: approval decision (approve)',
+    () =>
+      s.send('POST', current.path, {
+        cookie: owner.cookie,
+        form: new URLSearchParams({ _csrf: owner.csrf, decision: 'approve', hash: current.hash }).toString(),
+      }),
+    async () => {
+      current = await ask();
+    },
+  );
+  return ms;
+}
+
 async function main(argv: readonly string[]): Promise<number> {
   if (argv[0] === '--child-cold') return coldBoot();
   if (argv[0] === '--child-panel') return coldPanel();
@@ -457,6 +560,7 @@ async function main(argv: readonly string[]): Promise<number> {
   const panel = await warmPanel();
   const phase6 = await metadataPaths();
   const writes = await writePaths();
+  const approvals = await warmApprovals();
   const ms: Record<string, number> = {
     'cold: boot': Math.min(...cold.map((c) => c.boot)),
     ...Object.fromEntries(Object.entries(warm.ms).map(([k, v]) => [`warm: ${k}`, v])),
@@ -465,6 +569,7 @@ async function main(argv: readonly string[]): Promise<number> {
     ...Object.fromEntries(Object.entries(panel.ms).map(([k, v]) => [`warm: ${k}`, v])),
     ...phase6.ms,
     ...writes.ms,
+    ...Object.fromEntries(Object.entries(approvals).map(([k, v]) => [`warm: ${k}`, v])),
   };
   const relative = Object.fromEntries(
     Object.entries(ms).map(([k, v]) => [k, Number((v / calibrationMs).toFixed(3))]),

@@ -458,3 +458,9 @@
 - **Options:** (a) on Free, default 60 and refuse a larger explicit value at boot, like the other Free ceilings: 1,440 writes and about 45,000 rows a day at most, under half the budget; (b) cap the value silently and show it in `whoami`; (c) keep 200 and only document.
 - **Recommendation:** (a), built; the effective value is in the `booted` log line. Half the budget is left for reads (three rows each), OAuth counters and audit. The number is a judgement until the row count is read from a real D1 (P7-10); Paid keeps 200.
 - **Owner:** *(open; built as (a))*
+
+### D-212 — The outcome audit row stays awaited; the intent stays first *(P7-31)*
+- **Context:** The outcome row of a write is awaited before the answer, while the `tool_call` row goes through the app's background (`waitUntil`). P7-31 asked whether the outcome may go the same way.
+- **Options:** (a) keep it awaited: the answer is sent after the outcome is stored (or its failure is logged); (b) hand it to `waitUntil` after the intent was stored and the change sent: one insert off the response path, a failed write logged inside the background task; (c) batch the outcome with the `tool_call` row.
+- **Recommendation:** (a), built (nothing changes). The benchmark measures CPU and the move changes wall-clock only by one insert, next to 5 to 15 Agility requests and the awaited intent insert; the outcome row is the evidence that a change was applied, so losing it to an evicted isolate or a crash would make the "intent with no outcome" state (flagged by the audit viewer after ten minutes, P7-11) more frequent for no measured gain. The intent is awaited and first in every option (ADR-0013). Revisit with staging latency figures (P7-10): if the insert is a real share, (b) is a small change behind the same sink, and the log line for a failed outcome already exists.
+- **Owner:** *(open; built as (a))*

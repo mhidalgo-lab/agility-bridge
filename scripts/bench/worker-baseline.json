@@ -29,7 +29,11 @@
     "write: update_status dry run": 2.129,
     "write: update_status approved (elicitation)": 4.224,
     "write: update_status approval page, call 1 (ask)": 1.797,
-    "write: update_status approval page, call 2 (apply)": 3.922
+    "write: update_status approval page, call 2 (apply)": 3.922,
+    "write: update_status approved (elicitation) with the deployment limiter": 6.010000000000218,
+    "warm: admin: approval page (view)": 1.768000000000029,
+    "warm: admin: approvals list": 2.138999999999214,
+    "warm: admin: approval decision (approve)": 2.9439999999995052
   },
   "relative": {
     "cold: boot": 20.981,
@@ -60,7 +64,11 @@
     "write: update_status dry run": 0.634,
     "write: update_status approved (elicitation)": 1.258,
     "write: update_status approval page, call 1 (ask)": 0.535,
-    "write: update_status approval page, call 2 (apply)": 1.168
+    "write: update_status approval page, call 2 (apply)": 1.168,
+    "write: update_status approved (elicitation) with the deployment limiter": 1.473,
+    "warm: admin: approval page (view)": 0.433,
+    "warm: admin: approvals list": 0.524,
+    "warm: admin: approval decision (approve)": 0.722
   },
   "requests": {
     "whoami": 1,
@@ -86,12 +94,14 @@
     "write: update_status dry run": 2,
     "write: update_status approved (elicitation)": 4,
     "write: update_status approval page, call 1 (ask)": 2,
-    "write: update_status approval page, call 2 (apply)": 4
+    "write: update_status approval page, call 2 (apply)": 4,
+    "write: update_status approved (elicitation) with the deployment limiter": 4
   },
   "storage": {
     "write: update_status dry run": 0,
     "write: update_status approved (elicitation)": 0,
     "write: update_status approval page, call 1 (ask)": 3,
-    "write: update_status approval page, call 2 (apply)": 1
+    "write: update_status approval page, call 2 (apply)": 1,
+    "write: update_status approved (elicitation) with the deployment limiter": 4
   }
 }
