@@ -209,7 +209,15 @@ export class FakeAgility {
     const call: FakeCall = {
       method: req.method,
       path,
-      ...(text === '' ? {} : { body: JSON.parse(text) as unknown }),
+      // A JSON body is parsed; an XML write (rest-1.v1) stays the text that was sent, so tests can assert it exactly.
+      ...(text === ''
+        ? {}
+        : {
+            body:
+              req.headers.get('content-type')?.includes('json') === false
+                ? text
+                : (JSON.parse(text) as unknown),
+          }),
     };
     this.calls.push(call);
     const overridden = await this.#options.override?.(req, call);

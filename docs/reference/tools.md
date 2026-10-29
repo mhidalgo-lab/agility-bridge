@@ -2,7 +2,7 @@
 
 # Tool reference
 
-28 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
+33 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
 later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a cold metadata cache.
 
 | Tool | Group | Cost | Title |
@@ -35,6 +35,11 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 | [`defect_triage`](#defect_triage) | reports | 28 | Defect triage |
 | [`work_item_quality`](#work_item_quality) | reports | 28 | Work item quality |
 | [`quality_scan`](#quality_scan) | reports | 30 | Quality scan |
+| [`add_comment`](#add_comment) | writes | 16 | Add comment |
+| [`update_status`](#update_status) | writes | 12 | Update status |
+| [`log_effort`](#log_effort) | writes | 14 | Log effort |
+| [`assign_owners`](#assign_owners) | writes | 26 | Assign owners |
+| [`move_to_sprint`](#move_to_sprint) | writes | 14 | Move to sprint |
 
 ## `whoami`
 
@@ -527,3 +532,80 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 | `epic` | string |  |  | Epic number or OID token (its direct backlog items). |
 
 `structuredContent`: `sections`, `rubric`, `items`, `truncated`, `partial`, `notes` (open: more fields may be added).
+
+## `add_comment`
+
+**Add comment** · group `writes` · write · cost 16 Agility requests at most
+
+Add a comment to one backlog item, defect, task, test or epic. The text is shown in full to the person who approves, at most 4,000 characters. Not paged. Cold call: up to 16 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+
+Annotations: read-only false, destructive false, idempotent false, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
+| `text` | string | yes |  | The comment, at most 4,000 characters, plain text. |
+| `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
+| `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |
+
+## `update_status`
+
+**Update status** · group `writes` · write · cost 12 Agility requests at most
+
+Set the status of one backlog item, defect, task, test or epic to a status of its workflow (by name or OID token). Changes the status only: it does not close the item. Not paged. Cold call: up to 12 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+
+Annotations: read-only false, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
+| `new_status` | string | yes |  | Status names as configured on the instance. Exactly one: its name or its OID token. |
+| `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
+| `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |
+
+## `log_effort`
+
+**Log effort** · group `writes` · write · cost 14 Agility requests at most
+
+Log hours you worked on one backlog item, defect, task or test, on a date (UTC, today when omitted), as an effort entry for yourself. Not paged. Cold call: up to 14 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+
+Annotations: read-only false, destructive false, idempotent false, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
+| `hours` | number (≥ 0.01, ≤ 24) | yes |  | Hours worked, at most 24 and two decimals. |
+| `date` | string |  |  | Day worked, YYYY-MM-DD (UTC); today when omitted. |
+| `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
+| `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |
+
+## `assign_owners`
+
+**Assign owners** · group `writes` · write · cost 26 Agility requests at most
+
+Add and remove owners of one backlog item, defect, task, test or epic. Give members to add, to remove, or both; the other owners stay. Not paged. Cold call: up to 26 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+
+Annotations: read-only false, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
+| `add` | string[] (≤ 5) |  |  | Members to add: me, a username, a name or Member:<id>; at most 5. |
+| `remove` | string[] (≤ 5) |  |  | Members to remove: me, a username, a name or Member:<id>; at most 5. |
+| `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
+| `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |
+
+## `move_to_sprint`
+
+**Move to sprint** · group `writes` · write · cost 14 Agility requests at most
+
+Move one backlog item or defect into a sprint of its own Agility project, by sprint name, OID token or current, previous or next. A closed sprint is refused. Not paged. Cold call: up to 14 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+
+Annotations: read-only false, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
+| `sprint` | string | yes |  | Sprint: name, Timebox:<id>, or current, previous or next. |
+| `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
+| `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |

@@ -109,3 +109,45 @@
 - **Options:** (a) `AB_LIMIT_RATE` (existing, with scope, limit and seconds in its local details) for the limit and a new `AB_WRITE_LIMIT_UNAVAILABLE` for an outage or an untrustworthy counter value; (b) `AB_LIMIT_QUOTA` for the deployment scope; (c) `AB_INTERNAL` for the outage.
 - **Recommendation:** (a), built; codes are only ever added. Both say nothing was changed.
 - **Owner:** *(open; built as (a))*
+
+### D-172 — Wave-1 writes go through `rest-1.v1/Data` XML, built by one escaping builder *(P7-04)*
+- **Context:** ADR-0011 allows `rest-1.v1/Data` (XML) or `api/asset` (JSON) for single-asset writes. The XML shapes for set, add and remove on attributes and relations are the ones RESEARCH 1.5 documents; the `api/asset` shapes for relation add/remove are not documented in the sources we have (the developer library pages were not reachable on 2026-10-29). The client already has a single-attempt `restWrite`.
+- **Options:** (a) XML through `restWrite`, with a builder that checks attribute and relation names and OIDs against strict patterns and escapes every value (so no caller text can add an element); (b) `api/asset` JSON (no escaping concern, but the relation add/remove shape would be a guess); (c) both, chosen per tool.
+- **Recommendation:** (a), built. Every shape stays *unverified* in RESEARCH and is a P7-07 item; if the sandbox shows the XML route refusing something, (b) is a change inside `send` only (the plan, the approval and the tests of the plan do not change).
+- **Owner:** *(open; built as (a))*
+
+### D-173 — Relation values in a mutation read `Name [OID]` *(P7-04)*
+- **Context:** The approval must be readable (a status, a person, a sprint) and the hash must bind the identity, not a name two statuses or two members can share; Agility names are untrusted text.
+- **Options:** (a) the value is `"<name> [<OID>]"`: the name inside the envelope for the reader, the OID in the hash and parsed back by `send`; (b) the OID alone (unreadable approval); (c) the name alone (ambiguous, and the hash would not bind the identity).
+- **Recommendation:** (a), built. Lists (owners) are sorted by OID so one set hashes one way. A name with control or hidden characters is refused by the framework (not cleaned).
+- **Owner:** *(open; built as (a))*
+
+### D-174 — `log_effort` is for the caller, creates an `Actual` and shows the logged total *(P7-04)*
+- **Context:** Logging hours is a create, so there is no old value to compare. Logging for another member and updating the remaining to-do are bigger surface.
+- **Options:** (a) the caller only; the mutation shows `Actual.Value` as the item's logged total before and after (the re-read compares the total, so another person logging meanwhile is a conflict), plus the date and the member; an identical entry (same item, member, date, hours) already present is a no-op so a retried call never doubles the hours; no to-do update; (b) any member (needs a policy on who may log for whom); (c) also set `ToDo` in the same call.
+- **Recommendation:** (a), built; (b) and (c) are P7-17.
+- **Owner:** *(open; built as (a))*
+
+### D-175 — `move_to_sprint` stays inside the item's project schedule, and only into an open sprint *(P7-04)*
+- **Context:** Sprints of other schedules overlap by date; moving an item into a closed sprint is almost always a mistake. The task text of the catalogue also mentions "back to the backlog".
+- **Options:** (a) the sprint is resolved with the item's own Agility project (the schedule must be scheduled for it), closed sprints are refused, no "back to the backlog" in wave 1; (b) any visible sprint; (c) also clear the sprint.
+- **Recommendation:** (a), built; clearing the sprint is P7-17.
+- **Owner:** *(open; built as (a))*
+
+### D-176 — Which targets a wave-1 write refuses *(P7-04)*
+- **Context:** Agility keeps closed and deleted assets readable; editing them is rarely intended.
+- **Options:** (a) deleted, template and broken-down items are refused by every tool; a closed item is refused by every tool except `add_comment`; the re-read treats a target that went missing, deleted or (except for comments) closed as `AB_WRITE_CONFLICT`; types per tool: status, owners and comment on Story, Defect, Task, Test and Epic; effort on Story, Defect, Task, Test; sprint on Story and Defect; (b) allow edits to closed items; (c) refuse comments on closed items too.
+- **Recommendation:** (a), built; the attribute must also exist and be writable on the type in the instance metadata, else the call is refused with a message naming it.
+- **Owner:** *(open; built as (a))*
+
+### D-177 — What `add_comment` sends, and what counts as a repeat *(P7-04)*
+- **Context:** The read side treats comments as the `Expression` rows that mention the item. Whether a bare `Expression` needs a `Conversation` is unverified.
+- **Options:** (a) create an `Expression` with `Content` and `Mentions` (the item) only; plain text, 4,000 characters, line breaks normalised to `\n`, control and hidden characters refused; the same text as the member's latest comment on the item is a no-op; (b) create a `Conversation` first (two requests, two non-atomic writes); (c) accept HTML.
+- **Recommendation:** (a), built; (b) becomes a change inside `send` if P7-07 shows it is required. Agent mentions of other members and rich text are P7-18.
+- **Owner:** *(open; built as (a))*
+
+### D-178 — `update_status` takes `new_status`, offers only the item's workflow, and never closes *(P7-04)*
+- **Context:** `status` is a list filter everywhere else (an array), and the argument lint keeps one meaning per name. Statuses can be per team (`Team` on the status). L-142: Status, AssetState and the rollup category are different things.
+- **Options:** (a) `new_status` (one name or OID); candidates are the type's active statuses that have no team or the item's team; an inactive status is refused; only `Status` changes (closing is a separate, destructive tool); (b) reuse `status` as a string (breaks the lint); (c) accept any status of the list and let Agility refuse.
+- **Recommendation:** (a), built.
+- **Owner:** *(open; built as (a))*

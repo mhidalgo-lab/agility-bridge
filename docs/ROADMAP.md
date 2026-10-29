@@ -322,7 +322,7 @@ Status lives in each task file.
 | P7-01 | [Write framework (enablement, approval, dry run, audit intent)](tasks/phase-7-writes/P7-01-write-framework.md) | high | P2-17, P0-07 | review |
 | P7-02 | [Out-of-band approval page](tasks/phase-7-writes/P7-02-approval-page.md) | high | P7-01, P4-02 | review |
 | P7-03 | [Deployment-wide write limiter](tasks/phase-7-writes/P7-03-write-limiter.md) | high | P7-01 | done |
-| P7-04 | [Writes wave 1: comment, status, effort, owners, sprint](tasks/phase-7-writes/P7-04-writes-wave-1.md) | high | P7-01, P7-03 | todo |
+| P7-04 | [Writes wave 1: comment, status, effort, owners, sprint](tasks/phase-7-writes/P7-04-writes-wave-1.md) | high | P7-01, P7-03 | review |
 | P7-05 | [Writes wave 2: create work items and update fields](tasks/phase-7-writes/P7-05-writes-wave-2.md) | medium | P7-04 | todo |
 | P7-06 | [Lifecycle operations: close and reopen](tasks/phase-7-writes/P7-06-lifecycle-operations.md) | medium | P7-04 | todo |
 | P7-07 | [Sandbox write verification](tasks/phase-7-writes/P7-07-sandbox-write-verification.md) | high | P7-02, P7-05, P7-06 | todo |
@@ -335,6 +335,9 @@ Status lives in each task file.
 | P7-14 | [A list of my pending approvals](tasks/phase-7-writes/P7-14-pending-approvals-list.md) | low | P7-02 | todo |
 | P7-15 | [Per-grant write limit set by an owner](tasks/phase-7-writes/P7-15-per-grant-write-limit.md) | low | P7-03, P4-05 | todo |
 | P7-16 | [Show the remaining write budget](tasks/phase-7-writes/P7-16-write-budget-visibility.md) | low | P7-03 | todo |
+| P7-17 | [Wave-1 extensions: clear the sprint, effort for others, to-do](tasks/phase-7-writes/P7-17-wave-1-extensions.md) | low | P7-04 | todo |
+| P7-18 | [Comments: rich text and mentions](tasks/phase-7-writes/P7-18-comment-rich-text-mentions.md) | low | P7-04, P7-07 | todo |
+| P7-19 | [Optional read-back after a write](tasks/phase-7-writes/P7-19-read-back-after-write.md) | low | P7-04, P7-07 | todo |
 
 ### Phase 8
 

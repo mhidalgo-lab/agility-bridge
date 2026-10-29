@@ -4,6 +4,10 @@
 import { describe, expect, it } from 'vitest';
 import { COMPOSITE_SIBLINGS, compositeWarnings, DEFAULT_LIMITS, ToolRegistry } from '../../src/index.ts';
 import { CORE_TOOLS } from '../../src/tools/index.ts';
+
+// The write tools have their own tests (writes-wave1.test.ts, and the write worst cases below): they need an approval.
+const READ_TOOLS = CORE_TOOLS.filter((t) => t.kind === 'read');
+
 import { measureCost } from '../harness/index.ts';
 import { costRig } from './cost-world.ts';
 import { NOW, rig, toolByName } from './reports-world.ts';
@@ -11,11 +15,11 @@ import { WORST_CASES } from './worst-case.ts';
 
 describe('worst-case cost of every tool (L-114)', () => {
   it('has a worst-case fixture for every tool and none for a tool that is gone', () => {
-    const names = CORE_TOOLS.map((t) => t.name).sort();
+    const names = READ_TOOLS.map((t) => t.name).sort();
     expect(Object.keys(WORST_CASES).sort()).toEqual(names);
   });
 
-  it.each(CORE_TOOLS.map((t) => [t.name]))(
+  it.each(READ_TOOLS.map((t) => [t.name]))(
     '%s stays within its declared cost on a cold cache and actually reads',
     async (name) => {
       const tool = toolByName(name as string);
@@ -49,13 +53,13 @@ describe('worst-case cost of every tool (L-114)', () => {
 
 describe('hide what cannot fit (L-115)', () => {
   const registry = new ToolRegistry();
-  for (const t of CORE_TOOLS) registry.register(t);
-  const costs = [...new Set(CORE_TOOLS.map((t) => t.cost))].sort((a, b) => a - b);
+  for (const t of READ_TOOLS) registry.register(t);
+  const costs = [...new Set(READ_TOOLS.map((t) => t.cost))].sort((a, b) => a - b);
 
   it.each(costs)('a budget of %i lists no tool that costs more, composites included', (budget) => {
     const listed = registry.select({ maxCost: budget });
     expect(listed.every((t) => t.cost <= budget)).toBe(true);
-    expect(listed.length).toBe(CORE_TOOLS.filter((t) => t.cost <= budget).length);
+    expect(listed.length).toBe(READ_TOOLS.filter((t) => t.cost <= budget).length);
   });
 
   it('a budget just below a composite hides it, and just at its cost lists it', () => {
@@ -78,7 +82,7 @@ describe('hide what cannot fit (L-115)', () => {
 describe('composite siblings (L-037)', () => {
   it('the sibling table names exactly the reports of the catalogue', () => {
     expect(Object.keys(COMPOSITE_SIBLINGS).sort()).toEqual(
-      CORE_TOOLS.filter((t) => t.group === 'reports')
+      READ_TOOLS.filter((t) => t.group === 'reports')
         .map((t) => t.name)
         .sort(),
     );

@@ -2,7 +2,7 @@
 id: P7-04
 title: "Writes wave 1: comment, status, effort, owners, sprint"
 phase: 7
-status: todo
+status: review
 priority: high
 depends_on: [P7-01, P7-03]
 adr: ["0011", "0013"]
@@ -41,14 +41,14 @@ The everyday changes: `add_comment`, `update_status`, `log_effort`, `assign_owne
   worst-case cost test and the `tools/list` budgets cover them (33 tools in all, every group on).
 
 ## Acceptance criteria
-- [ ] For each tool, on fakes: dry run, approval, conflict on re-read, no-op repeat, refusal paths, and the exact request
+- [x] For each tool, on fakes: dry run, approval, conflict on re-read, no-op repeat, refusal paths, and the exact request
   body sent (asserted in full).
-- [ ] Negative authorization tests: tool absent unless enabled at every layer; a denied asset type and an out-of-scope
+- [x] Negative authorization tests: tool absent unless enabled at every layer; a denied asset type and an out-of-scope
   target are refused with no write and no approval.
-- [ ] Untrusted Agility text (names, statuses) and the comment text appear only inside the envelope in approvals and results;
+- [x] Untrusted Agility text (names, statuses) and the comment text appear only inside the envelope in approvals and results;
   `add_comment` refuses control characters and shows the full text.
-- [ ] Worst-case cost fixtures; `tools/list` budgets hold; lints pass with no exceptions.
-- [ ] Docs: tool reference, guide, RESEARCH (unverified shapes), THREAT_MODEL, decisions D-172..D-178.
+- [x] Worst-case cost fixtures; `tools/list` budgets hold; lints pass with no exceptions.
+- [x] Docs: tool reference, guide, RESEARCH (unverified shapes), THREAT_MODEL, decisions D-172..D-178.
 - [ ] *Sandbox (P7-07):* each write against a real writable instance, read-lag and response shapes (listed in P7-07).
 
 ## Security notes

@@ -143,6 +143,24 @@ All of them are tool errors (`isError: true`), never a successful result with `a
 4. In stdio, `AB_WRITE_APPROVAL=off` is for your own machine and your own token only; shared deployments always require
    approval ([D-10](../pending-decisions/phase-0.md)).
 
+## The tools (wave 1)
+
+Each acts on **one** work item, found by number or OID inside the workspace (an item outside the workspace's Agility
+projects answers "not found"), and refuses a denied asset type before any request. Relation values show as
+`Name [OID]` so the approval is readable and the approval binds the identity.
+
+| Tool | Changes | Notes |
+|---|---|---|
+| `update_status` | `Status` of a Story, Defect, Task, Test or Epic | `new_status` is a name or OID from the item's own workflow (a status of another team, or an inactive one, is refused). It never closes the item. |
+| `add_comment` | creates a comment (an `Expression` that mentions the item) | At most 4,000 characters of plain text, shown whole in the approval; control, invisible and bidirectional characters are refused. The same text as your latest comment on the item is a no-op. Allowed on closed items. |
+| `log_effort` | creates an effort entry (`Actual`) for **you** | `hours` (0.01 to 24) and `date` (UTC, not in the future, within the history limit). The mutation shows the item's logged total before and after. An identical entry (item, you, date, hours) is a no-op. |
+| `assign_owners` | `Owners` of a Story, Defect, Task, Test or Epic | `add` and `remove` (at most five members in all, resolved like `list_members`); only the difference is sent. |
+| `move_to_sprint` | `Timebox` of a Story or Defect | The sprint must belong to the item's own project schedule and be open. |
+
+A closed, deleted or template item is refused (comments may still be added to a closed one). If the item disappears, closes
+or changes between the plan and the send, the call is `AB_WRITE_CONFLICT`. These request shapes are the documented ones and
+are not yet verified against a real instance ([RESEARCH](../RESEARCH.md) §1.5, P7-07).
+
 ## For a tool author
 
 A write tool is built with `defineWriteTool` (core `writes/`), the only way the registry accepts a `write` or
