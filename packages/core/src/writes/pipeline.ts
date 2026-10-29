@@ -154,12 +154,22 @@ async function obtainApproval(
   tool: string,
   hash: string,
   message: string,
+  plan: WritePlan,
 ): Promise<'elicitation' | 'page' | 'not_required'> {
   if (rt.approval === 'off') return 'not_required';
   const now = ctx.clock.now();
-  const grant = await rt.ledger.takeGrant(rt.actor.id, hash);
+  const scope = ctx.workspace.id;
+  const declined = (): AbError =>
+    new AbError(ErrorCode.WriteApprovalDeclined, 'The change was not approved, so nothing was changed.', {
+      hint: 'Ask the person what to change instead; do not repeat the same call unprompted.',
+    });
+  const grant = await rt.ledger.takeGrant(rt.actor.id, hash, scope);
   if (grant !== null && grant.tool === tool && grant.actor === rt.actor.id && grant.hash === hash) {
     return 'page';
+  }
+  const denial = await rt.ledger.takeDenial(rt.actor.id, hash, scope);
+  if (denial !== null && denial.tool === tool && denial.actor === rt.actor.id && denial.hash === hash) {
+    throw declined();
   }
   const channel = rt.channel;
   if (channel === undefined) {
@@ -171,10 +181,6 @@ async function obtainApproval(
       },
     );
   }
-  const declined = (): AbError =>
-    new AbError(ErrorCode.WriteApprovalDeclined, 'The change was not approved, so nothing was changed.', {
-      hint: 'Ask the person what to change instead; do not repeat the same call unprompted.',
-    });
   if (channel.resume !== undefined && channel.resume.answer !== 'none') {
     const state = await openState(rt.stateKey, channel.resume.state);
     if (state !== null && state.h === hash && state.a === rt.actor.id && state.e > now) {
@@ -193,6 +199,9 @@ async function obtainApproval(
     tool,
     actor: rt.actor,
     expiresAt,
+    workspaceId: scope,
+    mutation: plan.mutation,
+    ...(plan.label === undefined ? {} : { label: plan.label }),
   };
   const reply = await channel.ask(prompt);
   switch (reply.status) {
@@ -333,7 +342,7 @@ export function defineWriteTool<I extends InputSchema>(spec: WriteToolSpec<I>): 
       );
     }
 
-    const approval = await obtainApproval(ctx, rt, spec.name, hash, message);
+    const approval = await obtainApproval(ctx, rt, spec.name, hash, message, plan);
     await rt.limiter?.check({ tool: spec.name, actor: rt.actor, requestId: ctx.requestId });
 
     if (spec.reread !== undefined) {

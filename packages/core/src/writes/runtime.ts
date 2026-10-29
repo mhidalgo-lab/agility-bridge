@@ -3,6 +3,7 @@
 // approval channel of the request. Ports only: core knows neither storage nor the HTTP stack. Built per request by the
 // host (the channel by the server wrapper), never kept in module state (THREAT_MODEL T21, L-013).
 import type { ApprovalLedger } from './ledger.ts';
+import type { CanonicalMutation } from './mutation.ts';
 
 /** `required`: a person approves every write (default). `off`: stdio only, single user with their own token (D-10). */
 export type ApprovalMode = 'required' | 'off';
@@ -68,6 +69,12 @@ export interface ApprovalPrompt {
   readonly tool: string;
   readonly actor: WriteActor;
   readonly expiresAt: number;
+  /** The workspace asking (an out-of-band approval is bound to it). */
+  readonly workspaceId: string;
+  /** The change as data, for a channel that renders it itself (the approval page, P7-02). Untrusted values inside. */
+  readonly mutation: CanonicalMutation;
+  /** The target's display name from Agility (untrusted). */
+  readonly label?: string;
 }
 
 export type ChannelReply =

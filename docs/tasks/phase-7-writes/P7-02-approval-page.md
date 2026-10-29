@@ -2,7 +2,7 @@
 id: P7-02
 title: Out-of-band approval page
 phase: 7
-status: todo
+status: review
 priority: high
 depends_on: [P7-01, P4-02]
 adr: ["0013"]
@@ -26,9 +26,9 @@ Clients that cannot elicit (2025-era clients over remote HTTP, such as Copilot i
 - URL-mode elicitation and the real-client run: P7-13 (D-167). Owner decision D-12 (keep the page): built.
 
 ## Acceptance criteria
-- [ ] Phishing and forgery tests: another user, another workspace, another change, expired request, expired approval, replayed and double-submitted decisions, tampered hash, missing or wrong CSRF, cross-site post, malformed fields, stale sign-in, signed-out visitor.
-- [ ] The page shows the whole change escaped, under the panel CSP; the audit rows hold no value.
-- [ ] The agent's repeated call applies exactly once with the approved change; a decline is reported as declined.
+- [x] Phishing and forgery tests: another user, another workspace, another change, expired request, expired approval, replayed and double-submitted decisions, tampered hash, missing or wrong CSRF, cross-site post, malformed fields, stale sign-in, signed-out visitor.
+- [x] The page shows the whole change escaped, under the panel CSP; the audit rows hold no value.
+- [x] The agent's repeated call applies exactly once with the approved change; a decline is reported as declined.
 - [ ] End to end over HTTP on staging with a client that cannot elicit (Copilot in JetBrains, or the MCP Inspector CLI), the Playwright and DAST suites over the page, and URL-mode elicitation: P7-13 (needs a real write tool and the writable sandbox).
 
 ## Security notes

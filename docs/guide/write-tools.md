@@ -1,6 +1,6 @@
 # Write tools
 
-> The write **framework** is built (P7-01) and tested on fakes; the real write tools arrive in P7-04 – P7-06 and are
+> The write **framework** (P7-01) and the **approval page** (P7-02) are built and tested on fakes; the real write tools arrive in P7-04 – P7-06 and are
 > verified against a writable sandbox in P7-07. Until then no release offers a write tool, and nothing below changes
 > what a running server does. [ADR-0013](../adr/0013-opt-in-writes-human-approval.md) is the policy this page explains.
 
@@ -72,11 +72,29 @@ other-change state never approves anything: the pipeline simply asks again. On a
 capabilities (stdio) the server sends an `elicitation/create` request instead. A stateless 2025-era HTTP request carries no
 capabilities, so it cannot be asked (verified in P0-07).
 
+## The approval page
+
+For a client that cannot ask, the first call answers `AB_WRITE_APPROVAL_PENDING` and the hint holds a link,
+`<AB_PUBLIC_URL>/admin/approve/<id>`. The person who made the request opens it in the panel (signing in if needed), reads
+the whole change (workspace, item, every field with the value now and the value it will become, the change id) and presses
+**Approve** or **Decline**. Then the agent **repeats the same call**; that call finds the approval and applies the change once.
+
+- Only the signed-in person whose grant made the request can see or answer it; anyone else (another user, a link forwarded to
+  a colleague, an administrator) gets "not available", the same as for an expired or used link.
+- Approving needs a recent sign-in (the page sends you to sign in again, then back to it); declining does not.
+- An approval is for **one** repeat of **exactly** this change, in **this** workspace, for ten minutes. A different value, item,
+  tool or workspace asks again; so does a second repeat. A decline makes the next call fail as `AB_WRITE_APPROVAL_DECLINED`.
+- The same pending change asked again before the person acts gets the same link; at most 20 requests are open per person.
+- Available only on a server with `AB_WRITE_TOOLS=on` **and** sign-in configured, for grants that belong to a user (a service
+  grant has nobody to sign in). Otherwise the answer is `AB_WRITE_APPROVAL_UNAVAILABLE`.
+- Each decision is an admin audit row (`write.approval.approved`, `.declined`, `.refused`) with ids, field names and the
+  change hash, never a value. While a request is open its values sit in the storage `kv` table (at most ten minutes).
+
 ## Where the state lives
 
 | | Remote (Node server, Cloudflare Worker) | stdio |
 |---|---|---|
-| Approval ledger | the storage `kv` table; `take` hands each entry out once | process memory, bounded |
+| Approval ledger and pending page requests | the storage `kv` table; `take` hands each entry out once | process memory, bounded (no page) |
 | Round-trip state key | derived from the master key, so any isolate can verify it | random per process |
 | Intent and outcome | `audit_log` rows of kind `write`, stored before the change | **a log line on stderr** (weaker: no table) |
 

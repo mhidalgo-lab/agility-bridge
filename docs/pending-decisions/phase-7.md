@@ -54,3 +54,34 @@
 - **Options:** (a) at most 20 changes, 8,000 characters per value, 24,000 characters of approval text, 50 items per list; control, invisible and bidirectional characters are refused (not cleaned); (b) the same limits but strip the characters for the display only (what is shown differs from what is sent); (c) larger limits (more to read; clients truncate long prompts, which the design must not allow).
 - **Recommendation:** (a), built. Raise the limits only after seeing what real clients render (P7-12).
 - **Owner:** *(open; built as (a))*
+
+### D-163 — Where the approval page lives *(P7-02)*
+- **Context:** The task names `/approve/<id>`. The panel already has sessions, CSRF, fetch-metadata and Origin checks, re-authentication, the strict CSP, layout and an error page under `/admin/*`; a top-level route would need its own copy of each.
+- **Options:** (a) `/admin/approve/<id>` inside the panel (a normal screen, no new CSP variant, 404 when write tools are off); (b) top-level `/approve/<id>` with its own wiring; (c) a page in the OAuth consent module.
+- **Recommendation:** (a), built. The link in `AB_WRITE_APPROVAL_PENDING` is `AB_PUBLIC_URL`'s origin plus that path, never built from `Host` or a forwarded header (T8).
+- **Owner:** *(open; built as (a))*
+
+### D-164 — What a pending request stores, and who can read it *(P7-02)*
+- **Context:** The page must show the exact change, but the ledger holds only a hash. The change contains customer text (old and new values); D-160 keeps values out of the audit.
+- **Options:** (a) a short-lived `kv` record (`wr:pend:<userId>:<id>`, ten minutes) with the canonical mutation, looked up by the **signed-in person's own id** so another person's link finds nothing, taken atomically when answered; (b) only the hash, and the page asks the tool to plan again (the page would need the tool context, the credential and a second Agility read); (c) the sealed change inside the link (long links, values in URLs and logs).
+- **Recommendation:** (a), built. The same change asked again before the person acts reuses the link; at most 20 open requests per person (the oldest is dropped); values are in `kv` only until it is answered or expires, never in audit rows or logs.
+- **Owner:** *(open; built as (a))*
+
+### D-165 — An out-of-band approval is bound to the workspace, and a decline is remembered *(P7-02)*
+- **Context:** The change hash (D-155) holds tool, actor, target and values, not the workspace; the same person could in principle hold two workspaces whose instances produce the same target OID. The agent also needs to learn that the person said no.
+- **Options:** (a) ledger grants and denials are keyed by actor, workspace and hash, and checked on take; a decline writes a single-use denial that the repeated call turns into `AB_WRITE_APPROVAL_DECLINED`; (b) add the workspace to the hash (changes the hash that the elicitation channel already issues); (c) no denial: a decline only lets the request expire, and the repeated call is pending again.
+- **Recommendation:** (a), built; the elicitation hash is unchanged.
+- **Owner:** *(open; built as (a))*
+
+### D-166 — Who is offered the page *(P7-02)*
+- **Context:** Only the grant's own signed-in user may approve. A service grant (no user) has nobody who can sign in and answer; stdio has no panel.
+- **Options:** (a) the page channel exists only for a request whose grant has a user, on a server with write tools and sign-in configured; everything else keeps `AB_WRITE_APPROVAL_UNAVAILABLE`; (b) let any owner approve for a service grant (a second person approving what an agent asked is a different control, not this one); (c) offer the page without sign-in configured (a dead link).
+- **Recommendation:** (a), built.
+- **Owner:** *(open; built as (a))*
+
+### D-167 — D-12 stays (the page is built); URL-mode elicitation waits for a client that declares it *(P7-02)*
+- **Context:** The owner's D-12 asked whether to keep or drop the page; it is built. The task also lists URL-mode elicitation. No client in the P0-07 matrix is known to declare `elicitation.url`, and a stateless 2025-era request cannot be asked anything (L-156).
+- **Options:** (a) plain link in the tool error now; URL-mode in P7-13 after the client matrix shows who declares it; (b) build URL-mode now without a client to test it; (c) drop it.
+- **Recommendation:** (a), built; filed as P7-13 with the browser suites and the staging run.
+- **Owner:** *(open; built as (a))*
+

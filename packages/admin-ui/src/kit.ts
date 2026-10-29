@@ -79,6 +79,40 @@ export interface AdminUiDeps {
    * `cf-access`, `oidc:<name>`; `label` is the name shown). The unbind page offers exactly these (P4-39, D-130).
    */
   readonly identityProviders?: readonly { readonly idp: string; readonly label: string }[];
+  /** The write approval page (P7-02): present only when write tools are on. Absent: `/admin/approve/*` is a 404. */
+  readonly approvals?: ApprovalsPort;
+}
+
+/** One pending write approval, as the approval page shows it (P7-02). Text from Agility or the agent is untrusted. */
+export interface ApprovalView {
+  readonly id: string;
+  readonly tool: string;
+  readonly operation: string;
+  readonly workspaceName: string | null;
+  readonly target: { readonly assetType: string; readonly oid: string; readonly number: string | null };
+  /** The target's title from Agility (untrusted); null when unknown. */
+  readonly label: string | null;
+  /** Each field with its old and new value, JSON-quoted. */
+  readonly changes: readonly { readonly field: string; readonly old: string; readonly new: string }[];
+  /** The hash the approval binds (also posted back by the form), and its short form. */
+  readonly hash: string;
+  readonly changeId: string;
+  /** Epoch ms. */
+  readonly expiresAt: number;
+}
+
+/** `gone`: unknown, used, expired or another person's (one answer for all, so nothing is learned from it). */
+export type ApprovalOutcome = 'approved' | 'declined' | 'gone' | 'mismatch';
+
+/** The pending write approvals of the signed-in person (P7-02). The server looks them up by the principal's own id. */
+export interface ApprovalsPort {
+  view(c: Context, principal: UiPrincipal, id: string): Promise<ApprovalView | null>;
+  decide(
+    c: Context,
+    principal: UiPrincipal,
+    id: string,
+    input: { readonly decision: 'approve' | 'decline'; readonly hash: string },
+  ): Promise<ApprovalOutcome>;
 }
 
 /** Single-use keys with a lifetime (`kv` with an atomic `take` on the server, L-073). */

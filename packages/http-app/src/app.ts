@@ -647,6 +647,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
             ...(identity.auditAdmin === undefined ? {} : { audit: identity.auditAdmin }),
             runInBackground: keepAlive,
             identityProviders: identity.providers.map((p) => ({ idp: p.idp, label: p.label })),
+            ...(options.writes?.approvals === undefined ? {} : { approvals: options.writes.approvals }),
             async beforeAuth(ic) {
               const decision = await options.limits?.beforeAuth?.(clientIp(ic), services.clock.now());
               if (decision === undefined || decision.ok) return undefined;

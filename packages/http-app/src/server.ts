@@ -28,7 +28,7 @@ import type { Storage } from '@agility-bridge/storage';
 import type { Context } from 'hono';
 import { adminTokenAuthenticator } from './admin/api.ts';
 import { createHttpApp, type HostServices, type HttpApp } from './app.ts';
-import { AuditWriter } from './audit.ts';
+import { type AdminChange, AuditWriter } from './audit.ts';
 import type { ClientMetadataFetch } from './oauth/clients.ts';
 import type { OAuthConsentHandler } from './oauth/server.ts';
 import {
@@ -461,7 +461,21 @@ export function assembleServer(parts: ServerParts): AssembledServer {
     },
     tools: CORE_TOOLS,
     ...(settings.writeTools
-      ? { writes: createHttpWrites({ storage, audit, keyring, clock: host.clock }) }
+      ? {
+          writes: createHttpWrites({
+            storage,
+            audit,
+            keyring,
+            clock: host.clock,
+            // The approval page lives in the signed-in panel: only offered where sign-in is configured (P7-02).
+            ...(settings.identity === undefined
+              ? {}
+              : {
+                  panelOrigin: new URL(settings.identity.publicUrl).origin,
+                  auditAdmin: (change: AdminChange) => audit.admin(change),
+                }),
+          }),
+        }
       : {}),
     services: host,
     ...(settings.publicUrl === undefined ? {} : { publicUrl: settings.publicUrl }),

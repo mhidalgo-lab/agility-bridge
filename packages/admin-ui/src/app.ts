@@ -8,6 +8,7 @@
 //   /admin/oauth/*                 connected apps of everyone (owner, admin) and registered OAuth apps (owner), P5-08
 //   /admin/instances, /credentials, /workspaces, /grants (with their device tokens) and /users: P4-04, owners and admins
 //   GET /admin/assets/:file        static assets (public, hashed names, immutable)
+//   GET, POST /admin/approve/:id   a write waiting for the person's approval (P7-02; only with write tools on)
 //   ALL /admin/*                   signed-in 404 page (everyone else: sign-in redirect)
 //
 // Screens (P4-04 and later) add their routes in `registerScreens` with `kit.page` / `kit.form` and an entry in `NAV_ITEMS`.
@@ -17,6 +18,7 @@ import { type AdminUiDeps, createUiKit, requestIdOf, type UiKit } from './kit.ts
 import { errorPage } from './pages.tsx';
 import { registerAccount } from './screens/account.tsx';
 import { registerAllTokens } from './screens/all-tokens.tsx';
+import { registerApprove } from './screens/approve.tsx';
 import { registerAudit } from './screens/audit.tsx';
 import { registerCredentials } from './screens/credentials.tsx';
 import { registerGrants } from './screens/grants.tsx';
@@ -47,6 +49,7 @@ function registerScreens(ui: Hono, kit: UiKit): void {
   registerUsers(ui, kit);
   registerAudit(ui, kit);
   registerUsage(ui, kit);
+  registerApprove(ui, kit);
 }
 
 /** The panel's routes, relative to {@link ADMIN_UI_BASE} (mount it with `app.route(ADMIN_UI_BASE, createAdminUi(deps))`). */

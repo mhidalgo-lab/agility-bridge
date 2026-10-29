@@ -350,7 +350,21 @@ tool; no release has a real write tool yet (P7-04 – P7-06) and nothing has run
 | T6 (approval text) | implemented | What a person approves is what is sent: values with control, invisible or bidirectional characters are refused rather than cleaned; Agility and agent text is JSON-quoted inside the untrusted-data envelope (a forged closing tag or a newline cannot pose as our line); an approval above 24,000 characters (8,000 per value, 20 changes) is refused, never truncated. |
 | T21 | verified | The write runtime and approval channel are built per request; the in-process stdio ledger and key live in the process, not in module state. |
 
-Residual: the page channel (P7-02), the write limiter (P7-03), the real tools' field allowlists and metadata checks (P7-04 –
+Residual: the write limiter (P7-03), the real tools' field allowlists and metadata checks (P7-04 –
 P7-06), the multi-isolate `kv` ledger and sealed state on Workers (P7-10) and what real clients render of the approval text
 (P7-12) are not verified yet. In stdio with `AB_WRITE_APPROVAL=off` nothing asks a person: documented, warned at start,
 stdio only (D-10).
+
+## 8g. Status after P7-02 (2026-10-29)
+
+The out-of-band approval page (`/admin/approve/<id>`, `packages/http-app/src/approval-page.ts`, `packages/admin-ui/src/screens/approve.tsx`)
+is built and tested with the real panel on fakes. Not yet run in a browser suite, in the DAST scan or with a real client (P7-13).
+
+| Id | Status | Evidence |
+|---|---|---|
+| A13 | implemented, unverified in a browser | The pending record is stored under the signed-in person's own id and read with it, so another person's link, an unknown, used or expired id are one 404 / "not available" answer (tests: another user, other workspace, expired, replayed, double submit, tampered hash, CSRF, cross-site, malformed fields). The page shows every field old and new, JSON-quoted and escaped, the workspace, the item and the change id; posting needs the CSRF token, Origin and fetch metadata (panel kit) and, to approve, a recent sign-in (else the sign-in-again page and nothing recorded; declining is always allowed). The record is taken atomically when answered; the approval is a ledger grant for one actor, one workspace and one change hash, taken once by the repeated call and expiring in ten minutes; a decline is a single-use denial. Audit rows (`write.approval.approved`, `.declined`, `.refused`) hold ids, field names and the hash, never a value. |
+| T31 | extended | A grant given for one workspace never applies in another (hash plus scope, D-165); a service grant (no user) is not offered the page (D-166). |
+| T8 | unchanged | The link's host is `AB_PUBLIC_URL`'s origin, never `Host` or a forwarded header. |
+
+Residual: the pending record holds the change's values (customer text) in `kv` for at most ten minutes, until it is answered
+(D-164); the page in the Playwright and ZAP suites and a run with a client that cannot elicit (P7-13); a list of open requests (P7-14).

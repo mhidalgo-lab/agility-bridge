@@ -4,7 +4,7 @@
 import { createIdentityProviders, EMPTY_LOGIN_POLICY, type ToolInfo } from '@agility-bridge/auth';
 import { Secret } from '@agility-bridge/core';
 import { type FakeOidc, fakeOidc, route } from '../../../auth/test/helpers/fake-idp.ts';
-import { ADMIN_BASE, type OAuthOptions, type SessionOptions } from '../../src/index.ts';
+import { ADMIN_BASE, type HttpWrites, type OAuthOptions, type SessionOptions } from '../../src/index.ts';
 import { type World, world } from './world.ts';
 
 export const MIN = 60_000;
@@ -24,6 +24,8 @@ export interface Opts {
   oauth?: OAuthOptions;
   /** A second configured provider, `oidc:other`, nobody signs in with (P4-39: a claim for a configured provider). */
   secondProvider?: boolean;
+  /** The write wiring (P7-02): the approval page needs only `approvals`. */
+  writes?: HttpWrites;
 }
 
 export async function setup(options: Opts = {}) {
@@ -74,6 +76,7 @@ export async function setup(options: Opts = {}) {
       ...(options.session === undefined ? {} : { session: options.session }),
       ...(options.isolation === undefined ? {} : { isolation: options.isolation }),
       ...(options.oauth === undefined ? {} : { oauth: options.oauth }),
+      ...(options.writes === undefined ? {} : { writes: options.writes }),
     },
     {
       admin: true,

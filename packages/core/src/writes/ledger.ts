@@ -13,6 +13,8 @@ export interface LedgerEntry {
   readonly tool: string;
   /** Epoch ms; an entry past it is refused even if the store still holds it. */
   readonly expiresAt: number;
+  /** The workspace the approval is for (grants and denials, P7-02): an approval never crosses workspaces. */
+  readonly scope?: string;
 }
 
 /** The part of the storage `kv` table the ledger needs (`KvStore` satisfies it structurally). */
@@ -41,20 +43,29 @@ export class ApprovalLedger {
     return this.#take(`wr:round:${part(nonce)}`);
   }
 
-  /** Records an out-of-band approval (P7-02): valid for this actor and this hash only, until `expiresAt`. */
+  /** Records an out-of-band approval (P7-02): valid for this actor, workspace and hash only, until `expiresAt`. */
   grant(entry: LedgerEntry): Promise<void> {
-    return this.#put(`wr:ok:${part(entry.actor)}:${entry.hash}`, entry);
+    return this.#put(`wr:ok:${part(entry.actor)}:${part(entry.scope ?? '')}:${entry.hash}`, entry);
   }
 
-  takeGrant(actor: string, hash: string): Promise<LedgerEntry | null> {
-    return this.#take(`wr:ok:${part(actor)}:${hash}`);
+  takeGrant(actor: string, hash: string, scope = ''): Promise<LedgerEntry | null> {
+    return this.#take(`wr:ok:${part(actor)}:${part(scope)}:${hash}`, scope);
+  }
+
+  /** Records that the person declined on the page (P7-02): the agent's next call is refused as declined, once. */
+  deny(entry: LedgerEntry): Promise<void> {
+    return this.#put(`wr:no:${part(entry.actor)}:${part(entry.scope ?? '')}:${entry.hash}`, entry);
+  }
+
+  takeDenial(actor: string, hash: string, scope = ''): Promise<LedgerEntry | null> {
+    return this.#take(`wr:no:${part(actor)}:${part(scope)}:${hash}`, scope);
   }
 
   #put(key: string, entry: LedgerEntry): Promise<void> {
     return this.#store.set(key, JSON.stringify(entry), { expiresAt: entry.expiresAt });
   }
 
-  async #take(key: string): Promise<LedgerEntry | null> {
+  async #take(key: string, scope?: string): Promise<LedgerEntry | null> {
     const raw = await this.#store.take(key);
     if (raw === null) return null;
     try {
@@ -68,7 +79,15 @@ export class ApprovalLedger {
       ) {
         return null;
       }
-      return { hash: e['hash'], actor: e['actor'], tool: e['tool'], expiresAt: e['expiresAt'] };
+      const stored = typeof e['scope'] === 'string' ? e['scope'] : undefined;
+      if (scope !== undefined && (stored ?? '') !== scope) return null;
+      return {
+        hash: e['hash'],
+        actor: e['actor'],
+        tool: e['tool'],
+        expiresAt: e['expiresAt'],
+        ...(stored === undefined ? {} : { scope: stored }),
+      };
     } catch {
       return null;
     }
