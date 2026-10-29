@@ -393,3 +393,9 @@
 - **Recommendation:** (a), built. It matches `limits`, needs no migration and is the least surprising for an API that already says "replaced". The CLI has no write-setting option today and gets none here.
 - **Owner:** *(open; built as (a))*
 
+
+### D-207 — A value with the envelope phrase is shown with a JSON escape, not refused and not rewritten *(P7-29)*
+- **Context:** `neutralise()` rewrites `untrusted data` (any case, spaces, underscores, hyphens) to `untrusted~data` inside the untrusted-data envelope, so an approval of a title containing the phrase showed text different from what is sent (review L7).
+- **Options:** (a) write the first letter of each look-alike as a JSON escape in the already JSON-quoted value (`\u0075ntrusted data`) with one fixed note line; the envelope and `neutralise()` stay as they are; (b) refuse caller text with the phrase (blocks honest titles such as "Handle untrusted data in the importer") and rewrite Agility text with a visible note; (c) leave the rewrite and document it.
+- **Recommendation:** (a), built. It shows exactly what is sent (decoding the quoted value as JSON gives the value), refuses nothing, and does not touch the envelope. The cost is a slightly odd-looking `\u0075` in a rare value, explained by the note.
+- **Owner:** *(open; built as (a))*

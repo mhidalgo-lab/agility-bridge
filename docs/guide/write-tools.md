@@ -169,7 +169,7 @@ A change already present at plan time is a no-op too: no approval, no audit, not
 
 The approval text shows the target (type, number, OID), the number of changes and, for each, the field with the old and
 the new value, then a short change id that matches the audit row. Values are JSON-quoted and sit inside the
-untrusted-data envelope, so text from Agility or from the agent cannot pose as part of the question. **A change too large
+untrusted-data envelope, so text from Agility or from the agent cannot pose as part of the question. A value that contains the envelope's own tag phrase (`untrusted data`, any case, spaces, underscores or hyphens) is shown exactly, with its first letter written as a JSON escape (`\u0075ntrusted data`) and a one-line note, never rewritten to something else (D-207). **A change too large
 to show whole is refused, never truncated** (at most 24,000 characters of approval text, 8,000 per value, 20 changes);
 values **you** supply with control, invisible or bidirectional characters are refused because the person could not see them (a zero-width joiner between two visible characters, as in emoji sequences or Persian text, is allowed). Text from Agility (the current value, the title, names inside `Name [OID]`) is shown cleaned of such characters and, past 2,000 characters, shortened, each with a visible note; it never blocks a change.
 

@@ -347,7 +347,7 @@ Status lives in each task file.
 | P7-26 | [Approval policy: page only, per workspace or grant](tasks/phase-7-writes/P7-26-approval-policy-page-only.md) | medium | P7-02 | todo |
 | P7-27 | [Limit approval prompts and stop pending approvals evicting each other](tasks/phase-7-writes/P7-27-approval-request-limits.md) | medium | P7-02 | done |
 | P7-28 | [Do not burn an approval on a later refusal](tasks/phase-7-writes/P7-28-approval-consumed-before-refusals.md) | low | P7-02 | done |
-| P7-29 | [Approval text: values that contain the envelope phrase](tasks/phase-7-writes/P7-29-envelope-lookalike-in-approval.md) | low | P7-02 | todo |
+| P7-29 | [Approval text: values that contain the envelope phrase](tasks/phase-7-writes/P7-29-envelope-lookalike-in-approval.md) | low | P7-02 | done |
 | P7-30 | [Free-plan ceiling for the deployment write cap; one statement for the grant and denial take](tasks/phase-7-writes/P7-30-free-plan-write-cap-and-one-statement-take.md) | low | P7-03, P7-02 | todo |
 | P7-31 | [Bench the approval page and the write limiter; take the outcome audit off the hot path](tasks/phase-7-writes/P7-31-write-path-bench-and-audit-latency.md) | low | P7-09 | todo |
 | P7-32 | [Show the OAuth write scope on My access and the administrators' device list](tasks/phase-7-writes/P7-32-oauth-write-scope-on-my-access.md) | low | P7-24 | todo |

@@ -4,7 +4,7 @@
 // value cannot start a line that looks like ours). A change too large to read is refused, never truncated.
 import type { Random } from '../context.ts';
 import { AbError, ErrorCode } from '../errors.ts';
-import { envelope, newEnvelopeId } from '../output/envelope.ts';
+import { envelope, newEnvelopeId, replaceLookalikes } from '../output/envelope.ts';
 import { cleanText } from '../output/text.ts';
 import { type CanonicalMutation, forDisplay, MAX_APPROVAL_CHARS, type WriteValue } from './mutation.ts';
 
@@ -15,7 +15,21 @@ export const APPROVAL_SCHEMA: Readonly<Record<string, unknown>> = Object.freeze(
   required: ['approve'],
 });
 
-const quote = (v: WriteValue): string => JSON.stringify(v);
+/**
+ * A value as the person reads it: JSON, so the quotes and escapes show exactly what is sent. The envelope rewrites the
+ * look-alikes of its own tag name (`untrusted data` and its spellings) to `untrusted~data`; in an approval that would show
+ * a value different from the one that is sent (P7-29). So a look-alike gets its first letter written as a JSON escape
+ * (`\u0075ntrusted data`): the same text once read as JSON, nothing for the envelope to rewrite, and the envelope itself
+ * is untouched. `escaped.used` tells the caller to add the one-line explanation.
+ */
+const quoteWith =
+  (escaped: { used: boolean }) =>
+  (v: WriteValue): string =>
+    replaceLookalikes(JSON.stringify(v), (match) => {
+      escaped.used = true;
+      const first = match.charCodeAt(0);
+      return `\\u${first.toString(16).padStart(4, '0')}${match.slice(1)}`;
+    });
 
 /** The target's title as shown next to an approval: Agility text, so cleaned, on one line and capped (every channel). */
 export const displayLabel = (label: string): string =>
@@ -37,6 +51,8 @@ export function renderApproval(opts: {
 }): string {
   const m = opts.mutation;
   const id = newEnvelopeId(opts.random);
+  const escaped = { used: false };
+  const quote = quoteWith(escaped);
   const body: string[] = [];
   if (opts.label !== undefined && opts.label !== '') {
     body.push(`Title: ${quote(displayLabel(opts.label))}`);
@@ -51,6 +67,11 @@ export function renderApproval(opts: {
     `Target: ${target}`,
     `Changes: ${m.changes.length}`,
     envelope(body.join('\n'), id, 'proposed change'),
+    ...(escaped.used
+      ? [
+          'Note: \\uXXXX inside a quoted value stands for that exact character; the value is shown without change.',
+        ]
+      : []),
     `Change id: ${shortId(opts.hash)}`,
   ].join('\n');
   if (message.length > MAX_APPROVAL_CHARS) {
