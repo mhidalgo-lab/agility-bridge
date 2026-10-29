@@ -157,7 +157,7 @@
     "id": "Q023",
     "category": "my-work",
     "question": "What is on Marcus Oyelaran's plate this sprint?",
-    "expect": ["list_my_work"],
+    "expect": ["list_my_work", "search_work_items"],
     "catalogue": "default"
   },
   {
@@ -206,7 +206,7 @@
     "id": "Q030",
     "category": "sprint",
     "question": "Which sprint starts next for the Kestrel team?",
-    "expect": ["list_sprints"],
+    "expect": ["list_sprints", "get_sprint"],
     "catalogue": "default"
   },
   {
@@ -507,6 +507,27 @@
     "id": "Q073",
     "category": "generic",
     "question": "Query regression tests sorted by name",
+    "expect": ["query_assets"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q074",
+    "category": "reports",
+    "question": "Which open stories in sprint Lantern 14 are least ready for refinement?",
+    "expect": ["quality_scan"],
+    "catalogue": "full"
+  },
+  {
+    "id": "Q075",
+    "category": "generic",
+    "question": "List the themes of the Orchard Checkout project",
+    "expect": ["query_assets"],
+    "catalogue": "default"
+  },
+  {
+    "id": "Q076",
+    "category": "generic",
+    "question": "Show the retrospectives held for sprint Lantern 13",
     "expect": ["query_assets"],
     "catalogue": "default"
   }

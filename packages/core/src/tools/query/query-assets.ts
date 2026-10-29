@@ -57,7 +57,7 @@ export const queryAssets: ToolDefinition = defineTool({
   name: NAME,
   title: 'Query assets',
   description:
-    'Query any asset type this workspace allows (stories, defects, tasks, tests, epics, issues, requests, custom fields) with structured filters, fields and sort; values are bound and the workspace scope is enforced. Sorting by ChangeDate costs about a second per call. Paged: pass nextCursor back as cursor. Cold call: up to 12 Agility requests.',
+    'Query any asset type this workspace allows (stories, defects, tasks, tests, epics, issues, requests, goals, themes, retrospectives, custom fields) with structured filters, fields and sort; values are bound and the workspace scope is enforced. Sorting by ChangeDate costs about a second per call. Paged: pass nextCursor back as cursor. Cold call: up to 12 Agility requests.',
   kind: 'read',
   group: 'query',
   // Capped at run time: metadata for the type and every related type on a cold cache, the project tree, the page.

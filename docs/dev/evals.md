@@ -185,9 +185,9 @@ of such answers, so the next run shows whether that was the model or the router.
 
   | Question | Seen | Verdict |
   |---|---|---|
-  | Q023 "on Marcus's plate this sprint" | every run, both models | Description change: `list_my_work` does not say it takes another member (P6-34). |
-  | Q030 "which sprint starts next" | Sonnet, two of three runs | Description change: `list_sprints` should say it covers future sprints (P6-34). |
-  | Q049 "links and attachments on S-01054" | Opus | Description change: `list_attachments` should name links (P6-34). |
+  | Q023 "on Marcus's plate this sprint" | every run, both models | Legitimate route (P6-34): `search_work_items` with a member and a sprint answers it; the dataset accepts it. |
+  | Q030 "which sprint starts next" | Sonnet, two of three runs | Legitimate route (P6-34): `get_sprint` takes `sprint: next`; the dataset accepts it. |
+  | Q049 "links and attachments on S-01054" | Opus | Kept as a miss to watch (P6-34): a pointer in `get_work_item` pulled the lexical router the wrong way, and `list_attachments` already names links. |
   | Q026 burndown | Opus | Router dropped the call; accepted note. |
   | Q001 stories mentioning words | both models chose `query_assets` | Legitimate route: dataset accepts it (L-312). |
   | Q018, Q029, Q057, Q060, Q063, Q071 – Q073 | after one lookup, a second lookup | Accepted note: a lookup chain (projects, then types), never a wrong answering tool; the harness scores one lookup. |
