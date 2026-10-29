@@ -222,3 +222,72 @@ describe('write tools over MCP', () => {
     expect(fake.sends).toHaveLength(0);
   });
 });
+
+describe('the approval policy page_only (P7-26): a client that can elicit is never asked', () => {
+  const pending = () =>
+    answeringChannel(
+      () => ({ status: 'pending', link: 'https://example.test/admin/approve/x', expiresAt: 1 }),
+      'page',
+    );
+  const pageOnly = (withPage: boolean) =>
+    makeRuntime({ approvalPolicy: 'page_only', ...(withPage ? { page: pending() } : {}) });
+  const channelOf = async (client: Client) =>
+    (
+      (await client.callTool({ name: 'whoami', arguments: {} })).structuredContent as {
+        workspace: { writes: { approval: string } };
+      }
+    ).workspace.writes.approval;
+
+  it('2026-07-28 with an accepting client: the link, no question, nothing sent', async () => {
+    const fake = new FakeItems();
+    const { client, questions } = await httpClient(fake, pageOnly(true), { pin: '2026-07-28' }, 'accept');
+    const result = await client.callTool(CALL);
+    expect(result.isError).toBe(true);
+    expect(codeOf(result)).toBe(ErrorCode.WriteApprovalPending);
+    expect(text(result)).toContain('https://example.test/admin/approve/x');
+    expect(questions).toHaveLength(0);
+    expect(fake.sends).toHaveLength(0);
+    expect(await channelOf(client)).toBe('page');
+  });
+
+  it('a 2025-era connection that keeps its capabilities (push elicitation) is not asked either', async () => {
+    const fake = new FakeItems();
+    const server = buildMcpServer({
+      tools: tools(fake),
+      ctx: () => writeContext(pageOnly(true)),
+      listChanged: true,
+    });
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverSide);
+    const { client, questions } = await connected(clientSide, 'legacy', 'accept');
+    const result = await client.callTool(CALL);
+    expect(codeOf(result)).toBe(ErrorCode.WriteApprovalPending);
+    expect(questions).toHaveLength(0);
+    expect(fake.sends).toHaveLength(0);
+  });
+
+  it('without a page the answer is unavailable (its own hint), and the client is still not asked', async () => {
+    const fake = new FakeItems();
+    const { client, questions } = await httpClient(fake, pageOnly(false), { pin: '2026-07-28' }, 'accept');
+    const result = await client.callTool(CALL);
+    expect(codeOf(result)).toBe(ErrorCode.WriteApprovalUnavailable);
+    expect(text(result)).toContain('approval page');
+    expect(questions).toHaveLength(0);
+    expect(fake.sends).toHaveLength(0);
+    expect(await channelOf(client)).toBe('unavailable');
+  });
+
+  it('the policy any (and an absent one) still asks in the client first', async () => {
+    for (const approvalPolicy of ['any', undefined] as const) {
+      const fake = new FakeItems();
+      const runtime = makeRuntime({
+        page: pending(),
+        ...(approvalPolicy === undefined ? {} : { approvalPolicy }),
+      });
+      const { client, questions } = await httpClient(fake, runtime, { pin: '2026-07-28' }, 'accept');
+      expect((await client.callTool(CALL)).isError).not.toBe(true);
+      expect(questions).toHaveLength(1);
+      expect(fake.sends).toHaveLength(1);
+    }
+  });
+});

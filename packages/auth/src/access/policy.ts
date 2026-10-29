@@ -64,6 +64,11 @@ export const writePolicySchema = z.strictObject({
    * (P7-20). Set by an owner; each is checked again against the instance metadata when a tool uses it.
    */
   customFields: z.array(z.string().regex(CUSTOM_FIELD_RE)).max(MAX_CUSTOM_FIELDS).optional(),
+  /**
+   * How writes in this workspace are approved (P7-26): `any` (default) lets a client that can elicit approve in the
+   * client; `page_only` needs the out-of-band approval page for every write. Set by an owner.
+   */
+  approval: z.enum(['any', 'page_only']).optional(),
 });
 export type WritePolicy = z.infer<typeof writePolicySchema>;
 
@@ -75,6 +80,11 @@ export const rateLimitPolicySchema = z.strictObject({
    * deployment's `AB_WRITE_RATE_PER_GRANT_HOURLY`; setting one above the deployment's value is refused.
    */
   writesPerHour: z.number().int().min(1).max(1_000).optional(),
+  /**
+   * `page_only` (P7-26): this grant's writes are approved on the approval page only, whatever the workspace says. It can
+   * only tighten (the effective policy is `page_only` when either says so). An owner sets and removes it.
+   */
+  writeApproval: z.literal('page_only').optional(),
 });
 export type RateLimitPolicy = z.infer<typeof rateLimitPolicySchema>;
 

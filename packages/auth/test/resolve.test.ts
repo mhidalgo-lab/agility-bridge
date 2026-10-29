@@ -370,6 +370,41 @@ describe('resolveAccess: write tools (ADR-0008, ADR-0013)', () => {
     expect(allowed(writeRecords()).writeCustomFields).toEqual([]);
   });
 
+  it('the approval policy is the stricter of the workspace and the grant; any by default (P7-26)', () => {
+    expect(allowed(writeRecords()).writeApproval).toBe('any');
+    const page = { writePolicy: { enabled: true, approval: 'page_only' as const } };
+    expect(allowed(writeRecords({ ws: page })).writeApproval).toBe('page_only');
+    expect(
+      allowed(writeRecords({ ws: { writePolicy: { enabled: true, approval: 'any' } } })).writeApproval,
+    ).toBe('any');
+    expect(allowed(writeRecords({ g: { rateLimit: { writeApproval: 'page_only' } } })).writeApproval).toBe(
+      'page_only',
+    );
+    // A grant cannot loosen the workspace, and the grant's other limits say nothing about approval.
+    expect(allowed(writeRecords({ ws: page, g: { rateLimit: { perMinute: 5 } } })).writeApproval).toBe(
+      'page_only',
+    );
+    // Anything but the two known words makes the policy malformed: the request is refused, never read as "any".
+    for (const approval of ['page', 'PAGE_ONLY', true, 'elicitation']) {
+      const d = resolveAccess(
+        { kind: 'device_token', token: token() },
+        'team-a',
+        writeRecords({ ws: { writePolicy: { enabled: true, approval } as never } }),
+        SETTINGS,
+        NOW,
+      );
+      expect(d.ok, String(approval)).toBe(false);
+    }
+    const bad = resolveAccess(
+      { kind: 'device_token', token: token() },
+      'team-a',
+      writeRecords({ g: { rateLimit: { writeApproval: 'any' } as never } }),
+      SETTINGS,
+      NOW,
+    );
+    expect(bad.ok).toBe(false);
+  });
+
   it('a malformed list of custom attributes makes the workspace policy malformed (the request is refused)', () => {
     for (const customFields of [
       ['Name'],

@@ -144,6 +144,11 @@ export interface WriteRuntime {
   readonly limiter: WriteLimiter;
   /** The out-of-band channel (P7-02), used when the request cannot be elicited. */
   readonly page?: ApprovalChannelPort;
+  /**
+   * `page_only` (P7-26): the approval page is the only channel, whatever the client can do: nothing is ever elicited, so a
+   * client that auto-accepts cannot approve. Absent or `any`: elicitation first, then the page.
+   */
+  readonly approvalPolicy?: 'any' | 'page_only';
   /** The channel of this request; set per call by the server wrapper from the request's declared capabilities. */
   readonly channel?: ApprovalChannelPort;
 }

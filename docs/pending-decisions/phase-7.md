@@ -394,6 +394,18 @@
 - **Owner:** *(open; built as (a))*
 
 
+### D-208 — The default approval policy stays `any`; the owner confirms or changes it *(P7-26)*
+- **Context:** D-11 allowed elicitation-only remote writes. A client that auto-accepts elicitation (or an agent that answers it) proves no person answered (review M3). `page_only` is built per workspace and per grant; the question is what a workspace or grant that says nothing does, in particular for OAuth clients that are not allowlisted.
+- **Options:** (a) default `any`: elicitation where the client can ask, else the page (today's behaviour); owners opt into `page_only`; (b) default `page_only` everywhere (safest, but every write in Claude Code, Copilot CLI and VS Code needs a browser trip, which makes the feature much less usable); (c) `page_only` by default only for OAuth clients and tokens that are not on an allowlist of known interactive clients (needs an allowlist of clients and a way to maintain it); (d) a deployment-wide default switch an owner sets.
+- **Recommendation:** (a), built, with the owner deciding. The per-workspace and per-grant switches are the lever; (d) is a small follow-up (a server setting that supplies the default) if the owner wants the default flipped for a whole deployment, filed as P7-34 together with CLI flags. (c) needs real client evidence (P7-10).
+- **Owner:** *(open; built as (a). Please confirm the default or ask for (b) or (d).)*
+
+### D-209 — The grant's policy lives in `rateLimit.writeApproval`, accepts only `page_only`, and only an owner changes it *(P7-26)*
+- **Context:** A grant's JSON columns are `limits` (shared with workspaces, tightening rules for numbers and switches) and `rateLimit` (the grant's own, where P7-15 put the hourly write cap). A new column needs a migration on three adapters.
+- **Options:** (a) `rateLimit.writeApproval: "page_only"` beside `writesPerHour`: no migration, an absent key is the default, the value `any` is refused so the grant can only tighten; the guard treats set, change and removal as an owner act with a recent sign-in (an administrator sending a `rateLimit` without the key is a removal); (b) a switch in `limits` (it is also valid on a workspace, where an administrator could remove it); (c) a new column.
+- **Recommendation:** (a), built. The name `rateLimit` is a misnomer for a policy; renaming would be a migration for no behaviour, so a comment says so.
+- **Owner:** *(open; built as (a))*
+
 ### D-207 — A value with the envelope phrase is shown with a JSON escape, not refused and not rewritten *(P7-29)*
 - **Context:** `neutralise()` rewrites `untrusted data` (any case, spaces, underscores, hyphens) to `untrusted~data` inside the untrusted-data envelope, so an approval of a title containing the phrase showed text different from what is sent (review L7).
 - **Options:** (a) write the first letter of each look-alike as a JSON escape in the already JSON-quoted value (`\u0075ntrusted data`) with one fixed note line; the envelope and `neutralise()` stay as they are; (b) refuse caller text with the phrase (blocks honest titles such as "Handle untrusted data in the importer") and rewrite Agility text with a visible note; (c) leave the rewrite and document it.

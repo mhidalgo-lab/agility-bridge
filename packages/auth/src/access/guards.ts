@@ -166,6 +166,20 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     }
   }
 
+  const writeApprovalOf = (rateLimit: unknown): string | null => {
+    const v = (rateLimit as { writeApproval?: unknown } | null | undefined)?.writeApproval;
+    return typeof v === 'string' ? v : null;
+  };
+  /**
+   * How a grant's writes are approved is the owner's to set or remove (P7-26): an administrator must not loosen what an
+   * owner set, nor can a member or an administrator tighten it behind the owner's back.
+   */
+  function checkWriteApproval(next: unknown, current: unknown): void {
+    if (writeApprovalOf(next) === (current === undefined ? null : writeApprovalOf(current))) return;
+    needOwner(actor, 'change how the writes of a grant are approved');
+    needRecent(actor, 'changing how the writes of a grant are approved');
+  }
+
   async function load<T>(row: Promise<T | null>, what: string): Promise<T> {
     const r = await row;
     if (r === null) throw new NotFoundError(`No ${what} with this id.`);
@@ -510,6 +524,7 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
         needRecent(actor, 'granting write tools');
       }
       checkWriteRate(input.rateLimit, null);
+      checkWriteApproval(input.rateLimit, null);
       return services.grants.create(input);
     },
     async update(id: string, patch: GrantPatchInput): Promise<WithWarnings<Grant>> {
@@ -519,7 +534,10 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
         needRecent(actor, 'granting write tools');
       }
       const current = await load(storage.grants.get(id), 'grant');
-      if (patch.rateLimit !== undefined) checkWriteRate(patch.rateLimit, current.rateLimit);
+      if (patch.rateLimit !== undefined) {
+        checkWriteRate(patch.rateLimit, current.rateLimit);
+        checkWriteApproval(patch.rateLimit, current.rateLimit);
+      }
       if (patch.credentialId !== undefined && patch.credentialId !== current.credentialId) {
         await needCredentialOwner(patch.credentialId, "put a grant on someone's personal Agility token");
       }

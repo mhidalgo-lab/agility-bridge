@@ -164,6 +164,7 @@ export function createHttpWrites(options: HttpWritesOptions): HttpWrites {
         audit,
         stateKey: await key(),
         limiter: grantLimiter,
+        approvalPolicy: access.writeApproval,
       };
     },
   };

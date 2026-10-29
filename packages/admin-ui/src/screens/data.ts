@@ -150,6 +150,8 @@ export interface Workspace {
   readonly limits: Limits;
   readonly defaultCredentialId: string | null;
   readonly writesEnabled: boolean;
+  /** How writes are approved in this workspace (P7-26): `page_only` = the approval page only. */
+  readonly writeApproval: 'any' | 'page_only';
   /** Custom attributes an agent may write through this workspace (P7-20). */
   readonly customFields: string[];
   readonly credentialSource: 'stored' | 'passthrough';
@@ -172,6 +174,7 @@ export function parseWorkspace(r: Row): Workspace | null {
     limits: parseLimits(r['limits']),
     defaultCredentialId: strOrNull(r['defaultCredentialId']),
     writesEnabled: obj(r['writePolicy'])['enabled'] === true,
+    writeApproval: obj(r['writePolicy'])['approval'] === 'page_only' ? 'page_only' : 'any',
     customFields: strs(obj(r['writePolicy'])['customFields']),
     credentialSource: r['credentialSource'] === 'passthrough' ? 'passthrough' : 'stored',
     createdAt: int(r['createdAt']),
@@ -195,6 +198,8 @@ export interface Grant {
   readonly perMinute: number | null;
   /** The grant's own hourly write limit, set by an owner (P7-15); null = the server's. */
   readonly writesPerHour: number | null;
+  /** `page_only`: this grant's writes are approved on the approval page only (P7-26); null = the workspace's setting. */
+  readonly writeApproval: 'page_only' | null;
   readonly createdAt: number;
   readonly expiresAt: number | null;
   readonly revokedAt: number | null;
@@ -216,6 +221,7 @@ export function parseGrant(r: Row): Grant | null {
     limits: parseLimits(r['limits']),
     perMinute: rate === null ? null : intOrNull(rate['perMinute']),
     writesPerHour: rate === null ? null : intOrNull(rate['writesPerHour']),
+    writeApproval: rate !== null && rate['writeApproval'] === 'page_only' ? 'page_only' : null,
     createdAt: int(r['createdAt']),
     expiresAt: intOrNull(r['expiresAt']),
     revokedAt: intOrNull(r['revokedAt']),
