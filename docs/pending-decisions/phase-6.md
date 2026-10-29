@@ -475,6 +475,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   handler wrapper, once for every tool, answering `AB_INPUT_INVALID` with the argument path, a clipped issue text (never the
   value) and a `Hint:`; (b) leave the SDK message; (c) validate in each tool.
 - **Recommendation:** (a), built. Parsed data (defaults applied) still reaches the handler.
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-135 — Where asset-type metadata is kept across isolates *(P6-39)*
 - **Context:** a cold Worker isolate fetches one `meta.v1` document per asset type (9 to 17 for a Phase 6 tool). The task names
@@ -486,13 +487,13 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Recommendation:** (a), built; the Node hosts keep their process-wide cache and pass no store. Each stored type is one D1 read
   on a cold isolate instead of one Agility request (D1 reads are not Agility subrequests, but their count against the Free
   plan's subrequest limit is *unverified*). Statuses, prefixes and project trees stay in the isolate for now.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-147 — Resolution memo lives on the request context; the standup change-date filter waits for a sandbox *(P6-40)*
 - **Context:** Report sections run together and each resolved the same member, team, project or sprint. The task also proposed filtering `standup_summary` on `ChangeDateUTC >= since`, to be done only if a sandbox confirms the filter on all four types.
 - **Options:** (a) an optional `memo` map on the per-request context, created by the report handler, with the resolvers memoising through it; the date filter is left for a sandbox check (follow-up P6-55); (b) a module-level cache keyed by request id (breaks L-013, L-096); (c) pass resolved OIDs down as section inputs (changes the sibling tools' inputs).
 - **Recommendation:** (a), built.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-143 — Portfolio roll-ups stay computed from the rows; the downcast aggregate is not used *(P6-15)*
 - **Context:** D-80 (a) computes roll-ups from the stories and defects read under the epics. P6-15 asked for a live check of
@@ -502,12 +503,13 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   and mark it approximate; (c) search other relation names for an aggregate that matches.
 - **Recommendation:** (a): an approximate roll-up that looks exact is worse than a bounded exact one (L-272). A search for another
   relation is a new task if the call cost ever matters.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-154 — Prompt completion reuses the list tools and offers fixed sprint words *(P6-32)*
 - **Context:** `completion/complete` for `team`, `project` and `sprint` needs candidate names the caller may see.
 - **Options:** (a) call the granted list tool (`list_teams`, `list_projects`, `list_sprints`) with the typed text through its handler: same scope, budget and shaping, one call per completion, nothing when that tool is not granted; (b) read the metadata cache; (c) no completion.
 - **Recommendation:** (a), built; `sprint` also offers `current`, `previous`, `next` first, and every value must pass the prompt's argument schema. Completion is not audited as a tool call of its own beyond an observer event named `completion:<prompt>.<argument>`.
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-139 — Large sprints: raise the row bound to 1,000 and trade burndown points for it *(P6-18)*
 - **Context:** `get_sprint` read at most five pages of items, so a sprint of more than 500 items lost its history, and every
@@ -517,6 +519,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   has fewer points; (b) aggregations now, unmeasured; (c) leave the bound.
 - **Recommendation:** (a): it stays inside tested bounds (60 history queries, 20 per request, the P6-42 response-cap guard)
   and needs no new query shape beyond more pages; the live check is P6-51 (L-330).
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-144 — A very large epic continues with a cursor that carries the totals *(P6-16)*
 - **Context:** `get_portfolio_tree` reads three item pages per type and marks the roll-ups `incomplete` beyond that. P6-15 found
@@ -525,7 +528,7 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
   fingerprint; (b) only the documented "get each sub-epic" walk; (c) raise the page cap for everyone.
 - **Recommendation:** (a), built, limited to trees of 60 epics or fewer (the cursor stays under its length limit); larger trees keep (b).
   The totals are the caller's own numbers and never carry scope or items; a changed tree refuses the cursor.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-140 — `get_velocity` is a planning tool and the default `tools/list` target moves to 37.6 KB *(P6-17)*
 - **Context:** velocity needs its own tool (the sprint tool's cost and output are full). The default catalogue was at 35,892 of 36,500
@@ -533,23 +536,23 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Options:** (a) planning group, default on, target 37,600 (the 40,000 cap holds, 2.7 KB of headroom left); (b) the opt-in `reports`
   group (its tests and the sibling table assume composite reports); (c) fold velocity into `get_sprint` (costlier, bigger output).
 - **Recommendation:** (a): velocity is a basic planning question and (b) mixes a non-composite tool into the reports group.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 
 ### D-148 — The sprint end-date check waits for a sandbox *(P6-47)*
 - **Context:** The task asks for a live check of whether a sprint that ends today is still current on its last day (the end date may be inclusive), and a fix of `timing` and the ideal line if so. No live run is allowed in this change and a fix without the evidence could move a boundary that is right.
 - **Options:** (a) build the output polish now (most similar duplicate pairs first, cut notes, a stop-word list, the items block found by its `source`) and move the end-date check to a follow-up (P6-56); (b) hold the whole task for the sandbox; (c) treat the end date as inclusive without evidence.
 - **Recommendation:** (a), built.
-- **Owner:** *(open; built as a)*
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-149 — `defect_triage` reads priority and severity with one compiler query, and finds severity in the metadata *(P6-30)*
 - **Context:** The report said priority and severity were not read. `search_work_items` rows carry neither, and the task allows the sibling's internals or a compiler query that keeps the scope predicate. A severity attribute is custom on most instances, so its name cannot be hard-coded.
 - **Options:** (a) one guarded compiler read of `Priority.Name`, `Priority.Order` and, when exactly one single-valued text or relation attribute of Defect has a name containing "severity", that attribute, for the page's OIDs (scope predicate and recheck kept; declared cost 24 to 28; flagged list ordered by priority rank, unprioritised last; failures named as budget, permission or failed); several candidates read none and say so; (b) add the fields to every work-item row (changes four tools and their budgets); (c) leave priority and severity unread.
 - **Recommendation:** (a), built. Live verification of the severity discovery on a real instance is follow-up P6-57 (L-148).
-- **Owner:** *(open; built as a)*
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-150 — The quality scan is its own tool, scores open items, and reads the epic's own backlog items *(P6-29)*
 - **Context:** `work_item_quality` scores one item through `get_work_item`. The task allows extending it or adding a sibling report, and leaves open which items count and what an epic's items are.
 - **Options:** (a) a new report `quality_scan` (input `sprint` or `epic`, never both) with one batched read of the text fields of open stories and defects, scored by the same `assess` and `summarise`; at most 50 items per type per call, more is partial and says so; for an epic the items whose `Super` is that epic (items below sub-epics are named as not read); gated by the `get_work_item` grant, declared cost 30; (b) add `sprint` and `epic` inputs to `work_item_quality` (one tool with three modes and a mixed output); (c) walk the whole epic tree (up to four levels, several requests more).
 - **Recommendation:** (a), built.
-- **Owner:** *(open; built as a)*
+- **Owner (2026-10-29):** Decided: as recommended, (a).

@@ -258,7 +258,7 @@ Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.m
 - **Recommendation:** (a). The cost is one write per device per isolate per interval, and a last-used time that can be 5 minutes
   late. A missing row (approved before the switch, or expired) starts counting at the next refresh instead of ending the device,
   so switching `AB_OAUTH_IDLE_TTL` on never disconnects people at once.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-132 — The operator view of OAuth abuse is owner-only and counts audit rows *(P5-20)*
 - **Context:** the task asked for "administrators only". Registration caps and per-surface refusals are deployment-level facts, and the
@@ -268,7 +268,7 @@ Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.m
   new durable counter per refusal (a write per refused request, the opposite of what the once-per-window audit avoids).
 - **Recommendation:** (a): same audience as the client list, no new writes. (b) is one line (`authorizeClients` becomes manager-level)
   if the owner wants administrators to see it; (c) only if windows prove too coarse to tune from.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-29):** Decided: as recommended, (a).
 
 ### D-133 — The document host allowlist matches exact host names *(P5-16)*
 - **Context:** `AB_OAUTH_CIMD_HOSTS` lets an operator accept metadata-document clients only from known hosts. A client's document host is
@@ -276,4 +276,4 @@ Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.m
 - **Options:** (a) exact host names only; (b) also `*.example.org` wildcards; (c) a registrable-domain match (needs a public suffix list).
 - **Recommendation:** (a): the list is a security control, and a suffix or wildcard match widens it to hosts nobody reviewed (anyone can
   publish under a shared domain). List each host; add a wildcard only if a real client needs one.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-29):** Decided: as recommended, (a).
