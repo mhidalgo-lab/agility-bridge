@@ -27,9 +27,10 @@ describe('stdio composite reports (P6-07, D-101)', () => {
     'release_readiness',
     'defect_triage',
     'work_item_quality',
+    'quality_scan',
   ];
 
-  it('offers no report by default and all five with AB_REPORTS=on', () => {
+  it('offers no report by default and all of them with AB_REPORTS=on', () => {
     for (const r of REPORTS) expect(names(config())).not.toContain(r);
     for (const r of REPORTS) expect(names(config({ AB_REPORTS: 'on' }))).toContain(r);
     expect(names(config({ AB_REPORTS: 'off' }))).not.toContain('sprint_health');

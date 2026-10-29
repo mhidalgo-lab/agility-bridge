@@ -32,6 +32,7 @@ const NOUN_TOOLS = new Set([
   'standup_summary',
   'release_readiness',
   'defect_triage',
+  'quality_scan',
   'work_item_quality',
 ]);
 const SNAKE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;

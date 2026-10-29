@@ -20,6 +20,7 @@ import { getAssets } from './query/get-assets.ts';
 import { queryAssets } from './query/query-assets.ts';
 import { defectTriage } from './reports/defect-triage.ts';
 import { workItemQuality } from './reports/quality.ts';
+import { qualityScan } from './reports/quality-scan.ts';
 import { releaseReadiness } from './reports/release-readiness.ts';
 import { sprintHealth } from './reports/sprint-health.ts';
 import { standupSummary } from './reports/standup.ts';
@@ -56,4 +57,5 @@ export const CORE_TOOLS: readonly ToolDefinition[] = Object.freeze([
   releaseReadiness,
   defectTriage,
   workItemQuality,
+  qualityScan,
 ] as ToolDefinition[]);

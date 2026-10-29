@@ -499,7 +499,7 @@ Full list with inputs, risk class and phase: [reference/tool-catalogue.md](refer
 | Planning context | `list_teams`, `get_team`, `list_sprints`, `list_members` | 1 |
 | Portfolio, planning, collaboration, history | `get_sprint`, `list_portfolio_items`, `get_portfolio_tree`, `get_conversations`, `list_attachments`, `get_asset_history`, `list_recent_changes` | 6 |
 | Attachment content (opt-in, off by default) | `get_attachment` | 6 |
-| Reports (composites) | `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage`, `work_item_quality` | 6 |
+| Reports (composites) | `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage`, `work_item_quality`, `quality_scan` | 6 |
 | Writes (opt-in) | `add_comment`, `update_status`, `log_effort`, `assign_owners`, `move_to_sprint`, `create_work_item`, `update_fields`, `close_asset`, `reopen_asset` | 7 |
 
 Plus MCP **prompts** (workflows such as backlog-item quality review, sprint review, defect triage; registered only when

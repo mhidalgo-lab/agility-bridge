@@ -285,7 +285,7 @@ Status lives in each task file.
 | P6-26 | [Revisit a typed quality tool after the tool evals](tasks/phase-6-tool-breadth/P6-26-quality-typed-tool-revisit.md) | low | P6-03, P6-10 | done |
 | P6-27 | [Verify requests and empty asset types on a writable sandbox](tasks/phase-6-tool-breadth/P6-27-verify-requests-on-sandbox.md) | low | P6-06 | todo |
 | P6-28 | [Decide on typed tools for issues and requests from usage and evals](tasks/phase-6-tool-breadth/P6-28-typed-tools-for-other-types.md) | low | P6-06, P6-10 | todo |
-| P6-29 | [Quality scan over a sprint or epic](tasks/phase-6-tool-breadth/P6-29-quality-batch-scan.md) | low | P6-07 | todo |
+| P6-29 | [Quality scan over a sprint or epic](tasks/phase-6-tool-breadth/P6-29-quality-batch-scan.md) | low | P6-07 | done |
 | P6-30 | [Priority and severity in defect triage](tasks/phase-6-tool-breadth/P6-30-defect-priority-severity-triage.md) | low | P6-07 | done |
 | P6-31 | [Prompt fallbacks without the reports group](tasks/phase-6-tool-breadth/P6-31-prompt-fallbacks-without-reports.md) | low | P6-08 | dropped |
 | P6-32 | [Prompt argument completion](tasks/phase-6-tool-breadth/P6-32-prompt-argument-completion.md) | low | P6-08 | done |

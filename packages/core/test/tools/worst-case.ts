@@ -68,5 +68,9 @@ export const WORST_CASES: Readonly<Record<string, WorstCase>> = {
   standup_summary: { args: { member: 'me', time_range: 'last 3 days' }, why: 'two searches' },
   release_readiness: { args: { asset: 'E-00001' }, why: 'one tree' },
   defect_triage: { args: {}, why: 'one search plus the priority and severity read' },
+  quality_scan: {
+    args: { sprint: 'current' },
+    why: 'sprint resolution, two types of metadata and one batched read',
+  },
   work_item_quality: { args: { asset: 'B-01002' }, why: 'item plus the priority read' },
 };

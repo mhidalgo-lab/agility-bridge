@@ -2,7 +2,7 @@
 id: P6-29
 title: Quality scan over a sprint or epic
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-07]
 adr: ["0015"]
@@ -23,9 +23,9 @@ sprint or epic need work first.
 - Cost declared at the worst case of the batch; a cap on items per call with `partial` and a note when more exist.
 
 ## Acceptance criteria
-- [ ] Items of a sprint and of an epic are scored with the same results as one-by-one calls on the same data.
-- [ ] More items than the cap are reported as `partial`, never scored from a partial read as if complete.
-- [ ] Cold cost, negative authorization and poisoned-text tests as for the other reports; `pnpm docs:tools` refreshed.
+- [x] Items of a sprint and of an epic are scored with the same results as one-by-one calls on the same data.
+- [x] More items than the cap are reported as `partial`, never scored from a partial read as if complete.
+- [x] Cold cost, negative authorization and poisoned-text tests as for the other reports; `pnpm docs:tools` refreshed.
 
 ## Security notes
 THREAT_MODEL T3, A1: scope on every row; descriptions are untrusted data.

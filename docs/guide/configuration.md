@@ -37,7 +37,7 @@ The smallest working configuration:
 | `AB_GENERIC_QUERY` | `on` | `off` removes `query_assets` and `get_assets`. |
 | `AB_MEMBER_EMAILS` | `off` | `on` includes member emails in results. |
 | `AB_ATTACHMENT_DOWNLOAD` | `off` | `on` offers `get_attachment`: the text of one attachment of an asset in scope (own group, [THREAT_MODEL](../THREAT_MODEL.md) A8). Each download is logged to stderr (asset number, attachment id, size, type). |
-| `AB_REPORTS` | `off` | `on` offers the composite reports `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage` and `work_item_quality` (own group; each runs several reads, so keep `AB_CALL_BUDGET` at 54 or more). In the workspace YAML: `reports: true`. |
+| `AB_REPORTS` | `off` | `on` offers the composite reports `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage`, `work_item_quality` and `quality_scan` (own group; each runs several reads, so keep `AB_CALL_BUDGET` at 54 or more). In the workspace YAML: `reports: true`. |
 | `AB_ATTACHMENT_MAX_BYTES` | `1048576` | Largest attachment read, counted on the stream (1024–8388608; never above the largest Agility response). |
 | `AB_ATTACHMENT_TYPES` | `text/plain,text/markdown,text/csv,application/json` | Content types `get_attachment` returns, exact `type/subtype`; checked on the stored type and on the response. HTML, SVG, XML and JavaScript are refused even when listed. |
 | `AB_LIMITS_MAX_LIMIT` | `100` | Most rows one call may ask for (1–1000). |

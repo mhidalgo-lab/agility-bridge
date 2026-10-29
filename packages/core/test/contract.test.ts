@@ -315,6 +315,16 @@ describe('tools/list contract', () => {
           },
           "name": "work_item_quality",
         },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": "Quality scan",
+          },
+          "name": "quality_scan",
+        },
       ]
     `,
     );
@@ -325,7 +335,7 @@ describe('tools/list contract', () => {
     '%s follows the naming and description conventions',
     (_n, tool) => {
       expect(tool.name).toMatch(
-        /^(?:list|search|get|query|describe)_[a-z0-9_]+$|^(?:whoami|sprint_health|standup_summary|release_readiness|defect_triage|work_item_quality)$/,
+        /^(?:list|search|get|query|describe)_[a-z0-9_]+$|^(?:whoami|sprint_health|standup_summary|release_readiness|defect_triage|work_item_quality|quality_scan)$/,
       );
       expect(tool.description.length).toBeLessThanOrEqual(450);
       expect(tool.description).not.toMatch(/^(?:This tool|Use this|A tool)/i);
