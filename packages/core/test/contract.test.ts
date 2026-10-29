@@ -34,9 +34,10 @@ describe('tools/list contract', () => {
       expect(t.bytes, `${t.name} is ${t.bytes} bytes`).toBeLessThanOrEqual(TOOL_MAX_BYTES);
   });
 
-  it('counts: every read group plus the nine planned Phase 7 write tools stays below 40 tools (L-155)', async () => {
+  it('counts: every group plus the write tools still planned in Phase 7 stays below 40 tools (L-155)', async () => {
     const all = await toolsListContract(CORE_TOOLS);
-    const PLANNED_WRITE_TOOLS = 9;
+    // Nine write tools are planned in all; wave 1 (P7-04) built five of them, so four are still to come.
+    const PLANNED_WRITE_TOOLS = 4;
     expect(all.count + PLANNED_WRITE_TOOLS).toBeLessThan(40);
   });
 
@@ -325,6 +326,56 @@ describe('tools/list contract', () => {
           },
           "name": "quality_scan",
         },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": false,
+            "openWorldHint": true,
+            "readOnlyHint": false,
+            "title": "Add comment",
+          },
+          "name": "add_comment",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": false,
+            "title": "Update status",
+          },
+          "name": "update_status",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": false,
+            "openWorldHint": true,
+            "readOnlyHint": false,
+            "title": "Log effort",
+          },
+          "name": "log_effort",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": false,
+            "title": "Assign owners",
+          },
+          "name": "assign_owners",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": false,
+            "title": "Move to sprint",
+          },
+          "name": "move_to_sprint",
+        },
       ]
     `,
     );
@@ -335,7 +386,7 @@ describe('tools/list contract', () => {
     '%s follows the naming and description conventions',
     (_n, tool) => {
       expect(tool.name).toMatch(
-        /^(?:list|search|get|query|describe)_[a-z0-9_]+$|^(?:whoami|sprint_health|standup_summary|release_readiness|defect_triage|work_item_quality|quality_scan)$/,
+        /^(?:list|search|get|query|describe|add|update|log|assign|move|close|reopen|create)_[a-z0-9_]+$|^(?:whoami|sprint_health|standup_summary|release_readiness|defect_triage|work_item_quality|quality_scan)$/,
       );
       expect(tool.description.length).toBeLessThanOrEqual(450);
       expect(tool.description).not.toMatch(/^(?:This tool|Use this|A tool)/i);

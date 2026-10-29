@@ -28,6 +28,16 @@ Rehearse every write against the sandbox before writes are enabled anywhere.
 ## Acceptance criteria
 - [ ] Evidence recorded in the verification notes; procedure documented for operators.
 
+## Wave-1 items from P7-04 (unverified request shapes)
+Check each against the sandbox and fix the tool's `send` (not its plan) if a shape differs; record the evidence in RESEARCH §1.5.
+- [ ] `update_status`: `Status` set on Story, Defect, Task, Test and Epic; a status of another team's workflow is refused by Agility or accepted?
+- [ ] `assign_owners`: `act="add"` and `act="remove"` on `Owners` in one document.
+- [ ] `move_to_sprint`: `Timebox` set; a sprint of another schedule refused by Agility?
+- [ ] `add_comment`: a bare `Expression` with `Content` and `Mentions` (does it need a `Conversation` through `BelongsTo`; are `Author` and `AuthoredAt` set by the server; plain text or HTML; the read side shows it as a comment of the item).
+- [ ] `log_effort`: `Actual` with `Value`, `Date`, `Member`, `Workitem` (are `Scope`, `Team`, `Timebox` derived; does the item's `Actuals` total change at once).
+- [ ] The response of each write (`<Asset id="Type:id:moment">`?) and the read lag before the change is visible (L-051).
+- [ ] The comment and effort no-op rules (identical latest entry) against how Agility stores text and dates.
+
 ## Security notes
 None beyond the shared rules in AGENTS.md.
 

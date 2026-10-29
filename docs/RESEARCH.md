@@ -188,6 +188,20 @@ except `group`, and adds `op` (POST only). *docs*
   (`attachments.img/<id>`, as in the developer library's utility endpoints page; `attachment.img` appears in SDK
   examples) and its `Content-Type` behaviour are **unverified**: the read-only tenant's guard allows no such request
   (P6-19).
+- **Wave-1 write shapes (P7-04, 2026-10-29), all *unverified* against a real instance until the sandbox run (P7-07).** The
+  tools send `POST rest-1.v1/Data/<Type>[/<id>]` with `Content-Type: application/xml` through the client's single-attempt
+  `restWrite`; the document is `<Asset>` with `<Attribute name="X" act="set">value</Attribute>` and
+  `<Relation name="R" act="set|add|remove"><Asset idref="Type:id"/></Relation>` children (the documented shapes above), built
+  by one escaping builder (D-172). Per tool: `update_status` sets the `Status` relation on the item
+  (`/Data/Story/<id>`); `assign_owners` sends `act="add"` and `act="remove"` on `Owners` for the difference only;
+  `move_to_sprint` sets the `Timebox` relation; `add_comment` creates an `Expression` (`/Data/Expression`) with `Content` and a
+  `Mentions` relation to the item (the shape the read side already uses: comments are the `Expression` rows that mention
+  the item); `log_effort` creates an `Actual` (`/Data/Actual`) with `Value`, `Date`, `Member` and `Workitem`. Open
+  questions for P7-07 (listed in P7-07): does a bare `Expression` need a `BelongsTo` `Conversation`, and does it set `Author` and
+  `AuthoredAt` itself; is `Expression.Content` plain text or HTML (the tool sends plain text, escaped as XML); are `Scope`,
+  `Team` and `Timebox` of an `Actual` derived from the work item or required in the request; is the response `<Asset id="Type:id:moment">`
+  (the tools read the OID from it when it is) and how soon the read side shows the change (L-051); does a team workflow
+  restrict `Status` on write the way the status list's `Team` attribute suggests; is `Owners` `add`/`remove` accepted in one document.
 - **Idempotency**: no idempotency keys; each `rest-1.v1` POST is atomic for one asset. *docs / inferred*
 
 ### 1.6 Asset model

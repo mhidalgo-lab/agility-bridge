@@ -37,7 +37,7 @@ How to use it:
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
-| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391 |
+| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-396 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382 |
@@ -1586,6 +1586,30 @@ Separate limiter instances stand for isolates; the same suite runs on process me
 workerd. Also make the store throw and answer garbage (0, a string, above the cap): a limiter that trusts what it reads
 opens the write on a bad answer (L-080).
 *Applied in:* P7-03.
+
+**L-393 — A create has no old value: bind what can be observed and dedupe on what a retry would repeat.**
+`log_effort` and `add_comment` create assets, so there is nothing to compare. Bind the observable total (the item's logged
+hours before and after, re-read before the send) and treat an identical latest entry by the same member as the same call
+(old equals new, a no-op), so a call repeated after a timeout never doubles the data. Say plainly what the tool treats as
+"the same".
+*Applied in:* P7-04, `tools/writes/log-effort.ts`, `add-comment.ts`.
+
+**L-394 — Show a relation as `Name [OID]`: readable for the person, exact for the hash.**
+An approval that shows only an OID cannot be read and one that shows only a name does not bind the identity (two statuses or
+members share a name; names are untrusted text). Carry both in the value, sort lists by OID, and let `send` parse the OID
+back from what was approved, never from the caller's argument.
+*Applied in:* P7-04, `tools/writes/common.ts`.
+
+**L-395 — A shared argument name keeps one meaning: a write that sets one value needs another name.**
+`status` is a list filter on every read tool; the argument lint rightly refused a string `status`. The write takes
+`new_status`. Check the shared vocabulary before naming a write argument.
+*Applied in:* P7-04, `update_status`.
+
+**L-396 — Fakes for writes must apply the documented effect to their state.**
+A fake that only records the POST cannot exercise the re-read, the no-op repeat or the conflict. The write test world parses
+the XML and sets, adds, removes and creates on its rows, asserts the exact bytes sent, and says in its header that the shapes
+are the documented ones, not verified ones (L-112). The shared fake had to stop parsing every POST body as JSON.
+*Applied in:* P7-04, `test/tools/writes-world.ts`.
 
 ## O. Caching, quotas and budgets
 

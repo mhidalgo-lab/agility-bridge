@@ -296,7 +296,7 @@ describe('get_assets', () => {
 
 describe('the query group switch (AB_GENERIC_QUERY)', () => {
   it('removes both tools from tools/list and tools/call when the workspace has no query group', async () => {
-    const registry = new ToolRegistry();
+    const registry = new ToolRegistry({ allowNonRead: true });
     for (const t of CORE_TOOLS) registry.register(t);
     const without = registry.select({ groups: ['core', 'work'] });
     expect(without.map((t) => t.name)).not.toEqual(expect.arrayContaining(['query_assets']));

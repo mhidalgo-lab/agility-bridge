@@ -47,7 +47,9 @@ Measured by the contract test (`packages/core/test/contract.test.ts`) on the reg
 | `attachments` (opt-in) | +1 | +1,335 | | |
 | `reports` (opt-in) | +6 | +8,480 (includes `quality_scan`, P6-29) | | |
 | Every read group | 28 | **47,577** | 72,000 | 47,946 |
-| Every read group + the nine Phase 7 write tools | 35 | about 60,000 (estimate: about 1.8 KB per write tool; measured when Phase 7 lands) | 72,000 | |
+| `writes` (opt-in), wave 1 (P7-04): `add_comment`, `update_status`, `log_effort`, `assign_owners`, `move_to_sprint` | +5 | +5,478 (1.0 to 1.2 KB each, including `dry_run` and `confirm`) | | |
+| Every group, wave 1 built | 33 | **53,150** | 72,000 | |
+| Every read group + the nine Phase 7 write tools | 37 | about 57,000 (the four still to build are estimated at 1.0 to 1.5 KB each) | 72,000 | |
 
 Tool count with everything on: 21 default + 1 attachments + 6 reports = 28 read tools, plus the 9 planned write tools
 (`add_comment`, `update_status`, `log_effort`, `assign_owners`, `move_to_sprint`, `create_work_item`, `update_fields`,

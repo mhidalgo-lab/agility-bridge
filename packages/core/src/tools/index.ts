@@ -27,6 +27,7 @@ import { standupSummary } from './reports/standup.ts';
 import { getWorkItem } from './work/get-item.ts';
 import { listMyWork } from './work/my-work.ts';
 import { searchWorkItems } from './work/search.ts';
+import { WRITE_TOOLS } from './writes/index.ts';
 
 export const CORE_TOOLS: readonly ToolDefinition[] = Object.freeze([
   whoami,
@@ -58,4 +59,6 @@ export const CORE_TOOLS: readonly ToolDefinition[] = Object.freeze([
   defectTriage,
   workItemQuality,
   qualityScan,
+
+  ...WRITE_TOOLS,
 ] as ToolDefinition[]);

@@ -707,7 +707,8 @@ describe('workspaces', () => {
     const list = (await s.w.storage.workspaces.get(e.ids.workspaceA))?.enabledTools as string[];
     expect(list).toContain(WRITE_TOOL);
     expect(list).toContain('whoami');
-    expect(list.length).toBe(TOOLS.size);
+    // Every read tool plus the one write tool that was ticked: the other write tools are not implied (P7-04 adds some).
+    expect(list.length).toBe([...TOOLS.values()].filter((t) => t.kind === 'read').length + 1);
   });
 });
 

@@ -6,6 +6,10 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_LIMITS, type ToolContext } from '../../src/index.ts';
 import { CORE_TOOLS } from '../../src/tools/index.ts';
+
+// The write tools have their own tests (writes-wave1.test.ts, and the write worst cases below): they need an approval.
+const READ_TOOLS = CORE_TOOLS.filter((t) => t.kind === 'read');
+
 import type { FakeAgilityOptions } from '../harness/index.ts';
 import { advertisedSchemas } from '../harness/lint.ts';
 import { costFakeOptions } from './cost-world.ts';
@@ -20,7 +24,7 @@ const inputNames = (name: string): string[] =>
 const outputProps = (name: string): Record<string, { type?: string }> =>
   (advertisedSchemas(toolByName(name)).output?.['properties'] ?? {}) as Record<string, { type?: string }>;
 
-const ALL = CORE_TOOLS.map((t) => t.name);
+const ALL = READ_TOOLS.map((t) => t.name);
 const limits = { ...DEFAULT_LIMITS, attachmentDownload: true, reports: true };
 
 /** The tools some report reads through; the reports alone are granted in the last world. */
