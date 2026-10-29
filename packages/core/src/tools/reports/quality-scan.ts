@@ -42,7 +42,7 @@ const shown = (v: unknown): string | undefined => {
 export const qualityScan: ToolDefinition = defineTool({
   name: NAME,
   title: 'Quality scan',
-  description: `Score the open stories and defects of a sprint or an epic against the versioned quality rubric (resource backlog-item-quality), weakest first, from one read of their text. Give a sprint or an epic. Same checks and score ranges as work_item_quality; an item below a sub-epic is not included. At most ${SCAN_CAP} items; more are reported as partial. Not paged. Cold call: up to ${COST} Agility requests.`,
+  description: `Rank all the open stories and defects of a sprint or an epic by how ready they are for refinement, weakest first, using the versioned rubric (resource backlog-item-quality) over one read of their text. Give a sprint or an epic. For one item use work_item_quality. An item below a sub-epic is not included. At most ${SCAN_CAP} items per type; more are reported as partial. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'read',
   group: 'reports',
   cost: COST,

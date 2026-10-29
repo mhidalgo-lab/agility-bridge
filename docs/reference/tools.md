@@ -517,7 +517,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Quality scan** · group `reports` · read · cost 30 Agility requests at most
 
-Score the open stories and defects of a sprint or an epic against the versioned quality rubric (resource backlog-item-quality), weakest first, from one read of their text. Give a sprint or an epic. Same checks and score ranges as work_item_quality; an item below a sub-epic is not included. At most 50 items; more are reported as partial. Not paged. Cold call: up to 30 Agility requests.
+Rank all the open stories and defects of a sprint or an epic by how ready they are for refinement, weakest first, using the versioned rubric (resource backlog-item-quality) over one read of their text. Give a sprint or an epic. For one item use work_item_quality. An item below a sub-epic is not included. At most 50 items per type; more are reported as partial. Not paged. Cold call: up to 30 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
