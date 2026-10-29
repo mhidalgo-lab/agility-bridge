@@ -32,7 +32,7 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 | [`sprint_health`](#sprint_health) | reports | 54 | Sprint health |
 | [`standup_summary`](#standup_summary) | reports | 48 | Standup summary |
 | [`release_readiness`](#release_readiness) | reports | 20 | Release readiness |
-| [`defect_triage`](#defect_triage) | reports | 24 | Defect triage |
+| [`defect_triage`](#defect_triage) | reports | 28 | Defect triage |
 | [`work_item_quality`](#work_item_quality) | reports | 28 | Work item quality |
 
 ## `whoami`
@@ -484,9 +484,9 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 ## `defect_triage`
 
-**Defect triage** · group `reports` · read · cost 24 Agility requests at most
+**Defect triage** · group `reports` · read · cost 28 Agility requests at most
 
-Triage the open defects of an Agility project, team or sprint: those with no owner, no sprint or no change for 14 days, and likely duplicates by name similarity. Priority and severity are not read. Reads the first page only (at most 100 defects) and says when more exist. Not paged. Cold call: up to 24 Agility requests.
+Triage the open defects of an Agility project, team or sprint: those with no owner, no sprint or no change for 14 days, and likely duplicates by name similarity. Priority (in the instance’s own rank order) and severity, where the instance has them, are shown and order the flagged list. Reads the first page only (at most 100 defects) and says when more exist. Not paged. Cold call: up to 28 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 

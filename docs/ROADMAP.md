@@ -286,7 +286,7 @@ Status lives in each task file.
 | P6-27 | [Verify requests and empty asset types on a writable sandbox](tasks/phase-6-tool-breadth/P6-27-verify-requests-on-sandbox.md) | low | P6-06 | todo |
 | P6-28 | [Decide on typed tools for issues and requests from usage and evals](tasks/phase-6-tool-breadth/P6-28-typed-tools-for-other-types.md) | low | P6-06, P6-10 | todo |
 | P6-29 | [Quality scan over a sprint or epic](tasks/phase-6-tool-breadth/P6-29-quality-batch-scan.md) | low | P6-07 | todo |
-| P6-30 | [Priority and severity in defect triage](tasks/phase-6-tool-breadth/P6-30-defect-priority-severity-triage.md) | low | P6-07 | todo |
+| P6-30 | [Priority and severity in defect triage](tasks/phase-6-tool-breadth/P6-30-defect-priority-severity-triage.md) | low | P6-07 | done |
 | P6-31 | [Prompt fallbacks without the reports group](tasks/phase-6-tool-breadth/P6-31-prompt-fallbacks-without-reports.md) | low | P6-08 | dropped |
 | P6-32 | [Prompt argument completion](tasks/phase-6-tool-breadth/P6-32-prompt-argument-completion.md) | low | P6-08 | done |
 | P6-33 | [First LLM tool-eval run and triage](tasks/phase-6-tool-breadth/P6-33-first-llm-eval-run.md) | medium | P6-10 | done |
@@ -309,6 +309,7 @@ Status lives in each task file.
 | P6-52 | [Sprint burndown by aggregation for very large sprints](tasks/phase-6-tool-breadth/P6-52-sprint-burndown-by-aggregation.md) | low | P6-18 | todo |
 | P6-55 | [Filter standup_summary on the change date instead of reading the newest page](tasks/phase-6-tool-breadth/P6-55-standup-change-date-filter.md) | low | P6-40, P6-27 | todo |
 | P6-56 | [Check whether a sprint is still current on its end date](tasks/phase-6-tool-breadth/P6-56-sprint-end-date-inclusive-check.md) | low | P6-47, P6-27 | todo |
+| P6-57 | [Verify the defect priority and severity read live](tasks/phase-6-tool-breadth/P6-57-verify-defect-severity-discovery-live.md) | low | P6-30, P6-27 | todo |
 | P6-58 | [Show the budget-hidden tools note for an inherited call budget in the panel](tasks/phase-6-tool-breadth/P6-58-panel-inherited-call-budget-note.md) | low | P6-36 | todo |
 
 ### Phase 7

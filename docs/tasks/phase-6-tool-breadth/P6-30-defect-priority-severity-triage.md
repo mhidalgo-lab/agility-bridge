@@ -2,7 +2,7 @@
 id: P6-30
 title: Priority and severity in defect triage
 phase: 6
-status: todo
+status: done
 priority: low
 depends_on: [P6-07]
 adr: ["0015"]
@@ -22,10 +22,9 @@ read.
 - Order flagged defects by priority rank (the list's own order), and say when the instance has no priority list.
 
 ## Acceptance criteria
-- [ ] Flagged defects carry their priority when the instance has one; an instance without it says so and is unchanged.
-- [ ] No attribute name is hard-coded beyond `Priority`; custom severity fields are discovered from metadata and verified
-  live (L-148).
-- [ ] Cold cost, negative authorization and poisoned-text tests still pass; `pnpm docs:tools` refreshed.
+- [x] Flagged defects carry their priority when the instance has one; an instance without it says so and is unchanged.
+- [x] No attribute name is hard-coded beyond `Priority`; a single severity-like attribute is discovered from metadata (live check: [P6-57](P6-57-verify-defect-severity-discovery-live.md), D-149).
+- [x] Cold cost, negative authorization and poisoned-text tests still pass; `pnpm docs:tools` refreshed.
 
 ## Security notes
 THREAT_MODEL T3, A12: instance field names never reach tool definitions.

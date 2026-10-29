@@ -3,8 +3,13 @@
 // triage: no owner, no sprint, unchanged for a long time, and likely duplicates by name similarity. Priority and
 // severity are not read in this version (P6-30) and the report says so.
 import { z } from 'zod';
-import { capBudget } from '../../context.ts';
+import { capBudget, type ToolContext } from '../../context.ts';
+import { AbError, ErrorCode } from '../../errors.ts';
+import { runPage } from '../../identity/resolve.ts';
+import { oidsOf } from '../../identity/scope.ts';
+import { metadataFor } from '../../metadata/service.ts';
 import { shapeOutput } from '../../output/result.ts';
+import { compileQuery } from '../../query/compiler.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import { projectArg, sprintArg, teamArg } from '../common.ts';
 import { searchWorkItems } from '../work/search.ts';
@@ -21,8 +26,8 @@ import {
 } from './common.ts';
 
 const NAME = 'defect_triage';
-/** search_work_items (24). */
-const COST = 24;
+/** search_work_items (24) plus one guarded read of priority and severity (4: its query and the list metadata). */
+const COST = 28;
 const DAY = 86_400_000;
 /** A defect not changed for this long is flagged stale. */
 export const STALE_DEFECT_DAYS = 14;
@@ -77,11 +82,93 @@ function setSimilarity(x: ReadonlySet<string>, y: ReadonlySet<string>): number {
   return shared / (x.size + y.size - shared);
 }
 
+export interface TriageFields {
+  /** Per defect OID: the priority name and its rank in the instance's list (lower is more urgent). */
+  readonly priority: ReadonlyMap<string, { readonly name: string; readonly rank?: number }>;
+  /** Per defect OID: the severity value, when exactly one severity-like attribute exists. */
+  readonly severity: ReadonlyMap<string, string>;
+  /** The type has no priority attribute on this instance. */
+  readonly noPriorityList: boolean;
+  /** `none`: no severity-like attribute; `ambiguous`: several, so none is read. */
+  readonly severityAttribute: 'read' | 'none' | 'ambiguous';
+  /** Why the read did not happen, when it did not (a budget or permission failure is said as such). */
+  readonly unread?: 'budget' | 'forbidden' | 'failed';
+}
+
+const textOf = (v: unknown): string | undefined => (typeof v === 'string' && v !== '' ? v : undefined);
+
+/**
+ * One guarded read of Priority and a severity-like attribute for the defects the search returned, through the
+ * compiler (scope predicate and per-row recheck kept). The severity attribute is found in the metadata of the type:
+ * a single-valued text or relation attribute whose name contains "severity"; its name is never put in a tool
+ * definition or an output (P6-30, THREAT_MODEL A12). Several candidates read none (never a guess).
+ */
+export async function readTriageFields(ctx: ToolContext, oids: readonly string[]): Promise<TriageFields> {
+  const empty = { priority: new Map(), severity: new Map() };
+  const md = metadataFor(ctx);
+  try {
+    const meta = await md.assetType('Defect');
+    const hasPriority = meta.attributes.get('Priority')?.kind === 'Relation';
+    const candidates = [...meta.attributes.values()]
+      .filter((a) => /severity/i.test(a.name) && !a.multi && (a.kind === 'Text' || a.kind === 'Relation'))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const severityAttribute = candidates.length === 0 ? 'none' : candidates.length > 1 ? 'ambiguous' : 'read';
+    const sev = severityAttribute === 'read' ? candidates[0] : undefined;
+    if ((!hasPriority && sev === undefined) || oids.length === 0)
+      return { ...empty, noPriorityList: !hasPriority, severityAttribute };
+    const wanted = [
+      ...(hasPriority ? ['Priority.Name', 'Priority.Order'] : []),
+      ...(sev === undefined ? [] : [sev.kind === 'Relation' ? `${sev.name}.Name` : sev.name]),
+    ];
+    const fields: string[] = [];
+    for (const f of wanted) {
+      try {
+        fields.push((await md.resolvePath('Defect', f)).path);
+      } catch (error) {
+        if (!(error instanceof AbError) || error.code !== ErrorCode.InputInvalid) throw error;
+      }
+    }
+    const compiled = await compileQuery(ctx, {
+      assetType: 'Defect',
+      fields,
+      filters: [{ field: 'ID', op: 'in', value: [...oids] }],
+      includeClosed: true,
+      limit: Math.min(oids.length, ctx.limits.maxRows),
+    });
+    const priority = new Map<string, { name: string; rank?: number }>();
+    const severity = new Map<string, string>();
+    for (const row of (await runPage(ctx, compiled)).rows) {
+      const oid = oidsOf(row['_oid'])[0];
+      if (oid === undefined) continue;
+      const name = textOf(row['Priority.Name']);
+      const order = row['Priority.Order'];
+      if (name !== undefined)
+        priority.set(oid, {
+          name,
+          ...(typeof order === 'number' && Number.isFinite(order) ? { rank: order } : {}),
+        });
+      const sv =
+        sev === undefined ? undefined : textOf(row[sev.kind === 'Relation' ? `${sev.name}.Name` : sev.name]);
+      if (sv !== undefined) severity.set(oid, sv);
+    }
+    return { priority, severity, noPriorityList: !hasPriority, severityAttribute };
+  } catch (error) {
+    if (!(error instanceof AbError)) throw error;
+    const unread =
+      error.code === ErrorCode.BudgetExhausted
+        ? 'budget'
+        : error.code === ErrorCode.AuthForbidden
+          ? 'forbidden'
+          : 'failed';
+    return { ...empty, noPriorityList: false, severityAttribute: 'none', unread };
+  }
+}
+
 export const defectTriage: ToolDefinition = defineTool({
   name: NAME,
   title: 'Defect triage',
   description:
-    'Triage the open defects of an Agility project, team or sprint: those with no owner, no sprint or no change for 14 days, and likely duplicates by name similarity. Priority and severity are not read. Reads the first page only (at most 100 defects) and says when more exist. Not paged. Cold call: up to 24 Agility requests.',
+    'Triage the open defects of an Agility project, team or sprint: those with no owner, no sprint or no change for 14 days, and likely duplicates by name similarity. Priority (in the instance’s own rank order) and severity, where the instance has them, are shown and order the flagged list. Reads the first page only (at most 100 defects) and says when more exist. Not paged. Cold call: up to 28 Agility requests.',
   kind: 'read',
   group: 'reports',
   // search_work_items, capped at its own cost.
@@ -133,6 +220,11 @@ export const defectTriage: ToolDefinition = defineTool({
           ...(Number.isFinite(t) ? { daysSinceChange: Math.max(0, Math.floor((now - t) / DAY)) } : {}),
         };
       });
+      const fieldsRead = await readTriageFields(
+        ctx,
+        rows.flatMap((r) => (typeof r['oid'] === 'string' ? [r['oid']] : [])),
+      );
+      const prioOf = (r: Record<string, unknown>) => fieldsRead.priority.get(String(r['oid']));
       const noDate = rows.filter((r) => !Number.isFinite(changedMs(r))).length;
       if (noDate > 0) notes.push(`${noDate} defects have no change date and are not checked for staleness.`);
       if (more)
@@ -141,9 +233,29 @@ export const defectTriage: ToolDefinition = defineTool({
         );
       if (run.data?.['hiddenOutsideScope'] === true)
         notes.push('Some defects were left out because they are outside the workspace.');
+      const withPriority = fieldsRead.priority.size;
       notes.push(
-        'Priority and severity are not read. Age is the days since the last change, not since creation. Likely duplicates are a name-similarity hint, not a judgement.',
+        'Age is the days since the last change, not since creation. Likely duplicates are a name-similarity hint, not a judgement.',
       );
+      if (fieldsRead.unread === 'budget')
+        notes.push(
+          'Priority and severity were not read: the request budget of this call ran out. Repeat the call.',
+        );
+      else if (fieldsRead.unread === 'forbidden')
+        notes.push('Priority and severity were not read: this token or workspace may not read them.');
+      else if (fieldsRead.unread === 'failed')
+        notes.push('Priority and severity could not be read; the list is not ordered by priority.');
+      else {
+        notes.push(
+          fieldsRead.noPriorityList
+            ? 'This instance has no priority on defects, so the list is not ordered by priority.'
+            : `Priority is shown for ${withPriority} of ${rows.length} defects read and orders the flagged list, most urgent first (rank order of the instance's list); defects without one come last.`,
+        );
+        if (fieldsRead.severityAttribute === 'ambiguous')
+          notes.push('Several severity-like attributes exist on defects, so severity is not read.');
+        else if (fieldsRead.severityAttribute === 'none')
+          notes.push('This instance has no severity on defects.');
+      }
       if (rows.length > 0 && rows.every((r) => r['sprint'] === undefined))
         notes.push(
           'No defect read carries a sprint: either none is planned or this instance does not expose it; the no-sprint count may not be reliable.',
@@ -160,7 +272,11 @@ export const defectTriage: ToolDefinition = defineTool({
       flagged = view
         .filter((v) => v.flags.length > 0)
         .sort(
-          (a, b) => b.flags.length - a.flags.length || (b.daysSinceChange ?? -1) - (a.daysSinceChange ?? -1),
+          (a, b) =>
+            (prioOf(a.row)?.rank ?? Number.POSITIVE_INFINITY) -
+              (prioOf(b.row)?.rank ?? Number.POSITIVE_INFINITY) ||
+            b.flags.length - a.flags.length ||
+            (b.daysSinceChange ?? -1) - (a.daysSinceChange ?? -1),
         )
         .slice(0, LIST_CAP)
         .map((v) => ({
@@ -168,6 +284,10 @@ export const defectTriage: ToolDefinition = defineTool({
           oid: v.row['oid'],
           flags: v.flags,
           ...(v.daysSinceChange === undefined ? {} : { daysSinceChange: v.daysSinceChange }),
+          ...(prioOf(v.row) === undefined ? {} : { priority: prioOf(v.row)?.name }),
+          ...(fieldsRead.severity.get(String(v.row['oid'])) === undefined
+            ? {}
+            : { severity: fieldsRead.severity.get(String(v.row['oid'])) }),
           ...(strOf(v.row['status']) === undefined ? {} : { status: v.row['status'] }),
           ...(strOf(v.row['name']) === undefined ? {} : { name: v.row['name'] }),
         }));

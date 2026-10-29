@@ -541,3 +541,9 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Options:** (a) build the output polish now (most similar duplicate pairs first, cut notes, a stop-word list, the items block found by its `source`) and move the end-date check to a follow-up (P6-56); (b) hold the whole task for the sandbox; (c) treat the end date as inclusive without evidence.
 - **Recommendation:** (a), built.
 - **Owner:** *(open; built as a)*
+
+### D-149 — `defect_triage` reads priority and severity with one compiler query, and finds severity in the metadata *(P6-30)*
+- **Context:** The report said priority and severity were not read. `search_work_items` rows carry neither, and the task allows the sibling's internals or a compiler query that keeps the scope predicate. A severity attribute is custom on most instances, so its name cannot be hard-coded.
+- **Options:** (a) one guarded compiler read of `Priority.Name`, `Priority.Order` and, when exactly one single-valued text or relation attribute of Defect has a name containing "severity", that attribute, for the page's OIDs (scope predicate and recheck kept; declared cost 24 to 28; flagged list ordered by priority rank, unprioritised last; failures named as budget, permission or failed); several candidates read none and say so; (b) add the fields to every work-item row (changes four tools and their budgets); (c) leave priority and severity unread.
+- **Recommendation:** (a), built. Live verification of the severity discovery on a real instance is follow-up P6-57 (L-148).
+- **Owner:** *(open; built as a)*
