@@ -35,8 +35,8 @@
     "cf:migrate": "node --conditions=source scripts/cf-migrate.ts",
     "bench:worker": "node --conditions=source scripts/worker-bench.ts",
     "ui:assets": "node scripts/gen-admin-assets.ts",
-    "test:e2e": "playwright test -c e2e/playwright.config.ts",
-    "scan:zap": "node e2e/zap.ts"
+    "test:e2e": "node --conditions=source node_modules/@playwright/test/cli.js test -c e2e/playwright.config.ts",
+    "scan:zap": "node --conditions=source e2e/zap.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

@@ -79,7 +79,8 @@ run time. Nothing touches a real tenant or the network.
 ```sh
 pnpm exec playwright install chromium    # once (add --with-deps on a fresh Linux machine)
 pnpm test:e2e                            # desktop 1280 px and mobile 320 px; AB_E2E_BROWSERS=all adds Firefox and WebKit (smoke)
-pnpm exec playwright test -c e2e/playwright.config.ts --project=desktop security   # one spec
+pnpm test:e2e --project=desktop security # one spec
+                                         # (both scripts run with --conditions=source: no package build needed)
 pnpm scan:zap                            # needs Docker; pulls the ZAP image pinned by digest
 ```
 
