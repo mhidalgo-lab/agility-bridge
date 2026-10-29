@@ -2258,6 +2258,7 @@ export function defineOAuthWriteScopeSuite(
     it('refuses the write tick when the workspace does not allow writes or the credential is shared', async () => {
       const h = await host(true, false);
       const client = await register(h);
+      const upstream = h.agilityRequests();
       // Server switch on, workspace and grant not enabled: nothing to allow.
       const notEnabled = await authorizeTicked(h, client, 'mcp:read mcp:write', true);
       expect(notEnabled.code).toBeNull();
@@ -2271,7 +2272,7 @@ export function defineOAuthWriteScopeSuite(
       const viaShared = await authorizeTicked(h, client, 'mcp:read mcp:write', true);
       expect(viaShared.code).toBeNull();
       expect(viaShared.response.status).toBe(403);
-      expect(h.agilityRequests()).toBe(0);
+      expect(h.agilityRequests()).toBe(upstream);
     });
 
     it('does not carry mcp:write where the server switch is off, even if asked and ticked', async () => {
