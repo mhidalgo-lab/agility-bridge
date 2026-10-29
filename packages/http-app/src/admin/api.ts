@@ -170,6 +170,11 @@ export interface AdminApiOptions {
   readonly lightweightRouter?: boolean;
   /** Sign-in is configured (P4-01): owner setup links point at this origin. Absent = `POST /setup-links` is refused. */
   readonly setupLinks?: { readonly publicUrl: string };
+  /**
+   * The sign-in providers this deployment configured, as identities (`google`, `oidc:<name>`, ...): the only values the
+   * owner-only unbind may name (P4-39). Absent = none can be named.
+   */
+  readonly configuredIdps?: readonly string[];
   /** OAuth is on (P5-04): the signed-in person's connected apps. Absent = the `/me/oauth-devices` routes answer 404. */
   readonly oauthDevices?: AdminOAuthDevices;
   /** OAuth is on (P5-08): every person's apps and the registered clients. Absent = the `/oauth/*` routes answer 404. */
@@ -666,6 +671,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
         tools: options.tools,
         ...(options.keyring === undefined ? {} : { keyring: options.keyring }),
         now: () => options.clock.now(),
+        ...(options.configuredIdps === undefined ? {} : { configuredIdps: options.configuredIdps }),
       },
       c.get('actor' as never) as Actor,
     );
@@ -965,7 +971,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
           .optional()
           .openapi({
             description:
-              'Only this provider (google, github, cf-access or oidc:<name>) may bind the account next; a sign-in at another provider is refused while the claim lasts.',
+              'Only this provider may bind the account next; it must be one this deployment has configured (google, github, cf-access or oidc:<name>), otherwise the request is refused with 422. A sign-in at another provider is refused while the claim lasts.',
           }),
         ttlMinutes: z.number().int().min(1).max(10_080).optional().openapi({
           description:

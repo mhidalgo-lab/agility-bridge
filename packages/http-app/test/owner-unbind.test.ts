@@ -26,7 +26,7 @@ const flashOf = (res: Response): string | undefined =>
     ?.slice('ab_flash='.length);
 
 async function env() {
-  const s = await setup();
+  const s = await setup({ secondProvider: true });
   const owner = await s.session(OWNER);
   const admin = await s.session(ADMIN);
   const alice = await s.session(ALICE);
@@ -265,12 +265,12 @@ describe('POST /users/{id}/unbind with a named provider (P4-24, THREAT_MODEL T14
     const { s, owner, ids } = await env();
     const res = await s.api('POST', `/users/${ids.alice}/unbind`, owner, {
       confirm: ALICE,
-      provider: 'github',
+      provider: 'oidc:other',
       ttlMinutes: 30,
     });
     expect(res.status).toBe(200);
-    expect(await claimOf(s, ids.alice)).toContain('github');
-    // The configured provider here is oidc:corp: refused, nothing bound, no session, the claim stays.
+    expect(await claimOf(s, ids.alice)).toContain('oidc:other');
+    // The signed-in provider here is oidc:corp, the claim names oidc:other: refused, nothing bound, no session, the claim stays.
     const refused = await s.signIn(ALICE, { claims: { sub: 'someone-else' } });
     expect(refused.status).not.toBe(200);
     expect(s.cookieOf(refused)).toBeUndefined();
@@ -278,7 +278,7 @@ describe('POST /users/{id}/unbind with a named provider (P4-24, THREAT_MODEL T14
     expect(await claimOf(s, ids.alice)).not.toBeNull();
     // The audit row names the provider asked for, never the subject.
     const row = (await unbindRows(s)).find((r) => r.status === 'ok');
-    expect(row?.details).toMatchObject({ requiredIdp: 'github', claimMinutes: 30 });
+    expect(row?.details).toMatchObject({ requiredIdp: 'oidc:other', claimMinutes: 30 });
   });
 
   it('the named provider binds and clears the claim', async () => {
@@ -295,7 +295,7 @@ describe('POST /users/{id}/unbind with a named provider (P4-24, THREAT_MODEL T14
 
   it('without a provider the behaviour is as before, and a plain unbind clears an older claim', async () => {
     const { s, owner, ids } = await env();
-    await s.api('POST', `/users/${ids.alice}/unbind`, owner, { confirm: ALICE, provider: 'github' });
+    await s.api('POST', `/users/${ids.alice}/unbind`, owner, { confirm: ALICE, provider: 'oidc:other' });
     await s.w.storage.users.bind(ids.alice, 'oidc:corp', 'sub-again', {});
     expect((await s.api('POST', `/users/${ids.alice}/unbind`, owner, { confirm: ALICE })).status).toBe(200);
     expect(await claimOf(s, ids.alice)).toBeNull();
@@ -306,7 +306,7 @@ describe('POST /users/{id}/unbind with a named provider (P4-24, THREAT_MODEL T14
     const { s, owner, ids } = await env();
     await s.api('POST', `/users/${ids.alice}/unbind`, owner, {
       confirm: ALICE,
-      provider: 'github',
+      provider: 'oidc:other',
       ttlMinutes: 5,
     });
     expect((await s.signIn(ALICE, { claims: { sub: 'early' } })).status).not.toBe(303);
@@ -324,15 +324,57 @@ describe('POST /users/{id}/unbind with a named provider (P4-24, THREAT_MODEL T14
       { provider: 'a b' },
       { provider: '' },
       { provider: 'x'.repeat(65) },
-      { provider: 'github', ttlMinutes: 0 },
-      { provider: 'github', ttlMinutes: 10_081 },
-      { provider: 'github', ttlMinutes: 1.5 },
+      { provider: 'oidc:other', ttlMinutes: 0 },
+      { provider: 'oidc:other', ttlMinutes: 10_081 },
+      { provider: 'oidc:other', ttlMinutes: 1.5 },
       { ttlMinutes: 10 },
     ]) {
       expect((await post(owner, bad)).status, JSON.stringify(bad)).toBe(422);
     }
     // Negative authorization: an admin cannot name a provider (or anything else) and no claim is left behind.
-    expect((await post(admin, { provider: 'github' })).status).toBe(403);
+    expect((await post(admin, { provider: 'oidc:other' })).status).toBe(403);
+    expect(await state(s)).toBe(before);
+    expect(await claimOf(s, ids.alice)).toBeNull();
+  });
+
+  it('refuses a provider this deployment has not configured with 422, before anything is written (P4-39, D-130)', async () => {
+    const { s, owner, admin, ids } = await env();
+    const target = `/users/${ids.alice}/unbind`;
+    const before = await state(s);
+    for (const provider of ['github', 'google', 'cf-access', 'oidc:typo', 'oidc:cor', 'OIDC:Typo']) {
+      const res = await s.api('POST', target, owner, { confirm: ALICE, provider });
+      expect(res.status, provider).toBe(422);
+      const err = (await res.json()).error;
+      expect(err.code).toBe('invalid_input');
+      expect(err.field).toBe('provider');
+      expect(err.message).toContain('oidc:corp');
+    }
+    // Nothing written: no claim, still bound, sessions alive, no ok row and no ended session.
+    expect(await state(s)).toBe(before);
+    expect(await claimOf(s, ids.alice)).toBeNull();
+    expect(await actions(s)).not.toContain('user.unbind:ok');
+    expect(await actions(s)).not.toContain('session.revoke_all:ok');
+    // Negative authorization first: a typo from an admin is a 403, not a hint about providers.
+    expect((await s.api('POST', target, admin, { confirm: ALICE, provider: 'github' })).status).toBe(403);
+    expect(await claimOf(s, ids.alice)).toBeNull();
+  });
+
+  it('the panel offers a select of the configured providers and shows the refusal of a stale one (P4-39)', async () => {
+    const { s, owner, ids } = await env();
+    const html = await (await page(s, `/admin/users/${ids.alice}/unbind`, owner)).text();
+    expect(html).toContain('<select');
+    expect(html).toContain('value="oidc:corp"');
+    expect(html).toContain('value="oidc:other"');
+    expect(html).not.toContain('value="github"');
+    expect(html).not.toMatch(/name="provider"[^>]*type="text"|type="text"[^>]*name="provider"/);
+    const before = await state(s);
+    const res = await submit(s, `/admin/users/${ids.alice}/unbind`, owner, {
+      confirm: 'yes',
+      email: ALICE,
+      provider: 'github',
+    });
+    expect(res.status).toBe(422);
+    expect(await res.text()).toContain('not a sign-in provider of this deployment');
     expect(await state(s)).toBe(before);
     expect(await claimOf(s, ids.alice)).toBeNull();
   });
@@ -343,7 +385,7 @@ describe('POST /users/{id}/unbind with a named provider (P4-24, THREAT_MODEL T14
     await s.w.storage.kv.delete(`unbind-claim:${ids.alice}`);
     const again = await s.api('POST', `/users/${ids.alice}/unbind`, owner, {
       confirm: ALICE,
-      provider: 'github',
+      provider: 'oidc:other',
     });
     expect(again.status).toBe(409);
     expect(await claimOf(s, ids.alice)).toBeNull();
@@ -354,9 +396,9 @@ describe('POST /users/{id}/unbind with a named provider (P4-24, THREAT_MODEL T14
     const res = await submit(s, `/admin/users/${ids.alice}/unbind`, owner, {
       confirm: 'yes',
       email: ALICE,
-      provider: 'github',
+      provider: 'oidc:other',
     });
     expect(res.status).toBe(303);
-    expect(await claimOf(s, ids.alice)).toContain('github');
+    expect(await claimOf(s, ids.alice)).toContain('oidc:other');
   });
 });

@@ -37,6 +37,8 @@ export interface AdminUiWiring {
   readonly onError: (c: Context, error: unknown) => void;
   /** The admin API app, in-process (absent: the admin API is not mounted and every call is a 404). */
   readonly callApi?: (request: Request, c: Context) => Response | Promise<Response>;
+  /** The configured sign-in providers, for the unbind page's select (P4-39). */
+  readonly identityProviders?: AdminUiDeps['identityProviders'];
 }
 
 export function adminUiDeps(w: AdminUiWiring): AdminUiDeps {
@@ -70,6 +72,7 @@ export function adminUiDeps(w: AdminUiWiring): AdminUiDeps {
     secureCookies: w.publicOrigin.startsWith('https:'),
     publicOrigin: w.publicOrigin,
     clearSessionCookie: sessions.clearCookie,
+    ...(w.identityProviders === undefined ? {} : { identityProviders: w.identityProviders }),
     ...(w.beforeAuth === undefined ? {} : { beforeAuth: w.beforeAuth }),
     onceStore: {
       put: (key, ttlSeconds) => w.kv.set(key, '1', { expiresAt: w.now() + ttlSeconds * 1000 }),

@@ -126,6 +126,11 @@ export interface GuardContext {
   readonly keyring?: Keyring;
   /** The clock for expiring claims (P4-24); default the system clock. */
   readonly now?: () => number;
+  /**
+   * The sign-in providers this deployment has configured, as identities (`google`, `github`, `cf-access`, `oidc:<name>`).
+   * An owner may only name one of these when moving a user (P4-39, D-130); absent or empty = none can be named.
+   */
+  readonly configuredIdps?: readonly string[];
 }
 
 /** The services, each call checked against the actor's role (and, for members, ownership). */
@@ -225,6 +230,17 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
       }
       if (provider !== undefined && (typeof provider !== 'string' || !IDP_NAME_RE.test(provider))) {
         throw new InvalidInputError('provider: must be a provider id such as google, github or oidc:<name>');
+      }
+      if (provider !== undefined) {
+        const configured = (ctx.configuredIdps ?? []).map((p) => p.toLowerCase());
+        if (!configured.includes(provider.toLowerCase())) {
+          // The list is deployment configuration the owner may read, not data from a provider or a secret.
+          throw new InvalidInputError(
+            `provider: not a sign-in provider of this deployment${
+              configured.length === 0 ? ' (none is configured)' : ` (configured: ${configured.join(', ')})`
+            }`,
+          );
+        }
       }
       const minutes = provider === undefined ? null : (claim.ttlMinutes ?? CLAIM_DEFAULT_MINUTES);
       if (

@@ -231,6 +231,56 @@ describe('local and remote management', () => {
     expect(JSON.stringify(rows)).not.toContain('sub-ann');
   });
 
+  it('user unbind --to names only a configured provider; a typo is refused before anything changes (P4-39)', async () => {
+    const env = {
+      AB_DATA_DIR: join(dir, 'p'),
+      AB_MASTER_KEY_FILE: keyFile('p.key'),
+      AB_PUBLIC_URL: 'https://bridge.example.test',
+      AB_GOOGLE_CLIENT_ID: 'google-client',
+      AB_GOOGLE_CLIENT_SECRET: 'google-secret-value',
+    };
+    const added = (await cli(['user', 'add', 'pat@example.test'], env)).json as { id: string };
+    const path = join(dir, 'p', 'agility-bridge.db');
+    const seed = await openSqliteStorage({ path });
+    await seed.users.bind(added.id, 'github', 'sub-pat');
+    await seed.close();
+    const peek = async () => {
+      const store = await openSqliteStorage({ path });
+      const out = {
+        user: await store.users.get(added.id),
+        claim: await store.kv.get(`unbind-claim:${added.id}`),
+      };
+      await store.close();
+      return out;
+    };
+    for (const to of ['githab', 'oidc:corp', 'github']) {
+      const bad = await cli(['user', 'unbind', added.id, '--confirm', 'pat@example.test', '--to', to], env);
+      expect(bad.code, to).toBe(1);
+      expect(bad.err).toContain('provider');
+      expect(bad.err).toContain('google');
+      expect(await peek()).toMatchObject({ user: { idp: 'github', idpSubject: 'sub-pat' }, claim: null });
+    }
+    const ok = await cli(
+      ['user', 'unbind', added.id, '--confirm', 'pat@example.test', '--to', 'google'],
+      env,
+    );
+    expect(ok.code).toBe(0);
+    const after = await peek();
+    expect(after.user).toMatchObject({ idp: null, idpSubject: null });
+    expect(after.claim).toContain('google');
+    // Without any sign-in configured no provider can be named at all.
+    const bare = { AB_DATA_DIR: env.AB_DATA_DIR, AB_MASTER_KEY_FILE: env.AB_MASTER_KEY_FILE };
+    const seed2 = await openSqliteStorage({ path });
+    await seed2.users.bind(added.id, 'github', 'sub-pat2');
+    await seed2.close();
+    const none = await cli(
+      ['user', 'unbind', added.id, '--confirm', 'pat@example.test', '--to', 'google'],
+      bare,
+    );
+    expect(none.code).toBe(1);
+    expect(none.err).toContain('none is configured');
+  });
+
   it('keys status, rotate and retire on the local database; rotate stays local', async () => {
     const env = {
       AB_DATA_DIR: join(dir, 'd'),

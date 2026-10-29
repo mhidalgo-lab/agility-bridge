@@ -495,7 +495,12 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         clock: services.clock,
         background: keepAlive,
         keyring: options.keyring,
-        ...(options.identity === undefined ? {} : { setupLinks: { publicUrl: options.identity.publicUrl } }),
+        ...(options.identity === undefined
+          ? {}
+          : {
+              setupLinks: { publicUrl: options.identity.publicUrl },
+              configuredIdps: options.identity.providers.map((p) => p.idp),
+            }),
         ...(oauthRuntime === undefined
           ? {}
           : {
@@ -634,6 +639,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
             now: () => services.clock.now(),
             ...(identity.auditAdmin === undefined ? {} : { audit: identity.auditAdmin }),
             runInBackground: keepAlive,
+            identityProviders: identity.providers.map((p) => ({ idp: p.idp, label: p.label })),
             async beforeAuth(ic) {
               const decision = await options.limits?.beforeAuth?.(clientIp(ic), services.clock.now());
               if (decision === undefined || decision.ok) return undefined;

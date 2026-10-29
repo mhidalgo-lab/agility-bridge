@@ -7,6 +7,7 @@ import {
   accessServices,
   credentialValidator,
   Keyring,
+  providerIdp,
   revokeUserSessions,
   verifyKeyring,
 } from '@agility-bridge/auth';
@@ -74,7 +75,12 @@ export async function localClient(
     clock: systemClock,
     via: 'cli',
     keyring,
-    ...(config.identity === undefined ? {} : { setupLinks: { publicUrl: config.identity.publicUrl } }),
+    ...(config.identity === undefined
+      ? {}
+      : {
+          setupLinks: { publicUrl: config.identity.publicUrl },
+          configuredIdps: config.identity.providers.map(providerIdp),
+        }),
   });
   return {
     mode: 'local',

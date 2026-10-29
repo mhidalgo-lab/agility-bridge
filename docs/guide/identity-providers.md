@@ -118,15 +118,18 @@ OIDC provider can assert any address).
 only there, for a limited time:
 
 ```sh
-agility-bridge user unbind usr_abc123 --confirm ana@example.com --to github --ttl-minutes 60
-# or: POST /api/admin/v1/users/usr_abc123/unbind  {"confirm": "...", "provider": "github", "ttlMinutes": 60}
+agility-bridge user unbind usr_abc123 --confirm ana@example.com --to oidc:corp --ttl-minutes 60
+# or: POST /api/admin/v1/users/usr_abc123/unbind  {"confirm": "...", "provider": "oidc:corp", "ttlMinutes": 60}
 ```
 
-`--to` takes the provider id a user is bound with (`google`, `github`, `cf-access` or `oidc:<name>`); the panel has the
-same field. While the claim lasts (default 24 hours, at most 7 days) a verified sign-in at any other provider is refused
-like a conflict, whatever email it asserts; the first bind by the named provider, or the expiry, ends the claim. A later
-unbind without `--to` removes an older claim. The provider name is not checked against the configured providers: a name
-nobody configured simply blocks the account until it expires. Without `--to` the behaviour is as described above.
+`--to` takes the provider id a user is bound with (`google`, `github`, `cf-access` or `oidc:<name>`) and it must be one
+this deployment has configured (not case sensitive). A name nobody configured, a typo included, is refused (`422`,
+`provider`, exit code 1 in the CLI) before anything is written: the user stays bound, no claim is stored and no session
+ends; the answer lists the configured providers. Without sign-in configured no provider can be named. In the panel the
+field is a select of the configured providers. While the claim lasts (default 24 hours, at most 7 days) a verified
+sign-in at any other provider is refused like a conflict, whatever email it asserts; the first bind by the named
+provider, or the expiry, ends the claim. A later unbind without `--to` removes an older claim. Without `--to` the
+behaviour is as described above.
 
 Rules:
 
