@@ -24,8 +24,8 @@ Refined 2026-10-28 (no writable sandbox and no live access in this change; capac
   team or Agility project, each read as it ended in one batched request, bounded by `maxAsOfAgeDays`, with the sprints that
   could not be read named in `notes` (D-139 style bounds, L-060, L-279, P6-42). The default catalogue target moves to 37.6 KB (D-140).
 - Hour-based burndown: `Task` has `ToDo`, `DetailEstimate` and `Timebox` in the metadata snapshot, so it can be built, but it adds a
-  second family of per-point `asof` queries (L-330: a live check first). Not built here; needs a follow-up task id.
-- Capacity: not built, as D-83 decided; becomes a sandbox follow-up when an instance with capacity data is available.
+  second family of per-point `asof` queries (L-330: a live check first). Not built here: [P6-49](P6-49-hour-based-sprint-burndown.md).
+- Capacity: not built, as D-83 decided; becomes a sandbox follow-up when an instance with capacity data is available: [P6-50](P6-50-sprint-capacity.md).
 
 ## Acceptance criteria
 - [x] Refined with the evidence available (the snapshot has the task hour attributes; capacity has no data).

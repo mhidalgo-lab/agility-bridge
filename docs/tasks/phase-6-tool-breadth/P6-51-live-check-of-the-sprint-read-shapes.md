@@ -22,6 +22,12 @@ batch when the page size is large). The fakes cannot show whether the real tenan
 - A sprint of several hundred items (P6-18: up to ten pages per item read, at most 60 history queries): the call finishes in time, with the points it names.
 - On the sandbox, check whether `query.v1` accepts one shared `with` for the scope list across the queries of a batch (unverified); if so, build it.
 
+## Progress
+- 2026-10-28/29: the live suite on `main` with P6-41, P6-42 and P6-18 merged passed `live/sprint.live.test.ts` (a past and a
+  current sprint, bounded history, honest notes) and the every-tool check, on a quiet machine, within the declared cost and
+  the test timeouts. Earlier failures the same day were machine load (eight parallel test suites), not the request shapes.
+  Still open: the oversized-chunk path with `AB_MAX_ROWS` above 250, a sprint of several hundred items, and the shared `with`.
+
 ## Acceptance criteria
 - [ ] Live results recorded as shapes and levels only in the task and docs/RESEARCH.md.
 - [ ] A shared `with` is built or declared unsupported.
