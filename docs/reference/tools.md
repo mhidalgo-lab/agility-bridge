@@ -101,7 +101,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Query assets** · group `query` · read · cost 12 Agility requests at most
 
-Query any asset type this workspace allows (stories, defects, tasks, tests, epics, issues, requests, custom fields) with structured filters, fields and sort; values are bound and the workspace scope is enforced. Sorting by ChangeDate costs about a second per call. Paged: pass nextCursor back as cursor. Cold call: up to 12 Agility requests.
+Query any asset type this workspace allows (stories, defects, tasks, tests, epics, issues, requests, goals, themes, retrospectives, custom fields) with structured filters, fields and sort; values are bound and the workspace scope is enforced. Sorting by ChangeDate costs about a second per call. Paged: pass nextCursor back as cursor. Cold call: up to 12 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 

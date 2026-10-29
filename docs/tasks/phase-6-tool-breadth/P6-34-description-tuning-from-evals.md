@@ -2,7 +2,7 @@
 id: P6-34
 title: Tune tool descriptions from the eval misses
 phase: 6
-status: todo
+status: in-progress
 priority: low
 depends_on: [P6-33]
 adr: ["0015"]
@@ -23,10 +23,20 @@ Raise tool-choice accuracy where the LLM eval and the lexical router agree a des
 - Change wording only, inside the description lints and the default `tools/list` budget (40 KB); trade words, not features.
 - Raise the router baseline with the change (`pnpm eval:router --write-baseline`).
 
+## Progress (2026-10-29)
+- Q023 and Q030 were legitimate routes, not description bugs: the dataset accepts `search_work_items` (member and sprint) and
+  `get_sprint` (`sprint: next`) (L-312).
+- Q049: a "attachments: list_attachments" pointer in `get_work_item` made the lexical router pick `get_work_item` for more
+  attachment questions, so it was not kept; `list_attachments` already names links. Watched in the next LLM run.
+- `query_assets` now names goals, themes and retrospectives among its types, so generic questions about them route to it.
+- New dataset questions: Q074 (`quality_scan`), Q075 (themes), Q076 (retrospectives). Router 76 questions: top-1 78.9 %,
+  top-3 90.8 % (floor 78 % / 90 %, unchanged after rounding). Default `tools/list` within the 37.6 KB target.
+- **Owner step left:** rerun the LLM eval on the changed descriptions and attach the report.
+
 ## Acceptance criteria
-- [ ] Router top-1 and top-3 do not fall and the baseline is raised where they improved.
+- [x] Router top-1 and top-3 do not fall and the baseline is raised where they improved (78.9 % / 90.8 %; floors unchanged after rounding).
 - [ ] The LLM eval is rerun on the changed descriptions and its report attached.
-- [ ] Lints and the `tools/list` size test stay green; tool reference regenerated.
+- [x] Lints and the `tools/list` size test stay green; tool reference regenerated.
 
 ## Security notes
 Descriptions never carry instructions about other content (conventions).

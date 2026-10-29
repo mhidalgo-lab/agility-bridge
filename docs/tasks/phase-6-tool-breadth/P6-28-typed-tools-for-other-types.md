@@ -30,6 +30,10 @@ issues, goals and regression tests (Q070 – Q073) passed in 4 of 8 answers allo
 (`list_asset_types` or `list_projects`), never a wrong tool. Themes and retrospectives have no eval question yet (this task's
 scope). Points to "no typed tools"; the cost is an extra call.
 
+## Progress (2026-10-29)
+Eval questions for themes (Q075) and retrospectives (Q076) are in the dataset beside Q070 – Q073 (requests, issues, goals,
+regression tests), and `query_assets` names the types. The decision waits for the owner's next LLM eval run (P6-34).
+
 ## Acceptance criteria
 - [ ] Eval results for the five types are recorded.
 - [ ] A decision (typed tool or none) is recorded in the pending decisions with the evidence.
