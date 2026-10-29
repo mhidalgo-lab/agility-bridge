@@ -9,9 +9,9 @@ import { z } from 'zod';
 import { agilityClient } from '../../agility/client.ts';
 import type { ToolContext } from '../../context.ts';
 import { AbError, ErrorCode } from '../../errors.ts';
-import { runQuery } from '../../identity/resolve.ts';
+import { pageOf } from '../../identity/resolve.ts';
 import { metadataFor } from '../../metadata/service.ts';
-import { compileQuery } from '../../query/compiler.ts';
+import { type CompiledQuery, compileQuery } from '../../query/compiler.ts';
 import { invalid } from '../../query/limits.ts';
 import type { ToolDefinition } from '../../tool.ts';
 import { defineWriteTool } from '../../writes/index.ts';
@@ -42,17 +42,28 @@ const CHILDREN: Readonly<Record<string, ReadonlyArray<readonly [type: string, re
   Test: [],
 };
 const CHILD_LIMIT = 21;
-const COST = 22;
+// Measured worst case on a cold cache (a Story, one request for the child counts): 11; an Epic has two more child types
+// to read metadata of. Reopening reads no children (measured 7). Both keep headroom (P7-09, D-199).
+const COST_CLOSE = 16;
+const COST_REOPEN = 10;
 
 export const OPEN = 'Open';
 export const CLOSED = 'Closed';
 const FIELDS = ['Parent', 'Super'];
 const ALLOWED = Object.fromEntries(ITEM_TYPES.map((t) => [t, ['AssetState', 'OpenChildren']]));
 
+<<<<<<< HEAD
 /** Open children of one item, counted with the same scoped, bound-parameter queries the read tools use (capped). */
 export async function openChildren(ctx: ToolContext, type: string, oid: string): Promise<number> {
+=======
+/**
+ * Open children of one item, counted with the same scoped, bound-parameter queries the read tools use (capped). The
+ * queries of all child types go out in one `query.v1` request (an array body), so the count costs one request.
+ */
+async function openChildren(ctx: ToolContext, type: string, oid: string): Promise<number> {
+>>>>>>> fbeee2c (perf(core): fix the Worker bench, honest write costs, fewer storage round trips (P7-09))
   const md = metadataFor(ctx);
-  let count = 0;
+  const queries: CompiledQuery[] = [];
   for (const [childType, relation] of CHILDREN[type] ?? []) {
     const meta = await md.findAssetType(childType);
     if (meta === undefined || !meta.attributes.has(relation)) continue;
@@ -74,14 +85,21 @@ export async function openChildren(ctx: ToolContext, type: string, oid: string):
         'Close it in Agility, or use a workspace that covers every project the epic reaches.',
       );
     }
-    const compiled = await compileQuery(ctx, {
-      assetType: childType,
-      fields: ['Number'],
-      filters: [{ field: relation, op: 'eq', value: oid }],
-      limit: CHILD_LIMIT,
-      includeClosed: false,
-    });
-    count += (await runQuery(ctx, compiled)).rows.length;
+    queries.push(
+      await compileQuery(ctx, {
+        assetType: childType,
+        fields: ['Number'],
+        filters: [{ field: relation, op: 'eq', value: oid }],
+        limit: CHILD_LIMIT,
+        includeClosed: false,
+      }),
+    );
+  }
+  if (queries.length === 0) return 0;
+  const res = await agilityClient(ctx).query<unknown[]>(queries.map((q) => q.body));
+  let count = 0;
+  for (const [i, q] of queries.entries()) {
+    count += pageOf(ctx, q, Array.isArray(res.data) ? res.data[i] : undefined).rows.length;
   }
   return Math.min(count, CHILD_LIMIT - 1);
 }
@@ -107,16 +125,17 @@ function lifecycleTool(cfg: {
   readonly description: string;
   readonly ops: readonly string[];
   readonly to: string;
+  readonly cost: number;
 }): ToolDefinition {
   const closing = cfg.to === CLOSED;
   return defineWriteTool({
     name: cfg.name,
     title: cfg.title,
-    description: `${cfg.description} Needs approval; preview with dry_run. Not paged. Cold call: up to ${COST} Agility requests.`,
+    description: `${cfg.description} Needs approval; preview with dry_run. Not paged. Cold call: up to ${cfg.cost} Agility requests.`,
     kind: 'destructive',
     // Resolution, the item read, the metadata of the type and of its child types, the child counts, the re-read with its
     // counts, and the one operation.
-    cost: COST,
+    cost: cfg.cost,
     idempotent: true,
     inputSchema: z.object({ asset: assetArg }),
     allowedFields: ALLOWED,
@@ -197,6 +216,7 @@ export const closeAsset: ToolDefinition = lifecycleTool({
     'Close one backlog item, defect, task, test or epic with the close operation its type has on this instance. Refused while it has open child items; an item that is already closed is a no-op. Destructive.',
   ops: CLOSE_OPS,
   to: CLOSED,
+  cost: COST_CLOSE,
 });
 
 export const reopenAsset: ToolDefinition = lifecycleTool({
@@ -206,6 +226,7 @@ export const reopenAsset: ToolDefinition = lifecycleTool({
     'Reopen one closed backlog item, defect, task, test or epic with its Reactivate operation. An item that is already open is a no-op. Destructive.',
   ops: REOPEN_OPS,
   to: OPEN,
+  cost: COST_REOPEN,
 });
 
 export const LIFECYCLE_TOOLS: readonly ToolDefinition[] = Object.freeze([closeAsset, reopenAsset]);

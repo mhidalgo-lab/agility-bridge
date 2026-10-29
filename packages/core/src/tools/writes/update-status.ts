@@ -29,7 +29,7 @@ function candidates(all: readonly StatusEntry[], team: string | undefined): Stat
   return all.filter((s) => s.team === undefined || s.team === team);
 }
 
-const COST = 12;
+const COST = 15;
 
 export const updateStatus: ToolDefinition = defineWriteTool({
   name: 'update_status',

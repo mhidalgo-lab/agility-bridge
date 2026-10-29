@@ -22,7 +22,7 @@ import {
   withinWindow,
 } from './common.ts';
 
-const COST = 16;
+const COST = 18;
 
 export const MAX_COMMENT_CHARS = 4_000;
 const LINE_BREAKS = /\r\n?|[\u2028\u2029]/g;

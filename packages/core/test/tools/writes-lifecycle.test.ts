@@ -70,6 +70,15 @@ describe('close_asset', () => {
     expect(w.channel.asked).toHaveLength(0);
   });
 
+  it('counts the open children of every child type in one request (P7-09)', async () => {
+    const w = writeRig();
+    await w.run('close_asset', { asset: 'B-01004', dry_run: true });
+    // The child counts are one `query.v1` request with one query per child type (a story has tasks and tests).
+    const batches = w.calls.filter((c) => Array.isArray(c.body));
+    const counts = batches.filter((c) => (c.body as unknown[]).length === 2);
+    expect(counts).toHaveLength(1);
+  });
+
   it('applies once, after approval and an intent audit, with exactly this operation request', async () => {
     const w = writeRig();
     w.audit.onIntent = () => expect(w.posts).toHaveLength(0);

@@ -39,7 +39,7 @@ import {
   round2,
 } from './fields.ts';
 
-const COST = 16;
+const COST = 14;
 
 /** Read for every type; attributes the type lacks are left out by the reader. */
 const READ_FIELDS = ['Name', 'Description', 'Estimate', 'DetailEstimate', 'Priority', 'Priority.Name'];

@@ -35,15 +35,15 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 | [`defect_triage`](#defect_triage) | reports | 28 | Defect triage |
 | [`work_item_quality`](#work_item_quality) | reports | 28 | Work item quality |
 | [`quality_scan`](#quality_scan) | reports | 30 | Quality scan |
-| [`add_comment`](#add_comment) | writes | 16 | Add comment |
-| [`update_status`](#update_status) | writes | 12 | Update status |
+| [`add_comment`](#add_comment) | writes | 18 | Add comment |
+| [`update_status`](#update_status) | writes | 15 | Update status |
 | [`log_effort`](#log_effort) | writes | 14 | Log effort |
-| [`assign_owners`](#assign_owners) | writes | 26 | Assign owners |
+| [`assign_owners`](#assign_owners) | writes | 18 | Assign owners |
 | [`move_to_sprint`](#move_to_sprint) | writes | 14 | Move to sprint |
-| [`close_asset`](#close_asset) | writes | 22 | Close work item |
-| [`reopen_asset`](#reopen_asset) | writes | 22 | Reopen work item |
-| [`create_work_item`](#create_work_item) | writes | 28 | Create work item |
-| [`update_fields`](#update_fields) | writes | 16 | Update fields |
+| [`close_asset`](#close_asset) | writes | 16 | Close work item |
+| [`reopen_asset`](#reopen_asset) | writes | 10 | Reopen work item |
+| [`create_work_item`](#create_work_item) | writes | 20 | Create work item |
+| [`update_fields`](#update_fields) | writes | 14 | Update fields |
 
 ## `whoami`
 
@@ -539,9 +539,9 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 ## `add_comment`
 
-**Add comment** · group `writes` · write · cost 16 Agility requests at most
+**Add comment** · group `writes` · write · cost 18 Agility requests at most
 
-Add a comment to one backlog item, defect, task, test or epic. The text is shown in full to the person who approves, at most 4,000 characters. A comment identical to your latest one from the last 10 minutes is treated as already added. Not paged. Cold call: up to 16 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+Add a comment to one backlog item, defect, task, test or epic. The text is shown in full to the person who approves, at most 4,000 characters. Not paged. Cold call: up to 18 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
 Annotations: read-only false, destructive false, idempotent false, open world true.
 
@@ -554,11 +554,11 @@ Annotations: read-only false, destructive false, idempotent false, open world tr
 
 ## `update_status`
 
-**Update status** · group `writes` · write · cost 12 Agility requests at most
+**Update status** · group `writes` · write · cost 15 Agility requests at most
 
-Set the status of one backlog item, defect, task, test or epic to a status of its workflow (by name or OID token). Changes the status only: it does not close the item. Not paged. Cold call: up to 12 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+Set the status of one backlog item, defect, task, test or epic to a status of its workflow (by name or OID token). Changes the status only: it does not close the item. Not paged. Cold call: up to 15 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
-Annotations: read-only false, destructive true, idempotent true, open world true.
+Annotations: read-only false, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
@@ -585,11 +585,11 @@ Annotations: read-only false, destructive false, idempotent false, open world tr
 
 ## `assign_owners`
 
-**Assign owners** · group `writes` · write · cost 26 Agility requests at most
+**Assign owners** · group `writes` · write · cost 18 Agility requests at most
 
-Add and remove owners of one backlog item, defect, task, test or epic. Give members to add, to remove, or both; the other owners stay. Not paged. Cold call: up to 26 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+Add and remove owners of one backlog item, defect, task, test or epic. Give members to add, to remove, or both; the other owners stay. Not paged. Cold call: up to 18 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
-Annotations: read-only false, destructive true, idempotent true, open world true.
+Annotations: read-only false, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
@@ -605,7 +605,7 @@ Annotations: read-only false, destructive true, idempotent true, open world true
 
 Move one backlog item or defect into a sprint of its own Agility project, by sprint name, OID token or current, previous or next. A closed sprint is refused. Not paged. Cold call: up to 14 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
-Annotations: read-only false, destructive true, idempotent true, open world true.
+Annotations: read-only false, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
@@ -616,9 +616,9 @@ Annotations: read-only false, destructive true, idempotent true, open world true
 
 ## `close_asset`
 
-**Close work item** · group `writes` · destructive · cost 22 Agility requests at most
+**Close work item** · group `writes` · destructive · cost 16 Agility requests at most
 
-Close one backlog item, defect, task, test or epic with the close operation its type has on this instance. Refused while it has open child items; an item that is already closed is a no-op. Destructive. Needs approval; preview with dry_run. Not paged. Cold call: up to 22 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+Close one backlog item, defect, task, test or epic with the close operation its type has on this instance. Refused while it has open child items; an item that is already closed is a no-op. Destructive. Needs approval; preview with dry_run. Not paged. Cold call: up to 16 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
 Annotations: read-only false, destructive true, idempotent true, open world true.
 
@@ -630,9 +630,9 @@ Annotations: read-only false, destructive true, idempotent true, open world true
 
 ## `reopen_asset`
 
-**Reopen work item** · group `writes` · destructive · cost 22 Agility requests at most
+**Reopen work item** · group `writes` · destructive · cost 10 Agility requests at most
 
-Reopen one closed backlog item, defect, task, test or epic with its Reactivate operation. An item that is already open is a no-op. Destructive. Needs approval; preview with dry_run. Not paged. Cold call: up to 22 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+Reopen one closed backlog item, defect, task, test or epic with its Reactivate operation. An item that is already open is a no-op. Destructive. Needs approval; preview with dry_run. Not paged. Cold call: up to 10 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
 Annotations: read-only false, destructive true, idempotent true, open world true.
 
@@ -644,9 +644,9 @@ Annotations: read-only false, destructive true, idempotent true, open world true
 
 ## `create_work_item`
 
-**Create work item** · group `writes` · write · cost 28 Agility requests at most
+**Create work item** · group `writes` · write · cost 20 Agility requests at most
 
-Create one backlog item, defect, task, test or epic in an Agility project. A task or test needs a parent item; a backlog item, defect or epic may have an epic as parent. Sets only title, description, estimate and priority. Not paged. Cold call: up to 28 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+Create one backlog item, defect, task, test or epic in an Agility project. A task or test needs a parent item; a backlog item, defect or epic may have an epic as parent. Sets only title, description, estimate and priority. Not paged. Cold call: up to 20 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
 Annotations: read-only false, destructive false, idempotent false, open world true.
 
@@ -664,17 +664,17 @@ Annotations: read-only false, destructive false, idempotent false, open world tr
 
 ## `update_fields`
 
-**Update fields** · group `writes` · write · cost 16 Agility requests at most
+**Update fields** · group `writes` · write · cost 14 Agility requests at most
 
-Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic. Give only what changes; the person approves old and new for each. Not paged. Cold call: up to 16 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic. Give only what changes; the person approves old and new for each. Not paged. Cold call: up to 14 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
-Annotations: read-only false, destructive true, idempotent true, open world true.
+Annotations: read-only false, destructive false, idempotent true, open world true.
 
 | Argument | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
 | `name` | string |  |  | New title: one line, at most 200 characters. |
-| `description` | string |  |  | New description, plain text, at most 4,000 characters; it replaces the old one, which must be plain (no links, lists or images). |
+| `description` | string |  |  | New description, plain text, at most 4,000 characters; it replaces the old one. |
 | `estimate` | number (≥ 0, ≤ 10000) |  |  | Story points for a story or defect; hours for a task or test. Not for an epic. |
 | `priority` | string |  |  | Priority name or OID token, for a story or defect. |
 | `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |

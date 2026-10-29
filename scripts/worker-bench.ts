@@ -8,6 +8,8 @@
 // Phase 6 tools (P6-39): get_sprint, get_asset_history, get_portfolio_tree and sprint_health on a cold isolate (a new
 // MetadataService: one metadata request per asset type), on a cold isolate whose types another isolate stored (the D1
 // store the Worker uses), and warm. Requests per call are recorded beside the CPU.
+// Write path (P7-09): update_status on the fakes, a dry run and an approved write by elicitation and by the approval page
+// (two calls), with the Agility requests and the approval-ledger storage operations per call beside the CPU.
 //   pnpm bench:worker            measure and compare with scripts/bench/worker-baseline.json
 //   pnpm bench:worker --update   rewrite the baseline
 import { execFileSync } from 'node:child_process';
@@ -54,6 +56,8 @@ export interface BenchResult {
   readonly relative: Record<string, number>;
   /** Agility requests per call. */
   readonly requests: Record<string, number>;
+  /** Approval-ledger storage operations per call (write paths only). */
+  readonly storage?: Record<string, number>;
 }
 
 /** Paths whose relative cost grew past THRESHOLD × the baseline (new paths are not flagged). */
@@ -78,7 +82,8 @@ async function coldBoot(): Promise<number> {
   const storageMod = await import('../packages/storage/src/index.ts');
   const imported = cpu() - t;
   // As the Worker does at module scope (startup, not the request's budget, P3-14).
-  const registry = new core.ToolRegistry();
+  // The write tools are non-read: the hosts pass allowNonRead (apps/worker/src/boot.ts), so the bench does too (P7-09).
+  const registry = new core.ToolRegistry({ allowNonRead: true });
   for (const tool of core.CORE_TOOLS) registry.register(tool);
   core.prewarmToolSchemas(core.CORE_TOOLS);
   // The imports allocate seconds' worth of CPU; collect now so their garbage is not collected inside the measured boot
@@ -226,6 +231,114 @@ async function metadataPaths(): Promise<{ ms: Record<string, number>; requests: 
   return { ms, requests };
 }
 
+/** Write paths (P7-09): one write tool on the fakes, warm metadata, the item's status toggled between samples. */
+export async function writePaths(): Promise<{
+  ms: Record<string, number>;
+  requests: Record<string, number>;
+  storage: Record<string, number>;
+}> {
+  const core = await import('../packages/core/src/index.ts');
+  const { writeRig } = await import('../packages/core/test/tools/writes-world.ts');
+  const { answeringChannel, makeRuntime, ACTOR } = await import('../packages/core/test/helpers/writes.ts');
+  const ms: Record<string, number> = {};
+  const requests: Record<string, number> = {};
+  const storage: Record<string, number> = {};
+  const statuses = ['In review', 'Done'] as const;
+  const names = {
+    dry: 'write: update_status dry run',
+    elicitation: 'write: update_status approved (elicitation)',
+    pageAsk: 'write: update_status approval page, call 1 (ask)',
+    pageApply: 'write: update_status approval page, call 2 (apply)',
+  } as const;
+
+  const scenario = async (kind: keyof typeof names): Promise<void> => {
+    const w = writeRig();
+    const inner = core.memoryLedgerStore(core.systemClock);
+    let ops = 0;
+    const store = {
+      set: (...a: Parameters<typeof inner.set>) => (ops++, inner.set(...a)),
+      take: (...a: Parameters<typeof inner.take>) => (ops++, inner.take(...a)),
+    };
+    const ledger = new core.ApprovalLedger(store, core.systemClock);
+    const page = answeringChannel(
+      () => ({ status: 'pending', link: 'https://bench.example/approve/x', expiresAt: Date.now() + 60_000 }),
+      'page',
+    );
+    const channel = kind === 'elicitation' || kind === 'dry' ? answeringChannel(true) : page;
+    // The approval page records the grant when the person approves; here the page's `ask` does it at once.
+    const ask = page.ask.bind(page);
+    (page as { ask: typeof page.ask }).ask = async (prompt) => {
+      await ledger.grant({
+        hash: prompt.hash,
+        actor: ACTOR.id,
+        tool: prompt.tool,
+        expiresAt: core.systemClock.now() + 60_000,
+        scope: ctx.workspace.id,
+      });
+      return ask(prompt);
+    };
+    const runtime = makeRuntime({
+      ledger,
+      channel,
+      ...(kind === 'pageAsk' || kind === 'pageApply' ? { page } : {}),
+      tools: ['update_status'],
+    });
+    const ctx = w.context({ writes: runtime });
+    const samples: number[] = [];
+    let spentRequests = 0;
+    let spentOps = 0;
+    for (let i = 0; i < 14; i++) {
+      const args = { asset: 'B-01002', new_status: statuses[i % 2] as string };
+      const run = (extra: Record<string, unknown>) => w.run('update_status', { ...args, ...extra }, ctx);
+      if (i === 0) await run({ dry_run: true }); // fills the metadata cache; the first sample is dropped below
+      const before = w.calls.length;
+      ops = 0;
+      if (kind === 'dry') {
+        const t = cpu();
+        await run({ dry_run: true });
+        samples.push(cpu() - t);
+      } else if (kind === 'elicitation') {
+        const t = cpu();
+        const out = await run({ confirm: true });
+        samples.push(cpu() - t);
+        if ((out.structured as { applied?: boolean } | undefined)?.applied !== true)
+          throw new Error('no write');
+      } else {
+        const t = cpu();
+        await run({ confirm: true }).catch((e: unknown) => {
+          if (!(e instanceof core.AbError) || e.code !== core.ErrorCode.WriteApprovalPending) throw e;
+        });
+        const first = cpu() - t;
+        const mid = w.calls.length;
+        const midOps = ops;
+        ops = 0;
+        const t2 = cpu();
+        const out = await run({ confirm: true });
+        const second = cpu() - t2;
+        if ((out.structured as { applied?: boolean } | undefined)?.applied !== true)
+          throw new Error('no write');
+        if (kind === 'pageAsk') {
+          samples.push(first);
+          spentRequests = mid - before;
+          spentOps = midOps;
+        } else {
+          samples.push(second);
+          spentRequests = w.calls.length - mid;
+          spentOps = ops;
+        }
+        continue;
+      }
+      spentRequests = w.calls.length - before;
+      spentOps = ops;
+    }
+    ms[names[kind]] = median(samples.slice(2));
+    requests[names[kind]] = spentRequests;
+    storage[names[kind]] = spentOps;
+  };
+  for (const kind of Object.keys(names) as Array<keyof typeof names>) await scenario(kind);
+  return { ms, requests, storage };
+}
+
 /** The panel's world as the Worker runs it (request isolation), signed in as the owner, with realistic row counts. */
 async function panelEnv() {
   register('./bench/admin-ui-dist-hook.mjs', import.meta.url);
@@ -341,6 +454,7 @@ async function main(argv: readonly string[]): Promise<number> {
   const warm = await warmCalls();
   const panel = await warmPanel();
   const phase6 = await metadataPaths();
+  const writes = await writePaths();
   const ms: Record<string, number> = {
     'cold: boot': Math.min(...cold.map((c) => c.boot)),
     ...Object.fromEntries(Object.entries(warm.ms).map(([k, v]) => [`warm: ${k}`, v])),
@@ -348,6 +462,7 @@ async function main(argv: readonly string[]): Promise<number> {
     'cold: second /admin': Math.min(...coldPanels.map((c) => c.second)),
     ...Object.fromEntries(Object.entries(panel.ms).map(([k, v]) => [`warm: ${k}`, v])),
     ...phase6.ms,
+    ...writes.ms,
   };
   const relative = Object.fromEntries(
     Object.entries(ms).map(([k, v]) => [k, Number((v / calibrationMs).toFixed(3))]),
@@ -356,7 +471,8 @@ async function main(argv: readonly string[]): Promise<number> {
     calibrationMs,
     ms,
     relative,
-    requests: { ...warm.requests, ...panel.requests, ...phase6.requests },
+    requests: { ...warm.requests, ...panel.requests, ...phase6.requests, ...writes.requests },
+    storage: writes.storage,
   };
   console.log(JSON.stringify(result, null, 2));
   if (argv.includes('--update')) {

@@ -2,8 +2,8 @@
   "calibrationMs": 3.358000000000004,
   "ms": {
     "cold: boot": 70.45299999999997,
-    "warm: tools/list": 2.1800000000000637,
-    "warm: whoami": 2.7719999999999345,
+    "warm: tools/list": 2.569,
+    "warm: whoami": 3.751,
     "warm: search_work_items": 3.6089999999999236,
     "warm: get_work_item": 2.8239999999998417,
     "cold: first /admin": 21.824,
@@ -25,12 +25,16 @@
     "warm-metadata: get_portfolio_tree": 3.3789999999999054,
     "cold-metadata: sprint_health": 12.764000000000124,
     "stored-metadata: sprint_health": 8.701999999999316,
-    "warm-metadata: sprint_health": 7.359000000000378
+    "warm-metadata: sprint_health": 7.359000000000378,
+    "write: update_status dry run": 2.129,
+    "write: update_status approved (elicitation)": 4.224,
+    "write: update_status approval page, call 1 (ask)": 1.797,
+    "write: update_status approval page, call 2 (apply)": 3.922
   },
   "relative": {
     "cold: boot": 20.981,
-    "warm: tools/list": 0.649,
-    "warm: whoami": 0.825,
+    "warm: tools/list": 0.765,
+    "warm: whoami": 1.117,
     "warm: search_work_items": 1.075,
     "warm: get_work_item": 0.841,
     "cold: first /admin": 6.499,
@@ -52,7 +56,11 @@
     "warm-metadata: get_portfolio_tree": 0.85,
     "cold-metadata: sprint_health": 3.213,
     "stored-metadata: sprint_health": 2.19,
-    "warm-metadata: sprint_health": 1.852
+    "warm-metadata: sprint_health": 1.852,
+    "write: update_status dry run": 0.634,
+    "write: update_status approved (elicitation)": 1.258,
+    "write: update_status approval page, call 1 (ask)": 0.535,
+    "write: update_status approval page, call 2 (apply)": 1.168
   },
   "requests": {
     "whoami": 1,
@@ -74,6 +82,16 @@
     "warm-metadata: get_portfolio_tree": 4,
     "cold-metadata: sprint_health": 24,
     "stored-metadata: sprint_health": 8,
-    "warm-metadata: sprint_health": 6
+    "warm-metadata: sprint_health": 6,
+    "write: update_status dry run": 2,
+    "write: update_status approved (elicitation)": 4,
+    "write: update_status approval page, call 1 (ask)": 2,
+    "write: update_status approval page, call 2 (apply)": 4
+  },
+  "storage": {
+    "write: update_status dry run": 0,
+    "write: update_status approved (elicitation)": 0,
+    "write: update_status approval page, call 1 (ask)": 3,
+    "write: update_status approval page, call 2 (apply)": 1
   }
 }
