@@ -145,16 +145,23 @@ grant names a tool its workspace does not enable). Check the result with a **dry
    already there, and which approval channel this client has. Nothing is sent, nothing is audited.
 3. **`confirm: true`** is required to apply. It is only a guard against accidents: it is **never** approval.
 4. **Approval.** A person sees the *whole* change and approves it (below). The approval is bound to a hash of the tool,
-   the actor, the target and every field with its old and new value; it is valid once and for a few minutes.
-5. **Re-read.** The target is read again. If it changed since the plan, the write is refused with `AB_WRITE_CONFLICT`
-   (plan again and ask again). If it already holds the new values (someone else made the same change), the call is an
-   idempotent no-op.
+   the actor, the target and every field with its old and new value; it is valid once and for a few minutes. It is
+   *found* here and *used up* only just before the send (step 7), so a refusal in steps 5 to 7 does not make the person
+   approve again.
+5. **Limit and re-read.** The write limiter takes its unit (below). The target is read again. If it changed since the
+   plan, the write is refused with `AB_WRITE_CONFLICT` (plan again; the approval is kept and still applies if the new
+   plan is the same change). If it already holds the new values (someone else made the same change), the approval is
+   used up and the call is an idempotent no-op.
 6. **Intent audit.** The intent is stored durably **before** the change is sent. If it cannot be stored the write is
-   refused (`AB_WRITE_AUDIT_UNAVAILABLE`).
-7. **Send once.** One request to Agility. It is never retried, not even after a timeout: the error then says the change
+   refused (`AB_WRITE_AUDIT_UNAVAILABLE`) and the approval is kept.
+7. **Send once.** The approval is used up first, with one atomic take: of two calls that hold the same approval exactly
+   one passes, the other is refused (`AB_WRITE_APPROVAL_DECLINED`, "already used") and its intent row gets an error
+   outcome saying nothing was sent. Then One request to Agility. It is never retried, not even after a timeout: the error then says the change
    may or may not have been applied, and to look at the item before repeating (this replaces the client's usual "try again" hint). A 2xx answer with an empty or unreadable body counts as applied: the result says the answer could not be read and not to repeat the write.
 8. **Outcome audit.** The result is recorded next to the intent. The answer notes that Agility may take a moment to show
-   the change.
+   the change. An intent row with no outcome row means the process died between the intent and its outcome or the
+   outcome could not be stored: the change may or may not have been made, so look at the item (a reconciliation list is
+   not built yet).
 
 A change already present at plan time is a no-op too: no approval, no audit, nothing sent.
 
@@ -191,7 +198,7 @@ the agent should ask what to change instead of repeating the call.
 
 How the elicitation works: on 2026-07-28 the first call returns `input_required` with the question and a sealed state; the
 client asks the person and repeats the call with the answer. The state is an HMAC over the nonce, the change hash, the actor
-and an expiry; the matching ledger entry is taken (once) when the answer arrives. A forged, replayed, expired or
+and an expiry; the matching ledger entry is read when the answer arrives and taken (once) just before the send. A forged, replayed, expired or
 other-change state never approves anything: the pipeline simply asks again. On a 2025-era connection that keeps its
 capabilities (stdio) the server sends an `elicitation/create` request instead. A stateless 2025-era HTTP request carries no
 capabilities, so it cannot be asked (verified in P0-07).
@@ -241,7 +248,8 @@ closed**: if the counters cannot be reached the write is refused (`AB_WRITE_LIMI
 - Over a limit: `AB_LIMIT_RATE` with the scope (`grant` or `deployment`), the limit and the seconds until the next hour.
   The refusal makes no read of the target and no send, and writes no intent audit row.
 - A unit is spent when the limiter runs and is not refunded: an approved write that turns out to be a conflict, an
-  already-applied no-op or a failed send still counts. A declined or unavailable approval counts nothing.
+  already-applied no-op or a failed send still counts. The approval itself survives a limiter refusal, a conflict and
+  an audit outage (D-204), so the person is not asked twice; it expires after ten minutes. A declined or unavailable approval counts nothing.
 - A window is a clock hour, so a burst across a boundary can reach twice the limit; an exact sliding window needs the
   optional Durable Object limiter (P3-12). The decisions are D-168 to D-171.
 

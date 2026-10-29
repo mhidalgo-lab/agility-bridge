@@ -15,11 +15,15 @@ export interface LedgerEntry {
   readonly expiresAt: number;
   /** The workspace the approval is for (grants and denials, P7-02): an approval never crosses workspaces. */
   readonly scope?: string;
+  /** Grants only: where the approval came from. Absent means the approval page (P7-02); `elicitation` is a push answer kept after a later refusal (P7-28). */
+  readonly via?: 'elicitation';
 }
 
 /** The part of the storage `kv` table the ledger needs (`KvStore` satisfies it structurally). */
 export interface LedgerStore {
   set(key: string, value: string, options?: { expiresAt?: number | null }): Promise<void>;
+  /** The live value without removing it (a read; P7-28). */
+  get(key: string): Promise<string | null>;
   /** Removes and returns a live value in one step: of concurrent callers exactly one gets it. */
   take(key: string): Promise<string | null>;
 }
@@ -53,6 +57,16 @@ export class ApprovalLedger {
     return this.#take(`wr:ok:${part(actor)}:${part(scope)}:${hash}`, scope);
   }
 
+  /** Reads a grant without using it up (P7-28): the pipeline consumes it with `takeGrant` just before the send. */
+  peekGrant(actor: string, hash: string, scope = ''): Promise<LedgerEntry | null> {
+    return this.#take(`wr:ok:${part(actor)}:${part(scope)}:${hash}`, scope, false);
+  }
+
+  /** Reads an open round without using it up (P7-28). */
+  peekRound(nonce: string, scope = ''): Promise<LedgerEntry | null> {
+    return this.#take(`wr:round:${part(nonce)}`, scope, false);
+  }
+
   /** Records that the person declined on the page (P7-02): the agent's next call is refused as declined, once. */
   deny(entry: LedgerEntry): Promise<void> {
     return this.#put(`wr:no:${part(entry.actor)}:${part(entry.scope ?? '')}:${entry.hash}`, entry);
@@ -66,8 +80,8 @@ export class ApprovalLedger {
     return this.#store.set(key, JSON.stringify(entry), { expiresAt: entry.expiresAt });
   }
 
-  async #take(key: string, scope?: string): Promise<LedgerEntry | null> {
-    const raw = await this.#store.take(key);
+  async #take(key: string, scope?: string, consume = true): Promise<LedgerEntry | null> {
+    const raw = await (consume ? this.#store.take(key) : this.#store.get(key));
     if (raw === null) return null;
     try {
       const e = JSON.parse(raw) as Record<string, unknown>;
@@ -88,6 +102,7 @@ export class ApprovalLedger {
         tool: e['tool'],
         expiresAt: e['expiresAt'],
         ...(stored === undefined ? {} : { scope: stored }),
+        ...(e['via'] === 'elicitation' ? { via: 'elicitation' as const } : {}),
       };
     } catch {
       return null;
@@ -107,6 +122,10 @@ export function memoryLedgerStore(clock: Clock, maxEntries = 1_000): LedgerStore
         if (data.size >= maxEntries && !oldest.done) data.delete(oldest.value);
       }
       data.set(key, { value, expiresAt: options?.expiresAt ?? Number.POSITIVE_INFINITY });
+    },
+    async get(key) {
+      const entry = data.get(key);
+      return entry !== undefined && entry.expiresAt > clock.now() ? entry.value : null;
     },
     async take(key) {
       const entry = data.get(key);

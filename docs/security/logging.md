@@ -99,7 +99,7 @@ carry `requestId`.
 | info | `write intent`, `write outcome` (stdio: the whole write audit, P7-01) | `phase`, `requestId`, `tool`, `operation`, `actor`, `workspaceId`, `instanceId`, `hash`, `target`, `fields` (names), `approval`, `status`, `errorCode` | [stdio.ts](../../apps/cli/src/stdio.ts) |
 | error | `write limiter failed; the write is refused` | `error` (class; none in stdio) | [writes.ts](../../packages/http-app/src/writes.ts), [stdio.ts](../../apps/cli/src/stdio.ts) |
 | info | `write applied` | `tool`, `change` (short hash), `approval` | [pipeline.ts](../../packages/core/src/writes/pipeline.ts) |
-| error | `write refused: intent audit failed`, `write outcome audit failed` | `tool`, `error` | [pipeline.ts](../../packages/core/src/writes/pipeline.ts) |
+| error | `write refused: intent audit failed`, `write outcome audit failed`, `write approval could not be kept`, `write approval could not be consumed` | `tool`, `error` | [pipeline.ts](../../packages/core/src/writes/pipeline.ts) |
 | warn | `AB_WRITE_APPROVAL=off: write tools change Agility without asking a person first…` | — | [stdio.ts](../../apps/cli/src/stdio.ts) |
 | error | `write runtime unavailable` | `requestId`, `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |
 | warn | `AB_WRITE_TOOLS is on, but AB_TOOLS names no write tool, so none is offered.` | — | [stdio.ts](../../apps/cli/src/stdio.ts) |

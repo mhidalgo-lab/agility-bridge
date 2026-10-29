@@ -340,3 +340,9 @@
 - **Recommendation:** (a), built. Real tools may show that 20 is too many or too few; P7-27 (request limits) owns the bound.
 - **Owner:** *(open; built as (a))*
 
+
+### D-204 — The approval is used up just before the send, not when it is found *(P7-28)*
+- **Context:** The approval (a page grant, an elicitation round) was taken from the ledger before the limiter, the re-read and the intent audit, so a limiter refusal, a conflict or an audit outage made the person approve again (review quality 8). Keeping it must never let one approval send twice.
+- **Options:** (a) find the approval with a read, run the limiter, the re-read and the intent audit, then use it up with the atomic `take` immediately before the send; a lost take refuses the call, writes an error outcome ("nothing was sent") and sends nothing; a push elicitation answer, which is stored nowhere, is written as a grant (`via: elicitation`) only when a later step refuses, so the repeated call is not asked again; (b) keep taking it first and document the cost; (c) take it last, after the send (an approval that is never consumed if the process dies: unsafe).
+- **Recommendation:** (a), built. The take is still the single-use guarantee (L-073); the cost is that two concurrent calls on one approval can both spend a limiter unit and write an intent row, of which one ends as an error outcome with no send. A conflict keeps the approval only when the new plan is the same change (the hash includes the old values).
+- **Owner:** *(open; built as (a))*

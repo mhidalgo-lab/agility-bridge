@@ -90,6 +90,8 @@ export type ChannelReply =
 /** One way of getting a person's approval for this request. */
 export interface ApprovalChannelPort {
   readonly kind: 'elicitation' | 'page';
+  /** The answer comes within this very call (push elicitation) and is kept nowhere: a refusal after it would lose it (P7-28). */
+  readonly sameCall?: boolean;
   /** A retried multi round-trip round: the (untrusted, sealed) state the client echoed and its answer. */
   readonly resume?: { readonly state: string; readonly answer: 'approve' | 'decline' | 'none' };
   ask(prompt: ApprovalPrompt): Promise<ChannelReply>;

@@ -483,6 +483,10 @@ describe('the out-of-band grant (seam for P7-02): bound to the change, the actor
     const inner = memoryLedgerStore(systemClock);
     const store = {
       set: inner.set,
+      get: async (key: string) => {
+        reads.push(key);
+        return inner.get(key);
+      },
       take: async (key: string) => {
         reads.push(key);
         return inner.take(key);
@@ -670,6 +674,223 @@ describe('multi round-trip approval (2026-07-28): sealed state, single use, boun
         writeContext({ ...runtime, channel: round({ state: signal.state, answer: 'approve' }) }),
       ),
     ).rejects.toBeInstanceOf(InputRequiredSignal);
+    expect(fake.sends).toHaveLength(0);
+  });
+});
+
+describe('the approval is used up only when the send is attempted (P7-28)', () => {
+  async function grantFor(runtime: ReturnType<typeof makeRuntime>, status = 'Done') {
+    const m = canonicalize(
+      {
+        operation: 'update_status',
+        target: { assetType: 'Story', oid: 'Story:1', number: 'B-00001' },
+        changes: [{ field: 'Status', old: 'In Progress', new: status }],
+      },
+      { Story: ['Status'] },
+    );
+    const hash = await mutationHash(TEST_TOOL, ACTOR.id, m);
+    await runtime.ledger.grant({
+      hash,
+      actor: ACTOR.id,
+      tool: TEST_TOOL,
+      expiresAt: systemClock.now() + 60_000,
+      scope: 'ws-1',
+    });
+  }
+
+  it('a limiter refusal leaves a page grant usable, once', async () => {
+    const fake = new FakeItems();
+    let refuse = true;
+    const runtime = makeRuntime({
+      page: answeringChannel(true, 'page'),
+      limiter: {
+        check: async () => {
+          if (refuse) throw new AbError(ErrorCode.LimitRate, 'Write limit reached.');
+        },
+      },
+    });
+    const ctx = writeContext(runtime);
+    const tool = makeTestWriteTool(fake);
+    await grantFor(runtime);
+    expect((await refused(run(tool, CONFIRMED, ctx))).code).toBe(ErrorCode.LimitRate);
+    expect(fake.sends).toHaveLength(0);
+    refuse = false;
+    expect(await run(tool, CONFIRMED, ctx)).toMatchObject({
+      structured: { applied: true, approval: 'page' },
+    });
+    expect(fake.sends).toHaveLength(1);
+    // Used up now: a third call needs a new approval and sends nothing.
+    const item = fake.items.get('Story:1');
+    if (item) Object.assign(item, { status: 'In Progress', version: 9 });
+    expect((await refused(run(tool, CONFIRMED, ctx))).code).toBe(ErrorCode.WriteApprovalUnavailable);
+    expect(fake.sends).toHaveLength(1);
+  });
+
+  it('a conflict (the item moved since the plan) leaves the grant usable for the same change', async () => {
+    const fake = new FakeItems();
+    const runtime = makeRuntime({ page: answeringChannel(true, 'page') });
+    const ctx = writeContext(runtime);
+    const tool = makeTestWriteTool(fake);
+    await grantFor(runtime);
+    fake.beforeReread = () => {
+      const item = fake.items.get('Story:1');
+      if (item) item.version++;
+    };
+    expect((await refused(run(tool, CONFIRMED, ctx))).code).toBe(ErrorCode.WriteConflict);
+    expect(fake.sends).toHaveLength(0);
+    expect(await run(tool, CONFIRMED, ctx)).toMatchObject({ structured: { applied: true } });
+    expect(fake.sends).toHaveLength(1);
+  });
+
+  it('an audit outage leaves the grant usable, and nothing was sent', async () => {
+    const fake = new FakeItems();
+    const runtime = makeRuntime({ page: answeringChannel(true, 'page') });
+    const ctx = writeContext(runtime);
+    const tool = makeTestWriteTool(fake);
+    await grantFor(runtime);
+    runtime.audit.failIntent = true;
+    expect((await refused(run(tool, CONFIRMED, ctx))).code).toBe(ErrorCode.WriteAuditUnavailable);
+    expect(fake.sends).toHaveLength(0);
+    runtime.audit.failIntent = false;
+    await run(tool, CONFIRMED, ctx);
+    expect(fake.sends).toHaveLength(1);
+  });
+
+  it('two concurrent calls on one grant send exactly once; the other is refused and audited as not sent', async () => {
+    const fake = new FakeItems();
+    const runtime = makeRuntime({ page: answeringChannel(true, 'page') });
+    const ctx = writeContext(runtime);
+    const tool = makeTestWriteTool(fake);
+    await grantFor(runtime);
+    // Hold every call at its intent audit so all three have read the grant before any of them uses it up.
+    const intent = runtime.audit.intent.bind(runtime.audit);
+    runtime.audit.intent = async (record) => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return intent(record);
+    };
+    const results = await Promise.allSettled([
+      run(tool, CONFIRMED, ctx),
+      run(tool, CONFIRMED, ctx),
+      run(tool, CONFIRMED, ctx),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(fake.sends).toHaveLength(1);
+    const lost = results.filter((r) => r.status === 'rejected');
+    expect(lost).toHaveLength(2);
+    for (const r of lost) {
+      expect(((r as PromiseRejectedResult).reason as AbError).code).toBe(ErrorCode.WriteApprovalDeclined);
+    }
+    const outcomes = runtime.audit.records.filter((r) => r.phase === 'outcome');
+    expect(outcomes.filter((r) => r.status === 'ok')).toHaveLength(1);
+    expect(outcomes.filter((r) => r.status === 'error' && r.note?.includes('nothing was sent'))).toHaveLength(
+      2,
+    );
+  });
+
+  const roundChannel = (resume?: {
+    state: string;
+    answer: 'approve' | 'decline' | 'none';
+  }): ApprovalChannelPort => ({
+    kind: 'elicitation',
+    ...(resume === undefined ? {} : { resume }),
+    ask: async () => ({ status: 'needs_input' }),
+  });
+
+  it('a limiter refusal leaves an approved round usable, once; concurrent retries send once', async () => {
+    const fake = new FakeItems();
+    let refuse = true;
+    const runtime = makeRuntime({
+      limiter: {
+        check: async () => {
+          if (refuse) throw new AbError(ErrorCode.LimitRate, 'Write limit reached.');
+        },
+      },
+    });
+    const tool = makeTestWriteTool(fake);
+    let signal: InputRequiredSignal | undefined;
+    try {
+      await run(tool, CONFIRMED, writeContext({ ...runtime, channel: roundChannel() }));
+    } catch (e) {
+      signal = e as InputRequiredSignal;
+    }
+    if (signal === undefined) throw new Error('expected input_required');
+    const retry = writeContext({
+      ...runtime,
+      channel: roundChannel({ state: signal.state, answer: 'approve' }),
+    });
+    expect((await refused(run(tool, CONFIRMED, retry))).code).toBe(ErrorCode.LimitRate);
+    refuse = false;
+    const results = await Promise.allSettled([run(tool, CONFIRMED, retry), run(tool, CONFIRMED, retry)]);
+    expect(fake.sends).toHaveLength(1);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    // The loser either lost the take (declined) or, arriving after it, found no round and is asked again.
+    const loser = results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+    expect(
+      loser?.reason instanceof InputRequiredSignal ||
+        (loser?.reason as AbError | undefined)?.code === ErrorCode.WriteApprovalDeclined,
+    ).toBe(true);
+  });
+
+  it('a push answer is kept after a refusal: the repeated call is not asked again', async () => {
+    const fake = new FakeItems();
+    let refuse = true;
+    const asked: string[] = [];
+    const channel: ApprovalChannelPort = {
+      kind: 'elicitation',
+      sameCall: true,
+      async ask(prompt) {
+        asked.push(prompt.message);
+        return { status: 'answered', approved: true };
+      },
+    };
+    const runtime = makeRuntime({
+      channel,
+      limiter: {
+        check: async () => {
+          if (refuse) throw new AbError(ErrorCode.LimitRate, 'Write limit reached.');
+        },
+      },
+    });
+    const ctx = writeContext(runtime);
+    const tool = makeTestWriteTool(fake);
+    expect((await refused(run(tool, CONFIRMED, ctx))).code).toBe(ErrorCode.LimitRate);
+    refuse = false;
+    const out = await run(tool, CONFIRMED, ctx);
+    expect(out.structured).toMatchObject({ applied: true, approval: 'elicitation' });
+    expect(asked).toHaveLength(1);
+    expect(fake.sends).toHaveLength(1);
+    // Used up: the next identical call asks again.
+    const item = fake.items.get('Story:1');
+    if (item) Object.assign(item, { status: 'In Progress', version: 9 });
+    await run(tool, CONFIRMED, ctx);
+    expect(asked).toHaveLength(2);
+  });
+
+  it('a kept push answer is bound to the change: another value asks again', async () => {
+    const fake = new FakeItems();
+    const asked: string[] = [];
+    const channel: ApprovalChannelPort = {
+      kind: 'elicitation',
+      sameCall: true,
+      async ask(prompt) {
+        asked.push(prompt.message);
+        return { status: 'answered', approved: asked.length > 1 };
+      },
+    };
+    const runtime = makeRuntime({
+      channel,
+      limiter: {
+        check: async () => {
+          throw new AbError(ErrorCode.LimitRate, 'Write limit reached.');
+        },
+      },
+    });
+    const ctx = writeContext(runtime);
+    const tool = makeTestWriteTool(fake);
+    await refused(run(tool, CONFIRMED, ctx)); // declined (first answer is no): nothing kept
+    await refused(run(tool, { ...CONFIRMED, status: 'Blocked' }, ctx)); // approved then limiter refusal: kept for Blocked
+    await refused(run(tool, CONFIRMED, ctx)); // Done is not the kept change
+    expect(asked).toHaveLength(3);
     expect(fake.sends).toHaveLength(0);
   });
 });
