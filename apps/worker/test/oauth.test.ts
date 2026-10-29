@@ -22,6 +22,7 @@ import {
   type ActivityHostShape,
   defineDeviceActivitySuite,
   defineOAuthSuite,
+  defineOAuthWriteScopeSuite,
   defineRefreshFamilySuite,
   type OAuthHost,
   type RefreshHostShape,
@@ -58,7 +59,7 @@ async function buffered(res: Response): Promise<Response> {
 }
 
 async function workerHost(
-  shape?: Partial<RefreshHostShape> & ActivityHostShape & Partial<DocumentHostsShape>,
+  shape?: Partial<RefreshHostShape> & ActivityHostShape & Partial<DocumentHostsShape> & { writes?: boolean },
 ): Promise<OAuthHost> {
   const key = generateMasterKey(1);
   const adminToken = generateAdminToken();
@@ -99,6 +100,7 @@ async function workerHost(
         ...(shape?.idleTtlSeconds === undefined ? {} : { AB_OAUTH_IDLE_TTL: String(shape.idleTtlSeconds) }),
         ...(shape?.cimdHosts === undefined ? {} : { AB_OAUTH_CIMD_HOSTS: shape.cimdHosts.join(',') }),
         AB_ACCESS_CACHE_TTL: '0',
+        ...(shape?.writes === true ? { AB_WRITE_TOOLS: 'on' } : {}),
         // One Worker serves a whole test (dozens of requests from one address); limits have their own tests.
         AB_RATE_LIMIT_AUTH_FAILURES: '1000',
       },
@@ -195,6 +197,7 @@ async function workerHost(
 }
 
 defineOAuthSuite('workerd with D1 (Worker)', () => workerHost());
+defineOAuthWriteScopeSuite('workerd with D1 (Worker)', (shape) => workerHost(shape));
 defineRefreshFamilySuite('workerd with D1 (Worker)', workerHost);
 defineDeviceActivitySuite('workerd with D1 (Worker)', workerHost);
 defineOAuthClientSuite('workerd with D1 (Worker)', workerHost, { matrix: false });

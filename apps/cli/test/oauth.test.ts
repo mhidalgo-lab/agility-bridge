@@ -21,6 +21,7 @@ import {
   type ActivityHostShape,
   defineDeviceActivitySuite,
   defineOAuthSuite,
+  defineOAuthWriteScopeSuite,
   defineRefreshFamilySuite,
   type OAuthHost,
   type RefreshHostShape,
@@ -37,7 +38,7 @@ beforeAll(async () => {
 afterAll(() => agility.close());
 
 async function sqliteHost(
-  shape?: Partial<RefreshHostShape> & ActivityHostShape & Partial<DocumentHostsShape>,
+  shape?: Partial<RefreshHostShape> & ActivityHostShape & Partial<DocumentHostsShape> & { writes?: boolean },
 ): Promise<OAuthHost> {
   const dir = mkdtempSync(join(tmpdir(), 'ab-oauth-'));
   const key = generateMasterKey(1);
@@ -59,6 +60,7 @@ async function sqliteHost(
       ...(shape?.idleTtlSeconds === undefined ? {} : { AB_OAUTH_IDLE_TTL: String(shape.idleTtlSeconds) }),
       ...(shape?.cimdHosts === undefined ? {} : { AB_OAUTH_CIMD_HOSTS: shape.cimdHosts.join(',') }),
       AB_ACCESS_CACHE_TTL: '0',
+      ...(shape?.writes === true ? { AB_WRITE_TOOLS: 'on' } : {}),
       AB_ALLOW_HTTP_INSTANCES: 'on',
       AB_ENVIRONMENT: 'production',
       // The client address comes from the proxy header, so a test can be several addresses (P5-09).
@@ -170,6 +172,7 @@ async function sqliteHost(
 }
 
 defineOAuthSuite('SQLite storage (agility-bridge serve)', () => sqliteHost());
+defineOAuthWriteScopeSuite('SQLite storage (agility-bridge serve)', (shape) => sqliteHost(shape));
 defineRefreshFamilySuite('SQLite storage (agility-bridge serve)', sqliteHost);
 defineDeviceActivitySuite('SQLite storage (agility-bridge serve)', sqliteHost);
 defineOAuthClientSuite('SQLite storage (agility-bridge serve)', sqliteHost);

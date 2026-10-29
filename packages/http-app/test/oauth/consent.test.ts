@@ -30,9 +30,12 @@ async function pkce(): Promise<{ verifier: string; challenge: string }> {
   return { verifier, challenge: b64u(digest) };
 }
 
-async function server() {
+async function server(over: { writeSwitch?: boolean } = {}) {
   // Many registrations from one address: the per-address registration limit (P5-03) is not under test here.
-  const t = await setup({ oauth: { registrationIpLimit: 1000, registrationMaxClients: 500 } });
+  const t = await setup({
+    oauth: { registrationIpLimit: 1000, registrationMaxClients: 500 },
+    ...(over.writeSwitch === true ? { writeSwitch: true } : {}),
+  });
   return t;
 }
 
@@ -249,6 +252,51 @@ describe('sign-in and consent (P5-04)', () => {
     expect(typeof list[0]?.['lastUsedAt']).toBe('number');
     expect(Math.abs(Date.now() - (list[0]?.['lastUsedAt'] as number))).toBeLessThan(5 * 60_000);
     expect(await issued(t)).toHaveLength(1);
+  });
+
+  it('offers mcp:write as its own unticked box, only when asked for, never carried over, and grants it only when ticked (P7-24)', async () => {
+    const t = await server({ writeSwitch: true });
+    const w = t.w;
+    await w.storage.workspaces.update(w.ids.workspaceA, {
+      enabledTools: ['whoami', 'add_comment'],
+      writePolicy: { enabled: true },
+    });
+    await w.storage.grants.update(w.ids.aliceGrant, { tools: ['whoami', 'add_comment'] });
+    const clientId = await register(t);
+    const asked = await authRequest(t, clientId, { extra: { scope: 'mcp:read mcp:write' } });
+    const cookie = await login(t, 'alice@example.test', asked.path);
+    const page = await consentPage(t, asked, cookie);
+    // A separate box, never pre-ticked, naming the write tools.
+    expect(page.form.html).toMatch(/<input[^>]*type="checkbox"[^>]*name="write"[^>]*>/);
+    expect(page.form.html).not.toMatch(/name="write"[^>]*checked/);
+    expect(page.form.html).toContain('add_comment');
+    // Not ticked: the token is read-only.
+    const plain = await post(t, page.form, cookie, body(page.form));
+    const plainToken = await exchange(t, asked, codeOf(plain) as string);
+    expect(((await plainToken.json()) as { scope: string }).scope.split(' ')).not.toContain('mcp:write');
+    // A new request is a new page: nothing is remembered from the first, and ticking grants the scope.
+    const again = await authRequest(t, clientId, { extra: { scope: 'mcp:read mcp:write' } });
+    const second = await consentPage(t, again, cookie);
+    expect(second.form.html).not.toMatch(/name="write"[^>]*checked/);
+    const ticked = await post(t, second.form, cookie, body(second.form, { write: '1' }));
+    const token = await exchange(t, again, codeOf(ticked) as string);
+    expect(((await token.json()) as { scope: string }).scope.split(' ')).toContain('mcp:write');
+    // An app that did not ask gets no box, and a forged tick is ignored (never granted).
+    const quiet = await authRequest(t, clientId);
+    const third = await consentPage(t, quiet, cookie);
+    expect(third.form.html).not.toContain('name="write"');
+    const forged = await post(t, third.form, cookie, body(third.form, { write: '1' }));
+    const forgedToken = await exchange(t, quiet, codeOf(forged) as string);
+    expect(((await forgedToken.json()) as { scope: string }).scope.split(' ')).not.toContain('mcp:write');
+  });
+
+  it('shows no write box when the server switch is off, even if the app asks', async () => {
+    const t = await server();
+    const clientId = await register(t);
+    const asked = await authRequest(t, clientId, { extra: { scope: 'mcp:read mcp:write' } });
+    const cookie = await login(t, 'alice@example.test', asked.path);
+    const page = await consentPage(t, asked, cookie);
+    expect(page.form.html).not.toContain('name="write"');
   });
 
   it('shows the page with the strict policy: no framing, no inline script, the redirect origin in form-action', async () => {

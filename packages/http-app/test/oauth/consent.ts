@@ -5,6 +5,8 @@
 import type { OAuthConsentHandler } from '../../src/index.ts';
 
 export const APPROVE_HEADER = 'x-test-approve';
+/** `1` = the person ticked the separate "allow changes" box (P7-24). */
+export const WRITE_HEADER = 'x-test-write';
 
 export const testConsent: OAuthConsentHandler = async (c, api) => {
   const who = c.req.header(APPROVE_HEADER);
@@ -12,7 +14,7 @@ export const testConsent: OAuthConsentHandler = async (c, api) => {
     return new Response(null, { status: 302, headers: { location: api.deny() } });
   }
   const [userId, grantId] = who.split('|') as [string, string];
-  const result = await api.approve({ userId, grantId });
+  const result = await api.approve({ userId, grantId, write: c.req.header(WRITE_HEADER) === '1' });
   if (!result.ok) {
     return new Response(JSON.stringify({ refused: result.reason }), {
       status: 403,

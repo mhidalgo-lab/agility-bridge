@@ -7,11 +7,16 @@ import {
   defineDeviceActivitySuite,
   defineOAuthCacheSuite,
   defineOAuthSuite,
+  defineOAuthWriteScopeSuite,
   defineRefreshFamilySuite,
 } from './suite.ts';
 
 defineOAuthSuite('memory storage', () => memoryHost());
 defineOAuthClientSuite('memory storage', () => memoryHost());
+defineOAuthWriteScopeSuite('memory storage', (shape) => memoryHost(shape));
+defineOAuthWriteScopeSuite('memory storage, per-request isolation (the Workers shape)', (shape) =>
+  memoryHost({ ...shape, request: true }),
+);
 defineOAuthAdminSuite('memory storage', () => memoryHost());
 defineOAuthAdminSuite('memory storage, per-request isolation (the Workers shape)', () =>
   memoryHost({ request: true }),

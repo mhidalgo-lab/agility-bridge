@@ -73,9 +73,15 @@ export const OAUTH_METADATA_PATH = '/.well-known/oauth-authorization-server';
 /** RFC 9728 §3.1: the well-known prefix is inserted before the resource's path (`…/w/{slug}/mcp`). */
 export const OAUTH_RESOURCE_METADATA_PREFIX = '/.well-known/oauth-protected-resource';
 
-/** The scope every MCP token carries (read-only tools). Grants, not scopes, decide what a token may do. */
+/** The scope every MCP token carries (read tools). Grants, not scopes, decide what a token may do. */
 export const MCP_SCOPE = 'mcp:read';
-export const OAUTH_SCOPES: readonly string[] = Object.freeze([MCP_SCOPE, 'offline_access']);
+/**
+ * The scope that lets a token see and run write tools (P7-24, ADR-0013). Only one layer among several: it is requested by
+ * the client, ticked separately on the consent screen (never pre-ticked, never remembered) and still needs the server
+ * switch, the workspace and grant tool lists and a personal credential.
+ */
+export const MCP_WRITE_SCOPE = 'mcp:write';
+export const OAUTH_SCOPES: readonly string[] = Object.freeze([MCP_SCOPE, MCP_WRITE_SCOPE, 'offline_access']);
 
 export const DEFAULT_OAUTH_ACCESS_TTL_S = 3600;
 export const DEFAULT_OAUTH_REFRESH_TTL_S: number = 30 * 86_400;
@@ -260,14 +266,19 @@ export interface OAuthClientRevocation {
 
 export type OAuthApproval =
   | { readonly ok: true; readonly redirectTo: string; readonly scope: readonly string[] }
-  | { readonly ok: false; readonly reason: DenyReason | 'principal_mismatch' | 'device_limit' | 'busy' };
+  | {
+      readonly ok: false;
+      readonly reason: DenyReason | 'principal_mismatch' | 'device_limit' | 'busy' | 'write_unavailable';
+    };
 
 /** One of a person's grants on the requested workspace that an app could be given (it resolves right now). */
 export interface OAuthGrantOption {
   readonly id: string;
   readonly label: string | null;
-  /** Tool names of the effective access (read-only: writes are off for OAuth). */
+  /** Tool names of the effective access without `mcp:write` (read tools). */
   readonly tools: readonly string[];
+  /** Write tools this access would give a token that holds `mcp:write` (P7-24); empty when it cannot write. */
+  readonly writeTools: readonly string[];
   readonly projectCount: number;
   /** Epoch ms the access ends, or null. */
   readonly expiresAt: number | null;
@@ -296,6 +307,11 @@ export interface OAuthConsentApi {
     readonly grantId: string;
     /** The device name (already checked with {@link deviceLabel}). */
     readonly label?: string | null;
+    /**
+     * The person ticked the separate write box (P7-24). Honoured only when the app asked for `mcp:write` and this
+     * access can write (`write_unavailable` otherwise); never inferred, never remembered.
+     */
+    readonly write?: boolean;
   }): Promise<OAuthApproval>;
   /** The `access_denied` redirect (with `state` and `iss`). `userId`: who denied, for the audit row. */
   deny(description?: string, userId?: string): string;
@@ -778,7 +794,8 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     const built = new mod.OAuthAuthorizationServer<ProviderEnv>({
       issuer,
       resources: list,
-      scopesSupported: [...OAUTH_SCOPES],
+      // `mcp:write` is offered only where the server switch for writes is on (P7-24).
+      scopesSupported: OAUTH_SCOPES.filter((s) => s !== MCP_WRITE_SCOPE || deps.access.writesEnabled),
       authorizeEndpoint: OAUTH_AUTHORIZE_PATH,
       tokenEndpoint: OAUTH_TOKEN_PATH,
       accessTokenTTL: accessTtl,
@@ -837,7 +854,13 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
   const decide = async (
     props: { readonly grantId: string; readonly workspaceId: string; readonly userId: string },
     slug: string,
-    who: { readonly tokenId: string; readonly clientId: string; readonly expiresAt: number | null },
+    who: {
+      readonly tokenId: string;
+      readonly clientId: string;
+      readonly expiresAt: number | null;
+      /** The token holds `mcp:write` (P7-24): the access layer's write-enablement input. Absent means false. */
+      readonly writeScope?: boolean;
+    },
   ): Promise<
     | { readonly ok: true; readonly access: EffectiveAccess }
     | { readonly ok: false; readonly reason: DenyReason | 'principal_mismatch' }
@@ -850,7 +873,7 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
         clientId: who.clientId,
         grantId: props.grantId,
         workspaceId: props.workspaceId,
-        writeScope: false,
+        writeScope: who.writeScope === true,
         expiresAt: who.expiresAt,
       },
       slug,
@@ -1366,6 +1389,18 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     // A device that was disconnected, replaced or pushed out is gone before anything else is looked at.
     if (await revokedMeanwhile(refreshToken, helpers)) return invalid();
 
+    // A refresh never adds scope (RFC 6749 §6, P7-24): asking for `mcp:write` on an authorization that was not given it
+    // is refused before the token is spent, so the client keeps its refresh token and can retry without the scope.
+    if ((form.get('scope') ?? '').split(' ').includes(MCP_WRITE_SCOPE)) {
+      const record = (await env.OAUTH_KV.get(`grant:${userId}:${grantId}`, { type: 'json' })) as {
+        readonly scope?: unknown;
+      } | null;
+      const held = Array.isArray(record?.scope) ? (record?.scope as unknown[]) : [];
+      if (!held.includes(MCP_WRITE_SCOPE)) {
+        return jsonError(400, 'invalid_scope', 'mcp:write was not granted to this authorization.');
+      }
+    }
+
     const issued = (reused: boolean, clientId: string | null): void =>
       audit(
         {
@@ -1451,6 +1486,11 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       if (requested.length > 0 && !requested.some((s) => granted.includes(s))) {
         return jsonError(400, 'invalid_scope', 'None of the requested scopes were granted');
       }
+      // RFC 6749 §6: a refresh never adds scope. `mcp:write` is named because it is the one that changes what a token
+      // may do (P7-24); asking for it on a grant that was not given it is refused, whatever else is asked.
+      if (requested.includes(MCP_WRITE_SCOPE) && !granted.includes(MCP_WRITE_SCOPE)) {
+        return jsonError(400, 'invalid_scope', 'mcp:write was not granted to this authorization.');
+      }
       if (typeof grant.expiresAt === 'number' && grant.expiresAt - Math.floor(clock.now() / 1000) < 60) {
         return invalid('Refresh token has expired');
       }
@@ -1470,7 +1510,13 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       const decision = await decide(
         { grantId: props.grantId, workspaceId: props.workspaceId, userId },
         props.workspaceSlug,
-        { tokenId, clientId: successor.clientId, expiresAt: null },
+        // A refresh keeps the scope the token had: the successor carries the grant's scope, never more (P7-24).
+        {
+          tokenId,
+          clientId: successor.clientId,
+          expiresAt: null,
+          writeScope: granted.includes(MCP_WRITE_SCOPE),
+        },
       );
       if (!decision.ok) {
         const keep = isRecoverableRefusal(decision.reason);
@@ -1769,7 +1815,9 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
         JSON.stringify({
           resource: resourceUrl(slug),
           authorization_servers: [issuer],
-          scopes_supported: [MCP_SCOPE],
+          // `mcp:write` only on a server whose write switch is on; per workspace it is decided at consent (an
+          // unauthenticated document must not say which workspaces allow writes: no slug probing).
+          scopes_supported: deps.access.writesEnabled ? [MCP_SCOPE, MCP_WRITE_SCOPE] : [MCP_SCOPE],
           bearer_methods_supported: ['header'],
         }),
         // The app's own `no-store` applies to it like to every response (D-65).
@@ -2376,7 +2424,13 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       const client: ClientInfo | null = await helpers.lookupClient(authRequest.clientId);
       if (client === null) return jsonError(400, 'invalid_client', 'Unknown client.');
       const requested = authRequest.scope;
-      const scope = [MCP_SCOPE, ...(requested.includes('offline_access') ? ['offline_access'] : [])];
+      // What the client asked for. `mcp:write` is kept only on a server with writes on; whether it is *given* is the
+      // person's separate choice at `approve()` (P7-24).
+      const scope = [
+        MCP_SCOPE,
+        ...(requested.includes(MCP_WRITE_SCOPE) && deps.access.writesEnabled ? [MCP_WRITE_SCOPE] : []),
+        ...(requested.includes('offline_access') ? ['offline_access'] : []),
+      ];
       const request: OAuthAuthorizationRequest = Object.freeze({
         clientId: authRequest.clientId,
         clientName: client.clientName ?? null,
@@ -2421,10 +2475,20 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
               expiresAt: null,
             });
             if (!decision.ok) continue;
+            // The tools this access would give with `mcp:write`, only worked out when the app asked for it.
+            const writable = scope.includes(MCP_WRITE_SCOPE)
+              ? await decide({ grantId: g.id, workspaceId: workspace.id, userId }, slug, {
+                  tokenId: 'oauth_pending',
+                  clientId: authRequest.clientId,
+                  expiresAt: null,
+                  writeScope: true,
+                })
+              : null;
             options.push({
               id: g.id,
               label: g.label,
               tools: decision.access.tools,
+              writeTools: writable?.ok === true ? writable.access.writeTools : [],
               projectCount: decision.access.projects.allowed.length,
               expiresAt: decision.access.expiresAt,
             });
@@ -2444,16 +2508,18 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
           userId,
           grantId,
           label,
+          write,
         }: {
           readonly userId: string;
           readonly grantId: string;
           readonly label?: string | null;
+          readonly write?: boolean;
         }) => {
           if (used) throw new Error('an authorization request is approved at most once');
           used = true;
           const workspace = await storage.workspaces.getBySlug(slug);
           const refused = (
-            reason: DenyReason | 'principal_mismatch' | 'device_limit' | 'busy',
+            reason: DenyReason | 'principal_mismatch' | 'device_limit' | 'busy' | 'write_unavailable',
           ): OAuthApproval => {
             audit(
               {
@@ -2478,6 +2544,24 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
             expiresAt: null,
           });
           if (!decision.ok) return refused(decision.reason);
+          // `mcp:write` (P7-24): given only when the person ticked it for this request and the same resolver, asked as a
+          // token holding the scope, would give this access a write tool. Anything else is refused, never downgraded
+          // silently: the person must know what they approved.
+          const withWrite = write === true;
+          if (withWrite) {
+            const writable = scope.includes(MCP_WRITE_SCOPE)
+              ? await decide({ grantId, workspaceId: workspace.id, userId }, slug, {
+                  tokenId: 'oauth_pending',
+                  clientId: authRequest.clientId,
+                  expiresAt: null,
+                  writeScope: true,
+                })
+              : null;
+            if (writable === null || !writable.ok || writable.access.writeTools.length === 0) {
+              return refused('write_unavailable');
+            }
+          }
+          const granted = scope.filter((s) => s !== MCP_WRITE_SCOPE || withWrite);
           const props: OAuthGrantProps = {
             grantId,
             workspaceId: workspace.id,
@@ -2509,7 +2593,7 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
               // T25: grant metadata is stored unencrypted: the access grant id and workspace id (opaque) and the device
               // name the person typed (plain text, length-limited), never an email or other personal data.
               metadata: { grant: grantId, workspace: workspace.id, ...(label ? { label } : {}) },
-              scope: [...scope],
+              scope: [...granted],
               props,
               // A request alone must never end a device (relic-bridge H1, L-090): replacement waits for the code exchange.
               revokeExistingGrants: false,
@@ -2549,10 +2633,11 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
               grantId,
               workspaceId: workspace.id,
               clientId: authRequest.clientId,
+              details: { scope: granted.join(' ') },
             },
             c,
           );
-          return { ok: true as const, redirectTo, scope };
+          return { ok: true as const, redirectTo, scope: granted };
         },
       });
       return api;
@@ -2586,7 +2671,13 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       const decision = await decide(
         { grantId: props.grantId, workspaceId: props.workspaceId, userId: props.userId },
         slug,
-        { tokenId, clientId: validated.clientId, expiresAt: validated.expiresAt * 1000 },
+        {
+          tokenId,
+          clientId: validated.clientId,
+          expiresAt: validated.expiresAt * 1000,
+          // The scope the token carries is the only input (P7-24): the provider signs it into the grant.
+          writeScope: validated.scope.includes(MCP_WRITE_SCOPE),
+        },
       );
       if (!decision.ok) return { ok: false, stage: 'access', tokenId, reason: decision.reason };
       await touchDevice(props.userId, providerGrant);
