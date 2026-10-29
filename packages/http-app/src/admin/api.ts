@@ -17,7 +17,14 @@ import {
   type ToolInfo,
 } from '@agility-bridge/auth';
 import { type Clock, COMPOSITE_SIBLINGS, CORE_TOOLS, type Logger } from '@agility-bridge/core';
-import type { AccessToken, AuditKind, AuditStatus, Credential, Storage } from '@agility-bridge/storage';
+import type {
+  AccessToken,
+  AuditEntry,
+  AuditKind,
+  AuditStatus,
+  Credential,
+  Storage,
+} from '@agility-bridge/storage';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { LinearRouter } from 'hono/router/linear-router';
@@ -25,6 +32,7 @@ import type { RequestLimits } from '../app.ts';
 import type { AuditWriter } from '../audit.ts';
 import { CSRF_HEADER, isUnsafeMethod, type SessionManager } from '../session.ts';
 import { AdminError, errorBody, toAdminError } from './errors.ts';
+import { writeStats } from './write-stats.ts';
 
 export const ADMIN_BASE = '/api/admin/v1';
 const MAX_ADMIN_BODY_BYTES = 64 * 1024;
@@ -382,6 +390,8 @@ const TokenListQuery = z.object({
     .openapi({ description: 'The `next` of the previous page; anything else is a 422.' }),
   limit: z.coerce.number().int().min(1).max(200).optional(),
 });
+/** Pages of 1,000 write rows the statistics read at most (three queries). */
+const WRITE_STATS_PAGES = 3;
 const AuditOut = z.object({}).passthrough().openapi('AuditEntry');
 const Warnings = z.array(z.string());
 const ErrorOut = z
@@ -482,6 +492,39 @@ const AuditStatsQuery = z.object({
   to: z.coerce.number().int().min(0).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
+const WriteStatsQuery = z.object({
+  workspaceId: z.string().max(128).optional(),
+  from: z.coerce.number().int().min(0).optional(),
+  to: z.coerce.number().int().min(0).optional(),
+});
+const WriteStatsRowOut = z.object({
+  key: z.string(),
+  writes: z.number(),
+  ok: z.number(),
+  error: z.number(),
+  noOutcome: z.number(),
+  inProgress: z.number(),
+});
+const WriteStatsOut = z
+  .object({
+    byTool: z.array(WriteStatsRowOut),
+    byChannel: z.array(WriteStatsRowOut),
+    total: WriteStatsRowOut,
+    unpaired: z.array(
+      z.object({
+        intentId: z.string(),
+        ts: z.number(),
+        tool: z.string(),
+        targetType: z.string().nullable(),
+        targetId: z.string().nullable(),
+        workspaceId: z.string().nullable(),
+        userId: z.string().nullable(),
+      }),
+    ),
+    scanned: z.number(),
+    truncated: z.boolean(),
+  })
+  .openapi('WriteStats');
 const AuditStatsOut = z
   .object({
     data: z.array(
@@ -1905,6 +1948,43 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
         ...(q.limit === undefined ? {} : { limit: q.limit }),
       });
       return { data: stats.rows, scanned: stats.scanned, truncated: stats.truncated };
+    },
+  );
+
+  add(
+    {
+      method: 'get',
+      path: '/audit/write-stats',
+      tag: 'audit',
+      summary:
+        'Write statistics (P7-11): writes by tool and approval channel, and by outcome (ok, error, no outcome recorded), counting each intent with its outcome once, and the intents with no outcome (owner, admin). Reads at most the newest 3,000 write rows of the window and says when it stopped there.',
+      query: WriteStatsQuery,
+      out: WriteStatsOut,
+    },
+    async (c, { query }) => {
+      const actor = c.get('actor' as never) as Actor;
+      if (actor.kind === 'user' && actor.role === 'member')
+        throw new AdminError('forbidden', 'This needs an owner or an admin.');
+      const q = query as z.infer<typeof WriteStatsQuery>;
+      const rows: AuditEntry[] = [];
+      let after: { ts: number; id: string } | undefined;
+      let truncated = false;
+      for (let page = 0; page < WRITE_STATS_PAGES; page++) {
+        const got = await options.storage.audit.query({
+          kind: 'write',
+          limit: 1_000,
+          ...(q.workspaceId === undefined ? {} : { workspaceId: q.workspaceId }),
+          ...(q.from === undefined ? {} : { from: q.from }),
+          ...(q.to === undefined ? {} : { to: q.to }),
+          ...(after === undefined ? {} : { after }),
+        });
+        rows.push(...got);
+        const last = got[got.length - 1];
+        if (got.length < 1_000 || last === undefined) break;
+        if (page === WRITE_STATS_PAGES - 1) truncated = true;
+        after = { ts: last.ts, id: last.id };
+      }
+      return { ...writeStats(rows, options.clock.now()), scanned: rows.length, truncated };
     },
   );
 

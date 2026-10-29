@@ -6,11 +6,20 @@
 // says so instead of showing a plausible total (L-033). Bars are `<meter>` elements: no inline style, announced by screen
 // readers. Group keys come from audit rows (tool names, ids): auto-escaped text, like everything else.
 import type { Hono } from 'hono';
+import type { JSX } from 'hono/jsx/jsx-runtime';
 import { Button, DataTable, Layout, LinkButton, QueryForm, SelectField } from '../components.tsx';
 import type { UiKit } from '../kit.ts';
 import type { Names } from './audit.tsx';
-import { parseUsage, parseUser, parseWorkspace, rows, type UsageRow } from './data.ts';
-import { isOk, loadFailed } from './shared.tsx';
+import {
+  parseUsage,
+  parseUser,
+  parseWorkspace,
+  parseWriteStats,
+  rows,
+  type UsageRow,
+  type WriteStatsRow,
+} from './data.ts';
+import { isOk, loadFailed, When } from './shared.tsx';
 
 const BASE = '/admin/usage';
 
@@ -48,6 +57,75 @@ function labelOf(group: Group, key: string | null, names: Names): string {
   if (group === 'workspace') return names.workspaces.get(key) ?? key;
   if (group === 'user') return names.users.get(key) ?? key;
   return key;
+}
+
+const writeColumns = (label: string) => [
+  { header: label, cell: (r: WriteStatsRow) => <code>{r.key}</code> },
+  { header: 'Writes', cell: (r: WriteStatsRow) => r.writes.toLocaleString('en-US') },
+  { header: 'Applied', cell: (r: WriteStatsRow) => String(r.ok) },
+  { header: 'Failed', cell: (r: WriteStatsRow) => `${r.error} (${percent(r.error, r.writes)})` },
+  { header: 'No outcome', cell: (r: WriteStatsRow) => String(r.noOutcome) },
+  { header: 'In progress', cell: (r: WriteStatsRow) => String(r.inProgress) },
+];
+
+function WriteStatsSection(props: {
+  readonly stats: ReturnType<typeof parseWriteStats>;
+  readonly windowName: string;
+}): JSX.Element {
+  const { stats } = props;
+  if (stats === null)
+    return (
+      <>
+        <h2>Writes</h2>
+        <p class="flash flash-error" role="status">
+          The write statistics could not be loaded.
+        </p>
+      </>
+    );
+  return (
+    <>
+      <h2>Writes</h2>
+      <p>
+        Each change counts once: its intent row and its outcome row are paired. <em>No outcome</em> is an
+        intent older than ten minutes without an outcome row: the change may or may not have been applied, so
+        look at the item in Agility. Values are never stored, only field names.
+      </p>
+      {stats.truncated ? (
+        <p class="flash flash-error" role="status">
+          This window holds more write rows than the {stats.scanned.toLocaleString('en-US')} newest ones the
+          statistics read, so the numbers cover only those. Choose a shorter window.
+        </p>
+      ) : null}
+      <DataTable
+        caption={`Writes by tool, ${props.windowName.toLowerCase()} (${stats.total.writes.toLocaleString('en-US')} writes)`}
+        empty="No writes in this window."
+        rows={stats.byTool}
+        columns={writeColumns('Tool')}
+      />
+      <DataTable
+        caption="Writes by approval channel"
+        empty="No writes in this window."
+        rows={stats.byChannel}
+        columns={writeColumns('Channel')}
+      />
+      {stats.unpaired.length === 0 ? null : (
+        <DataTable
+          caption="Intents with no outcome recorded"
+          empty=""
+          rows={stats.unpaired}
+          columns={[
+            { header: 'When', cell: (r) => <When at={r.ts} /> },
+            { header: 'Tool', cell: (r) => <code>{r.tool}</code> },
+            {
+              header: 'Target',
+              cell: (r) => (r.targetType === null ? '—' : `${r.targetType} ${r.targetId ?? ''}`.trim()),
+            },
+            { header: 'Intent', cell: (r) => <code>{r.intentId}</code> },
+          ]}
+        />
+      )}
+    </>
+  );
 }
 
 export function registerUsage(ui: Hono, kit: UiKit): void {
@@ -88,6 +166,13 @@ export function registerUsage(ui: Hono, kit: UiKit): void {
           ]),
         ),
       };
+      // Writes (P7-11): a failed read leaves the tool-call statistics as they are and says so.
+      const writeRes = await kit.callAdmin(c, principal, {
+        method: 'GET',
+        path: '/audit/write-stats',
+        query: { from: String(Math.max(0, now() - span)) },
+      });
+      const writeStats = isOk(writeRes) ? parseWriteStats(writeRes.body) : null;
       const total = usage.rows.reduce((n, r) => n + r.calls, 0);
       const top = usage.rows.reduce((n, r) => Math.max(n, r.calls), 0);
       const groupName = GROUPS.find(([k]) => k === group)?.[1] ?? 'Group';
@@ -150,7 +235,11 @@ export function registerUsage(ui: Hono, kit: UiKit): void {
               { header: 'Slowest', cell: (r) => (r.maxDurationMs === null ? '—' : `${r.maxDurationMs} ms`) },
             ]}
           />
+          <WriteStatsSection stats={writeStats} windowName={windowName} />
           <div class="actions page-actions">
+            <LinkButton href="/admin/audit?kind=write" variant="secondary">
+              Write rows in the audit log
+            </LinkButton>
             <LinkButton href="/admin/audit" variant="secondary">
               Audit log
             </LinkButton>

@@ -96,6 +96,7 @@ function routes(w: World): [string, string, unknown?][] {
     ['POST', `/tokens/${w.ids.aliceToken}/revoke`],
     ['GET', '/audit'],
     ['GET', '/audit/stats?groupBy=tool'],
+    ['GET', '/audit/write-stats'],
     ['GET', '/openapi.json'],
   ];
 }

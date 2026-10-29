@@ -551,7 +551,9 @@ describe('usage screen', () => {
     await page(s, '/admin/usage?by=tool&window=24h', owner);
     expect(stats).toHaveBeenCalledTimes(1);
     expect(stats.mock.calls[0]?.[0]).toMatchObject({ groupBy: 'tool', limit: 50 });
-    expect(query).not.toHaveBeenCalled();
+    // The only row read is the bounded write statistics (P7-11): `write` rows, one page when there are few.
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0]?.[0]).toMatchObject({ kind: 'write', limit: 1_000 });
   });
 });
 

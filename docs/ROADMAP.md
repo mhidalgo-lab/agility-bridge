@@ -329,7 +329,7 @@ Status lives in each task file.
 | P7-08 | [Write documentation and threat-model update](tasks/phase-7-writes/P7-08-write-docs-threat-model.md) | medium | P7-07 | review |
 | P7-09 | [Phase 7 review](tasks/phase-7-writes/P7-09-phase-7-review.md) | high | P7-08, P5-10 | todo |
 | P7-10 | [Write pipeline on staging Workers](tasks/phase-7-writes/P7-10-staging-write-pipeline.md) | medium | P7-01 | todo |
-| P7-11 | [Write rows in the audit viewer, CSV and statistics](tasks/phase-7-writes/P7-11-write-audit-viewer.md) | low | P7-01, P4-05 | todo |
+| P7-11 | [Write rows in the audit viewer, CSV and statistics](tasks/phase-7-writes/P7-11-write-audit-viewer.md) | low | P7-01, P4-05 | done |
 | P7-12 | [What real clients render of the approval text](tasks/phase-7-writes/P7-12-approval-text-in-clients.md) | medium | P7-01 | todo |
 | P7-13 | [Approval page in the browser suites, URL-mode elicitation and a non-eliciting client on staging](tasks/phase-7-writes/P7-13-approval-page-e2e-url-elicitation.md) | medium | P7-02, P7-04 | review |
 | P7-14 | [A list of my pending approvals](tasks/phase-7-writes/P7-14-pending-approvals-list.md) | low | P7-02 | todo |

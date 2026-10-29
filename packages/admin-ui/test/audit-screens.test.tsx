@@ -10,9 +10,10 @@ import {
   csvCell,
   cursorOf,
   detailsText,
+  pairWrites,
   parseCursor,
 } from '../src/screens/audit.tsx';
-import { parseAudit, parseUsage } from '../src/screens/data.ts';
+import { parseAudit, parseUsage, parseWriteStats } from '../src/screens/data.ts';
 import { meanMs, percent } from '../src/screens/usage.tsx';
 import { type Fake, fakeDeps, get, NOW } from './helpers/fake-deps.ts';
 
@@ -195,5 +196,133 @@ describe('screens', () => {
     const res = await get(fake, '/admin/audit', asAdmin);
     expect(res.status).toBe(503);
     expect(await res.text()).not.toContain('No entries match');
+  });
+});
+
+describe('write rows (P7-11)', () => {
+  const w = (
+    id: string,
+    ts: number,
+    phase: 'intent' | 'outcome',
+    extra: Record<string, unknown> = {},
+    status = 'ok',
+  ) => {
+    const r = parseAudit({
+      id,
+      ts,
+      kind: 'write',
+      action: 'update_fields',
+      status,
+      details: { phase, ...extra },
+    });
+    if (r === null) throw new Error('row');
+    return r;
+  };
+  const opts = { now: NOW, continued: false, hasNext: false, complete: true };
+
+  it('pairs intent+ok, intent+error and an intent with no outcome', () => {
+    const rows = [
+      w('o2', NOW - 10, 'outcome', { intentId: 'i2' }, 'error'),
+      w('o1', NOW - 20, 'outcome', { intentId: 'i1' }),
+      w('i2', NOW - 30, 'intent'),
+      w('i1', NOW - 40, 'intent'),
+      w('lost', NOW - 3_600_000, 'intent'),
+      w('busy', NOW - 1_000, 'intent'),
+    ];
+    const pairs = pairWrites(rows, opts);
+    expect(pairs.get('i1')).toMatchObject({ kind: 'outcome', status: 'ok' });
+    expect(pairs.get('i2')).toMatchObject({ kind: 'outcome', status: 'error' });
+    expect(pairs.get('o1')).toEqual({ kind: 'intent', id: 'i1' });
+    expect(pairs.get('lost')).toEqual({ kind: 'missing' });
+    expect(pairs.get('busy')).toEqual({ kind: 'in_progress' });
+  });
+
+  it('claims nothing at a page edge or under a filter that hides rows', () => {
+    const top = [w('i1', NOW - 3_600_000, 'intent'), w('x', NOW - 3_700_000, 'intent')];
+    expect(pairWrites(top, { ...opts, continued: true }).get('i1')).toEqual({
+      kind: 'elsewhere',
+      where: 'on the previous page',
+    });
+    expect(pairWrites(top, { ...opts, continued: true }).get('x')).toEqual({ kind: 'missing' });
+    const bottom = [w('o', NOW - 5, 'outcome', { intentId: 'gone' })];
+    expect(pairWrites(bottom, { ...opts, hasNext: true }).get('o')).toEqual({
+      kind: 'elsewhere',
+      where: 'on the next page',
+    });
+    expect(pairWrites(top, { ...opts, complete: false }).get('i1')).toMatchObject({ kind: 'elsewhere' });
+  });
+
+  it('the CSV gives the write columns and the pair state', () => {
+    const rows = [
+      w('o1', NOW - 20, 'outcome', {
+        intentId: 'i1',
+        hash: 'h',
+        approval: 'page',
+        fields: ['A', 'B'],
+        operation: 'update',
+      }),
+      w('i1', NOW - 40, 'intent', { fields: ['A', 'B'] }),
+    ];
+    const lines = auditCsv(rows, { now: NOW }).trimEnd().split('\r\n');
+    expect(lines[1]?.endsWith('"outcome","update","page","h","A B","i1","intent_found"')).toBe(true);
+    expect(lines[2]).toContain('"outcome_found"');
+  });
+
+  it('parses a write statistics answer field by field and refuses another shape', () => {
+    expect(parseWriteStats(null)).toBeNull();
+    expect(parseWriteStats({ byTool: [] })).toBeNull();
+    const parsed = parseWriteStats({
+      byTool: [{ key: 't', writes: 2, ok: 1, error: 1, noOutcome: 0, inProgress: 0 }],
+      byChannel: [],
+      total: { key: 'all', writes: 2 },
+      unpaired: [{ intentId: 'i', ts: 5, tool: 't' }],
+      scanned: 2,
+      truncated: true,
+    });
+    expect(parsed?.byTool[0]?.writes).toBe(2);
+    expect(parsed?.unpaired[0]).toMatchObject({ intentId: 'i', targetId: null });
+    expect(parsed?.truncated).toBe(true);
+  });
+
+  it('the usage page shows the write statistics, and a failed read leaves the rest of the page', async () => {
+    const fake = fakeDeps();
+    fake.respond = (call) => {
+      if (call.path === '/audit/stats')
+        return { status: 200, body: { data: [], scanned: 0, truncated: false } };
+      if (call.path === '/audit/write-stats')
+        return {
+          status: 200,
+          body: {
+            byTool: [{ key: 'update_fields', writes: 2, ok: 1, error: 0, noOutcome: 1, inProgress: 0 }],
+            byChannel: [{ key: 'page', writes: 2, ok: 1, error: 0, noOutcome: 1, inProgress: 0 }],
+            total: { key: 'all', writes: 2, ok: 1, error: 0, noOutcome: 1, inProgress: 0 },
+            unpaired: [
+              {
+                intentId: 'intent-1',
+                ts: NOW,
+                tool: 'update_fields',
+                targetType: 'Story',
+                targetId: 'Story:1',
+              },
+            ],
+            scanned: 3,
+            truncated: false,
+          },
+        };
+      return undefined;
+    };
+    const html = await (await get(fake, '/admin/usage', asAdmin)).text();
+    expect(html).toContain('Writes by tool');
+    expect(html).toContain('Intents with no outcome recorded');
+    expect(html).toContain('intent-1');
+    fake.respond = (call) =>
+      call.path === '/audit/write-stats'
+        ? { status: 503, body: { error: { code: 'unavailable', message: 'x' } } }
+        : call.path === '/audit/stats'
+          ? { status: 200, body: { data: [], scanned: 0, truncated: false } }
+          : undefined;
+    const failed = await get(fake, '/admin/usage', asAdmin);
+    expect(failed.status).toBe(200);
+    expect(await failed.text()).toContain('could not be loaded');
   });
 });
