@@ -4,7 +4,8 @@
 // project that will hold it. After the approval the re-read is a validity check, not a value comparison: the project, the
 // parent and their scope must still be fine, and the item must not exist already. Idempotency has no key in Agility, so it
 // is derived: the same caller creating the same title under the same parent in the same project within 30 minutes is a
-// repeat and is refused, naming the item that exists (D-179). The write shape is *unverified* until the sandbox (P7-07).
+// repeat and is refused, naming the item that exists (D-179). Custom attributes the workspace owner enabled are set from
+// `custom` (P7-20). The write shape is *unverified* until the sandbox (P7-07).
 import { z } from 'zod';
 import { type ToolContext, withMemo } from '../../context.ts';
 import { AbError, ErrorCode } from '../../errors.ts';
@@ -14,7 +15,7 @@ import { metadataFor } from '../../metadata/service.ts';
 import { compileQuery } from '../../query/compiler.ts';
 import { invalid } from '../../query/limits.ts';
 import type { ToolDefinition } from '../../tool.ts';
-import { defineWriteTool } from '../../writes/index.ts';
+import { CUSTOM_FIELD_RE, defineWriteTool } from '../../writes/index.ts';
 import { text as textOf } from '../common.ts';
 import {
   assertTypeAllowed,
@@ -28,6 +29,7 @@ import {
   rereadTarget,
   withinWindow,
 } from './common.ts';
+import { checkCustomNames, customArg, customKinds, customOp, planCustom } from './custom.ts';
 import {
   descriptionHtml,
   descriptionText,
@@ -127,7 +129,7 @@ const newValue = (
 const defined: ToolDefinition = defineWriteTool({
   name: 'create_work_item',
   title: 'Create work item',
-  description: `Create one backlog item, defect, task, test or epic in an Agility project. A task or test needs a parent item; a backlog item, defect or epic may have an epic as parent. Sets only title, description, estimate and priority. Not paged. Cold call: up to ${COST} Agility requests.`,
+  description: `Create one backlog item, defect, task, test or epic in an Agility project. A task or test needs a parent item; a backlog item, defect or epic may have an epic as parent. Sets only title, description, estimate, priority and enabled custom attributes. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
   // Resolution of the project, the parent and the priority, metadata (cold), the duplicate scan, the re-read and the write.
   cost: COST,
@@ -165,11 +167,14 @@ const defined: ToolDefinition = defineWriteTool({
       .max(200)
       .optional()
       .describe('Priority name or OID token, for a story or defect.'),
+    custom: customArg,
   }),
   allowedFields: { Scope: CREATE_FIELDS },
+  customFields: true,
   async plan(input, ctx) {
     const type = input.item_type;
     assertTypeAllowed(ctx, type);
+    checkCustomNames(ctx, input.custom);
     const name = itemName(input.name);
     const description = input.description === undefined ? undefined : descriptionText(input.description);
     const allowed = FIELD_ALLOWLIST[type];
@@ -225,6 +230,7 @@ const defined: ToolDefinition = defineWriteTool({
     if (parentOid !== undefined) await requireWritable(ctx, type, relation, { relation: true, multi: false });
     const priority =
       input.priority === undefined ? undefined : await resolvePriority(ctx, type, input.priority);
+    const custom = await planCustom(ctx, type, input.custom);
 
     const duplicate = await recentDuplicate(ctx, type, projectRef.oid, parentOid, name);
     if (duplicate !== undefined) {
@@ -245,6 +251,7 @@ const defined: ToolDefinition = defineWriteTool({
     if (priority !== undefined)
       changes.push({ field: 'Priority', old: null, new: labelOf(priority.name, priority.oid) });
     if (parentLabel !== null) changes.push({ field: relation, old: null, new: parentLabel });
+    for (const x of custom) changes.push({ field: x.field, old: null, new: x.value });
     return {
       mutation: {
         operation: 'create_work_item',
@@ -295,6 +302,17 @@ const defined: ToolDefinition = defineWriteTool({
     const estimate = estimateAttribute === undefined ? undefined : newValue(c, estimateAttribute);
     const priority = newValue(c, 'Priority');
     const parent = newValue(c, PARENT_RELATION[field]);
+    const kinds = await customKinds(
+      ctx,
+      type,
+      plan.mutation.changes.map((x) => x.field).filter((f) => CUSTOM_FIELD_RE.test(f)),
+    );
+    const customOps = plan.mutation.changes.flatMap((x) => {
+      const kind = kinds.get(x.field);
+      return kind === undefined || (typeof x.new !== 'string' && typeof x.new !== 'number')
+        ? []
+        : [customOp(x.field, kind, x.new)];
+    });
     return postAsset(ctx, type, undefined, [
       { attribute: 'Name', value: name },
       ...(typeof description === 'string'
@@ -310,6 +328,7 @@ const defined: ToolDefinition = defineWriteTool({
       ...(typeof parent === 'string'
         ? [{ relation: PARENT_RELATION[field], act: 'set' as const, oids: [oidOfLabel(parent)] }]
         : []),
+      ...customOps,
     ]);
   },
 });

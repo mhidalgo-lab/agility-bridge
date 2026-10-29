@@ -49,7 +49,15 @@ export const whoami: ToolDefinition = defineTool({
       },
       limits: { ...limits },
       budget: { requestsPerCall: budget.limit, requestsUsed: budget.used },
-      writes: { ...workspace.writes },
+      // Only how many custom attributes are enabled for writing, never their names (THREAT_MODEL A12, P7-20): a refusal
+      // names what the caller sent, and describe_asset_type shows the attributes in enveloped output.
+      writes: {
+        enabled: workspace.writes.enabled,
+        approval: workspace.writes.approval,
+        ...((workspace.writes.customFields?.length ?? 0) > 0
+          ? { customFields: workspace.writes.customFields?.length }
+          : {}),
+      },
       ...(warnings.length === 0 ? {} : { warnings }),
       ...(hidden.length === 0 ? {} : { hiddenByBudget: hidden.map((t) => t.name) }),
     };

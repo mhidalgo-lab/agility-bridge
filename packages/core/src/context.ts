@@ -47,7 +47,15 @@ export interface WorkspaceInfo {
   readonly name: string;
   /** Tool groups enabled for this caller. */
   readonly groups: readonly string[];
-  readonly writes: { readonly enabled: boolean; readonly approval: ApprovalChannel };
+  readonly writes: {
+    readonly enabled: boolean;
+    readonly approval: ApprovalChannel;
+    /**
+     * Custom attributes (`Custom_X`) an owner enabled for writing in this workspace (P7-20). Absent or empty: none. Only
+     * the two wave-2 tools read it, and the write framework checks every custom field of a mutation against it.
+     */
+    readonly customFields?: readonly string[];
+  };
 }
 
 /** Query limits (tool conventions; units in the names, L-042). Tightened per grant upstream. */

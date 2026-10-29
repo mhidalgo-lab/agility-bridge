@@ -169,7 +169,13 @@ export function contextFactory(
       id: config.workspace.id,
       name: config.workspace.name,
       groups,
-      writes: { enabled: writes !== undefined, approval: 'unavailable' },
+      writes: {
+        enabled: writes !== undefined,
+        approval: 'unavailable',
+        ...(writes !== undefined && config.writeCustomFields.length > 0
+          ? { customFields: [...config.writeCustomFields] }
+          : {}),
+      },
     },
     credential: { id: 'stdio', kind: 'personal', token: config.token },
     projects: { allowed: [...config.projects], includeChildren: config.includeChildProjects },

@@ -273,4 +273,26 @@ describe('write tools over HTTP', () => {
     await w.audit.flush();
     expect(await writeRows(w)).toHaveLength(0);
   });
+
+  it("hands the workspace's writable custom attributes to the tools only where a write tool is granted (P7-20)", async () => {
+    const { w } = await setup();
+    await w.storage.workspaces.update(w.ids.workspaceA, {
+      writePolicy: { enabled: true, customFields: ['Custom_A', 'Custom_B'] },
+    });
+    const whoami = async (): Promise<{ writes?: Record<string, unknown> }> => {
+      const { client: c } = await client(w, w.tokens.alice);
+      const r = await c.callTool({ name: 'whoami', arguments: {} });
+      return r.structuredContent as { writes?: Record<string, unknown> };
+    };
+    // whoami shows how many, never which (names are for describe_asset_type and the refusals).
+    const on = await whoami();
+    expect(on.writes).toMatchObject({ enabled: true, customFields: 2 });
+    expect(JSON.stringify(on)).not.toContain('Custom_A');
+    // Without a write tool in the grant nothing is carried, whatever the workspace lists.
+    await w.storage.grants.update(w.ids.aliceGrant, { tools: ['whoami'] });
+    w.now.t += 61_000; // the access decision is cached for a minute
+    const off = await whoami();
+    expect(off.writes).toMatchObject({ enabled: false });
+    expect(off.writes?.['customFields']).toBeUndefined();
+  });
 });

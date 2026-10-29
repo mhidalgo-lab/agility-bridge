@@ -2,7 +2,7 @@
 // The policy vocabulary of workspaces and grants (ARCHITECTURE §4, ADR-0008): the JSON columns of storage parsed into
 // typed policies, and the rules that combine them. A workspace sets limits; a grant can only tighten them (L-062):
 // numbers take the minimum, allow lists intersect, deny lists union, switches can only be turned off.
-import type { Limits } from '@agility-bridge/core';
+import { CUSTOM_FIELD_RE, type Limits, MAX_CUSTOM_FIELDS } from '@agility-bridge/core';
 import { z } from 'zod';
 
 export const SCOPE_OID = /^Scope:\d{1,12}$/;
@@ -59,6 +59,11 @@ export type LimitsPolicy = z.infer<typeof limitsPolicySchema>;
 /** Writes per workspace (ADR-0013); write tools also need the server switch and an explicit listing (Phase 7). */
 export const writePolicySchema = z.strictObject({
   enabled: z.boolean().optional(),
+  /**
+   * Custom attributes (`Custom_X`) an agent may write through `create_work_item` and `update_fields` in this workspace
+   * (P7-20). Set by an owner; each is checked again against the instance metadata when a tool uses it.
+   */
+  customFields: z.array(z.string().regex(CUSTOM_FIELD_RE)).max(MAX_CUSTOM_FIELDS).optional(),
 });
 export type WritePolicy = z.infer<typeof writePolicySchema>;
 

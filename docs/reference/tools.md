@@ -648,7 +648,7 @@ Annotations: read-only false, destructive true, idempotent true, open world true
 
 **Create work item** · group `writes` · write · cost 20 Agility requests at most
 
-Create one backlog item, defect, task, test or epic in an Agility project. A task or test needs a parent item; a backlog item, defect or epic may have an epic as parent. Sets only title, description, estimate and priority. Not paged. Cold call: up to 20 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+Create one backlog item, defect, task, test or epic in an Agility project. A task or test needs a parent item; a backlog item, defect or epic may have an epic as parent. Sets only title, description, estimate, priority and enabled custom attributes. Not paged. Cold call: up to 20 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
 Annotations: read-only false, destructive false, idempotent false, open world true.
 
@@ -661,6 +661,7 @@ Annotations: read-only false, destructive false, idempotent false, open world tr
 | `description` | string |  |  | Plain text, at most 4,000 characters; a blank line starts a paragraph. |
 | `estimate` | number (≥ 0, ≤ 10000) |  |  | Story points for a story or defect; hours for a task or test. Not for an epic. |
 | `priority` | string |  |  | Priority name or OID token, for a story or defect. |
+| `custom` | object[] (≤ 5) |  |  | Custom attributes the workspace owner enabled for writing: { attribute, value } pairs, text or a number; at most 5. Attribute names: describe_asset_type. |
 | `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
 | `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |
 
@@ -668,7 +669,7 @@ Annotations: read-only false, destructive false, idempotent false, open world tr
 
 **Update fields** · group `writes` · write · cost 14 Agility requests at most
 
-Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic, or the remaining to-do hours of a task or test. Give only what changes; the person approves old and new for each. Not paged. Cold call: up to 14 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
+Change the title, description, estimate or priority of one open backlog item, defect, task, test or epic, the remaining to-do hours of a task or test, or an enabled custom attribute. Give only what changes; the person approves old and new for each. Not paged. Cold call: up to 14 Agility requests. Changes Agility. Needs approval. Preview with dry_run.
 
 Annotations: read-only false, destructive true, idempotent true, open world true.
 
@@ -680,5 +681,6 @@ Annotations: read-only false, destructive true, idempotent true, open world true
 | `estimate` | number (≥ 0, ≤ 10000) |  |  | Story points for a story or defect; hours for a task or test. Not for an epic. |
 | `priority` | string |  |  | Priority name or OID token, for a story or defect. |
 | `todo` | number (≥ 0, ≤ 10000) |  |  | Remaining hours, for a task or test. Not for a backlog item, defect or epic. |
+| `custom` | object[] (≤ 5) |  |  | Custom attributes the workspace owner enabled for writing: { attribute, value } pairs, text or a number; at most 5. Attribute names: describe_asset_type. |
 | `dry_run` | boolean |  |  | Preview the full change and the approval channel without applying anything. |
 | `confirm` | boolean |  |  | Required (true) to apply. It is not approval: the person still approves. |

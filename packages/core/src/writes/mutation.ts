@@ -40,6 +40,11 @@ export const MAX_LIST_ITEMS = 50;
 export const MAX_APPROVAL_CHARS = 24_000;
 
 const FIELD_RE = /^[A-Za-z][A-Za-z0-9_.]{0,79}$/;
+/** A custom attribute an owner may enable for writing: the `Custom_` prefix and a plain identifier (P7-20). */
+export const CUSTOM_FIELD_RE: RegExp = /^Custom_[A-Za-z0-9_]{1,80}$/;
+/** Custom attributes one workspace may enable, and one call may change. */
+export const MAX_CUSTOM_FIELDS = 20;
+export const MAX_CUSTOM_PER_CALL = 5;
 const OID_RE = /^[A-Za-z][A-Za-z0-9]{0,63}:\d{1,18}$/;
 const TYPE_RE = /^[A-Za-z][A-Za-z0-9]{0,63}$/;
 const NUMBER_RE = /^[A-Za-z]{1,4}-\d{1,12}$/;
@@ -132,7 +137,12 @@ function checkValue(field: string, value: unknown, side: 'old' | 'new'): WriteVa
  * A shape the tool itself must never build (unknown asset type or field, duplicates, no change) is `AB_INTERNAL`; a
  * value the caller supplied that cannot be shown whole is `AB_INPUT_INVALID`.
  */
-export function canonicalize(m: CanonicalMutation, allowed: FieldAllowlist): CanonicalMutation {
+export function canonicalize(
+  m: CanonicalMutation,
+  allowed: FieldAllowlist,
+  /** Custom attributes the workspace enabled, for a tool that opted in (P7-20): the only fields beyond `allowed`. */
+  custom: readonly string[] = [],
+): CanonicalMutation {
   if (!TYPE_RE.test(m.target.assetType) || !OID_RE.test(m.target.oid)) {
     throw toolBug('A write tool built a mutation without a valid single target.');
   }
@@ -154,7 +164,10 @@ export function canonicalize(m: CanonicalMutation, allowed: FieldAllowlist): Can
   const seen = new Set<string>();
   const changes: FieldChange[] = [];
   for (const c of m.changes) {
-    if (!FIELD_RE.test(c.field) || !fields.includes(c.field)) {
+    if (
+      !FIELD_RE.test(c.field) ||
+      !(fields.includes(c.field) || (CUSTOM_FIELD_RE.test(c.field) && custom.includes(c.field)))
+    ) {
       throw toolBug(
         `A write tool built a change to ${String(c.field).slice(0, 80)}, which is not in its allowlist.`,
       );

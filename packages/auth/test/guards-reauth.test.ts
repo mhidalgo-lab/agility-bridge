@@ -98,6 +98,10 @@ const actions: Array<[string, (g: ReturnType<typeof guardedServices>) => Promise
   ],
   ['change write settings', (g) => g.workspaces.update(ids.workspace, { writePolicy: { enabled: true } })],
   [
+    'change the custom attributes agents may write',
+    (g) => g.workspaces.update(ids.workspace, { writePolicy: { customFields: ['Custom_A'] } }),
+  ],
+  [
     'enable write tools on a workspace',
     (g) => g.workspaces.update(ids.workspace, { enabledTools: ['add_comment'] }),
   ],

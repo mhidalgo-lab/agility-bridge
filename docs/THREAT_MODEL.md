@@ -379,6 +379,10 @@ those suites stop at the recorded approval.
 
 Wave-1 extensions add arguments to existing tools, not tools: `move_to_sprint.to_backlog`, `log_effort.member` and `update_fields.todo`. A2: still one item, one request per call; effort for another member is accepted only for an owner of the item, checked at the plan and again at the re-read, and shown in the approval as `Actual.Member` (D-236); the to-do is one more field of one request, never a second write (D-237). A6 is unchanged: Agility's history still shows the token's member as the author of the entry. All new request shapes are *unverified* until the sandbox (P7-07).
 
+## 8g-3. Status after P7-20 (2026-10-29)
+
+Writable custom attributes (`create_work_item.custom`, `update_fields.custom`, [guide](guide/write-tools.md#custom-attributes-p7-20), D-238). A12: the argument's description is static and names no attribute; names reach the model through `describe_asset_type` (enveloped) only, `whoami` says how many are enabled, never which, and a refusal names only what the caller sent. T4/T31: an owner (recent sign-in) lists the attributes per workspace; an attribute is refused before any request unless it is on that list, then checked against the instance metadata (custom, writable, single-valued, text, long text or number) and the value typed by kind; the write framework re-checks every custom field of a mutation against the list (a tool that did not opt in cannot reach one), so a tool bug cannot widen it; the approval shows and binds each as `Custom_X` old to new. A2 is unchanged: one item, one request. The request shape is *unverified* until the sandbox (P7-07).
+
 ## 8h. Status after P7-08 (2026-10-29)
 
 The write documentation ([guide](guide/write-tools.md), [client approval table](reference/client-compatibility.md#write-approval-channels-per-client))

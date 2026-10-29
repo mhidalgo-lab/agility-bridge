@@ -7,9 +7,11 @@ import { closeSync, fstatSync, openSync, readFileSync } from 'node:fs';
 import { IDENTITY_SECRET_NAMES, IDENTITY_SETTING_NAMES } from '@agility-bridge/auth';
 import {
   ACTIVE_ATTACHMENT_TYPES,
+  CUSTOM_FIELD_RE,
   canonicalInstanceUrl,
   DEFAULT_ATTACHMENT_TYPES,
   type LogLevel,
+  MAX_CUSTOM_FIELDS,
   Secret,
 } from '@agility-bridge/core';
 import { parse as parseYaml } from 'yaml';
@@ -44,6 +46,8 @@ export interface StdioConfig {
   readonly writeTools: boolean;
   /** `required` (default): a person approves every write. `off`: stdio only, your own token (D-10); warned at start. */
   readonly writeApproval: 'required' | 'off';
+  /** Custom attributes (`Custom_X`) the create and update tools may write (P7-20): `AB_WRITE_CUSTOM_FIELDS`. None by default. */
+  readonly writeCustomFields: readonly string[];
   /** Writes an hour for this process (P7-03); the same variable limits a grant on the remote hosts. */
   readonly writeRatePerHour: number;
   readonly attachmentMaxBytes: number;
@@ -85,6 +89,7 @@ const KNOWN_ENV = new Set([
   'AB_CA_FILE',
   'AB_WRITE_TOOLS',
   'AB_WRITE_APPROVAL',
+  'AB_WRITE_CUSTOM_FIELDS',
   'AB_WRITE_RATE_PER_GRANT_HOURLY',
   'AB_LOG_LEVEL',
   // Remote and Worker settings: valid names, not used by stdio.
@@ -211,6 +216,15 @@ function writeApproval(value: string | undefined): 'required' | 'off' {
   const v = value.trim().toLowerCase();
   if (v === 'required' || v === 'off') return v;
   throw new ConfigError(`AB_WRITE_APPROVAL must be required or off (got "${value.slice(0, 20)}").`);
+}
+
+function customFields(value: string | undefined): readonly string[] {
+  const items =
+    list('AB_WRITE_CUSTOM_FIELDS', value, CUSTOM_FIELD_RE, 'custom attribute (use Custom_Name)') ?? [];
+  if (items.length > MAX_CUSTOM_FIELDS) {
+    throw new ConfigError(`AB_WRITE_CUSTOM_FIELDS names more than ${MAX_CUSTOM_FIELDS} attributes.`);
+  }
+  return [...new Set(items)];
 }
 
 function int(name: string, value: string | undefined, fallback: number, min: number, max: number): number {
@@ -357,6 +371,7 @@ const workspaceSchema = z.strictObject({
     .strictObject({
       enabled: z.boolean().optional(),
       approval: z.enum(['required', 'off']).optional(),
+      custom_fields: z.array(z.string().regex(CUSTOM_FIELD_RE)).max(MAX_CUSTOM_FIELDS).optional(),
     })
     .optional(),
   member_emails: z.boolean().optional(),
@@ -502,6 +517,7 @@ function fromYaml(env: Readonly<Record<string, string | undefined>>, options: Lo
     reports: resolved.reports ?? false,
     writeTools: resolved.writes?.enabled ?? false,
     writeApproval: resolved.writes?.approval ?? 'required',
+    writeCustomFields: resolved.writes?.custom_fields ?? [],
     writeRatePerHour: int(
       'AB_WRITE_RATE_PER_GRANT_HOURLY',
       env['AB_WRITE_RATE_PER_GRANT_HOURLY'],
@@ -575,6 +591,7 @@ export function loadConfig(
     reports: bool('AB_REPORTS', env['AB_REPORTS'], false),
     writeTools: bool('AB_WRITE_TOOLS', env['AB_WRITE_TOOLS'], false),
     writeApproval: writeApproval(env['AB_WRITE_APPROVAL']),
+    writeCustomFields: customFields(env['AB_WRITE_CUSTOM_FIELDS']),
     writeRatePerHour: int(
       'AB_WRITE_RATE_PER_GRANT_HOURLY',
       env['AB_WRITE_RATE_PER_GRANT_HOURLY'],

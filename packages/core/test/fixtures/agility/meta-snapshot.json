@@ -3238,6 +3238,30 @@
     "IsCanned": true,
     "IsCustom": false
    },
+   "Task.Custom_SyntheticHours": {
+    "_type": "AttributeDefinition",
+    "Name": "Custom_SyntheticHours",
+    "Token": "Task.Custom_SyntheticHours",
+    "DisplayName": "Custom_SyntheticHours",
+    "AttributeType": "Numeric",
+    "IsReadOnly": false,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": false,
+    "IsCustom": true
+   },
+   "Task.Custom_SyntheticLocked": {
+    "_type": "AttributeDefinition",
+    "Name": "Custom_SyntheticLocked",
+    "Token": "Task.Custom_SyntheticLocked",
+    "DisplayName": "Custom_SyntheticLocked",
+    "AttributeType": "Text",
+    "IsReadOnly": true,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": false,
+    "IsCustom": true
+   },
    "Task.ToDo": {
     "_type": "AttributeDefinition",
     "Name": "ToDo",

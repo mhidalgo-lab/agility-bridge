@@ -68,6 +68,10 @@ None beyond the shared rules in AGENTS.md.
 - [ ] `log_effort` with `member`: is an `Actual` for another member of the item's owners accepted with the writer's token, and is it attributed to that member? Does Agility refuse it for a non-member of the project?
 - [ ] `update_fields` with `todo`: `ToDo` set on a Task and a Test; is it writable at every tracking level; does the item's roll-up (`Story.ToDo`) update at once?
 
+## Items from P7-20 (writable custom attributes, unverified request shapes)
+- [ ] `update_fields` and `create_work_item` with `custom`: `<Attribute name="Custom_X" act="set">` for a Text, a LongText and a Numeric custom attribute on a Story, a Defect and a Task; is a LongText stored as HTML (our escaped paragraphs) or as plain text; the real length limit of a Text attribute; a required custom attribute on create; the read side shows the new value (L-051).
+- [ ] A custom attribute of kind list, date or boolean is refused by the tool today; check which kinds the sandbox's custom fields really are, and whether a list kind is worth a later task.
+
 ## Items moved from P7-08 (documentation walkthrough)
 - [ ] Walk the [write tools guide](../../guide/write-tools.md) on staging against the sandbox: every command, the enablement steps for stdio and for a device-token HTTP connection, and the operator checklist.
 - [ ] Copy each sandbox-verified fact into the guide's "What is unverified" list (remove what is now verified, with date and instance version) and into RESEARCH §1.5; update THREAT_MODEL T31, A2, A6 from "verified on fakes only" where the sandbox shows it.

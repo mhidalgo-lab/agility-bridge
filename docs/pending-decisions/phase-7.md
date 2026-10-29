@@ -380,5 +380,16 @@
 - **Context:** The task says "CLI if that is how other grant settings work". Today no grant command sets any rate (`grant add` has no rate option and there is no `grant update`).
 - **Options:** (a) leave the CLI and file P7-40 (`grant update` with `--rate-per-minute` and `--writes-per-hour`); (b) add only a write-cap flag to `grant add` (a different setting from every other one, and a half-finished command).
 - **Recommendation:** (a), built. The CLI's in-process client already enforces the same owner rule and the cap (it is handed the server's value).
+
+### D-238 — Writable custom attributes: an owner list per workspace, typed by the instance's own kind *(P7-20)*
+- **Context:** D-181 refused custom attributes in wave 2 because a free attribute name is how an agent reaches anything (a status, a project, a security field), and A12 forbids naming instance attributes in tool descriptions.
+- **Options:** (a) a per-workspace allowlist in `writePolicy.customFields` (owner, recent sign-in; panel, API and, for stdio, `AB_WRITE_CUSTOM_FIELDS`), a static `custom` argument on `create_work_item` and `update_fields`, each attribute re-checked against the instance metadata (custom, writable, single-valued, text, long text or number) and the value typed by that kind; the write framework re-checks every custom field of a mutation against the same list; (b) a per-grant list (finer, but a second place to keep in step, and an owner already decides per workspace what may be written); (c) any `Custom_` attribute the metadata says is writable (no owner decision, the exact thing D-181 refused); (d) new tools per attribute.
+- **Recommendation:** (a), built. The list is the owner's decision and sits next to the other write settings; the metadata check keeps it honest when an attribute is changed or removed in Agility; `whoami` shows only how many are enabled, never which. Lists, dates and booleans are left out until the sandbox shows what the real custom fields are (P7-07).
+- **Owner:** *(open; built as (a))*
+
+### D-239 — `PATCH /workspaces` replaces `writePolicy` as a whole; the panel sends both settings together *(P7-20)*
+- **Context:** `writePolicy` held one setting (`enabled`) and the API replaces the object, as it does for `limits`. A second setting (`customFields`) means a client that sends only one drops the other.
+- **Options:** (a) keep replace semantics, document it, and make the panel send `enabled` and `customFields` together when either changes; (b) merge the patch into the stored object (a client can no longer remove a key by omitting it, and `limits` would then differ); (c) a separate `customFields` field on the workspace (a storage change in three adapters and a migration).
+- **Recommendation:** (a), built. It matches `limits`, needs no migration and is the least surprising for an API that already says "replaced". The CLI has no write-setting option today and gets none here.
 - **Owner:** *(open; built as (a))*
 

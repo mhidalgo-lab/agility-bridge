@@ -712,6 +712,52 @@ describe('workspaces', () => {
   });
 });
 
+describe('workspace writable custom attributes (P7-20)', () => {
+  it('belongs to owners with a recent sign-in, is validated, and survives other saves', async () => {
+    const e = await env();
+    const { s, owner, admin } = e;
+    const edit = `/admin/workspaces/${e.ids.workspaceA}/edit`;
+    const base = { name: 'Team A', scopes: 'Scope:1001', tools_all: '1' };
+    const stored = async () => (await s.w.storage.workspaces.get(e.ids.workspaceA))?.writePolicy;
+    expect(await (await page(s, edit, owner)).text()).toContain('name="customfields"');
+    expect(await (await page(s, edit, admin)).text()).not.toContain('name="customfields"');
+    // An admin's forged field is never read.
+    expect((await submit(s, edit, admin, { ...base, customfields: 'Custom_A' })).status).toBe(303);
+    expect(await stored()).toEqual({});
+    // The API refuses the same change from an admin.
+    const body = { writePolicy: { customFields: ['Custom_A'] } };
+    expect((await s.api('PATCH', `/workspaces/${e.ids.workspaceA}`, admin, body)).status).toBe(403);
+    expect(await stored()).toEqual({});
+    // Names that are not custom attributes, or too many, are an error on the form and change nothing.
+    for (const bad of [
+      'Name',
+      'Custom_',
+      'custom_a',
+      `${Array.from({ length: 21 }, (_, i) => `Custom_X${i}`)}`,
+    ]) {
+      const res = await submit(s, edit, owner, { ...base, customfields: bad });
+      expect(res.status, bad).toBe(422);
+      expect(await res.text()).toContain('Custom_Name');
+    }
+    expect(await stored()).toEqual({});
+    // A stale sign-in is asked to sign in again; a fresh one saves, together with the write switch.
+    s.w.now.t += 11 * MIN;
+    const stale = await submit(s, edit, owner, { ...base, writes: '1', customfields: 'Custom_A, Custom_B' });
+    expect(stale.status).toBe(403);
+    expect(await stored()).toEqual({});
+    const fresh = await s.session(OWNER);
+    const own = { ...base, writes: '1', customfields: 'Custom_A, Custom_B,Custom_A' };
+    expect((await submit(s, edit, fresh, own)).status).toBe(303);
+    expect(await stored()).toEqual({ enabled: true, customFields: ['Custom_A', 'Custom_B'] });
+    // The form shows them, an admin's other save keeps them, and clearing the field clears the list.
+    expect(await (await page(s, edit, fresh)).text()).toContain('Custom_A, Custom_B');
+    expect((await submit(s, edit, admin, { ...base, name: 'Team A 2' })).status).toBe(303);
+    expect(await stored()).toEqual({ enabled: true, customFields: ['Custom_A', 'Custom_B'] });
+    expect((await submit(s, edit, fresh, { ...base, writes: '1', customfields: '' })).status).toBe(303);
+    expect(await stored()).toEqual({ enabled: true });
+  });
+});
+
 describe('grants', () => {
   it('creates a person grant and a service grant, edits, and shows the notes the API would warn about', async () => {
     const e = await env();

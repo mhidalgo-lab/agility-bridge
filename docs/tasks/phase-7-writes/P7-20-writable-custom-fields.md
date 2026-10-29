@@ -2,7 +2,7 @@
 id: P7-20
 title: "Workspace-enabled writable custom fields"
 phase: 7
-status: todo
+status: review
 priority: low
 depends_on: [P7-05]
 adr: ["0013"]
