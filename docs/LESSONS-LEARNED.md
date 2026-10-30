@@ -38,7 +38,7 @@ How to use it:
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412 |
-| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365 |
+| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
@@ -1738,6 +1738,14 @@ Not retries or cache hits; per grant, per UTC day and month; warn at 80%.
 **L-365 — Sections that run together need budgets of their own, and a memo that lives and dies with the request.**
 A before/after reading of the shared budget attributes a concurrent sibling's requests to the wrong section, so each section gets a child budget that counts only its own spend and still draws from the call's total. Resolution of the same member, team, project or sprint is shared through a map created inside the request's handler (`withMemo`): never module state (L-013), and a completed or pending promise lives only as long as the request (L-096). A failed resolution is dropped so the next section tries again.
 *Applied in:* P6-40, `context.ts` (`childBudget`, `withMemo`), `identity/resolve.ts`, `test/tools/reports.test.ts`.
+
+**L-413 — A credential id is not a principal: pass-through callers share one.**
+Every caller of a pass-through workspace has the same credential id and acts with a different Agility token, so a cache key built from the credential id would show one member's data to another. The key binds the keyed fingerprint of the caller's own token for them (the one the identity cache already uses) and the credential id for stored credentials, and a test sends two tokens through one workspace and one grant.
+*Applied in:* P8-01, `app.ts` (`queryCache` scope), `test/query-cache.test.ts`.
+
+**L-414 — A cache hit saves requests and latency, not Worker CPU: bench it before promising more.**
+On the bench a memory hit, a sealed shared-tier hit (decrypt and parse) and an uncached call against an instant fake cost about the same CPU, because a hit still parses the stored answer. What a hit removes is the Agility request (a subrequest on the Free plan) and its network time, so the guide claims exactly that and the bench records requests per call beside the CPU.
+*Applied in:* P8-01, `scripts/worker-bench.ts` (`cachePaths`), `docs/guide/query-cache.md`.
 
 ## P. Observability and logging
 

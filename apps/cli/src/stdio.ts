@@ -20,6 +20,8 @@ import {
   memoryCounterStore,
   memoryLedgerStore,
   PUBLIC_CATALOG_GROUPS,
+  QueryCache,
+  randomMac,
   Secret,
   type SelectOptions,
   silentLogger,
@@ -160,6 +162,16 @@ export function contextFactory(
   const limiters = new CredentialLimiters({ concurrency: 5 });
   const breakers = new CircuitBreakers();
   const metadata = new MetadataService();
+  // One cache per process (P8-01); entry ids are keyed with a random per-process key and bind the scope of every call.
+  const queryCache =
+    (config.queryCacheTtlSeconds ?? 0) > 0
+      ? new QueryCache({
+          ttlMs: (config.queryCacheTtlSeconds ?? 0) * 1000,
+          mac: randomMac(),
+          clock: systemClock,
+          logger: services.logger,
+        })
+      : undefined;
   const instanceId = config.workspace.id;
   const groups = [...new Set(tools.map((t) => t.group))];
   const writeNames = tools.filter((t) => t.kind !== 'read').map((t) => t.name);
@@ -200,6 +212,9 @@ export function contextFactory(
     breaker: breakers.for(instanceId, 'stdio'),
     fetch: services.fetch,
     metadata,
+    ...(queryCache === undefined
+      ? {}
+      : { queryCache: { cache: queryCache, grantId: 'stdio', principal: 'cred:stdio' } }),
     logger: services.logger,
     clock: systemClock,
     random: webCryptoRandom,

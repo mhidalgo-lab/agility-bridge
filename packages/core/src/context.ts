@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
+
+import type { QueryCacheScope } from './agility/query-cache.ts';
 import { AbError, ErrorCode } from './errors.ts';
 import type { Logger } from './logger.ts';
 import type { MetadataService } from './metadata/service.ts';
@@ -269,6 +271,11 @@ export interface ToolContext {
   readonly writes?: WriteRuntime;
   /** The host's metadata service (P1-03); tools use `metadataFor(ctx)`. */
   readonly metadata?: MetadataService;
+  /**
+   * The query cache and the scope dimensions only the host knows (P8-01, T16). Absent means no caching. The cache is
+   * shared by the requests of a process or isolate, but every entry id binds this request's whole scope.
+   */
+  readonly queryCache?: QueryCacheScope;
   readonly logger: Logger;
   readonly clock: Clock;
   readonly random: Random;

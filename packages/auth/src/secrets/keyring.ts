@@ -16,6 +16,8 @@ export const KeyPurpose = {
   Login: 'login',
   /** Cache entry ids (P8-01). */
   CacheId: 'cache-id',
+  /** Bodies of the shared query cache tier (P8-01). */
+  CacheBody: 'cache-body',
   /** Write approval records (P7-01). */
   Approval: 'approval',
   /** Task records (P8-10). */
@@ -27,6 +29,7 @@ const ENCRYPTION: ReadonlySet<KeyPurpose> = new Set([
   KeyPurpose.Credentials,
   KeyPurpose.Approval,
   KeyPurpose.Task,
+  KeyPurpose.CacheBody,
 ]);
 
 export type SecretsErrorCode =

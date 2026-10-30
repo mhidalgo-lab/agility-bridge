@@ -34,6 +34,26 @@ describe('workersPlan', () => {
     ).toBe(40);
   });
 
+  it('the query cache is off by default; its TTL is 0-60 s and the shared tier is a separate switch (P8-01)', () => {
+    expect(parseServerSettings({}, PLAN_PRESETS.free).queryCache).toEqual({ ttlSeconds: 0, edge: false });
+    const on = parseServerSettings(
+      { AB_QUERY_CACHE_TTL: '20', AB_QUERY_CACHE_EDGE: 'on' },
+      PLAN_PRESETS.free,
+    ).queryCache;
+    expect(on).toEqual({ ttlSeconds: 20, edge: true });
+    for (const bad of ['61', '-1', 'x', '1.5'])
+      expect(() => parseServerSettings({ AB_QUERY_CACHE_TTL: bad }, PLAN_PRESETS.free)).toThrow(
+        /AB_QUERY_CACHE_TTL/,
+      );
+    expect(() => parseServerSettings({ AB_QUERY_CACHE_EDGE: 'maybe' }, PLAN_PRESETS.free)).toThrow(
+      /AB_QUERY_CACHE_EDGE/,
+    );
+    expect(workerSettings({ AB_QUERY_CACHE_TTL: '5', AB_QUERY_CACHE_EDGE: 'on' })).toEqual({
+      AB_QUERY_CACHE_TTL: '5',
+      AB_QUERY_CACHE_EDGE: 'on',
+    });
+  });
+
   it('AB_PLAN is a Worker setting; Node-only settings are refused', () => {
     expect(workerSettings({ AB_PLAN: 'paid', DB: {} as never })).toEqual({ AB_PLAN: 'paid' });
     expect(() => workerSettings({ AB_DATA_DIR: '/data' })).toThrow(/AB_DATA_DIR/);

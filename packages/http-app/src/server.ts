@@ -13,6 +13,7 @@ import {
   IdentityConfigError,
   type IdentitySettings,
   identitySettingsFromEnv,
+  KeyPurpose,
   type Keyring,
   type SessionTimeouts,
 } from '@agility-bridge/auth';
@@ -23,6 +24,9 @@ import {
   type FetchLike,
   type Logger,
   type LogLevel,
+  MAX_QUERY_CACHE_TTL_SECONDS,
+  QueryCache,
+  type SharedTier,
   type ToolRegistry,
 } from '@agility-bridge/core';
 import type { Storage } from '@agility-bridge/storage';
@@ -83,6 +87,8 @@ export const SERVER_SETTING_NAMES: readonly string[] = Object.freeze([
   'AB_WRITE_RATE_DEPLOYMENT_HOURLY',
   'AB_ALLOW_HTTP_INSTANCES',
   'AB_PUBLIC_TOOL_CATALOG',
+  'AB_QUERY_CACHE_TTL',
+  'AB_QUERY_CACHE_EDGE',
   ...IDENTITY_SETTING_NAMES,
   ...OAUTH_SETTING_NAMES,
 ]);
@@ -119,6 +125,11 @@ export interface ServerSettings {
   readonly writeTools: boolean;
   /** Writes an hour per grant and per deployment (P7-03, D-169); the counters are shared in `kv`, so they hold across isolates. */
   readonly writeRates: { readonly perGrant: number; readonly deployment: number };
+  /**
+   * The query cache (P8-01): `ttlSeconds` 0 is off (default); `edge` adds the encrypted shared tier where the host has
+   * one (Workers Cache API, `AB_QUERY_CACHE_EDGE=on`).
+   */
+  readonly queryCache: { readonly ttlSeconds: number; readonly edge: boolean };
   /** Sign-in providers and the login policy (P4-01); absent = no `/auth` routes. */
   readonly identity?: IdentitySettings;
   /** Admin session timeouts, cap and logout behaviour (P4-02); only used with sign-in. */
@@ -314,6 +325,10 @@ export function parseServerSettings(
         10_000,
       ),
     },
+    queryCache: {
+      ttlSeconds: int('AB_QUERY_CACHE_TTL', env['AB_QUERY_CACHE_TTL'], 0, 0, MAX_QUERY_CACHE_TTL_SECONDS),
+      edge: onOff('AB_QUERY_CACHE_EDGE', env['AB_QUERY_CACHE_EDGE'], false),
+    },
     ...(identity === null ? {} : { identity }),
     ...(oauth === null ? {} : { oauth }),
     session: parseSessionSettings(env),
@@ -363,6 +378,9 @@ export function settingWarnings(env: Env, settings: ServerSettings): string[] {
     warnings.push(
       'AB_PASSTHROUGH is on: pass-through workspaces accept any valid Agility token of their instance.',
     );
+  }
+  if (settings.queryCache.edge && settings.queryCache.ttlSeconds === 0) {
+    warnings.push('AB_QUERY_CACHE_EDGE is on but AB_QUERY_CACHE_TTL is 0: the query cache is off.');
   }
   warnings.push(...(settings.identity?.warnings ?? []));
   return warnings;
@@ -436,6 +454,11 @@ export interface ServerParts {
   readonly clientMetadataFetch?: ClientMetadataFetch;
   /** Refuses an instance host by throwing (Node: one resolving to a private address, P2-19). */
   readonly checkInstanceHost?: (hostname: string) => Promise<void>;
+  /**
+   * The shared query cache tier (P8-01), used when `AB_QUERY_CACHE_EDGE=on`: encrypted bodies in the Workers Cache API.
+   * Absent on Node, where the setting is reported and ignored.
+   */
+  readonly queryCacheShared?: SharedTier;
   /** The tool registry built once (Workers: at module scope, P3-14). */
   readonly registry?: ToolRegistry;
   /** A stand-in for the interactive step of `/oauth/authorize` (tests); default: the built-in consent screen (P5-04). */
@@ -476,6 +499,24 @@ export function assembleServer(parts: ServerParts): AssembledServer {
       'AB_OAUTH=on needs sign-in: people approve apps on a consent screen after signing in.',
     );
   }
+  // The query cache (P8-01): entry ids are keyed hashes under the keyring's cache-id purpose; off unless a TTL is set.
+  const queryCache =
+    settings.queryCache.ttlSeconds === 0
+      ? undefined
+      : new QueryCache({
+          ttlMs: settings.queryCache.ttlSeconds * 1000,
+          mac: (data) => keyring.mac(KeyPurpose.CacheId, data),
+          clock: host.clock,
+          logger,
+          ...(settings.queryCache.edge && parts.queryCacheShared !== undefined
+            ? { shared: parts.queryCacheShared }
+            : {}),
+        });
+  if (settings.queryCache.edge && parts.queryCacheShared === undefined && queryCache !== undefined) {
+    logger.warn(
+      'AB_QUERY_CACHE_EDGE is on but this host has no shared tier: the query cache is in memory only.',
+    );
+  }
   const authErrors = revalidateOnAuthErrors(services, logger, () => host.clock.now());
   const app = createHttpApp({
     storage,
@@ -514,7 +555,7 @@ export function assembleServer(parts: ServerParts): AssembledServer {
           }),
         }
       : {}),
-    services: host,
+    services: { ...host, ...(queryCache === undefined ? {} : { queryCache }) },
     ...(settings.publicUrl === undefined ? {} : { publicUrl: settings.publicUrl }),
     allowedHosts: settings.allowedHosts,
     allowedOrigins: settings.allowedOrigins,

@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from 'zod';
+import type { QueryCacheInfo } from '../../agility/query-cache.ts';
 import { resolveMember } from '../../identity/resolve.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { shapeOutput, untrusted } from '../../output/result.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import { callerWriteBudget } from '../../writes/budget.ts';
 import { compositeWarnings } from '../reports/siblings.ts';
+
+/** Settings and the shared tier's proof only: hit counters are per process and would show other callers' activity (T16). */
+const cacheStatus = ({ mode, ttlSeconds, shared }: QueryCacheInfo) => ({ mode, ttlSeconds, shared });
 
 export const whoami: ToolDefinition = defineTool({
   name: 'whoami',
@@ -67,6 +71,11 @@ export const whoami: ToolDefinition = defineTool({
         // The grant's own writes left this hour (P7-16).
         ...(writeBudget === undefined ? {} : { budget: writeBudget }),
       },
+      // Honest cache status (P8-01, L-098): whether answers may be reused, for how long, and whether the shared tier was
+      // proven by a read-back. Configuration and counters only, never cached data.
+      ...(ctx.queryCache === undefined || ctx.workspace.writes.enabled
+        ? {}
+        : { queryCache: cacheStatus(ctx.queryCache.cache.info()) }),
       ...(warnings.length === 0 ? {} : { warnings }),
       ...(hidden.length === 0 ? {} : { hiddenByBudget: hidden.map((t) => t.name) }),
     };
