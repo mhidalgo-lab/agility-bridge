@@ -154,6 +154,7 @@ isolation as on Workers, Agility-shaped fake responses. *Staging*: `agility-brid
 | Server build and `tools/list`, Apps views on | 1.5 ms (0.45×) ⁵ | — | 0 |
 | Public catalogue `tools/list`, no credential, warm | 0.9 ms (0.26×) ⁵ | — | 0 |
 | Public catalogue `initialize`, no credential, warm | 0.5 ms (0.16×) ⁵ | — | 0 |
+| Six identical parallel reads in one request, query cache off / on (single flight) ⁶ | about 0.4 / 0.6 ms | — | 6 / 1 |
 | Shared tier (seal, put, get, open), 8 KB body | 0.7 ms (0.23×) ⁵ | — | 0 |
 | Shared tier, 64 KB body | 3.7 ms (1.11×) ⁵ | — | 0 |
 | Shared tier, 100 KB body | 6.2 ms (1.87×) ⁵ | — | 0 |
@@ -180,6 +181,11 @@ about twice again (P8-40 looks at the per-row cost); the quota adds 2 counter st
 flush per call adds a few tenths of a millisecond; registering the Apps views is within noise; the public catalogue is
 the cheapest MCP path; and the shared tier's seal and open costs milliseconds from 64 KB (P8-38). Agility requests are
 counted by the fakes; D1 rows and the deployed Worker are *unverified* until the live pass (P8-13).
+
+⁶ P8-35, `pnpm bench:worker`, local and indicative, one run: with the cache on the six reads share one Agility request (the
+saving is the five subrequests, not CPU; the fake answers instantly). The public catalogue rows above are measured after
+P8-35, so they are the kept-bytes path: `tools/list` fell from about 0.9 ms (0.26×) to about 0.3 ms (0.08×) and `initialize`
+from about 0.5 ms to about 0.1 ms in the same kind of run before and after.
 
 ³ Write paths (P7-09), `pnpm bench:worker`: the handler of one write tool on the fakes (no JSON-RPC, no HTTP, no D1), the
 item's status toggled between samples. The figures are the quietest of three local runs (the machine was shared, so the

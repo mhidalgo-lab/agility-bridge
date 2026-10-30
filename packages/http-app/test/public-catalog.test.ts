@@ -283,3 +283,110 @@ describe('the setting', () => {
     expect(SERVER_SETTING_NAMES).toContain('AB_PUBLIC_TOOL_CATALOG');
   });
 });
+
+describe('the kept answers (P8-35, T33)', () => {
+  const MODERN_HEADERS = { 'mcp-protocol-version': '2026-07-28' };
+  const DISCOVER = (id: unknown) => ({
+    jsonrpc: '2.0',
+    id,
+    method: 'server/discover',
+    params: {
+      _meta: {
+        'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+        'io.modelcontextprotocol/clientCapabilities': {},
+      },
+    },
+  });
+  const withId = (message: Record<string, unknown>, id: unknown) => ({ ...message, id });
+  const IDS: unknown[] = [1, 99, -4, 'abc', 'quote"and\\slash', '', 'x'.repeat(300)];
+  const ASKS: Array<[string, (id: unknown) => unknown, Record<string, string>]> = [
+    ['tools/list', (id) => withId(LIST, id), {}],
+    ['initialize', (id) => withId(INIT, id), {}],
+    ['server/discover', DISCOVER, { ...MODERN_HEADERS, 'mcp-method': 'server/discover' }],
+  ];
+  /** Headers the app adds per request: not part of the answer. */
+  const strip = (h: [string, string][]) => h.filter(([k]) => !/request-id|date/i.test(k));
+
+  /** The answer a world that has never answered anything builds: the uncached bytes. */
+  async function fresh(body: unknown, headers: Record<string, string>, slug = 'team-a') {
+    const res = await post(await world(on), slug, null, body, headers);
+    return { status: res.status, headers: strip([...res.headers.entries()]), text: await text(res) };
+  }
+
+  it('serves tools/list, initialize and server/discover from the isolate after the first build, byte for byte', async () => {
+    for (const [name, make, headers] of ASKS) {
+      const w = await world(on);
+      // The first request builds and keeps the answer; every later one, whatever its id, is the kept bytes.
+      expect((await post(w, 'team-a', null, make(1), headers)).status, name).toBe(200);
+      for (const id of IDS) {
+        const kept = await post(w, 'team-a', null, make(id), headers);
+        const reference = await fresh(make(id), headers);
+        const got = {
+          status: kept.status,
+          headers: strip([...kept.headers.entries()]),
+          text: await text(kept),
+        };
+        expect(got, `${name} ${String(id)}`).toEqual(reference);
+      }
+      const sources = w.requests.map((r) => r.catalog);
+      expect(sources[0], name).toBe('built');
+      expect(
+        sources.slice(1).every((s) => s === 'cached'),
+        name,
+      ).toBe(true);
+    }
+  });
+
+  it('is the same for every workspace name, and a kept answer reads no storage', async () => {
+    const { storage, touched } = untouchable();
+    const w = await world({ ...on, storage });
+    for (const [name, make, headers] of ASKS) {
+      const reference = await fresh(make(7), headers);
+      for (const slug of ['team-a', 'team-b', 'does-not-exist', 'A', 'x'.repeat(200)]) {
+        const res = await post(w, slug, null, make(7), headers);
+        expect(await text(res), `${name} ${slug}`).toBe(reference.text);
+      }
+    }
+    expect(touched).toEqual([]);
+    expect(w.requests.filter((r) => r.catalog === 'cached').length).toBeGreaterThan(0);
+  });
+
+  it('counts catalogue answers apart from authenticated ones', async () => {
+    const w = await world(on);
+    await post(w, 'team-a', null, LIST);
+    await post(w, 'team-a', null, LIST);
+    await post(w, 'team-a', w.tokens.alice, LIST);
+    expect(w.requests.map((r) => r.catalog)).toEqual(['built', 'cached', undefined]);
+  });
+
+  it('does not share an answer between requests that differ in anything the answer could echo', async () => {
+    const w = await world(on);
+    const other = { ...INIT, params: { ...INIT.params, protocolVersion: '2025-06-18' } };
+    expect(await text(await post(w, 'team-a', null, INIT))).toBe((await fresh(INIT, {})).text);
+    expect(await text(await post(w, 'team-a', null, other))).toBe((await fresh(other, {})).text);
+    // A different Accept header (JSON or an event stream) is a different answer too.
+    const json = { accept: 'application/json' };
+    expect(await text(await post(w, 'team-a', null, LIST, json))).toBe((await fresh(LIST, json)).text);
+    expect(w.requests.filter((r) => r.catalog === 'cached')).toHaveLength(0);
+  });
+
+  it('keeps nothing for a request that is not one of the three or has no usable id, and never serves a credentialed one', async () => {
+    const w = await world(on);
+    const bodies = [
+      PING,
+      withId(LIST, null),
+      { jsonrpc: '2.0', method: 'tools/list' },
+      withId(LIST, { a: 1 }),
+    ];
+    for (const body of bodies) {
+      await post(w, 'team-a', null, body);
+      await post(w, 'team-a', null, body);
+    }
+    expect(w.requests.filter((r) => r.catalog === 'cached')).toHaveLength(0);
+    // The kept bytes exist now, and still answer no request that needs a credential.
+    await post(w, 'team-a', null, LIST);
+    await post(w, 'team-a', null, LIST);
+    expect((await post(w, 'team-a', 'ab_not-a-token', LIST)).status).toBe(401);
+    expect((await post(w, 'team-a', null, { ...LIST, method: 'tools/call' })).status).toBe(401);
+  });
+});

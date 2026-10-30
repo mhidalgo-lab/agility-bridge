@@ -2,7 +2,7 @@
 id: P8-35
 title: Public catalogue response cache and query-cache single flight
 phase: 8
-status: todo
+status: review
 priority: low
 depends_on: [P8-11, P8-01]
 adr: ["0010"]
@@ -19,13 +19,13 @@ Cut repeated work the Phase 8 review found on two hot paths: the anonymous `tool
 
 ## Scope
 - Public catalogue (review P-8): keep the serialised answer of `tools/list`, `initialize` and `server/discover` in an isolate-level map keyed by method and protocol version, substitute the JSON-RPC `id`, and count these requests separately from authenticated ones. The answer must stay byte-identical for every workspace name and read no storage. A POST response is not cacheable by browsers or the Cache API, so no `Cache-Control` is added.
-- Query cache (review P-10): single flight for concurrent identical misses within one request (the call budget allows 6 in parallel) and drop expired entries behind a live head in `#remember`. Sharing a promise **across** requests is not allowed on Workers (workerd forbids I/O objects of another request); the task decides between per-request single flight only and a documented cross-request limit.
-- Optional: batch OTLP spans per isolate on Workers with a time or size flush through `waitUntil` (review P-3).
+- Query cache (review P-10): single flight for concurrent identical misses within one request (the call budget allows 6 in parallel) and drop expired entries behind a live head in `#remember`. Sharing a promise **across** requests is not allowed on Workers (workerd forbids I/O objects of another request); built as per-request single flight with the cross-request limit documented (D-311).
+- Optional: batch OTLP spans per isolate on Workers with a time or size flush through `waitUntil` (review P-3). Not built here: split into [P8-43](P8-43-batch-otlp-spans-on-workers.md) (D-312).
 
 ## Acceptance criteria
-- [ ] The catalogue's three answers are served from the isolate map after the first build, with a test that the bytes equal the uncached answer for every slug and that storage is untouched.
-- [ ] A test with concurrent identical reads in one request shows one Agility request; a test shows a different scope never shares.
-- [ ] `pnpm bench:worker` shows the catalogue and the repeat-read scenarios (see P8-37).
+- [x] The catalogue's three answers are served from the isolate map after the first build, with a test that the bytes equal the uncached answer for every slug and that storage is untouched.
+- [x] A test with concurrent identical reads in one request shows one Agility request; a test shows a different scope never shares.
+- [x] `pnpm bench:worker` shows the catalogue and the repeat-read scenarios (see P8-37).
 
 ## Security notes
 THREAT_MODEL T16, T33.

@@ -6,7 +6,7 @@ import type { ToolContext } from '../context.ts';
 import { AbError, ErrorCode } from '../errors.ts';
 import { VERSION } from '../version.ts';
 import { readCapped } from './body.ts';
-import { decodeResponse, encodeResponse } from './query-cache.ts';
+import { decodeResponse, encodeResponse, type QueryCache } from './query-cache.ts';
 import { parseXml, type XmlElement } from './xml.ts';
 
 export interface AgilityResponse<T> {
@@ -254,6 +254,16 @@ function classifyThrown(error: unknown, timeoutMs: number): Attempt {
   return { ok: false, error: unavailable('network error'), retryable: true };
 }
 
+/** In-flight cache misses per request context (P8-35): never a module-level table, so nothing crosses requests (T21). */
+const inflight = new WeakMap<object, Map<string, Promise<AgilityResponse<unknown>>>>();
+function inflightOf(ctx: ToolContext): Map<string, Promise<AgilityResponse<unknown>>> {
+  const known = inflight.get(ctx);
+  if (known !== undefined) return known;
+  const table = new Map<string, Promise<AgilityResponse<unknown>>>();
+  inflight.set(ctx, table);
+  return table;
+}
+
 /**
  * The Agility client for one tool call. Created from the call's context, so every request uses that call's instance,
  * credential, budget, limiter and breaker (L-152, T21); tools never build URLs or headers.
@@ -312,10 +322,34 @@ export class AgilityClient {
       this.#ctx.logger.warn('query cache lookup failed', { error: (error as Error).name });
       return send();
     }
+    // Single flight (P8-35): identical reads that are in flight at once under this context (the call budget allows several
+    // in parallel) cost one Agility request. The id binds every scope dimension, and the table belongs to the context of
+    // one request, so a promise is never shared with another request or scope (workerd forbids it, and T16 would).
+    const flights = inflightOf(this.#ctx);
+    const running = flights.get(id);
+    if (running !== undefined) {
+      this.#ctx.logger.debug('agility query joined an identical request in flight', { endpoint });
+      return structuredClone(await running) as AgilityResponse<T>;
+    }
+    const flight = this.#fetchAndStore(send, scope.cache, id);
+    flights.set(id, flight);
+    try {
+      return (await flight) as AgilityResponse<T>;
+    } finally {
+      flights.delete(id);
+    }
+  }
+
+  /** The live request of a cache miss, then its answer stored (the memory tier at once, the shared tier after the answer). */
+  async #fetchAndStore<T>(
+    send: () => Promise<AgilityResponse<T>>,
+    cache: QueryCache,
+    id: string,
+  ): Promise<AgilityResponse<T>> {
     const res = await send();
     // An answer above the entry cap is not even encoded: the response size is known (P-4).
-    if (!scope.cache.accepts(res.bytes)) return res;
-    const store = scope.cache.put(id, encodeResponse(res), true).catch((error: unknown) => {
+    if (!cache.accepts(res.bytes)) return res;
+    const store = cache.put(id, encodeResponse(res), true).catch((error: unknown) => {
       this.#ctx.logger.warn('query cache store failed', { error: (error as Error).name });
     });
     // The memory tier is filled at once; the shared tier (seal, put, first read-back) may finish after the answer (P-2).

@@ -860,6 +860,30 @@ async function phase8Paths(): Promise<{
     }
   }
 
+  // Identical reads in flight together (P8-35): six parallel copies of one query in one request, with the cache off and on.
+  {
+    const { makeContext } = await import('../packages/core/test/helpers/context.ts');
+    const { fakeFetch, json } = await import('../packages/core/test/agility/fake.ts');
+    const query = { from: 'Story', select: ['Name'], page: { size: 5, start: 0 } };
+    for (const cached of [false, true]) {
+      const cache = new core.QueryCache({ ttlMs: 60_000, mac: core.randomMac(), clock: core.systemClock });
+      const name = `phase 8: six identical parallel reads, query cache ${cached ? 'on (single flight)' : 'off'}`;
+      let sent = 0;
+      await measure(name, undefined, async () => {
+        cache.clear();
+        const fetch = fakeFetch(() => json([[{ _oid: 'Story:1', Name: 'A story' }]]));
+        const ctx = makeContext({
+          fetch,
+          budget: core.createBudget(10),
+          ...(cached ? { queryCache: { cache, grantId: 'g', principal: 'cred:c' } } : {}),
+        });
+        await Promise.all(Array.from({ length: 6 }, () => core.agilityClient(ctx).query(query)));
+        sent = fetch.calls.length;
+      });
+      requests[name] = sent;
+    }
+  }
+
   // The shared tier (P8-01, review P-1): seal, store, read and open a body of each size, cold memory.
   {
     const { EdgeQueryTier } = await import('../packages/http-app/src/query-cache-edge.ts');

@@ -47,6 +47,7 @@ carry `requestId`.
 | warn | `resource error` | `resource`, `ms`, `error` (class, redacted message) | [server.ts](../../packages/core/src/server.ts) |
 | debug | `agility request` | `endpoint`, `method`, `attempt`, `status`, `ms`, `bytes` (no body, no token) | [client.ts](../../packages/core/src/agility/client.ts) |
 | debug | `agility query cache hit` | `endpoint` | [client.ts](../../packages/core/src/agility/client.ts) |
+| debug | `agility query joined an identical request in flight` | `endpoint` | [client.ts](../../packages/core/src/agility/client.ts) |
 | warn | `query cache lookup failed`, `query cache store failed` | `error` (class) | [client.ts](../../packages/core/src/agility/client.ts) |
 | warn | `query cache shared tier read failed`, `query cache shared tier write failed` | `error` (class) | [query-cache.ts](../../packages/core/src/agility/query-cache.ts) |
 | warn | `AB_QUERY_CACHE_EDGE is on but this host has no shared tier: the query cache is in memory only.` | none | [server.ts](../../packages/http-app/src/server.ts) |
