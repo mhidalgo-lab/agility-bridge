@@ -145,7 +145,7 @@ isolation as on Workers, Agility-shaped fake responses. *Staging*: `agility-brid
 | `sprint_health`, cold / from D1 / warm ² | 12.8 / 8.7 / 7.4 ms (3.2× / 2.2× / 1.9×) | — | 24 / 8 / 6 |
 | `search_work_items`, 25 rows, with deep links, warm | 6.2 ms (1.88×) ⁵ | — | 1 |
 | `search_work_items`, 200 rows, with deep links, warm | 12.4 ms (3.77×) ⁵ | — | 1 |
-| `search_work_items` with a quota set (3 counter statements), warm | 2.3 ms (0.69×) ⁵ | — | 1 |
+| `search_work_items` with a quota set (2 counter statements), warm | 2.3 ms (0.69×) ⁵ | — | 1 |
 | `search_work_items`, telemetry off, warm | 2.4 ms (0.73×) ⁵ | — | 1 |
 | `search_work_items`, telemetry on (fake collector, flush each call), warm | 2.9 ms (0.87×) ⁵ | — | 1 |
 | Task create (2026-07-28 request, report tool), warm | 1.0 ms (0.29×) ⁵ | — | 0 |
@@ -176,7 +176,7 @@ plan's 50 subrequests is *unverified*. No Cloudflare measurement of these paths 
 3.3 ms): **local and indicative**, so compare rows of one run with each other, not with the CI history, and
 read the first-run figures as noisy. The baseline file is not refreshed from this run (it waits for an idle machine).
 What the rows say: deep links make a 25-row search about twice the cost of the old 2-row fixture and the 200-row search
-about twice again (P8-40 looks at the per-row cost); the quota adds 3 counter statements and little CPU; telemetry with a
+about twice again (P8-40 looks at the per-row cost); the quota adds 2 counter statements (3 before P8-39) and little CPU; telemetry with a
 flush per call adds a few tenths of a millisecond; registering the Apps views is within noise; the public catalogue is
 the cheapest MCP path; and the shared tier's seal and open costs milliseconds from 64 KB (P8-38). Agility requests are
 counted by the fakes; D1 rows and the deployed Worker are *unverified* until the live pass (P8-13).
