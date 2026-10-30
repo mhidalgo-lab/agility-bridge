@@ -1781,6 +1781,10 @@ On the bench a memory hit, a sealed shared-tier hit (decrypt and parse) and an u
 One increment per upstream call would be up to 45 statements and 90 rows for one tool call, against a Free plan of 100,000 rows a day. The meter lives for one request (never module state), reads the counters once when the first upstream call is about to happen, decides locally, and adds its total to each period at the end, so a request costs one read and two increments and a request of cache hits costs none. The price, a small overshoot between concurrent requests of one grant, is written down next to the fail-open decision. A cold isolate's metadata requests count too: tests that use a tiny quota are refused halfway through the first call, which is the behaviour, not a bug.
 *Applied in:* P8-09, `agility/quota.ts`, `test/quota.test.ts`.
 
+**L-416 — Without background work, the poll is the worker: claim with one atomic marker, run inside the request, drop a result the owner cancelled.**
+On Workers nothing may run after a response, so a task cannot be "started" at creation. The creating call stores the request and returns a handle; the first `tasks/get` takes a lease (`setIfAbsent`, expiring after the request deadline), runs the stored call through the normal pipeline, re-reads the record and writes the result only if it is still `working`, so a cancel that arrived meanwhile wins and a concurrent poll sees `working` instead of running it twice. Tests hold the tool on a gate to prove both orderings.
+*Applied in:* P8-10, `http-app/src/tasks.ts`, `test/tasks.test.ts`.
+
 ## P. Observability and logging
 
 **L-117 — Redaction is broad and tested.**

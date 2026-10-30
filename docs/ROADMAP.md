@@ -369,11 +369,12 @@ Status lives in each task file.
 | P8-07 | [Self-monitoring with OpenTelemetry](tasks/phase-8-power-features/P8-07-self-monitoring.md) | low | P6-13 | todo |
 | P8-08 | [OS keychain support](tasks/phase-8-power-features/P8-08-os-keychain.md) | low | P6-13 | review |
 | P8-09 | [Per-grant quotas and usage](tasks/phase-8-power-features/P8-09-quotas-usage.md) | low | P6-13 | review |
-| P8-10 | [MCP Tasks for long-running reports](tasks/phase-8-power-features/P8-10-mcp-tasks.md) | low | P6-13 | todo |
+| P8-10 | [MCP Tasks for long-running reports](tasks/phase-8-power-features/P8-10-mcp-tasks.md) | low | P6-13 | review |
 | P8-11 | [Lazy auth and public tool catalogue](tasks/phase-8-power-features/P8-11-lazy-auth-catalogue.md) | low | P6-13 | done |
 | P8-12 | [Phase 8 review](tasks/phase-8-power-features/P8-12-phase-8-review.md) | high | P8-01, P8-02, P8-03, P8-04, P8-05, P8-06, P8-07, P8-08, P8-09, P8-10, P8-11, P7-09 | todo |
 | P8-13 | [Verify the query cache shared tier on a deployed Worker](tasks/phase-8-power-features/P8-13-query-cache-live-check.md) | low | P8-01 | todo |
 | P8-14 | [Per-grant and per-workspace quota overrides](tasks/phase-8-power-features/P8-14-quota-overrides.md) | low | P8-09 | todo |
+| P8-15 | [Verify MCP Tasks with MCP Inspector and a real client](tasks/phase-8-power-features/P8-15-tasks-live-check.md) | low | P8-10 | todo |
 | P8-19 | [Verify MCP Apps views in real clients](tasks/phase-8-power-features/P8-19-verify-apps-in-real-clients.md) | low | P8-03 | todo |
 
 ### Phase 9

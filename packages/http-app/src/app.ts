@@ -69,6 +69,7 @@ import {
   type OAuthRuntime,
 } from './oauth/server.ts';
 import { createSessionManager, type SessionManager, type SessionOptions } from './session.ts';
+import { TASKS_EXTENSION, type TaskService } from './tasks.ts';
 import type { HttpWrites } from './writes.ts';
 
 /** 1 MiB (ARCHITECTURE §5 step 1). */
@@ -149,6 +150,11 @@ export interface HostServices {
   readonly random: Random;
   /** The query cache (P8-01); absent = off. */
   readonly queryCache?: QueryCache;
+  /**
+   * The MCP Tasks extension (P8-10): advertised in `server/discover` and served only when present (`AB_TASKS` not off).
+   * Used only by 2026-07-28 requests that declare it.
+   */
+  readonly tasks?: TaskService;
   /** The per-grant request quotas (P8-09); absent = none. */
   readonly quota?: QuotaGate;
 }
@@ -397,6 +403,8 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         ctx: prepared.ctx,
         onToolCall: prepared.onToolCall,
         ...(prepared.apps === undefined ? {} : { apps: prepared.apps }),
+        // Advertised in `server/discover`; a request still has to declare it to get a task (L-016).
+        ...(services.tasks === undefined ? {} : { extensions: { [TASKS_EXTENSION]: {} } }),
       });
     },
     { legacy: 'stateless' },
@@ -1074,6 +1082,65 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     };
 
     const forward = new Request(c.req.url, { method: 'POST', headers: c.req.raw.headers, body: body.bytes });
+    // The Tasks extension (P8-10): a declared `tools/call` of a report tool becomes a task, and `tasks/*` of a 2026-07-28
+    // client are answered here, for the owner device only. Pass-through callers share one identity and get no tasks.
+    const tasks = services.tasks;
+    if (
+      tasks !== undefined &&
+      passthroughToken === null &&
+      (tasks.isTaskRequest(body.message) ||
+        (mcp.kind === 'tool_call' && tasks.wants(body.message, mcp.tool, prepared.tools)))
+    ) {
+      const message = body.message as { params?: Record<string, unknown> };
+      const answer = await tasks.handle({
+        message: body.message,
+        access: resolved,
+        tools: prepared.tools,
+        run: async (call) => {
+          const headers = new Headers(c.req.raw.headers);
+          headers.delete('content-length');
+          headers.set('mcp-method', 'tools/call');
+          headers.set('mcp-name', call.name);
+          const inner = new Request(c.req.url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              method: 'tools/call',
+              params: { name: call.name, arguments: call.arguments, _meta: message.params?.['_meta'] },
+            }),
+          });
+          const res = await handler.fetch(inner, {
+            authInfo: {
+              token: 'device',
+              clientId: resolved.tokenId ?? 'device',
+              scopes: [],
+              extra: { prepared },
+            },
+          });
+          const text = await res.text();
+          const data = text.startsWith('event:')
+            ? (text.split('\n').find((l) => l.startsWith('data:')) ?? '').slice(5)
+            : text;
+          const failed = { error: { code: -32603, message: 'The report could not be produced.' } };
+          try {
+            const parsed = JSON.parse(data) as { result?: unknown; error?: { code: number } };
+            if (parsed.result !== undefined) return { result: parsed.result };
+            return { error: { code: parsed.error?.code ?? -32603, message: failed.error.message } };
+          } catch {
+            return failed;
+          }
+        },
+      });
+      return finish(
+        new Response(JSON.stringify(answer), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+        null,
+      );
+    }
     let timedOut = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const deadline = new Promise<Response>((resolve) => {

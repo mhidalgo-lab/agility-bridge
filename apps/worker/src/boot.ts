@@ -168,6 +168,8 @@ export async function boot(
     KeyPurpose.KeyCheck,
     KeyPurpose.AuditIdentity,
     KeyPurpose.Login,
+    // Task records (P8-10).
+    ...(settings.tasks ? [KeyPurpose.Task] : []),
     // The query cache's entry ids and its shared tier (P8-01); only derived when a TTL is set.
     ...(settings.queryCache.ttlSeconds > 0
       ? [KeyPurpose.CacheId, ...(settings.queryCache.edge ? [KeyPurpose.CacheBody] : [])]
