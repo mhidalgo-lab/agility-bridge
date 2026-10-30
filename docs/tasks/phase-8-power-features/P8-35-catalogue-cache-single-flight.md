@@ -25,7 +25,7 @@ Cut repeated work the Phase 8 review found on two hot paths: the anonymous `tool
 ## Acceptance criteria
 - [x] The catalogue's three answers are served from the isolate map after the first build, with a test that the bytes equal the uncached answer for every slug and that storage is untouched.
 - [x] A test with concurrent identical reads in one request shows one Agility request; a test shows a different scope never shares.
-- [ ] `pnpm bench:worker` shows the catalogue and the repeat-read scenarios (see P8-37).
+- [x] `pnpm bench:worker` shows the catalogue and the repeat-read scenarios (see P8-37).
 
 ## Security notes
 THREAT_MODEL T16, T33.
