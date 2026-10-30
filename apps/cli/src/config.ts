@@ -2,7 +2,6 @@
 // stdio configuration (P1-11, L-136): one surface, `AB_` environment variables or a YAML file (`AB_CONFIG`), validated
 // at startup with unknown keys rejected. Secrets come from the environment the MCP client sets, or from `${ENV}` and
 // `${keychain:service/account}` references in YAML; never from flags (L-026, T23).
-import { execFileSync } from 'node:child_process';
 import { closeSync, fstatSync, openSync, readFileSync } from 'node:fs';
 import { IDENTITY_SECRET_NAMES, IDENTITY_SETTING_NAMES } from '@agility-bridge/auth';
 import {
@@ -16,6 +15,7 @@ import {
 } from '@agility-bridge/core';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
+import { KeychainError, keychainFor, parseKeychainRef, readKeychainRef } from './keychain.ts';
 
 export class ConfigError extends Error {
   override name = 'ConfigError';
@@ -297,29 +297,36 @@ export function checkEnvNames(env: Readonly<Record<string, string | undefined>>)
 
 export type KeychainReader = (service: string, account: string) => string;
 
-/** The OS keychain: macOS `security`, Linux `secret-tool` (libsecret). Never through a shell. */
+/** The OS keychain (P8-08, L-103): the platform tool, no shell, no fallback; failures are `ConfigError`s. */
 export const osKeychain: KeychainReader = (service, account) => {
-  const opts = {
-    encoding: 'utf8' as const,
-    timeout: 5_000,
-    stdio: ['ignore', 'pipe', 'ignore'] as ['ignore', 'pipe', 'ignore'],
-  };
   try {
-    if (process.platform === 'darwin')
-      return execFileSync(
-        'security',
-        ['find-generic-password', '-s', service, '-a', account, '-w'],
-        opts,
-      ).trimEnd();
-    if (process.platform === 'linux')
-      return execFileSync('secret-tool', ['lookup', 'service', service, 'account', account], opts).trimEnd();
-  } catch {
-    throw new ConfigError(`The keychain has no entry for service "${service}", account "${account}".`);
+    return readKeychainRef({ service, account }, keychainFor(process.platform));
+  } catch (error) {
+    if (error instanceof KeychainError) throw new ConfigError(error.message);
+    throw error;
   }
-  throw new ConfigError(
-    `Keychain references are supported on macOS and Linux; on this system use \${ENV} references.`,
-  );
 };
+
+/**
+ * A value that is a `keychain:<name>` or `keychain:<service>/<account>` reference becomes the secret it names; any other
+ * value is returned as it is. The error names the reference and never a value (P8-08).
+ */
+export function resolveSecretValue(
+  value: string,
+  what: string,
+  keychain: KeychainReader = osKeychain,
+): string {
+  let ref: ReturnType<typeof parseKeychainRef>;
+  try {
+    ref = parseKeychainRef(value);
+  } catch (error) {
+    throw new ConfigError(`${what}: ${(error as Error).message}`);
+  }
+  if (ref === undefined) return value;
+  const secret = keychain(ref.service, ref.account);
+  if (secret === '') throw new ConfigError(`${what}: the keychain entry is empty.`);
+  return secret;
+}
 
 const REF = /\$\{([^}]{1,200})\}/g;
 
@@ -334,8 +341,7 @@ function substitute(
   return parts
     .map((part) =>
       part.replace(REF, (_m, ref: string) => {
-        const k = /^keychain:([^/]{1,100})\/(.{1,100})$/.exec(ref);
-        if (k !== null) return keychain(k[1] as string, k[2] as string);
+        if (ref.startsWith('keychain:')) return resolveSecretValue(ref, path, keychain);
         if (!/^[A-Z_][A-Z0-9_]{0,99}$/.test(ref))
           throw new ConfigError(
             `${path}: "\${${ref}}" is not an environment variable or keychain reference.`,
@@ -556,8 +562,8 @@ export function loadConfig(
   const logLevel = level(env['AB_LOG_LEVEL']);
   if (env['AB_CONFIG'] !== undefined && env['AB_CONFIG'] !== '') return fromYaml(env, options);
   const url = env['AB_AGILITY_URL'];
-  const token = env['AB_AGILITY_TOKEN'];
-  if ((url === undefined || url === '') && (token === undefined || token === '')) {
+  const rawToken = env['AB_AGILITY_TOKEN'];
+  if ((url === undefined || url === '') && (rawToken === undefined || rawToken === '')) {
     const others = ENV_MODE_ONLY.filter((k) => env[k] !== undefined);
     if (others.length > 0)
       throw new ConfigError(`${others.join(', ')} set, but AB_AGILITY_URL and AB_AGILITY_TOKEN are missing.`);
@@ -567,11 +573,13 @@ export function loadConfig(
     throw new ConfigError(
       'AB_AGILITY_TOKEN is set but AB_AGILITY_URL is missing (the address you open Agility at).',
     );
-  if (token === undefined || token === '') {
+  if (rawToken === undefined || rawToken === '') {
     throw new ConfigError(
       'AB_AGILITY_URL is set but AB_AGILITY_TOKEN is missing: create an access token on the Agility Applications page.',
     );
   }
+  // `keychain:<name>` keeps the token out of the client's configuration file (P8-08).
+  const token = resolveSecretValue(rawToken, 'AB_AGILITY_TOKEN', options.keychain);
   return {
     kind: 'configured',
     source: 'environment',

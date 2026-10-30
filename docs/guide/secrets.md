@@ -14,15 +14,51 @@ shown again.
 - 32 random bytes written as `v<N>:<base64>`, for example `v1:…`; `<N>` is the key version (bare base64 means
   version 1). Generate it with `agility-bridge init`, which writes it to `~/.config/agility-bridge/master.key`
   (`$XDG_CONFIG_HOME`, or `%APPDATA%\agility-bridge` on Windows) with mode `0600`, and never overwrites an existing file.
-- Give it to the server in **one** of two ways, never as a command-line flag:
+- Give it to the server in **one** of these ways, never as a command-line flag:
   - `AB_MASTER_KEY_FILE=/path/to/master.key`: the file must be a regular file, not a symbolic link, readable only by
     its owner (`chmod 600`), and **not inside the data directory** (`AB_DATA_DIR`, or the directory of `AB_DB_PATH`);
   - `AB_MASTER_KEY=v1:…` from your secret store (a Docker or Kubernetes secret, a systemd credential, a Worker
-    secret).
+    secret), or `AB_MASTER_KEY=keychain:<name>` ([OS keychain](#keeping-secrets-in-the-os-keychain)).
 - **Keep it away from the database.** A backup that contains both the database and the key gives away every token.
   Keep the key in a separate secret store, volume or password manager, and back it up separately.
 - At start the server checks the key against a key-check value stored the first time that version was used: a wrong
   key, or a different key reusing a known version number, stops the server before anything is decrypted.
+
+## Keeping secrets in the OS keychain
+
+Instead of a file or an environment value, a secret can live in your operating system's keychain and be referred to by
+name: `keychain:<name>` (stored under the service `agility-bridge`) or `keychain:<service>/<account>`. A reference is
+accepted as the whole value of `AB_AGILITY_TOKEN` (stdio), `AB_MASTER_KEY` and `AB_MASTER_KEY_PREVIOUS` (`serve` and the
+management commands), and inside `${keychain:…}` in the YAML configuration. The file or client configuration then holds
+only the name:
+
+```sh
+agility-bridge keychain set agility-token          # type or pipe the token; it is stored, never printed
+agility-bridge init --keychain master              # a new master key straight into the keychain
+agility-bridge keychain status --name agility-token
+```
+
+```json
+{ "env": { "AB_AGILITY_URL": "https://www7.v1host.com/YourInstance", "AB_AGILITY_TOKEN": "keychain:agility-token" } }
+```
+
+```sh
+AB_MASTER_KEY=keychain:master agility-bridge serve
+```
+
+| System | Tool | Notes |
+|---|---|---|
+| macOS | `security` (the login keychain) | A locked keychain or a prompt the client cannot show is an error. |
+| Linux | `secret-tool` (`libsecret-tools`) | Needs a desktop keyring (GNOME Keyring, KWallet) on a session bus; a headless server has none: use a `0600` file. |
+| Windows | Credential Manager, through Windows PowerShell | Generic credential named `<service>/<account>`, kept for this machine. |
+
+How it stays safe: no native module is installed; the system tool is started without a shell and a secret is handed to
+it on standard input, never as an argument, so it is not visible in a process listing; a missing tool, a locked or
+unreachable keychain, a missing entry and a platform without support are errors that name the cause. There is **no
+fallback** to a file or to the reference text. `keychain set` reads the entry back to prove it was stored. The keychain
+protects against a stolen config file and a leaked repository, not against other software running as you, and it is not
+a backup: keep a separate copy of the master key (a lost key loses every stored token). The Windows backend has not yet
+been run on a real machine (the maintainers record the check in the release notes).
 
 ## Rotating the master key
 

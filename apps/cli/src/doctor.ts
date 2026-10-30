@@ -318,7 +318,10 @@ async function serverChecks(deps: DoctorDeps): Promise<Finding[]> {
   }
   let keyring: Keyring | undefined;
   try {
-    const keys = readMasterKeys(env, { dataDir: dirname(dbPath) });
+    const keys = readMasterKeys(env, {
+      dataDir: dirname(dbPath),
+      ...(deps.keychain === undefined ? {} : { keychain: deps.keychain }),
+    });
     keyring = await Keyring.create(keys.current, keys.previous);
     findings.push(
       finding(
@@ -594,6 +597,7 @@ function clientFindings(file: ClientFile, platform: NodeJS.Platform): Finding[] 
         typeof value === 'string' &&
         value !== '' &&
         !/^\$\{[^}]+\}$/.test(value) &&
+        !value.startsWith('keychain:') &&
         !/^<.*>$/.test(value)
       ) {
         plaintext = true;

@@ -2,7 +2,7 @@
 id: P8-08
 title: OS keychain support
 phase: 8
-status: todo
+status: review
 priority: low
 depends_on: [P6-13]
 adr: ["0007"]
@@ -37,10 +37,10 @@ Keep Agility tokens and the master key out of configuration files on developer m
   the real keychain are opt-in (`AB_TEST_KEYCHAIN=1`) and never run in CI.
 
 ## Acceptance criteria
-- [ ] No secret in argv or in the child's environment, on all three platforms (tests with fake runners record every call).
-- [ ] No silent fallback: missing tool, failed tool, unsupported platform, missing entry and failed read-back each error (tests).
-- [ ] References resolve for the stdio token, the master keys and the YAML form; a malformed or missing one stops startup naming it, never a value.
-- [ ] `keychain set/delete/status` and `init --keychain` tested; `docs/reference/cli.md` regenerated.
+- [x] No secret in argv or in the child's environment, on all three platforms (tests with fake runners record every call).
+- [x] No silent fallback: missing tool, failed tool, unsupported platform, missing entry and failed read-back each error (tests).
+- [x] References resolve for the stdio token, the master keys and the YAML form; a malformed or missing one stops startup naming it, never a value.
+- [x] `keychain set/delete/status` and `init --keychain` tested; `docs/reference/cli.md` regenerated.
 - [ ] Manual verification on macOS, Linux and Windows recorded (owner step: the maintainers' machines; the Windows script is *unverified* until then).
 
 ## Security notes

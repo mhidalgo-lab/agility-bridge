@@ -2,10 +2,11 @@
 // Management commands (P2-10): one table drives parsing, help and the generated reference (docs/reference/cli.md).
 // Every change goes through the admin API — remotely, or in process over the local database — so validation, guards
 // and audit are the same on every path (L-065). Output is JSON on stdout; messages go to stderr.
-import { generateAdminToken, rotateCredentialKeys } from '@agility-bridge/auth';
+import { generateAdminToken, generateMasterKey, rotateCredentialKeys } from '@agility-bridge/auth';
 import { restoreSqliteBackup } from '@agility-bridge/storage-sqlite';
 import { ConfigError } from '../config.ts';
 import { exitCode, renderReport, runDoctor } from '../doctor.ts';
+import { type KeychainBackend, KeychainError, type KeychainRef, parseKeychainRef } from '../keychain.ts';
 import { createMasterKeyFile, defaultMasterKeyFile } from '../master-key.ts';
 import type { AdminClient } from './client.ts';
 import { readSecret } from './secret-input.ts';
@@ -34,6 +35,8 @@ export interface Runtime {
   /** The local database and keys (for `keys …`). */
   local(): Promise<Parameters<NonNullable<CommandSpec['local']>>[0]>;
   readonly stdin: () => Promise<string>;
+  /** The OS keychain of this machine (P8-08). */
+  keychain(): KeychainBackend;
 }
 
 export interface CommandSpec {
@@ -72,6 +75,25 @@ const list = (v: unknown) =>
       : undefined;
 const defined = <T extends Record<string, unknown>>(o: T): Partial<T> =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
+
+/** `name` or `service/account` as a keychain entry (P8-08). */
+function keychainRef(name: string): KeychainRef {
+  try {
+    return parseKeychainRef(`keychain:${name}`) as KeychainRef;
+  } catch (error) {
+    throw new ConfigError((error as Error).message);
+  }
+}
+
+/** Runs a keychain operation: its failures are refusals with a message, not stack traces. */
+function keychainOp<T>(run: () => T): T {
+  try {
+    return run();
+  } catch (error) {
+    if (error instanceof KeychainError) throw new ConfigError(error.message);
+    throw error;
+  }
+}
 
 async function agilityToken(r: Runtime, p: Parsed): Promise<string> {
   return readSecret({
@@ -134,11 +156,34 @@ export const COMMANDS: readonly CommandSpec[] = [
         kind: 'string',
         help: 'Key version (default 1); a rotation needs one higher than the current key',
       },
+      {
+        name: 'keychain',
+        kind: 'string',
+        help: 'Store the new key in the OS keychain under this name instead of a file (never overwrites)',
+      },
     ],
     async run(r, p) {
       const version = p.opts['version'] === undefined ? 1 : Number(p.opts['version']);
       if (!Number.isInteger(version) || version < 1 || version > 1_000_000) {
         throw new ConfigError('--version is a whole number ≥ 1.');
+      }
+      if (typeof p.opts['keychain'] === 'string') {
+        const ref = keychainRef(p.opts['keychain']);
+        const kc = r.keychain();
+        keychainOp(() => {
+          if (kc.get(ref.service, ref.account) !== undefined) {
+            throw new KeychainError(
+              `${kc.label} already has an entry "${ref.service}/${ref.account}"; losing a master key loses every token encrypted with it, so it is not replaced.`,
+            );
+          }
+          kc.set(ref.service, ref.account, generateMasterKey(version));
+        });
+        const reference = `keychain:${p.opts['keychain']}`;
+        r.out(JSON.stringify({ masterKeyReference: reference }));
+        r.err(
+          `agility-bridge: stored a new master key in the ${kc.label}. Start the server with AB_MASTER_KEY=${reference}, and keep a separate backup of the key (docs/guide/secrets.md): the keychain is not a backup.`,
+        );
+        return 0;
       }
       const path = createMasterKeyFile(
         typeof p.opts['key-file'] === 'string' ? p.opts['key-file'] : defaultMasterKeyFile(r.env),
@@ -174,6 +219,58 @@ export const COMMANDS: readonly CommandSpec[] = [
       const report = await runDoctor(opts, { env: r.env });
       r.out(p.opts['json'] === true ? JSON.stringify(report, null, 2) : renderReport(report, opts));
       return exitCode(report);
+    },
+  },
+  {
+    words: ['keychain', 'set'],
+    summary:
+      'Store a secret in the OS keychain (from --from-file, AB_KEYCHAIN_SECRET, standard input or a hidden prompt); refer to it as keychain:<name>',
+    args: [id('name', 'Entry name, or service/account (service defaults to agility-bridge)')],
+    options: [{ name: 'from-file', kind: 'string', help: 'Read the secret from this 0600 file' }],
+    async run(r, p) {
+      const ref = keychainRef(p.args[0] as string);
+      const secret = await readSecret({
+        ...(typeof p.opts['from-file'] === 'string' ? { file: p.opts['from-file'] } : {}),
+        envName: 'AB_KEYCHAIN_SECRET',
+        env: r.env,
+        stdin: r.stdin,
+        what: 'secret to store',
+      });
+      const kc = r.keychain();
+      keychainOp(() => kc.set(ref.service, ref.account, secret));
+      r.out(JSON.stringify({ stored: `keychain:${p.args[0]}` }));
+      r.err(
+        `agility-bridge: stored in the ${kc.label}. Use keychain:${p.args[0]} where the secret would go (AB_AGILITY_TOKEN, AB_MASTER_KEY).`,
+      );
+      return 0;
+    },
+  },
+  {
+    words: ['keychain', 'delete'],
+    summary: 'Remove an entry from the OS keychain',
+    args: [id('name', 'Entry name, or service/account')],
+    async run(r, p) {
+      const ref = keychainRef(p.args[0] as string);
+      const deleted = keychainOp(() => r.keychain().delete(ref.service, ref.account));
+      r.out(JSON.stringify({ deleted }));
+      return 0;
+    },
+  },
+  {
+    words: ['keychain', 'status'],
+    summary:
+      'Show which keychain this machine uses and whether it works; with --name, whether an entry exists (never its value)',
+    options: [{ name: 'name', kind: 'string', help: 'Entry name, or service/account' }],
+    async run(r, p) {
+      const kc = r.keychain();
+      const available = keychainOp(() => kc.available());
+      let entry: boolean | undefined;
+      if (typeof p.opts['name'] === 'string' && available) {
+        const ref = keychainRef(p.opts['name']);
+        entry = keychainOp(() => kc.get(ref.service, ref.account)) !== undefined;
+      }
+      r.out(JSON.stringify({ backend: kc.label, available, ...(entry === undefined ? {} : { entry }) }));
+      return available ? 0 : 1;
     },
   },
   {

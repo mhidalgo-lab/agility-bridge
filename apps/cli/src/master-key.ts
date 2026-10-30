@@ -12,7 +12,7 @@ import {
   readSecretFile,
   UnsafeFileError,
 } from '@agility-bridge/storage-sqlite';
-import { ConfigError } from './config.ts';
+import { ConfigError, type KeychainReader, resolveSecretValue } from './config.ts';
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -69,7 +69,12 @@ const FILE_VARIABLE = {
   AB_MASTER_KEY_PREVIOUS: 'AB_MASTER_KEY_FILE_PREVIOUS',
 } as const;
 
-function readOne(env: Env, name: keyof typeof FILE_VARIABLE, dataDir?: string): string | undefined {
+function readOne(
+  env: Env,
+  name: keyof typeof FILE_VARIABLE,
+  dataDir?: string,
+  keychain?: KeychainReader,
+): string | undefined {
   const fileName = FILE_VARIABLE[name];
   const value = env[name];
   const file = env[fileName];
@@ -90,7 +95,8 @@ function readOne(env: Env, name: keyof typeof FILE_VARIABLE, dataDir?: string): 
       throw error;
     }
   } else if (value !== undefined && value !== '') {
-    key = value;
+    // A `keychain:` reference keeps the key out of every file and environment block (P8-08).
+    key = resolveSecretValue(value, name, keychain);
   }
   if (key === undefined) return undefined;
   try {
@@ -103,15 +109,18 @@ function readOne(env: Env, name: keyof typeof FILE_VARIABLE, dataDir?: string): 
 }
 
 /** Reads and validates the master keys; `dataDir` is the directory of the database, which may not hold a key file. */
-export function readMasterKeys(env: Env, options: { dataDir?: string } = {}): MasterKeys {
-  const current = readOne(env, 'AB_MASTER_KEY', options.dataDir);
+export function readMasterKeys(
+  env: Env,
+  options: { dataDir?: string; keychain?: KeychainReader } = {},
+): MasterKeys {
+  const current = readOne(env, 'AB_MASTER_KEY', options.dataDir, options.keychain);
   if (current === undefined) {
     throw new ConfigError(
       `agility-bridge serve needs a master key to encrypt stored Agility tokens: run \`agility-bridge init\` and set ` +
         `AB_MASTER_KEY_FILE=${defaultMasterKeyFile(env)} (or AB_MASTER_KEY from your secret store). See docs/guide/secrets.md.`,
     );
   }
-  const previous = readOne(env, 'AB_MASTER_KEY_PREVIOUS', options.dataDir);
+  const previous = readOne(env, 'AB_MASTER_KEY_PREVIOUS', options.dataDir, options.keychain);
   return previous === undefined ? { current } : { current, previous };
 }
 

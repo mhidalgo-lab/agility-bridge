@@ -67,7 +67,7 @@ workspaces:
     instance:
       url: https://www7.v1host.com/YourInstance
       token: ${AGILITY_TOKEN}              # from the environment
-      # token: ${keychain:agility/ann}     # or the OS keychain (macOS security, Linux secret-tool)
+      # token: ${keychain:agility/ann}     # or the OS keychain (macOS, Linux secret-tool, Windows)
       # ca_file: /etc/ssl/agility-ca.pem
     projects: [Scope:1234]
     include_child_projects: true
@@ -83,8 +83,9 @@ workspaces:
   resolved stops startup and names it.
 - Unknown keys are refused, the file may be at most 1 MiB, YAML aliases are limited, and the server warns when the file
   is readable by other users (`chmod 600` it).
-- Keychain references use `security find-generic-password` on macOS and `secret-tool lookup` on Linux; on Windows use
-  `${NAME}` references.
+- Keychain references (`${keychain:name}` or `${keychain:service/account}`) use the macOS `security` tool, Linux
+  `secret-tool` and the Windows Credential Manager; `AB_AGILITY_TOKEN=keychain:<name>` works the same way without a YAML
+  file. Store the secret with `agility-bridge keychain set <name>` ([secrets guide](secrets.md#keeping-secrets-in-the-os-keychain)).
 
 ## After an upgrade
 

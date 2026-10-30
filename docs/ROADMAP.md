@@ -367,7 +367,7 @@ Status lives in each task file.
 | P8-05 | [Configuration import and export](tasks/phase-8-power-features/P8-05-config-import-export.md) | low | P6-13 | todo |
 | P8-06 | [Client integrations (Claude Code plugin, VS Code and Copilot snippets)](tasks/phase-8-power-features/P8-06-client-integrations.md) | low | P6-13 | todo |
 | P8-07 | [Self-monitoring with OpenTelemetry](tasks/phase-8-power-features/P8-07-self-monitoring.md) | low | P6-13 | todo |
-| P8-08 | [OS keychain support](tasks/phase-8-power-features/P8-08-os-keychain.md) | low | P6-13 | todo |
+| P8-08 | [OS keychain support](tasks/phase-8-power-features/P8-08-os-keychain.md) | low | P6-13 | review |
 | P8-09 | [Per-grant quotas and usage](tasks/phase-8-power-features/P8-09-quotas-usage.md) | low | P6-13 | todo |
 | P8-10 | [MCP Tasks for long-running reports](tasks/phase-8-power-features/P8-10-mcp-tasks.md) | low | P6-13 | todo |
 | P8-11 | [Lazy auth and public tool catalogue](tasks/phase-8-power-features/P8-11-lazy-auth-catalogue.md) | low | P6-13 | done |

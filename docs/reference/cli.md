@@ -12,13 +12,14 @@ when `AB_ADMIN_URL` is set ([guide](../guide/cli.md)). Output is JSON on stdout.
 Write a new master key (0600) to the user configuration directory, never overwriting one.
 
 ```text
-agility-bridge init [--key-file <value>] [--version <value>]
+agility-bridge init [--key-file <value>] [--version <value>] [--keychain <value>]
 ```
 
 | Name | Kind | Meaning |
 |---|---|---|
 | `--key-file` | string | Where to write it (default ~/.config/agility-bridge/master.key) |
 | `--version` | string | Key version (default 1); a rotation needs one higher than the current key |
+| `--keychain` | string | Store the new key in the OS keychain under this name instead of a file (never overwrites) |
 
 Runs without a server.
 
@@ -38,6 +39,51 @@ agility-bridge doctor [--check-token] [--offline] [--fix] [--json]
 | `--offline` | flag | Make no network request |
 | `--fix` | flag | Apply only the chmod repairs the report lists |
 | `--json` | flag | Print the report as JSON |
+
+Runs without a server.
+
+## keychain
+
+### `keychain set`
+
+Store a secret in the OS keychain (from --from-file, AB_KEYCHAIN_SECRET, standard input or a hidden prompt); refer to it as keychain:<name>.
+
+```text
+agility-bridge keychain set <name> [--from-file <value>]
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `<name>` | argument | Entry name, or service/account (service defaults to agility-bridge) |
+| `--from-file` | string | Read the secret from this 0600 file |
+
+Runs without a server.
+
+### `keychain delete`
+
+Remove an entry from the OS keychain.
+
+```text
+agility-bridge keychain delete <name>
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `<name>` | argument | Entry name, or service/account |
+
+Runs without a server.
+
+### `keychain status`
+
+Show which keychain this machine uses and whether it works; with --name, whether an entry exists (never its value).
+
+```text
+agility-bridge keychain status [--name <value>]
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `--name` | string | Entry name, or service/account |
 
 Runs without a server.
 
