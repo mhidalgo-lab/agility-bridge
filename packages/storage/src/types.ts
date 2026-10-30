@@ -417,6 +417,13 @@ export interface KvIncrementOptions {
   max?: number;
 }
 
+export interface KvIncrementEntry {
+  key: string;
+  by?: number;
+  /** Expiry of a new (or expired, hence restarted) counter; an existing counter keeps its expiry. */
+  expiresAt?: number | null;
+}
+
 /** Short-lived state: single-use markers, OAuth provider records, counters (ADR-0006). Values are opaque strings. */
 export interface KvStore {
   get(key: string): Promise<string | null>;
@@ -433,6 +440,12 @@ export interface KvStore {
   delete(key: string): Promise<boolean>;
   /** Atomically adds `by` (default 1) and returns the new value, or `null` when `max` would be exceeded. */
   increment(key: string, options?: KvIncrementOptions): Promise<number | null>;
+  /**
+   * Adds to several counters in ONE statement (P8-39): each `by` (default 1) is added atomically, a new or expired
+   * counter restarts at `by` with its `expiresAt`, and the new values come back in the order of `entries`. Uncapped
+   * (use `increment` with `max` where a cap matters); at most 10 distinct keys; an empty list touches nothing.
+   */
+  incrementMany(entries: readonly KvIncrementEntry[]): Promise<number[]>;
   /** Live keys with this prefix, in key order, after `after`, at most `limit` (default 100, at most 1,000). */
   list(prefix: string, options?: { after?: string; limit?: number }): Promise<string[]>;
   /**

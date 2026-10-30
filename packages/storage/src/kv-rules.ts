@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Input rules and expiry semantics of the kv store, shared by every adapter.
 import { InvalidInputError } from './errors.ts';
-import type { KvIncrementOptions, KvSetOptions } from './types.ts';
+import type { KvIncrementEntry, KvIncrementOptions, KvSetOptions } from './types.ts';
 
 /** Printable ASCII without spaces, so prefix lengths agree between JavaScript and SQLite. */
 const KEY = /^[\x21-\x7e]{1,512}$/;
@@ -71,4 +71,21 @@ export function isLive(expiresAt: number | null, now: number): boolean {
 export function prefixRange(prefix: string): readonly [low: string, high: string | null] {
   if (prefix === '') return ['', null];
   return [prefix, prefix.slice(0, -1) + String.fromCharCode(prefix.charCodeAt(prefix.length - 1) + 1)];
+}
+
+/** Up to this many counters in one `incrementMany` (a bound on the statement, P8-39). */
+export const MAX_KEYS_PER_INCREMENT = 10;
+
+/** Validates the entries of `incrementMany`: distinct keys, positive whole `by`, a valid expiry. */
+export function checkIncrements(entries: unknown): { key: string; by: number; expiresAt: number | null }[] {
+  if (!Array.isArray(entries) || entries.length > MAX_KEYS_PER_INCREMENT) {
+    throw new InvalidInputError(`kv.incrementMany takes at most ${MAX_KEYS_PER_INCREMENT} entries.`);
+  }
+  const seen = new Set<string>();
+  return (entries as KvIncrementEntry[]).map((entry) => {
+    const { by, expiresAt } = checkIncrement(entry?.key, entry ?? {});
+    if (seen.has(entry.key)) throw new InvalidInputError('kv.incrementMany takes each key once.');
+    seen.add(entry.key);
+    return { key: entry.key, by, expiresAt };
+  });
 }

@@ -683,7 +683,7 @@ async function phase8Paths(): Promise<{
     await measure(name, w, async () => text(await post(w, 'team-a', w.tokens.alice, body)), 15);
   }
 
-  // A read with a quota set (P8-09): one counter read before, two increments after, over the world's own kv.
+  // A read with a quota set (P8-09): one counter read before, one statement for both periods after, over the world's own kv.
   {
     let kv: W['storage']['kv'] | undefined;
     let statements = 0;
@@ -692,7 +692,7 @@ async function phase8Paths(): Promise<{
       clock: core.systemClock,
       counters: {
         getMany: (keys) => (statements++, (kv as NonNullable<typeof kv>).getMany(keys)),
-        increment: (key, options) => (statements++, (kv as NonNullable<typeof kv>).increment(key, options)),
+        incrementMany: (entries) => (statements++, (kv as NonNullable<typeof kv>).incrementMany(entries)),
       },
     });
     const w = await world(

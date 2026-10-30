@@ -13,7 +13,11 @@ import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loginRace, unbindRace } from '../../../packages/auth/test/login-race.ts';
 import { writeLimiterContract } from '../../../packages/core/test/helpers/write-limiter-contract.ts';
-import { storageContract } from '../../../packages/storage/test/contract.ts';
+import {
+  countingDriver,
+  quotaStatementContract,
+  storageContract,
+} from '../../../packages/storage/test/contract.ts';
 
 let mf: Miniflare;
 let db: D1Database;
@@ -101,6 +105,14 @@ async function emptyD1(d: D1Database): Promise<void> {
 storageContract('d1 (local)', async (clock) => {
   await emptyD1(db);
   return openSqlStorage(createD1Driver(db), { now: clock.now });
+});
+
+// The quota's statement budget on D1: one read and one write for both periods (P8-39).
+quotaStatementContract('d1 (local)', async (clock) => {
+  await emptyD1(db);
+  const counting = countingDriver(createD1Driver(db));
+  const storage = await openSqlStorage(counting.driver, { now: clock.now });
+  return { storage, statements: counting.statements, reset: counting.reset };
 });
 
 // The write limiter's counters (P7-03) on D1 inside workerd: parallel checks from several "isolates" share one count.

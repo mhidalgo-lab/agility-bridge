@@ -7,6 +7,7 @@ import {
   NotFoundError,
   ReadOnlyStorageError,
   readOnlyStorage,
+  type SqlDriver,
   STATS_SCAN_CAP,
   type Storage,
 } from '../src/index.ts';
@@ -74,6 +75,53 @@ async function seed(s: Storage) {
     defaultCredentialId: 'c-shared',
   });
   return { owner, alice, bob, inst, other, shared, sharedOther, aliceCred, bobCred, ws };
+}
+
+/** A driver that counts the statements (a `batch` is one round trip) that reach it. */
+export function countingDriver(inner: SqlDriver): {
+  driver: SqlDriver;
+  statements: () => number;
+  reset(): void;
+} {
+  let n = 0;
+  return {
+    driver: {
+      query: (st) => (n++, inner.query(st)),
+      batch: (sts) => (n++, inner.batch(sts)),
+      close: () => inner.close(),
+    },
+    statements: () => n,
+    reset: () => {
+      n = 0;
+    },
+  };
+}
+
+/**
+ * The quota's statement budget (P8-39, D-248): reading both periods is one statement and adding to both is one
+ * statement, the same on every adapter. `open` returns the storage and a counter of what reached the database.
+ */
+export function quotaStatementContract(
+  name: string,
+  open: (clock: TestClock) => Promise<{ storage: Storage; statements: () => number; reset(): void }>,
+): void {
+  describe(`Quota statements: ${name}`, () => {
+    it('reads two periods in one statement and adds to both in one statement', async () => {
+      const clock = testClock();
+      const { storage, statements, reset } = await open(clock);
+      const keys = ['qt:d:g1:20261030', 'qt:m:g1:202610'];
+      const resetsAt = clock.now() + 60_000;
+      reset();
+      expect(
+        await storage.kv.incrementMany(keys.map((key) => ({ key, by: 3, expiresAt: resetsAt }))),
+      ).toEqual([3, 3]);
+      expect(statements()).toBe(1);
+      reset();
+      expect(await storage.kv.getMany(keys)).toEqual(new Map(keys.map((k) => [k, '3'])));
+      expect(statements()).toBe(1);
+      await storage.close();
+    });
+  });
 }
 
 export function storageContract(name: string, factory: StorageFactory): void {
@@ -1190,6 +1238,52 @@ export function storageContract(name: string, factory: StorageFactory): void {
         expect(await s.kv.get('n')).toBe('7');
         await expect(s.kv.increment('n', { by: 0 })).rejects.toThrow(InvalidInputError);
         await expect(s.kv.increment('n', { by: 1.5 })).rejects.toThrow(InvalidInputError);
+      });
+
+      it('incrementMany adds to several counters at once, in the order given, with the same expiry rules (P8-39)', async () => {
+        const w = clock.now() + 1_000;
+        expect(await s.kv.incrementMany([])).toEqual([]);
+        expect(
+          await s.kv.incrementMany([
+            { key: 'a', by: 2, expiresAt: w },
+            { key: 'b', by: 5, expiresAt: w + 5_000 },
+          ]),
+        ).toEqual([2, 5]);
+        // An existing counter keeps its expiry; the order of the answer is the order of the entries.
+        expect(
+          await s.kv.incrementMany([
+            { key: 'b', by: 1, expiresAt: w + 99_999 },
+            { key: 'a', expiresAt: w + 99_999 },
+            { key: 'c' },
+          ]),
+        ).toEqual([6, 3, 1]);
+        expect(await s.kv.getMany(['a', 'b', 'c'])).toEqual(
+          new Map([
+            ['a', '3'],
+            ['b', '6'],
+            ['c', '1'],
+          ]),
+        );
+        clock.advance(1_000); // a's window ends and restarts at `by`; b is still live
+        expect(
+          await s.kv.incrementMany([
+            { key: 'a', by: 4, expiresAt: clock.now() + 1_000 },
+            { key: 'b', by: 1, expiresAt: clock.now() + 1_000 },
+          ]),
+        ).toEqual([4, 7]);
+        await expect(s.kv.incrementMany([{ key: 'a' }, { key: 'a' }])).rejects.toThrow(InvalidInputError);
+        await expect(s.kv.incrementMany([{ key: 'a', by: 0 }])).rejects.toThrow(InvalidInputError);
+        await expect(s.kv.incrementMany([{ key: 'bad key' }])).rejects.toThrow(InvalidInputError);
+        await expect(
+          s.kv.incrementMany(Array.from({ length: 11 }, (_, i) => ({ key: `k${i}` }))),
+        ).rejects.toThrow(InvalidInputError);
+        expect(await s.kv.get('k0')).toBeNull();
+      });
+
+      it('incrementMany is refused by a read-only view', async () => {
+        await expect(readOnlyStorage(s).kv.incrementMany([{ key: 'a' }])).rejects.toThrow(
+          ReadOnlyStorageError,
+        );
       });
     });
 

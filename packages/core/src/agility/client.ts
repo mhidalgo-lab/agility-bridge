@@ -435,10 +435,11 @@ export class AgilityClient {
       // One quota unit per logical upstream call: the first attempt, never a retry (L-116). A hit in the query cache never
       // gets here. Writes are counted but not refused (their own limits and approval apply, D-249). The quota is asked
       // before the budget is spent, so a refusal costs no unit and is not reported as a request (Q-4); an exhausted
-      // budget is refused first, so it counts no quota unit either.
+      // budget is refused first, so it counts no quota unit either. Metadata (`meta.v1`) is refused like a read but
+      // never counted (D-316): a cold isolate fetches a dozen schema documents the caller did not ask for.
       if (attempt === 1) {
         if (!budget.canSpend(1)) budget.spend(1, call.what);
-        await this.#ctx.quota?.beforeCall({ write: call.write });
+        await this.#ctx.quota?.beforeCall({ write: call.write, count: call.endpoint !== 'meta.v1' });
       }
       budget.spend(1, call.what);
       const outcome = await limiter.run(() => this.#attempt(call, attempt));

@@ -24,7 +24,7 @@ function gateFor(
   failing: { reads?: boolean; writes?: boolean } = {},
 ) {
   let kv: Storage['kv'] | undefined;
-  const stats = { reads: 0, increments: 0 };
+  const stats = { reads: 0, writes: 0 };
   const logs: string[] = [];
   const gate: QuotaGate = createQuotaGate({
     logger: createLogger({ level: 'debug', sink: (l) => logs.push(l) }),
@@ -37,11 +37,11 @@ function gateFor(
           ? Promise.reject(new Error('kv down'))
           : (kv as Storage['kv']).getMany(keys);
       },
-      increment: (key, options) => {
-        stats.increments++;
+      incrementMany: (entries) => {
+        stats.writes++;
         return failing.writes === true
           ? Promise.reject(new Error('kv down'))
-          : (kv as Storage['kv']).increment(key, options);
+          : (kv as Storage['kv']).incrementMany(entries);
       },
     },
   });
@@ -70,25 +70,27 @@ const counter = (w: World, key: string) => w.storage.kv.get(key);
 describe('counting over HTTP', () => {
   it('writes one increment per period for a whole request, whatever it asked of Agility', async () => {
     const { w, stats, clock } = await rig({ daily: 100, monthly: 1000 });
-    const before = w.agilityTokens.length;
+    const before = w.fake.calls.length;
     await (await post(w, 'team-a', w.tokens.alice, GET('B-00001'))).text();
-    const asked = w.agilityTokens.length - before;
+    const calls = w.fake.calls.slice(before);
+    // Metadata requests reach Agility but are not counted (D-316).
+    const asked = calls.filter((c) => !c.path.startsWith('meta.v1')).length;
     expect(asked).toBeGreaterThan(0);
-    expect(stats).toEqual({ reads: 1, increments: 2 });
+    expect(stats).toEqual({ reads: 1, writes: 1 });
     expect(await counter(w, `qt:d:${w.ids.aliceGrant}:${DAY(clock.t)}`)).toBe(String(asked));
     expect(await counter(w, `qt:m:${w.ids.aliceGrant}:202610`)).toBe(String(asked));
   });
 
   it('counts concurrent requests of one grant without losing any', async () => {
     const { w, clock } = await rig({ daily: 100_000, monthly: null });
-    const before = w.agilityTokens.length;
+    const before = w.fake.calls.length;
     const results = await Promise.all(
       Array.from({ length: 12 }, () =>
         Promise.resolve(post(w, 'team-a', w.tokens.alice, GET('B-00001'))).then((r) => r.text()),
       ),
     );
     expect(results).toHaveLength(12);
-    const asked = w.agilityTokens.length - before;
+    const asked = w.fake.calls.slice(before).filter((c) => !c.path.startsWith('meta.v1')).length;
     expect(await counter(w, `qt:d:${w.ids.aliceGrant}:${DAY(clock.t)}`)).toBe(String(asked));
   });
 });
@@ -156,7 +158,7 @@ describe('refusal over HTTP', () => {
     expect(await denied.text()).not.toContain('In A');
     const nobody = await post(w, 'team-a', null, GET('B-00001'));
     expect(nobody.status).toBe(401);
-    expect(stats).toEqual({ reads: 0, increments: 0 });
+    expect(stats).toEqual({ reads: 0, writes: 0 });
   });
 
   it('resets at the next UTC day', async () => {
@@ -192,7 +194,7 @@ describe('whoami', () => {
     expect(text).toMatch(
       /"daily":\{"used":\d+,"limit":10,"remaining":\d+,"resetsAt":"2026-10-31T00:00:00.000Z","warning":true\}/,
     );
-    expect(text).toContain('9 of 10 Agility requests used today');
+    expect(text).toContain('8 of 10 Agility requests used today');
     const off = await world();
     expect(await (await post(off, 'team-a', off.tokens.alice, WHOAMI)).text()).not.toContain('"quota"');
   });
