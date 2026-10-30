@@ -56,7 +56,13 @@ const IV_BYTES = 12;
 const MASTER_KEY = /^(?:v([1-9][0-9]{0,2}):)?([A-Za-z0-9+/]{43}=)$/;
 const HKDF_SALT = new TextEncoder().encode('agility-bridge/hkdf/v1');
 
+/** The runtime's own base64 (`Uint8Array.prototype.toBase64`, in workerd and newer V8): about 100 times faster there. */
+type NativeBase64 = { toBase64?: () => string };
+type NativeBase64Static = { fromBase64?: (text: string) => Uint8Array };
+
 export function toBase64(bytes: Uint8Array): string {
+  const native = (bytes as NativeBase64).toBase64;
+  if (typeof native === 'function') return native.call(bytes);
   // In slices: a per-byte string concatenation cost milliseconds on a 256 KB cache entry (P-1).
   const parts: string[] = [];
   for (let i = 0; i < bytes.length; i += 0x2000) {
@@ -66,6 +72,9 @@ export function toBase64(bytes: Uint8Array): string {
 }
 
 export function fromBase64(text: string): Uint8Array {
+  const native = (Uint8Array as unknown as NativeBase64Static).fromBase64;
+  // The native decoder is strict (it throws a SyntaxError on a bad character), like `atob`'s InvalidCharacterError.
+  if (typeof native === 'function') return native.call(Uint8Array, text);
   const s = atob(text);
   const out = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);

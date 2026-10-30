@@ -22,6 +22,11 @@ export interface SharedTier {
   get(id: string): Promise<string | undefined>;
   set(id: string, text: string, ttlMs: number): Promise<void>;
   status(): SharedTierStatus;
+  /**
+   * The largest text (characters, as given to `set`) the tier will store; bigger entries stay in memory only. Sealing and
+   * opening cost CPU in proportion to size, and a Free plan Worker has 10 ms (P8-38). Absent: no cap.
+   */
+  readonly maxEntryChars?: number;
 }
 
 export interface QueryCacheOptions {
@@ -52,6 +57,8 @@ export interface QueryCacheInfo {
   readonly mode: 'memory' | 'memory+shared';
   readonly ttlSeconds: number;
   readonly shared: SharedTierStatus | 'off';
+  /** The shared tier's size cap in characters: answers above it are kept in memory only (absent: no tier or no cap). */
+  readonly sharedMaxEntryChars?: number;
   readonly entries: number;
   readonly hits: number;
   readonly misses: number;
@@ -190,6 +197,8 @@ export class QueryCache {
     this.#remember(id, text, now, now + this.#opts.ttlMs);
     const tier = shared ? this.#opts.shared : undefined;
     if (tier === undefined) return;
+    // The tier's own cap, checked before the entry is prefixed and handed over (the prefix is under 20 characters).
+    if (tier.maxEntryChars !== undefined && text.length + 20 > tier.maxEntryChars) return;
     try {
       await tier.set(id, `${now}:${text}`, this.#opts.ttlMs);
     } catch (error) {
@@ -237,6 +246,7 @@ export class QueryCache {
       mode: shared === undefined ? 'memory' : 'memory+shared',
       ttlSeconds: Math.round(this.#opts.ttlMs / 1000),
       shared: shared === undefined ? 'off' : shared.status(),
+      ...(shared?.maxEntryChars === undefined ? {} : { sharedMaxEntryChars: shared.maxEntryChars }),
       entries: this.#entries.size,
       hits: this.#hits,
       misses: this.#misses,

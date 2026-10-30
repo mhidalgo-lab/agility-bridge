@@ -2,7 +2,7 @@
 id: P8-38
 title: Shared-tier size cap and Worker CPU of sealing
 phase: 8
-status: todo
+status: review
 priority: low
 depends_on: [P8-13]
 adr: ["0010"]
@@ -23,9 +23,9 @@ Settle the CPU cost of sealing and opening shared-tier entries on workerd (revie
 - Avoid the double JSON parse of a hit if the measurement says it matters.
 
 ## Acceptance criteria
-- [ ] Measured numbers on workerd are in `docs/RESEARCH.md` with the date.
-- [ ] The shared tier skips entries above its cap and `whoami` still tells the truth.
-- [ ] A test pins the cap.
+- [x] Measured numbers on workerd are in `docs/RESEARCH.md` with the date (local workerd through miniflare, indicative). The deployed-Worker measurement is an owner step and waits for P8-13.
+- [x] The shared tier skips entries above its cap and `whoami` still tells the truth.
+- [x] A test pins the cap.
 
 ## Security notes
 THREAT_MODEL T16.

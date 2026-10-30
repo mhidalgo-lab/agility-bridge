@@ -5,7 +5,7 @@
 import { generateMasterKey, Keyring } from '@agility-bridge/auth';
 import { QueryCache, randomMac, type SharedTier } from '@agility-bridge/core';
 import { describe, expect, it } from 'vitest';
-import { type CacheLike, EdgeQueryTier } from '../src/index.ts';
+import { type CacheLike, DEFAULT_SHARED_ENTRY_CHARS, EdgeQueryTier } from '../src/index.ts';
 import { post, world } from './helpers/world.ts';
 
 const WHOAMI = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'whoami', arguments: {} } };
@@ -235,5 +235,48 @@ describe('EdgeQueryTier', () => {
     expect(await c.get('shared-id', false)).toBeUndefined();
     expect(await b.get('shared-id', true)).toBe('cached text');
     expect(b.info().shared).toBe('verified');
+  });
+
+  it('skips an entry above its size cap: nothing is sealed or stored, the status is untouched (P8-38)', async () => {
+    const cache = fakeCache();
+    const { tier } = await setup(cache);
+    // The cap is pinned: 64 KiB of characters, an option of the tier.
+    expect(DEFAULT_SHARED_ENTRY_CHARS).toBe(65_536);
+    expect(tier.maxEntryChars).toBe(65_536);
+    await tier.set('big', 'x'.repeat(65_537), 30_000);
+    expect(cache.stored.size).toBe(0);
+    expect(tier.status()).toBe('unverified');
+    await tier.set('edge', 'x'.repeat(65_536), 30_000);
+    expect(cache.stored.size).toBe(1);
+    expect(tier.status()).toBe('verified');
+    // A smaller cap is the operator's option.
+    const small = new EdgeQueryTier({
+      cache: fakeCache(),
+      keyring: await Keyring.create(generateMasterKey(1)),
+      clock: { now: () => 0 },
+      maxEntryChars: 100,
+    });
+    await small.set('a', 'y'.repeat(101), 1_000);
+    expect(small.status()).toBe('unverified');
+    expect(await small.get('a')).toBeUndefined();
+  });
+
+  it('keeps a big answer in memory only, never offers it to the tier, and whoami says what the tier takes (P8-38)', async () => {
+    const cache = fakeCache();
+    const { tier } = await setup(cache);
+    const mac = randomMac();
+    const qc = new QueryCache({ ttlMs: 30_000, mac, clock: { now: () => 1_000 }, shared: tier });
+    await qc.put('big', 'z'.repeat(70_000), true);
+    await qc.put('small', 'z'.repeat(100), true);
+    expect(await qc.get('big', false)).toHaveLength(70_000);
+    expect(cache.stored.size).toBe(1);
+    expect(qc.info().sharedMaxEntryChars).toBe(65_536);
+    // Through the tool: the cap is configuration, shown next to the tier's proof.
+    const w = await world({}, { services: { queryCache: qc } });
+    const text = await (await post(w, 'team-a', w.tokens.alice, WHOAMI)).text();
+    expect(text).toContain('"sharedMaxEntryChars":65536');
+    expect(text).not.toContain('"hits"');
+    // A deployment without the tier reports no cap.
+    expect(newCache(() => 1).info()).not.toHaveProperty('sharedMaxEntryChars');
   });
 });

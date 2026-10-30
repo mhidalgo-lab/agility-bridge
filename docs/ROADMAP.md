@@ -383,7 +383,7 @@ Status lives in each task file.
 | P8-35 | [Public catalogue response cache and query-cache single flight](tasks/phase-8-power-features/P8-35-catalogue-cache-single-flight.md) | low | P8-11, P8-01 | review |
 | P8-36 | [Run MCP Tasks outside the poll](tasks/phase-8-power-features/P8-36-background-task-runner.md) | low | P8-10, P8-15 | todo |
 | P8-37 | [Bench scenarios and baseline for Phase 8 hot paths](tasks/phase-8-power-features/P8-37-bench-phase-8-hot-paths.md) | low | P8-09 | review |
-| P8-38 | [Shared-tier size cap and Worker CPU of sealing](tasks/phase-8-power-features/P8-38-shared-tier-size-and-cpu.md) | low | P8-13 | todo |
+| P8-38 | [Shared-tier size cap and Worker CPU of sealing](tasks/phase-8-power-features/P8-38-shared-tier-size-and-cpu.md) | low | P8-13 | review |
 | P8-39 | [Quota: one statement per request, and metadata requests](tasks/phase-8-power-features/P8-39-quota-statements-and-metadata.md) | low | P8-09 | done |
 | P8-40 | [Deep links: parse the base once and keep links under the output cap](tasks/phase-8-power-features/P8-40-deep-links-per-row-cost.md) | low | P8-02 | todo |
 | P8-41 | [Refuse an unbound keychain token](tasks/phase-8-power-features/P8-41-refuse-unbound-keychain-token.md) | low | P8-31 | todo |
