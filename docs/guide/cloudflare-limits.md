@@ -143,6 +143,21 @@ isolation as on Workers, Agility-shaped fake responses. *Staging*: `agility-brid
 | `get_asset_history`, cold / from D1 / warm ² | 4.9 / 2.8 / 2.5 ms (1.2× / 0.7× / 0.6×) | — | 13 / 4 / 2 |
 | `get_portfolio_tree`, cold / from D1 / warm ² | 6.7 / 8.1 / 3.4 ms (1.7× / 2.0× / 0.85×) | — | 16 / 7 / 4 |
 | `sprint_health`, cold / from D1 / warm ² | 12.8 / 8.7 / 7.4 ms (3.2× / 2.2× / 1.9×) | — | 24 / 8 / 6 |
+| `search_work_items`, 25 rows, with deep links, warm | 6.2 ms (1.88×) ⁵ | — | 1 |
+| `search_work_items`, 200 rows, with deep links, warm | 12.4 ms (3.77×) ⁵ | — | 1 |
+| `search_work_items` with a quota set (3 counter statements), warm | 2.3 ms (0.69×) ⁵ | — | 1 |
+| `search_work_items`, telemetry off, warm | 2.4 ms (0.73×) ⁵ | — | 1 |
+| `search_work_items`, telemetry on (fake collector, flush each call), warm | 2.9 ms (0.87×) ⁵ | — | 1 |
+| Task create (2026-07-28 request, report tool), warm | 1.0 ms (0.29×) ⁵ | — | 0 |
+| Task first poll (runs a trivial report), warm | 2.5 ms (0.77×) ⁵ | — | 0 |
+| Server build and `tools/list`, Apps views off | 1.7 ms (0.51×) ⁵ | — | 0 |
+| Server build and `tools/list`, Apps views on | 1.5 ms (0.45×) ⁵ | — | 0 |
+| Public catalogue `tools/list`, no credential, warm | 0.9 ms (0.26×) ⁵ | — | 0 |
+| Public catalogue `initialize`, no credential, warm | 0.5 ms (0.16×) ⁵ | — | 0 |
+| Shared tier (seal, put, get, open), 8 KB body | 0.7 ms (0.23×) ⁵ | — | 0 |
+| Shared tier, 64 KB body | 3.7 ms (1.11×) ⁵ | — | 0 |
+| Shared tier, 100 KB body | 6.2 ms (1.87×) ⁵ | — | 0 |
+| Shared tier, 256 KB body | 14.7 ms (4.45×) ⁵ | — | 0 |
 
 ¹ Panel rows: CPU as measured by the benchmark job on CI (2026-10-23), the same workload on a GitHub-hosted runner, in
 milliseconds from the ratio to the run's calibration workload (about 2.6 ms) in brackets. Not the local column: the first
@@ -156,6 +171,15 @@ committed snapshot is 228 KB for all types; a live type list parses 1.9 MB), so 
 and the saving is the requests (here 17 to 7, 13 to 4, 16 to 7, 24 to 8), not only CPU: against D1 the saving in CPU is
 smaller and, for `get_portfolio_tree`, within noise. D1 reads are not Agility requests; whether they count toward the Free
 plan's 50 subrequests is *unverified*. No Cloudflare measurement of these paths was made (no staging call reaches Agility, D-01).
+
+⁵ Phase 8 paths (P8-37), `pnpm bench:worker`, one run on 2026-10-30 on a shared development machine (calibration
+3.3 ms): **local and indicative**, so compare rows of one run with each other, not with the CI history, and
+read the first-run figures as noisy. The baseline file is not refreshed from this run (it waits for an idle machine).
+What the rows say: deep links make a 25-row search about twice the cost of the old 2-row fixture and the 200-row search
+about twice again (P8-40 looks at the per-row cost); the quota adds 3 counter statements and little CPU; telemetry with a
+flush per call adds a few tenths of a millisecond; registering the Apps views is within noise; the public catalogue is
+the cheapest MCP path; and the shared tier's seal and open costs milliseconds from 64 KB (P8-38). Agility requests are
+counted by the fakes; D1 rows and the deployed Worker are *unverified* until the live pass (P8-13).
 
 ³ Write paths (P7-09), `pnpm bench:worker`: the handler of one write tool on the fakes (no JSON-RPC, no HTTP, no D1), the
 item's status toggled between samples. The figures are the quietest of three local runs (the machine was shared, so the
