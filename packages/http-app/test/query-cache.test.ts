@@ -203,7 +203,10 @@ describe('EdgeQueryTier', () => {
     const sealed = JSON.parse(cache.stored.get(url1 as string) as string) as { ciphertext: string };
     cache.stored.set(
       url1 as string,
-      JSON.stringify({ ...sealed, ciphertext: `A${sealed.ciphertext.slice(1)}` }),
+      JSON.stringify({
+        ...sealed,
+        ciphertext: `${sealed.ciphertext.startsWith('A') ? 'B' : 'A'}${sealed.ciphertext.slice(1)}`,
+      }),
     );
     expect(await tier.get('id1')).toBeUndefined();
     // Another deployment's key cannot read it.

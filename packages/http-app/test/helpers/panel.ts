@@ -4,13 +4,21 @@
 import { createIdentityProviders, EMPTY_LOGIN_POLICY, type ToolInfo } from '@agility-bridge/auth';
 import { DEFAULT_LIMITS, Secret } from '@agility-bridge/core';
 import { type FakeOidc, fakeOidc, route } from '../../../auth/test/helpers/fake-idp.ts';
-import { ADMIN_BASE, type HttpWrites, type OAuthOptions, type SessionOptions } from '../../src/index.ts';
+import {
+  ADMIN_BASE,
+  type HostServices,
+  type HttpWrites,
+  type OAuthOptions,
+  type SessionOptions,
+} from '../../src/index.ts';
 import { TOOL_INFO, type World, world } from './world.ts';
 
 export const MIN = 60_000;
 const ISSUER = 'https://login.example.test';
 
 export interface Opts {
+  /** Host services replacing the defaults (a quota gate, P8-09). */
+  services?: Partial<HostServices>;
   allowedOrigins?: string[];
   publicUrl?: string;
   session?: SessionOptions;
@@ -104,6 +112,7 @@ export async function setup(options: Opts = {}) {
       admin: true,
       ...(options.writeRateCap === undefined ? {} : { writeRateCap: options.writeRateCap }),
       ...(options.oauth === undefined ? {} : { liveClock: true }),
+      ...(options.services === undefined ? {} : { services: options.services }),
       ...(options.tools === undefined ? {} : { tools: options.tools }),
       ...(options.validate === undefined ? {} : { validate: options.validate }),
     },

@@ -108,6 +108,7 @@ follows in the self-hosting guide.
 | `AB_ALLOWED_ORIGINS` | none | Browser origins allowed to call the server, with CORS headers |
 | `AB_ACCESS_CACHE_TTL` | `30` | Seconds (0–60) a resolved access is reused; a revocation takes effect within this time |
 | `AB_QUERY_CACHE_TTL` / `AB_QUERY_CACHE_EDGE` | `0` (off) / `off` | Seconds (0-60) a repeated `query.v1` read is answered from memory; `on` adds the sealed Workers Cache API tier ([query cache](query-cache.md)). `AB_QUERY_CACHE_TTL` also works on stdio |
+| `AB_QUOTA_DAILY` / `AB_QUOTA_MONTHLY` | unset (off) | Agility requests one grant may cause per UTC day / month; a read over it is refused with `AB_LIMIT_QUOTA`. Remote hosts only ([query limits](query-limits.md)) |
 | `AB_ENVIRONMENT` | `production` | `test` issues `ab_test_` device tokens, so test tokens are recognisable |
 | `AB_TRUSTED_PROXY_HOPS` | `0` | Reverse proxies in front whose `X-Forwarded-For` entries are trusted for the client address |
 | `AB_CALL_BUDGET`, `AB_LIMITS_MAX_RESPONSE_BYTES` | `1000`, 8 MiB | Defaults for workspaces that set no limits |

@@ -19,6 +19,7 @@ import {
 } from '@agility-bridge/auth';
 import {
   CORE_TOOLS,
+  createQuotaGate,
   DEFAULT_LIMITS,
   DEFAULT_WRITE_RATE_LIMITS,
   type FetchLike,
@@ -26,6 +27,7 @@ import {
   type LogLevel,
   MAX_QUERY_CACHE_TTL_SECONDS,
   QueryCache,
+  type QuotaLimits,
   type SharedTier,
   type ToolRegistry,
 } from '@agility-bridge/core';
@@ -87,6 +89,8 @@ export const SERVER_SETTING_NAMES: readonly string[] = Object.freeze([
   'AB_WRITE_RATE_DEPLOYMENT_HOURLY',
   'AB_ALLOW_HTTP_INSTANCES',
   'AB_PUBLIC_TOOL_CATALOG',
+  'AB_QUOTA_DAILY',
+  'AB_QUOTA_MONTHLY',
   'AB_QUERY_CACHE_TTL',
   'AB_QUERY_CACHE_EDGE',
   'AB_MCP_APPS',
@@ -133,6 +137,11 @@ export interface ServerSettings {
    * one (Workers Cache API, `AB_QUERY_CACHE_EDGE=on`).
    */
   readonly queryCache: { readonly ttlSeconds: number; readonly edge: boolean };
+  /**
+   * Agility requests one grant may cause per UTC day and per UTC month (P8-09, `AB_QUOTA_DAILY`, `AB_QUOTA_MONTHLY`);
+   * `null` leaves that period unlimited (default).
+   */
+  readonly quota: QuotaLimits;
   /** Sign-in providers and the login policy (P4-01); absent = no `/auth` routes. */
   readonly identity?: IdentitySettings;
   /** Admin session timeouts, cap and logout behaviour (P4-02); only used with sign-in. */
@@ -171,6 +180,17 @@ export function settingInteger(
   if (!Number.isInteger(n) || n < min || n > max)
     throw new SettingsError(`${name} must be an integer from ${min} to ${max}.`);
   return n;
+}
+
+/** An integer setting that is off when unset (`null`). */
+export function optionalInt(
+  name: string,
+  value: string | undefined,
+  min: number,
+  max: number,
+): number | null {
+  if (value === undefined || value === '') return null;
+  return settingInteger(name, value, min, min, max);
 }
 
 function onOff(name: string, value: string | undefined, fallback: boolean): boolean {
@@ -329,6 +349,10 @@ export function parseServerSettings(
         10_000,
       ),
     },
+    quota: {
+      daily: optionalInt('AB_QUOTA_DAILY', env['AB_QUOTA_DAILY'], 1, 100_000_000),
+      monthly: optionalInt('AB_QUOTA_MONTHLY', env['AB_QUOTA_MONTHLY'], 1, 1_000_000_000),
+    },
     queryCache: {
       ttlSeconds: int('AB_QUERY_CACHE_TTL', env['AB_QUERY_CACHE_TTL'], 0, 0, MAX_QUERY_CACHE_TTL_SECONDS),
       edge: onOff('AB_QUERY_CACHE_EDGE', env['AB_QUERY_CACHE_EDGE'], false),
@@ -381,6 +405,15 @@ export function settingWarnings(env: Env, settings: ServerSettings): string[] {
   if (settings.passthrough) {
     warnings.push(
       'AB_PASSTHROUGH is on: pass-through workspaces accept any valid Agility token of their instance.',
+    );
+  }
+  if (
+    settings.quota.daily !== null &&
+    settings.quota.monthly !== null &&
+    settings.quota.monthly < settings.quota.daily
+  ) {
+    warnings.push(
+      'AB_QUOTA_MONTHLY is below AB_QUOTA_DAILY: the monthly quota ends the month before one day can be used.',
     );
   }
   if (settings.queryCache.edge && settings.queryCache.ttlSeconds === 0) {
@@ -521,6 +554,11 @@ export function assembleServer(parts: ServerParts): AssembledServer {
       'AB_QUERY_CACHE_EDGE is on but this host has no shared tier: the query cache is in memory only.',
     );
   }
+  // Per-grant quotas (P8-09): counters in `kv`, so every isolate and replica sees them; off unless a limit is set.
+  const quota =
+    settings.quota.daily === null && settings.quota.monthly === null
+      ? undefined
+      : createQuotaGate({ counters: storage.kv, clock: host.clock, limits: settings.quota, logger });
   const authErrors = revalidateOnAuthErrors(services, logger, () => host.clock.now());
   const app = createHttpApp({
     storage,
@@ -559,7 +597,11 @@ export function assembleServer(parts: ServerParts): AssembledServer {
           }),
         }
       : {}),
-    services: { ...host, ...(queryCache === undefined ? {} : { queryCache }) },
+    services: {
+      ...host,
+      ...(queryCache === undefined ? {} : { queryCache }),
+      ...(quota === undefined ? {} : { quota }),
+    },
     ...(settings.publicUrl === undefined ? {} : { publicUrl: settings.publicUrl }),
     allowedHosts: settings.allowedHosts,
     allowedOrigins: settings.allowedOrigins,

@@ -29,6 +29,18 @@ export {
   type SharedTier,
   type SharedTierStatus,
 } from './agility/query-cache.ts';
+export {
+  createQuotaGate,
+  QUOTA_WARN_AT,
+  type QuotaCounters,
+  type QuotaGate,
+  type QuotaGateOptions,
+  type QuotaLimits,
+  type QuotaMeter,
+  type QuotaPeriod,
+  type QuotaPeriodUsage,
+  type QuotaUsage,
+} from './agility/quota.ts';
 export { parseXml, type XmlElement } from './agility/xml.ts';
 export {
   APP_VIEWS,

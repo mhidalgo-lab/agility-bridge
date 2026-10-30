@@ -118,6 +118,35 @@
 - **Context:** The task fixes PBKDF2-HMAC-SHA-256 at 600,000 iterations and AES-256-GCM. A file that names its own cost would let a crafted file cost minutes of CPU or choose a weak setting.
 - **Options:** (a) the algorithm and the cost are constants: a file naming anything else is refused before deriving a key; the header (format, version, KDF, cost) is the AES-GCM additional data, so editing it fails the open; a wrong passphrase and a changed file give the same message; a passphrase is 12 to 1,024 characters; (b) honour the file's cost within a range; (c) scrypt or Argon2id (not what the task says, and not in Web Crypto).
 - **Recommendation:** (a), built.
+
+### D-247 — Quota settings: two limits for every grant, off by default *(P8-09)*
+- **Context:** The task names `AB_LIMIT_QUOTA`, which is already the error code of a refused quota. Counters are per grant; the limits could also differ per grant or workspace.
+- **Options:** (a) `AB_QUOTA_DAILY` and `AB_QUOTA_MONTHLY`, deployment-wide numbers applied to every grant, each off when unset; overrides later (P8-14); (b) one combined setting (`daily=,monthly=`); (c) per-grant limits in the grant policy now (admin API, CLI, panel and access model changes).
+- **Recommendation:** (a), built. Two plain integer settings follow the existing ones; `AB_LIMIT_QUOTA` stays the error code; overrides are a separate task because they touch the policy schema, the guards (an administrator must not loosen an owner's value) and three admin surfaces.
+- **Owner:** *(open; built as (a))*
+
+### D-248 — Count logical calls, write the total once per request *(P8-09)*
+- **Context:** Workers Free allows 100,000 D1 rows written a day and 50 D1 statements a request; one increment per upstream call (up to 45 a tool call) would eat both.
+- **Options:** (a) count in memory per request (a call is counted at its first attempt, a cache hit never reaches the client) and add the total to the day and month counters when the call ends, with one read at the first upstream call; (b) increment per call (exact, atomic, many rows); (c) count in the audit rows and sum them.
+- **Recommendation:** (a), built: at most 1 read and 2 increments per request. The cost is a small overshoot when requests of one grant run at once, documented.
+- **Owner:** *(open; built as (a))*
+
+### D-249 — Fail open on a counter outage; writes are counted, not refused *(P8-09)*
+- **Context:** L-080 asks for an explicit fail-open or fail-closed choice. A quota is a cost control, not an authorization; a write's approval is single use and the write limiter already fails closed.
+- **Options:** (a) reads fail open on an unreadable counter, writes are counted but never refused by the quota; (b) fail closed for everything (a D1 hiccup stops all reads); (c) fail open, and refuse writes over the quota too.
+- **Recommendation:** (a), built. `whoami` and the panel show `unknown` rather than "unlimited". A write the person approved should not be lost to a read quota, and the write limiter plus approval already bound writes.
+- **Owner:** *(open; built as (a))*
+
+### D-250 — A refused quota is a tool error, not an HTTP 429 *(P8-09)*
+- **Context:** Rate limits answer HTTP 429 with `Retry-After`; a day-long quota would make a client back off for hours and, for some, treat the whole server as down.
+- **Options:** (a) a tool-error result with `AB_LIMIT_QUOTA`, the period, the limit, the use and the UTC reset, raised inside the Agility client; (b) HTTP 429 with a `Retry-After` of hours; (c) a protocol error.
+- **Recommendation:** (a), built; the agent reads the reason and the reset instant, and tools that need no request keep working.
+- **Owner:** *(open; built as (a))*
+
+### D-251 — No quota on stdio *(P8-09)*
+- **Context:** stdio has one process, one token, no grants and no shared store; the per-call budget and the Agility instance's own quota apply.
+- **Options:** (a) remote hosts only; (b) an in-process counter per process (resets on restart, so a weak promise).
+- **Recommendation:** (a), built; documented in the guide.
 - **Owner:** *(open; built as (a))*
 
 ### D-280 — One generator for every client snippet, link and the plugin's `.mcp.json` *(P8-06)*

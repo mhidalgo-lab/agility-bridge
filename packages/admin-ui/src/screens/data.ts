@@ -638,3 +638,55 @@ export function budgetText(b: WriteBudgetView | null): string {
   if (b.state === 'off') return 'write tools are off on this server';
   return `${b.used} of ${b.limit} used this hour (${b.remaining} left)`;
 }
+
+/** A grant's Agility request usage (P8-09): `GET /grants/{id}/usage`. */
+export interface UsagePeriod {
+  readonly used: number;
+  readonly limit: number;
+  readonly remaining: number;
+  readonly resetsAt: number;
+  readonly warn: boolean;
+}
+export type GrantUsageView =
+  | { readonly state: 'off' }
+  | { readonly state: 'unknown' }
+  | { readonly state: 'ok'; readonly daily?: UsagePeriod; readonly monthly?: UsagePeriod };
+
+function parseUsagePeriod(v: unknown): UsagePeriod | undefined {
+  const o = obj(v);
+  if (typeof o['limit'] !== 'number' || typeof o['used'] !== 'number') return undefined;
+  return {
+    used: int(o['used']),
+    limit: int(o['limit']),
+    remaining: int(o['remaining']),
+    resetsAt: int(o['resetsAt']),
+    warn: o['warn'] === true,
+  };
+}
+
+export function parseGrantUsage(body: unknown): GrantUsageView | null {
+  const o = obj(body);
+  if (typeof o['enabled'] !== 'boolean') return null;
+  if (!o['enabled']) return { state: 'off' };
+  if (o['status'] !== 'ok') return { state: 'unknown' };
+  const daily = parseUsagePeriod(o['daily']);
+  const monthly = parseUsagePeriod(o['monthly']);
+  return {
+    state: 'ok',
+    ...(daily === undefined ? {} : { daily }),
+    ...(monthly === undefined ? {} : { monthly }),
+  };
+}
+
+/** One line for a grant's usage: `12 of 1,000 today (988 left); 340 of 20,000 this month (UTC)`. Never "unlimited". */
+export function usageText(u: GrantUsageView | null): string {
+  if (u === null || u.state === 'unknown') return 'unknown right now';
+  if (u.state === 'off') return 'no quota is set on this server';
+  const n = (v: number): string => v.toLocaleString('en-US');
+  const part = (name: string, p: UsagePeriod | undefined): string[] =>
+    p === undefined
+      ? []
+      : [`${n(p.used)} of ${n(p.limit)} ${name} (${n(p.remaining)} left${p.warn ? ', over 80%' : ''})`];
+  const parts = [...part('today', u.daily), ...part('this month', u.monthly)];
+  return parts.length === 0 ? 'no quota is set on this server' : `${parts.join('; ')} (UTC)`;
+}

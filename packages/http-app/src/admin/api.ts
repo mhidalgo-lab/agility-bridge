@@ -21,6 +21,7 @@ import {
   COMPOSITE_SIBLINGS,
   CORE_TOOLS,
   type Logger,
+  type QuotaUsage,
   type WriteBudget,
 } from '@agility-bridge/core';
 import type {
@@ -191,6 +192,8 @@ export interface AdminApiOptions {
   readonly configuredIdps?: readonly string[];
   /** Reads the write budget of a grant (and the deployment's) without taking a unit; absent when write tools are off (P7-16). */
   readonly writeBudget?: (grantId: string, grantLimit?: number) => Promise<WriteBudget>;
+  /** Reads a grant's request quota usage (P8-09); absent when no quota is configured. */
+  readonly grantUsage?: (grantId: string) => Promise<QuotaUsage>;
   /** `AB_WRITE_RATE_PER_GRANT_HOURLY`: the most a grant's own hourly write limit may be (P7-15). */
   readonly writeRateCap?: number;
   /** OAuth is on (P5-04): the signed-in person's connected apps. Absent = the `/me/oauth-devices` routes answer 404. */
@@ -512,6 +515,21 @@ const WriteBudgetOut = z
     deployment: BudgetCount.nullable().optional(),
   })
   .openapi('WriteBudget');
+const QuotaPeriodOut = z.object({
+  limit: z.number(),
+  used: z.number(),
+  remaining: z.number(),
+  resetsAt: z.number(),
+  warn: z.boolean(),
+});
+const GrantUsageOut = z
+  .object({
+    enabled: z.boolean(),
+    status: z.enum(['ok', 'unknown']).optional(),
+    daily: QuotaPeriodOut.optional(),
+    monthly: QuotaPeriodOut.optional(),
+  })
+  .openapi('GrantUsage');
 const WriteStatsQuery = z.object({
   workspaceId: z.string().max(128).optional(),
   from: z.coerce.number().int().min(0).optional(),
@@ -1430,6 +1448,30 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
         grant: true,
         deployment: false,
       });
+    },
+  );
+  add(
+    {
+      method: 'get',
+      path: '/grants/{id}/usage',
+      ...gr,
+      params: true,
+      summary:
+        'One grant\'s Agility requests used today and this month (UTC) against the server\'s quotas (AB_QUOTA_DAILY, AB_QUOTA_MONTHLY), read without taking anything. Owners and admins any grant, a member only their own (another is a 404). `{ enabled: false }` when no quota is configured; `unknown` when the counters cannot be read, never "unlimited".',
+      out: GrantUsageOut,
+    },
+    async (c, { id }) => {
+      // The guarded read decides visibility: a member's other grants are "not found".
+      found(await services(c).grants.get(id), 'grant');
+      const usage = await options.grantUsage?.(id);
+      if (usage === undefined) return { enabled: false };
+      if (usage.status !== 'ok') return { enabled: true, status: 'unknown' as const };
+      return {
+        enabled: true,
+        status: 'ok' as const,
+        ...(usage.daily === undefined ? {} : { daily: usage.daily }),
+        ...(usage.monthly === undefined ? {} : { monthly: usage.monthly }),
+      };
     },
   );
   add(

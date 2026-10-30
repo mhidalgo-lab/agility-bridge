@@ -429,6 +429,9 @@ export class AgilityClient {
       const openMs = breaker.openForMs();
       if (openMs > 0) throw rateLimited(Math.ceil(openMs / 1000), true);
       budget.spend(1, call.what);
+      // One quota unit per logical upstream call: the first attempt, never a retry (L-116). A hit in the query cache never
+      // gets here. Writes are counted but not refused (their own limits and approval apply, D-249).
+      if (attempt === 1) await this.#ctx.quota?.beforeCall({ write: call.write });
       const outcome = await limiter.run(() => this.#attempt(call, attempt));
       if (outcome.ok) {
         breaker.onSuccess();
