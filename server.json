@@ -3,7 +3,7 @@
   "name": "io.github.mhidalgo-lab/agility-bridge",
   "title": "agility-bridge",
   "description": "Unofficial MCP server for Digital.ai Agility: read every asset type with your own access token.",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "websiteUrl": "https://github.com/mhidalgo-lab/agility-bridge#readme",
   "repository": {
     "url": "https://github.com/mhidalgo-lab/agility-bridge",
@@ -15,7 +15,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "agility-bridge",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
