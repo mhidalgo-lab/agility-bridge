@@ -2,7 +2,7 @@
 id: P8-11
 title: Lazy auth and public tool catalogue
 phase: 8
-status: in-progress
+status: done
 priority: low
 depends_on: [P6-13]
 adr: ["0009"]
@@ -36,16 +36,16 @@ learning anything about any workspace, tenant or write capability.
 - Docs: configuration guide; self-hosting note that clients then see the catalogue before signing in.
 
 ## Acceptance criteria
-- [ ] Off by default: without the setting, an unauthenticated `initialize` and `tools/list` answer `401` as before.
-- [ ] On: the five allowed messages are answered for a request without a credential, on both protocol eras
+- [x] Off by default: without the setting, an unauthenticated `initialize` and `tools/list` answer `401` as before.
+- [x] On: the five allowed messages are answered for a request without a credential, on both protocol eras
       (`initialize` and `tools/list` on the 2025-era stateless path, `server/discover` and `tools/list` on 2026-07-28).
-- [ ] The response is identical for a real, an unknown, a disabled and a malformed slug, and no storage method is
+- [x] The response is identical for a real, an unknown, a disabled and a malformed slug, and no storage method is
       called (a storage double that fails on any call).
-- [ ] No write or destructive tool, no tool of an opt-in group and no workspace-specific text ever appears in the answer.
-- [ ] `tools/call`, `prompts/*`, `resources/*`, `completion/*`, `tasks/*` and any unknown method without a credential
+- [x] No write or destructive tool, no tool of an opt-in group and no workspace-specific text ever appears in the answer.
+- [x] `tools/call`, `prompts/*`, `resources/*`, `completion/*`, `tasks/*` and any unknown method without a credential
       still answer `401`; a request with a bad credential gets `401` even for `tools/list`; a non-`POST` gets `401`.
-- [ ] stdio without configuration lists exactly the public catalogue.
-- [ ] The setting is validated (`on`/`off`), warned at start, documented and known to both hosts.
+- [x] stdio without configuration lists exactly the public catalogue.
+- [x] The setting is validated (`on`/`off`), warned at start, documented and known to both hosts.
 
 ## Security notes
 THREAT_MODEL T33.

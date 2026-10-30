@@ -168,6 +168,13 @@ export {
 export { cleanText, decodeEntities, htmlToText, richText, utcIso } from './output/text.ts';
 export { PROMPT_MANIFEST, PROMPT_RULES, type PromptDefinition } from './prompts.ts';
 export {
+  isPublicCatalogMethod,
+  PUBLIC_CATALOG_GROUPS,
+  PUBLIC_CATALOG_METHODS,
+  publicCatalogContext,
+  publicCatalogTools,
+} from './public-catalog.ts';
+export {
   type CompiledQuery,
   type CompileOptions,
   compileQuery,

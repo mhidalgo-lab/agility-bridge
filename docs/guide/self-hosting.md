@@ -145,6 +145,23 @@ own Agility access token in the `X-Agility-Token` header instead of a device tok
 - Anyone with a valid token for the instance and network access to the server can use such a workspace: keep it on a
   private network, and prefer per-user grants with device tokens when you need to know who is who.
 
+
+## Public tool catalogue (optional)
+
+`AB_PUBLIC_TOOL_CATALOG=on` lets a client or a registry see **which tools the server has** before anyone signs in. A request to
+`/w/{slug}/mcp` with no `Authorization` and no `X-Agility-Token` header may send `initialize`, `ping`, `server/discover`,
+`tools/list` and `notifications/initialized`; the server answers from a static list and reads no storage. It is off by default
+and it is safe by construction:
+
+- The list is the read-only tools of the default groups (the same list an unconfigured stdio server shows), whatever the
+  workspace. Write tools, reports and attachments are never in it, so it does not say whether your deployment offers them.
+- The answer does not depend on the workspace name in the URL: a real, an unknown, a disabled and a malformed name get the same
+  bytes, so it cannot be used to find out which workspaces exist.
+- Everything else, `tools/call`, prompts, resources and any request that presents a credential, valid or not, is `401` as before.
+  The per-address request limit still applies.
+- Tool descriptions are public documentation (they are in this repository), so listing them reveals nothing about your Agility
+  instance or your people.
+
 ## Docker
 
 The image runs `agility-bridge serve` as the non-root user `65532` on distroless Node 24, with a read-only root
