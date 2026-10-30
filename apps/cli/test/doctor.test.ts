@@ -459,7 +459,7 @@ describe('doctor: hostile files and the keychain (Phase 8 review S-6, Q-8)', () 
     },
   );
 
-  it('reports a keychain token bound to another host as a failure, an unbound one as a warning, a bound one as ok (P8-31)', async () => {
+  it('reports a keychain token bound to another host as a failure, an unbound one as a failure too (P8-41), a bound one as ok (P8-31)', async () => {
     const data: Record<string, string> = { 'agility-bridge/agility-token': 'FAKE-TOKEN-0000000000' };
     const keychain = (service: string, account: string) => {
       const v = data[`${service}/${account}`];
@@ -468,9 +468,8 @@ describe('doctor: hostile files and the keychain (Phase 8 review S-6, Q-8)', () 
     };
     const env = { AB_AGILITY_URL: INSTANCE, AB_AGILITY_TOKEN: 'keychain:agility-token' };
     const unbound = await run({ ...OPTS, offline: false }, env, { keychain });
-    expect(unbound.findings.some((f) => f.id === 'config.warning' && f.message.includes('not bound'))).toBe(
-      true,
-    );
+    expect(byId(unbound, 'config.stdio')[0]?.status).toBe('fail');
+    expect(byId(unbound, 'config.stdio')[0]?.message).toContain('keychain bind agility-token --for-url');
     expect(byId(unbound, 'config.keychain-binding')).toEqual([]);
     data['agility-bridge/agility-token#host'] = new URL(INSTANCE).host;
     const ok = await run({ ...OPTS, offline: false }, env, { keychain });
