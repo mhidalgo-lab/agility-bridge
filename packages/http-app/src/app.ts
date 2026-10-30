@@ -36,6 +36,7 @@ import {
   type Random,
   requestDeclaresApps,
   Secret,
+  type Telemetry,
   type ToolCallEvent,
   type ToolContext,
   type ToolDefinition,
@@ -238,6 +239,11 @@ export interface HttpAppOptions extends EdgeOptions {
    * kill switch). Only 2026-07-28 requests carry their capabilities, so a 2025-era stateless request is never offered Apps.
    */
   readonly mcpApps?: boolean;
+  /**
+   * Self-monitoring (P8-07, T30): one span per finished MCP request, with allowlisted attributes only. Absent: nothing is
+   * measured or sent. The host builds it from `AB_OTEL_ENDPOINT`.
+   */
+  readonly telemetry?: Telemetry;
 }
 
 export interface HttpApp {
@@ -289,8 +295,17 @@ function forwardRequest(c: Context): Request {
 }
 
 /** Ends a streamed body at the deadline. */
-function withDeadline(response: Response, ms: number, onTimeout: () => void): Response {
-  if (response.body === null) return response;
+function withDeadline(
+  response: Response,
+  ms: number,
+  onTimeout: () => void,
+  /** Called once when the exchange ends, whichever way (finished, cut at the deadline, cancelled, failed). */
+  onEnd: () => void = () => {},
+): Response {
+  if (response.body === null) {
+    onEnd();
+    return response;
+  }
   const reader = response.body.getReader();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const body = new ReadableStream<Uint8Array>({
@@ -299,6 +314,7 @@ function withDeadline(response: Response, ms: number, onTimeout: () => void): Re
         onTimeout();
         reader.cancel().catch(() => {});
         controller.error(new Error('deadline'));
+        onEnd();
       }, ms);
     },
     async pull(controller) {
@@ -307,16 +323,19 @@ function withDeadline(response: Response, ms: number, onTimeout: () => void): Re
         if (done) {
           clearTimeout(timer);
           controller.close();
+          onEnd();
         } else {
           controller.enqueue(value);
         }
       } catch (error) {
         clearTimeout(timer);
         controller.error(error);
+        onEnd();
       }
     },
     cancel(reason) {
       clearTimeout(timer);
+      onEnd();
       return reader.cancel(reason);
     },
   });
@@ -779,7 +798,31 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     const ip = clientIp(c);
     let mcp: ClassifiedRequest | null = null;
     let access: EffectiveAccess | null = null;
-    const finish = (res: Response, refusal: RefusalReason | null): Response => {
+    /** What the tool call of this request reported (P8-07): known once the call ends, so the span waits for the exchange to end. */
+    const toolOutcome: { errorCode: string | null; requestsUsed?: number } = { errorCode: null };
+    let spanSent = false;
+    const sendSpan = (status: number, refusal: RefusalReason | null): void => {
+      const telemetry = options.telemetry;
+      if (telemetry === undefined || spanSent) return;
+      spanSent = true;
+      const work = telemetry.record({
+        method: mcp?.method ?? null,
+        kind: mcp?.kind ?? 'other',
+        tool: mcp?.tool ?? null,
+        status,
+        refusal: refusal === null ? null : String(refusal),
+        errorCode: toolOutcome.errorCode,
+        ...(toolOutcome.requestsUsed === undefined ? {} : { requestsUsed: toolOutcome.requestsUsed }),
+        requestId,
+        startMs: started,
+        endMs: services.clock.now(),
+        // A trace is joined only for an authenticated caller; the header is parsed strictly and never forwarded or returned.
+        traceparent: access === null ? null : (c.req.header('traceparent') ?? null),
+      });
+      if (work !== undefined) keepAlive(c, work);
+    };
+    const finish = (res: Response, refusal: RefusalReason | null, spanLater = false): Response => {
+      if (!spanLater) sendSpan(res.status, refusal);
       observe(c, 'request', {
         requestId,
         ip,
@@ -1078,7 +1121,11 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       ...(options.mcpApps !== false && requestDeclaresApps(body.message) ? { apps: 'on' as const } : {}),
       tools,
       ctx,
-      onToolCall: (event) => observe(c, 'toolCall', { ...event, requestId, access: resolved }),
+      onToolCall: (event) => {
+        toolOutcome.errorCode = event.errorCode;
+        toolOutcome.requestsUsed = event.requestsUsed;
+        observe(c, 'toolCall', { ...event, requestId, access: resolved });
+      },
     };
 
     const forward = new Request(c.req.url, { method: 'POST', headers: c.req.raw.headers, body: body.bytes });
@@ -1168,11 +1215,19 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     clearTimeout(timer);
     if (timedOut) return finish(response, 'deadline');
     const remaining = Math.max(1, deadlineMs - (services.clock.now() - started));
+    let streamCut = false;
     return finish(
-      withDeadline(response, remaining, () =>
-        services.logger.warn('response stream hit the deadline', { requestId }),
+      withDeadline(
+        response,
+        remaining,
+        () => {
+          streamCut = true;
+          services.logger.warn('response stream hit the deadline', { requestId });
+        },
+        () => (streamCut ? sendSpan(504, 'deadline') : sendSpan(response.status, null)),
       ),
       null,
+      true,
     );
   });
 

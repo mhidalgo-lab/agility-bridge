@@ -22,6 +22,7 @@ Why these numbers:
   512 KiB costs about 2–5 ms (P0-09 measurements). On Free the presets are **ceilings**: setting `AB_CALL_BUDGET`
   above 45 or `AB_LIMITS_MAX_RESPONSE_BYTES` above 512 KiB stops the Worker at its first request (it answers `503` and
   logs the setting), and a workspace or grant limit above them is capped (`whoami` shows the effective values).
+  With `AB_OTEL_ENDPOINT` set ([observability](observability.md)) each request makes one more outgoing request, for its span, after the response: 45 plus one is still under the 50.
 - **Paid** has 10,000 subrequests and seconds of CPU; the presets match `agility-bridge serve`, and workspaces may
   raise or lower them.
 - Workers open at most 6 connections at a time per request, so a call runs at most 6 Agility requests in parallel.

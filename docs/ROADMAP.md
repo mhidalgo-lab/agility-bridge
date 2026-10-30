@@ -366,7 +366,7 @@ Status lives in each task file.
 | P8-04 | [doctor command](tasks/phase-8-power-features/P8-04-doctor.md) | medium | P6-13 | done |
 | P8-05 | [Configuration import and export](tasks/phase-8-power-features/P8-05-config-import-export.md) | low | P6-13 | done |
 | P8-06 | [Client integrations (Claude Code plugin, VS Code and Copilot snippets)](tasks/phase-8-power-features/P8-06-client-integrations.md) | low | P6-13 | review |
-| P8-07 | [Self-monitoring with OpenTelemetry](tasks/phase-8-power-features/P8-07-self-monitoring.md) | low | P6-13 | todo |
+| P8-07 | [Self-monitoring with OpenTelemetry](tasks/phase-8-power-features/P8-07-self-monitoring.md) | low | P6-13 | done |
 | P8-08 | [OS keychain support](tasks/phase-8-power-features/P8-08-os-keychain.md) | low | P6-13 | review |
 | P8-09 | [Per-grant quotas and usage](tasks/phase-8-power-features/P8-09-quotas-usage.md) | low | P6-13 | review |
 | P8-10 | [MCP Tasks for long-running reports](tasks/phase-8-power-features/P8-10-mcp-tasks.md) | low | P6-13 | review |
@@ -376,6 +376,8 @@ Status lives in each task file.
 | P8-14 | [Per-grant and per-workspace quota overrides](tasks/phase-8-power-features/P8-14-quota-overrides.md) | low | P8-09 | todo |
 | P8-15 | [Verify MCP Tasks with MCP Inspector and a real client](tasks/phase-8-power-features/P8-15-tasks-live-check.md) | low | P8-10 | todo |
 | P8-19 | [Verify MCP Apps views in real clients](tasks/phase-8-power-features/P8-19-verify-apps-in-real-clients.md) | low | P8-03 | todo |
+| P8-20 | [Self-monitoring for the stdio server](tasks/phase-8-power-features/P8-20-stdio-telemetry.md) | low | P8-07 | todo |
+| P8-21 | [Stop the OAuth abuse tests timing out on busy CI runners](tasks/phase-8-power-features/P8-21-oauth-abuse-test-timeout.md) | low | — | todo |
 
 ### Phase 9
 

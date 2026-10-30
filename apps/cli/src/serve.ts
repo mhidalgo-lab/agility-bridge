@@ -15,6 +15,7 @@ import {
   CredentialLimiters,
   createLogger,
   type FetchLike,
+  flushPeriodically,
   type Logger,
   MetadataService,
   stderrSink,
@@ -155,6 +156,8 @@ export async function startServe(
     oauthConsent?: OAuthConsentHandler;
     /** Tests only: a fake origin of client metadata documents in place of the public-only fetcher (P5-03). */
     clientMetadataFetch?: ClientMetadataFetch;
+    /** Tests only: a fake collector in place of the global `fetch` that posts spans (P8-07). */
+    telemetryFetch?: (request: Request) => Promise<Response>;
   } = {},
 ): Promise<RunningServer> {
   const config = loadServeConfig(env, { oauthConsent: options.oauthConsent !== undefined });
@@ -186,7 +189,7 @@ export async function startServe(
       : new ConfigError(`AB_ADMIN_TOKEN: ${(error as Error).message}`);
   }
   const hostServices = nodeHostServices(logger, { publicOnly: config.privateAddresses === 'refuse' });
-  const { app, audit, services } = assembleServer({
+  const { app, audit, services, telemetry } = assembleServer({
     settings: config,
     storage,
     keyring,
@@ -200,6 +203,7 @@ export async function startServe(
     ...(config.privateAddresses === 'refuse' ? { checkInstanceHost: checkPublicHost } : {}),
     // Identity providers are reached over public addresses only, checked at connect time (THREAT_MODEL T11).
     identityFetch: createNodeFetch({ publicOnly: config.identityPrivateAddresses === 'refuse' }),
+    ...(options.telemetryFetch === undefined ? {} : { telemetryFetch: options.telemetryFetch }),
     // OAuth client metadata documents: public addresses only, checked at connect time, no switch (P5-03, T11).
     clientMetadataFetch: options.clientMetadataFetch ?? createClientMetadataFetch(),
     clientIp: (c) =>
@@ -220,6 +224,8 @@ export async function startServe(
     oauth: config.oauth,
   });
   const stopRevalidation = scheduleRevalidation(services, config.revalidationHours, logger);
+  // Self-monitoring (P8-07): spans are batched and sent every few seconds and once more at shutdown.
+  const stopTelemetry = telemetry === undefined ? undefined : flushPeriodically(telemetry);
 
   const server = await new Promise<ReturnType<typeof serveNode>>((resolve, reject) => {
     const s = serveNode({ fetch: originFormOnly(app.fetch), port: config.port, hostname: config.host }, () =>
@@ -256,6 +262,8 @@ export async function startServe(
       stopRetention();
       stopHousekeeping();
       stopRevalidation();
+      stopTelemetry?.();
+      await telemetry?.flush();
       await audit.flush();
       await storage.close();
     },
