@@ -2,7 +2,7 @@
 id: P8-05
 title: Configuration import and export
 phase: 8
-status: todo
+status: done
 priority: low
 depends_on: [P6-13]
 adr: ["0007"]
@@ -29,7 +29,7 @@ Move or back up a deployment's configuration safely, between deployments or from
   from `AB_CONFIG_PASSPHRASE`, `--passphrase-file`, standard input or a prompt, never a flag, 12 characters at least. A
   wrong passphrase and a changed file give one message. Exporting tokens is an audit event (counts, no value).
 - **Import is additive and a dry run unless `--apply`**: it creates what is missing and never updates or deletes what
-  exists (matched by instance address, shared credential label, workspace slug, service-grant label), through the admin
+  exists (matched by instance address, shared credential label and workspace slug; grants only go to workspaces the same import creates), through the admin
   API, so validation, guards and audit rows are the same as for any command. Credentials are created only as shared
   ones from the file's sealed tokens; grants only for services; a personal credential is never used, replaced or
   referenced; workspaces that enable writes or pass-through need `--allow-sensitive`.
@@ -37,13 +37,13 @@ Move or back up a deployment's configuration safely, between deployments or from
   and its references must resolve inside it.
 
 ## Acceptance criteria
-- [ ] Escalation tests: an import cannot widen an existing workspace, create a grant for a person, reference or reuse a
+- [x] Escalation tests: an import cannot widen an existing workspace, create a grant for a person, reference or reuse a
       personal credential, name an owner or carry a clear token; sensitive workspaces are skipped without the flag.
-- [ ] No secret in the file without a passphrase; the sealed file holds no token or passphrase in clear (tests).
-- [ ] Dry run writes nothing (target database unchanged); a second `--apply` changes nothing.
-- [ ] The passphrase seal: round trip, wrong passphrase, tampered header and ciphertext, other KDF or cost refused.
-- [ ] Negative authorization: through a server, a wrong admin token imports nothing.
-- [ ] `docs/guide/migrating-config.md` written; `docs/reference/cli.md` regenerated.
+- [x] No secret in the file without a passphrase; the sealed file holds no token or passphrase in clear (tests).
+- [x] Dry run writes nothing (target database unchanged); a second `--apply` changes nothing.
+- [x] The passphrase seal: round trip, wrong passphrase, tampered header and ciphertext, other KDF or cost refused.
+- [x] Negative authorization: through a server, a wrong admin token imports nothing.
+- [x] `docs/guide/migrating-config.md` written; `docs/reference/cli.md` regenerated.
 
 ## Security notes
 THREAT_MODEL T29.
