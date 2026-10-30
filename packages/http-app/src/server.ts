@@ -51,6 +51,7 @@ import {
   type RateLimiter,
 } from './rate-limit.ts';
 import type { SessionOptions } from './session.ts';
+import { createTaskService } from './tasks.ts';
 import { createHttpWrites } from './writes.ts';
 
 /** A setting is missing or malformed; the message names the setting, never its value. */
@@ -89,6 +90,7 @@ export const SERVER_SETTING_NAMES: readonly string[] = Object.freeze([
   'AB_WRITE_RATE_DEPLOYMENT_HOURLY',
   'AB_ALLOW_HTTP_INSTANCES',
   'AB_PUBLIC_TOOL_CATALOG',
+  'AB_TASKS',
   'AB_QUOTA_DAILY',
   'AB_QUOTA_MONTHLY',
   'AB_QUERY_CACHE_TTL',
@@ -137,6 +139,8 @@ export interface ServerSettings {
    * one (Workers Cache API, `AB_QUERY_CACHE_EDGE=on`).
    */
   readonly queryCache: { readonly ttlSeconds: number; readonly edge: boolean };
+  /** `AB_TASKS=off` (P8-10): the Tasks extension is neither advertised nor served. On by default; it is used only by requests that declare it. */
+  readonly tasks: boolean;
   /**
    * Agility requests one grant may cause per UTC day and per UTC month (P8-09, `AB_QUOTA_DAILY`, `AB_QUOTA_MONTHLY`);
    * `null` leaves that period unlimited (default).
@@ -349,6 +353,7 @@ export function parseServerSettings(
         10_000,
       ),
     },
+    tasks: onOff('AB_TASKS', env['AB_TASKS'], true),
     quota: {
       daily: optionalInt('AB_QUOTA_DAILY', env['AB_QUOTA_DAILY'], 1, 100_000_000),
       monthly: optionalInt('AB_QUOTA_MONTHLY', env['AB_QUOTA_MONTHLY'], 1, 1_000_000_000),
@@ -601,6 +606,9 @@ export function assembleServer(parts: ServerParts): AssembledServer {
       ...host,
       ...(queryCache === undefined ? {} : { queryCache }),
       ...(quota === undefined ? {} : { quota }),
+      ...(settings.tasks
+        ? { tasks: createTaskService({ kv: storage.kv, keyring, clock: host.clock, random: host.random }) }
+        : {}),
     },
     ...(settings.publicUrl === undefined ? {} : { publicUrl: settings.publicUrl }),
     allowedHosts: settings.allowedHosts,

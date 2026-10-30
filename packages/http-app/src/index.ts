@@ -135,4 +135,5 @@ export {
   type SessionOptions,
   type SessionPrincipal,
 } from './session.ts';
+export { createTaskService, TASK_TTL_MS, TASKS_EXTENSION, type TaskService } from './tasks.ts';
 export { createHttpWrites, type HttpWrites, type HttpWritesOptions } from './writes.ts';

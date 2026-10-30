@@ -160,6 +160,11 @@ export interface BuildServerOptions {
   readonly apps?: 'off' | 'on' | 'detect';
   /** How error details that may contain Agility text are shown. Default: the untrusted-data envelope (P1-05). */
   readonly errors?: ToolErrorOptions;
+  /**
+   * Extensions advertised in `server/discover` (`capabilities.extensions`), name to settings, e.g. the Tasks extension
+   * (P8-10). Advertising is not use: a request still has to declare an extension (L-016).
+   */
+  readonly extensions?: Readonly<Record<string, Record<string, never>>>;
   /** Called after every tool call. Must not throw; a throw is swallowed. */
   readonly onToolCall?: (event: ToolCallEvent) => void;
 }
@@ -391,12 +396,18 @@ export function buildMcpServer({
   prompts = PROMPT_MANIFEST,
   listChanged = false,
   errors,
+  extensions,
   onToolCall,
   apps = 'off',
 }: BuildServerOptions): McpServer {
   const server = new McpServer(
     { name: info.name, version: info.version },
-    { capabilities: { tools: { listChanged } } },
+    {
+      capabilities: {
+        tools: { listChanged },
+        ...(extensions === undefined ? {} : { extensions: { ...extensions } }),
+      },
+    },
   );
   const contextFor = typeof context === 'function' ? context : () => context;
   const registeredTools = new Map<string, ReturnType<McpServer['registerTool']>>();

@@ -166,3 +166,34 @@
 - **Options:** (a) `agility_url` and a `sensitive` `agility_token` as `userConfig`; four read-only commands (my work, find item, sprint status, standup) and two skills (workflows; conduct: untrusted data, scope, secrets, approvals), every command repeating the untrusted-data rule; (b) ask the user to export variables (not reliable for a GUI-started client, L-026); (c) commands that write (ADR-0013: writes stay opt-in and approved, so no command encourages them).
 - **Recommendation:** (a), built. The plugin has not been installed in a real Claude Code in this batch (*unverified*; owner step), nor validated with `claude plugin validate` (the tests encode its documented rules).
 - **Owner:** *(open; built as (a))*
+
+### D-252 — A task runs inside the poll that claims it *(P8-10)*
+- **Context:** Workers must not do work after a response, and the SDK has no Tasks runtime, so there is nowhere to run a report "in the background".
+- **Options:** (a) creation returns the handle at once and the first `tasks/get` runs the stored call through the normal MCP pipeline, claimed by an atomic lease; (b) run the report at creation and store the result (the client's call still blocks until it ends, so no timeout benefit); (c) a Durable Object or queue worker (new Cloudflare resources, not allowed here).
+- **Recommendation:** (a), built. The client's `tools/call` returns at once; each poll is a normal request with its own budget, quota and audit. The report must still fit one request.
+- **Owner:** *(open; built as (a))*
+
+### D-253 — Only report tools become tasks *(P8-10)*
+- **Context:** The task names long reports and exports; write tools need an approval round trip that a task would complicate (L-411).
+- **Options:** (a) tools in the `reports` group, read-only, when the request declares the extension; (b) every read tool; (c) a per-tool flag.
+- **Recommendation:** (a), built. The group already marks the expensive composites and is enabled per workspace; other tools answer inline even for a declaring client.
+- **Owner:** *(open; built as (a))*
+
+### D-254 — Authorised per device, grant and workspace; no tasks for pass-through *(P8-10)*
+- **Context:** A task handle must not work for another device of the same person, but a pass-through workspace has one shared identity for all callers.
+- **Options:** (a) the record binds grant id, workspace id and the device token id; pass-through callers get no tasks; (b) bind the person only; (c) bind the pass-through token fingerprint too.
+- **Recommendation:** (a), built; (c) is possible later.
+- **Owner:** *(open; built as (a))*
+
+### D-255 — `tasks/update` always refuses; `input_required` is never produced *(P8-10)*
+- **Context:** The extension allows a task to ask for input (elicitation or sampling). Report tools never ask, and write approvals are out of scope (D-253).
+- **Options:** (a) refuse `tasks/update` with invalid params and never enter `input_required`; (b) implement input routing for future tools.
+- **Recommendation:** (a), built; the status stays in the vocabulary for the day a task tool asks.
+- **Owner:** *(open; built as (a))*
+
+### D-256 — `AB_TASKS` is on by default *(P8-10)*
+- **Context:** The extension is only used by requests that declare it, and only for report tools an owner enabled.
+- **Options:** (a) on, with `AB_TASKS=off` as the kill switch; (b) off until verified with a real client.
+- **Recommendation:** (a), built, as the task asks for a kill switch; it can be flipped to (b) if the live check (P8-15) finds a client problem.
+- **Owner:** *(open; built as (a))*
+
