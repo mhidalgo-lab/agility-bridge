@@ -18,7 +18,8 @@ import { main } from '../src/main.ts';
 import { PLUGIN_PATH, pluginMcpJson } from '../src/plugin-mcp.ts';
 
 const ROOT = new URL('../../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
+// A Windows checkout may turn LF into CRLF (core.autocrlf); compare the content, not the line endings.
+const read = (path: string) => readFileSync(join(ROOT, path), 'utf8').replace(/\r\n/g, '\n');
 const readJson = (path: string) => JSON.parse(read(path)) as Record<string, unknown>;
 
 const TOKEN = '1.IntegrationTestTokenNotReal0123456789AbCd';
