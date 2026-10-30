@@ -378,7 +378,7 @@ Status lives in each task file.
 | P8-19 | [Verify MCP Apps views in real clients](tasks/phase-8-power-features/P8-19-verify-apps-in-real-clients.md) | low | P8-03 | todo |
 | P8-20 | [Self-monitoring for the stdio server](tasks/phase-8-power-features/P8-20-stdio-telemetry.md) | low | P8-07 | todo |
 | P8-21 | [Stop the OAuth abuse tests timing out on busy CI runners](tasks/phase-8-power-features/P8-21-oauth-abuse-test-timeout.md) | low | — | done |
-| P8-31 | [Bind a keychain token to the instance it was stored for](tasks/phase-8-power-features/P8-31-keychain-token-host-binding.md) | low | — | todo |
+| P8-31 | [Bind a keychain token to the instance it was stored for](tasks/phase-8-power-features/P8-31-keychain-token-host-binding.md) | low | — | review |
 | P8-32 | [Verify the Windows keychain backend on a real machine](tasks/phase-8-power-features/P8-32-windows-keychain-real-run.md) | low | — | todo |
 | P8-35 | [Public catalogue response cache and query-cache single flight](tasks/phase-8-power-features/P8-35-catalogue-cache-single-flight.md) | low | P8-11, P8-01 | todo |
 | P8-36 | [Run MCP Tasks outside the poll](tasks/phase-8-power-features/P8-36-background-task-runner.md) | low | P8-10, P8-15 | todo |
@@ -386,6 +386,8 @@ Status lives in each task file.
 | P8-38 | [Shared-tier size cap and Worker CPU of sealing](tasks/phase-8-power-features/P8-38-shared-tier-size-and-cpu.md) | low | P8-13 | todo |
 | P8-39 | [Quota: one statement per request, and metadata requests](tasks/phase-8-power-features/P8-39-quota-statements-and-metadata.md) | low | P8-09 | todo |
 | P8-40 | [Deep links: parse the base once and keep links under the output cap](tasks/phase-8-power-features/P8-40-deep-links-per-row-cost.md) | low | P8-02 | todo |
+| P8-41 | [Refuse an unbound keychain token](tasks/phase-8-power-features/P8-41-refuse-unbound-keychain-token.md) | low | P8-31 | todo |
+| P8-42 | [Bind keychain tokens named in the YAML configuration](tasks/phase-8-power-features/P8-42-bind-yaml-keychain-tokens.md) | low | P8-31 | todo |
 
 ### Phase 9
 

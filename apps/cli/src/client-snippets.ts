@@ -116,7 +116,7 @@ export function cursorInstallLink(options: SnippetOptions): string {
 
 export function snippet(client: Client, options: SnippetOptions = {}): Snippet {
   const token = keychainRef(options);
-  const keychainNote = `The token stays in your OS keychain: store it once with \`agility-bridge keychain set ${options.keychain ?? DEFAULT_KEYCHAIN_NAME}\` (docs/guide/secrets.md).`;
+  const keychainNote = `The token stays in your OS keychain: store it once with \`agility-bridge keychain set ${options.keychain ?? DEFAULT_KEYCHAIN_NAME} --for-url ${options.url ?? '<https://your-instance>'}\`, so that it is sent to that instance only (docs/guide/secrets.md).`;
   const restart = 'Restart or reconnect the server after upgrading: clients cache the tool list (L-027).';
   switch (client) {
     case 'vscode': {

@@ -4,6 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
+  bindingAccount,
   DEFAULT_SERVICE,
   type KeychainBackend,
   KeychainError,
@@ -12,7 +13,9 @@ import {
   parseKeychainRef,
   type Runner,
   type RunResult,
+  readBinding,
   readKeychainRef,
+  writeBinding,
 } from '../src/keychain.ts';
 
 const SECRET = 'v1:Zm9vYmFyLXNlY3JldC12YWx1ZS1ub3QtcmVhbC0xMjM0NTY3OA==';
@@ -140,6 +143,25 @@ describe.each(platforms)('keychain backend: %s (fake tools)', (platform) => {
     expect(writes.some((c) => (c.input ?? '').includes(SECRET) || (c.input ?? '').includes(hexForm))).toBe(
       true,
     );
+  });
+
+  it('records the host an entry is for in a sibling entry, on every backend, with no secret in argv (P8-31)', () => {
+    const { run, calls, data } = store(platform);
+    const kc = keychainFor(platform, run);
+    const ref = { service: 'agility-bridge', account: 'agility-token' };
+    expect(readBinding(kc, ref)).toBeUndefined();
+    kc.set(ref.service, ref.account, SECRET);
+    writeBinding(kc, ref, 'agility.example.com');
+    expect(readBinding(kc, ref)).toBe('agility.example.com');
+    expect(kc.get(ref.service, ref.account)).toBe(SECRET);
+    expect([...data.keys()].sort()).toEqual([
+      'agility-bridge/agility-token',
+      `agility-bridge/${bindingAccount('agility-token')}`,
+    ]);
+    for (const c of calls) expect([c.file, ...c.args].join(' ')).not.toContain(SECRET);
+    // A secret cannot be given the binding's name, nor any other name outside the alphabet.
+    expect(() => kc.set('agility-bridge', 'x#host2', SECRET)).toThrow(KeychainError);
+    expect(() => kc.set('agility-bridge', '#host', SECRET)).toThrow(KeychainError);
   });
 
   it('refuses names that need quoting, before any tool runs', () => {

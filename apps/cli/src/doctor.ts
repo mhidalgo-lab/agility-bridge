@@ -188,6 +188,20 @@ function configChecks(deps: DoctorDeps): LoadedForDoctor {
         },
       ),
     );
+    const tokenValue = deps.env['AB_AGILITY_TOKEN'];
+    if (
+      loaded.source === 'environment' &&
+      tokenValue?.startsWith('keychain:') &&
+      !findings.some((f) => f.message.includes('is not bound to an instance'))
+    ) {
+      findings.push(
+        finding(
+          'config.keychain-binding',
+          'ok',
+          `The keychain token is bound to ${new URL(loaded.instanceUrl).host.toLowerCase()} and goes nowhere else.`,
+        ),
+      );
+    }
     const configFile = deps.env['AB_CONFIG'];
     if (configFile !== undefined && configFile !== '') {
       const f = modeFinding(

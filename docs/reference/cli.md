@@ -49,13 +49,29 @@ Runs without a server.
 Store a secret in the OS keychain (from --from-file, AB_KEYCHAIN_SECRET, standard input or a hidden prompt); refer to it as keychain:<name>.
 
 ```text
-agility-bridge keychain set <name> [--from-file <value>]
+agility-bridge keychain set <name> [--from-file <value>] [--for-url <value>]
 ```
 
 | Name | Kind | Meaning |
 |---|---|---|
 | `<name>` | argument | Entry name, or service/account (service defaults to agility-bridge) |
 | `--from-file` | string | Read the secret from this 0600 file |
+| `--for-url` | string | The instance address this token is for (https://…); the server then sends it to that host only |
+
+Runs without a server.
+
+### `keychain bind`
+
+Bind an existing keychain entry to the instance it is for (also how you confirm a changed address): the server sends the token to that host only.
+
+```text
+agility-bridge keychain bind <name> --for-url <value>
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `<name>` | argument | Entry name, or service/account |
+| `--for-url` | string, required | The instance address this token is for (https://…); the server then sends it to that host only |
 
 Runs without a server.
 
