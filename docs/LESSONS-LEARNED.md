@@ -27,7 +27,7 @@ How to use it:
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
-| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315, L-317 – L-320, L-324 – L-326, L-328, L-333, L-360, L-366, L-367 |
+| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315, L-317 – L-320, L-324 – L-326, L-328, L-333, L-360, L-366, L-367, L-423 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282, L-323 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280, L-304, L-316 |
@@ -492,6 +492,14 @@ the tree (an index past its end, an impossible count) are refused; the totals ar
 Until the last step every roll-up says it is not exact, so a model that stops early is never told a partial sum is final. Trees too
 large for the cursor's length limit keep the "get a sub-epic" answer.
 *Applied in:* P6-16, `tools/portfolio/get-tree.ts`, `query/cursor.ts`.
+
+**L-423 — A field every result needs is added at the server's one choke point, from configuration and validated identity.**
+Deep links (`url`) are needed on every asset row of every tool, including reports, details and write plans. Adding them per
+tool would miss the next tool and would let each one build a URL its own way. The server adds them once, after the handler
+returns, by walking `structuredContent` for objects with an `assetType` and a valid `oid` or `number`. The host, scheme and path
+come only from the pinned instance URL; the identity must match a strict pattern, and a result that is not on the pinned origin
+and path is dropped. The text carries one fixed line instead of a URL per row.
+*Applied in:* P8-02, `output/links.ts`, `test/output/links.test.ts`.
 
 ## E. The Agility API client
 

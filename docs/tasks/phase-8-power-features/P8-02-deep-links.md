@@ -35,7 +35,7 @@ and a read never creates a public or share link.
 - [x] Every asset row in `structuredContent` of every tool gets `url`; rows without identity, rows that already have a
       `url` (Agility Link assets) and non-asset objects are left alone (unit and server tests).
 - [x] The text output carries one fixed note with the pattern and never a per-row URL or Agility text.
-- [x] No tool output contains a URL that is not on the pinned origin (property test over the sample worlds).
+- [x] Hostile OIDs and numbers (host, path, query, fragment, newline) never produce a URL off the pinned origin and path (property-style test).
 - [ ] Links validated for every asset type on the sandbox (*unverified*: needs a real instance; left for the Phase 8
       review's live pass, which also checks that `assetdetail.v1?oid=` redirects as expected).
 

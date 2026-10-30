@@ -21,6 +21,7 @@ import {
 } from './errors.ts';
 import { availableEntries } from './manifest.ts';
 import { envelopeRenderer, newEnvelopeId } from './output/envelope.ts';
+import { addLinks, linkNote } from './output/links.ts';
 import { PROMPT_MANIFEST, type PromptDefinition } from './prompts.ts';
 import { isTemplate, RESOURCE_MANIFEST, type ResourceDefinition, type ResourceReader } from './resources.ts';
 import { annotationsFor, type ToolDefinition, type ToolOutput } from './tool.ts';
@@ -320,6 +321,15 @@ function withDeprecationNotes(
   };
 }
 
+/** Adds the deep links of the asset rows to `structuredContent` and one fixed note to the text (P8-02, T26). */
+function withDeepLinks(ctx: ToolContext, out: ToolOutput): ToolOutput {
+  if (out.structured === null || typeof out.structured !== 'object') return out;
+  const { value, linked } = addLinks(ctx.instance.baseUrl, out.structured);
+  if (linked === 0) return out;
+  const note = linkNote(ctx.instance.baseUrl);
+  return { ...out, structured: value, ...(note === undefined ? {} : { text: `${out.text}\n${note}` }) };
+}
+
 /** The MCP result for a handler's output. */
 export function toCallToolResult(out: ToolOutput): CallToolResult {
   return {
@@ -413,11 +423,14 @@ export function buildMcpServer({
         };
         try {
           const aliases: string[] = [];
-          const out = withDeprecationNotes(
-            def,
-            aliases,
-            await def.handler(parseInput(def, input, aliases), ctx),
-            (name) => warnOnce(logger, def.name, name),
+          const out = withDeepLinks(
+            ctx,
+            withDeprecationNotes(
+              def,
+              aliases,
+              await def.handler(parseInput(def, input, aliases), ctx),
+              (name) => warnOnce(logger, def.name, name),
+            ),
           );
           logger.debug('tool ok', { ms: ctx.clock.now() - started, requests: ctx.budget.used });
           observe('ok', null, out);

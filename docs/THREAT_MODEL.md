@@ -404,3 +404,8 @@ runs in the browser suites only against a synthetic Agility without a write endp
 Docs: the guide now states, per layer, how to enable and disable writes and what is unverified, so the residual list above is
 also what an operator reads (L-010, L-133).
 
+## 8i. Status after P8-02 (2026-10-30)
+
+| Id | Status | Evidence |
+|---|---|---|
+| T26 | implemented, verified on fakes only | `packages/core/src/output/links.ts` builds every `url` from the pinned instance URL, the fixed `assetdetail.v1` path and one OID or number that matches a strict pattern (letters, digits, one colon or hyphen); the server adds it at one choke point to asset rows only (`packages/core/test/output/links.test.ts`: hostile OIDs and numbers with a host, path, query, fragment or newline give no link or a link on the pinned origin and path; a row with a `url` of its own, a Link asset, is left alone). No share, public or token URL is built or requested. A link opens only for a signed-in Agility user, so a link pasted elsewhere gives no access. Residual: whether `assetdetail.v1?oid=` opens every asset type, and how Agility redirects it, is **unverified** until the Phase 8 live pass. |

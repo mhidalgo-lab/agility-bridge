@@ -361,7 +361,7 @@ Status lives in each task file.
 | ID | Task | Priority | Depends on | Status |
 |---|---|---|---|---|
 | P8-01 | [Query cache](tasks/phase-8-power-features/P8-01-query-cache.md) | medium | P6-13 | todo |
-| P8-02 | [Deep links to the Agility UI](tasks/phase-8-power-features/P8-02-deep-links.md) | low | P6-13 | todo |
+| P8-02 | [Deep links to the Agility UI](tasks/phase-8-power-features/P8-02-deep-links.md) | low | P6-13 | review |
 | P8-03 | [MCP Apps views](tasks/phase-8-power-features/P8-03-mcp-apps-views.md) | low | P6-13 | todo |
 | P8-04 | [doctor command](tasks/phase-8-power-features/P8-04-doctor.md) | medium | P6-13 | todo |
 | P8-05 | [Configuration import and export](tasks/phase-8-power-features/P8-05-config-import-export.md) | low | P6-13 | todo |
