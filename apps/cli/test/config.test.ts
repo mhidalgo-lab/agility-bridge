@@ -143,6 +143,25 @@ workspaces:
     expect(k.kind === 'configured' && k.token.reveal()).toBe('FAKE-agility-ann');
   });
 
+  it('warns on stderr when a setting only a remote host reads is set for stdio (Q-7)', () => {
+    const warnings: string[] = [];
+    loadConfig(
+      {
+        AB_AGILITY_URL: URL,
+        AB_AGILITY_TOKEN: '1.x',
+        AB_QUOTA_DAILY: '200',
+        AB_OTEL_ENDPOINT: 'https://o.example/v1',
+      },
+      { warn: (m) => warnings.push(m) },
+    );
+    expect(warnings).toEqual([
+      expect.stringMatching(/AB_QUOTA_DAILY, AB_OTEL_ENDPOINT are read by a remote host only/),
+    ]);
+    const none: string[] = [];
+    loadConfig({ AB_AGILITY_URL: URL, AB_AGILITY_TOKEN: '1.x' }, { warn: (m) => none.push(m) });
+    expect(none).toEqual([]);
+  });
+
   it('warns when the file is readable by others', () => {
     const warnings: string[] = [];
     loadConfig(

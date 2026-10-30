@@ -17,6 +17,7 @@ import { type KeychainBackend, KeychainError, type KeychainRef, parseKeychainRef
 import { createMasterKeyFile, defaultMasterKeyFile } from '../master-key.ts';
 import type { AdminClient } from './client.ts';
 import {
+  bindingOf,
   buildBundle,
   decryptSecrets,
   exportableCredentials,
@@ -415,6 +416,11 @@ export const COMMANDS: readonly CommandSpec[] = [
         help: 'Also create workspaces that enable writes or pass-through (review the plan first)',
       },
       {
+        name: 'add-grants',
+        kind: 'flag',
+        help: "Also add the file's service grants that an existing workspace lacks (finishes a partly failed import)",
+      },
+      {
         name: 'passphrase-file',
         kind: 'string',
         help: 'Read the passphrase from this 0600 file (else AB_CONFIG_PASSPHRASE, standard input or a hidden prompt)',
@@ -431,7 +437,7 @@ export const COMMANDS: readonly CommandSpec[] = [
           stdin: r.stdin,
           what: 'passphrase of the file',
         });
-        secrets = await decryptSecrets(bundle.secrets, passphrase);
+        secrets = await decryptSecrets(bundle.secrets, passphrase, bindingOf(bundle));
       }
       const apply = p.opts['apply'] === true;
       const client = await r.client();
@@ -439,9 +445,17 @@ export const COMMANDS: readonly CommandSpec[] = [
         const result = await importBundle(client, bundle, {
           apply,
           allowSensitive: p.opts['allow-sensitive'] === true,
+          addGrants: p.opts['add-grants'] === true,
           ...(secrets === undefined ? {} : { secrets }),
         });
         r.out(JSON.stringify(result, null, 2));
+        if (
+          apply &&
+          (result.counts.failed > 0 || result.items.some((i) => i.reason?.startsWith('created without')))
+        )
+          r.err(
+            'agility-bridge: the import is incomplete. Fix the cause, then re-run with --add-grants to create the grants that are missing; a workspace created without its default credential needs it set by hand first.',
+          );
         r.err(
           apply
             ? `agility-bridge: ${result.counts.create} created, ${result.counts.exists} already there, ${result.counts.skip} skipped, ${result.counts.failed} failed.`

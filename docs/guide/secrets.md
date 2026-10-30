@@ -27,7 +27,9 @@ shown again.
 ## Keeping secrets in the OS keychain
 
 Instead of a file or an environment value, a secret can live in your operating system's keychain and be referred to by
-name: `keychain:<name>` (stored under the service `agility-bridge`) or `keychain:<service>/<account>`. A reference is
+name: `keychain:<name>` (stored under the service `agility-bridge`) or, in the YAML configuration only,
+`keychain:<service>/<account>` (an environment value may name the `agility-bridge` service only, so a project's client
+file cannot make the server read another application's entry). A reference is
 accepted as the whole value of `AB_AGILITY_TOKEN` (stdio), `AB_MASTER_KEY` and `AB_MASTER_KEY_PREVIOUS` (`serve` and the
 management commands), and inside `${keychain:…}` in the YAML configuration. The file or client configuration then holds
 only the name:

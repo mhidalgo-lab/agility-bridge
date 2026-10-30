@@ -167,7 +167,8 @@ function macos(run: Runner): KeychainBackend {
       throw unusable(b, r, 'security');
     },
     available() {
-      return run('security', ['list-keychains']).failure === undefined;
+      const r = run('security', ['list-keychains']);
+      return r.failure === undefined && r.status === 0;
     },
   };
   return self;
@@ -200,7 +201,16 @@ function linux(run: Runner): KeychainBackend {
       return true;
     },
     available() {
-      return run('secret-tool', ['--version']).failure === undefined;
+      // A lookup that matches nothing answers exit 1 with no message when a Secret Service is reachable; anything else
+      // (no D-Bus, no service, locked) is a message on stderr. `secret-tool` has no documented `--version` (Q-8, D-292).
+      const r = run('secret-tool', [
+        'lookup',
+        'service',
+        'agility-bridge-probe',
+        'account',
+        crypto.randomUUID(),
+      ]);
+      return r.failure === undefined && (r.status === 0 || (r.status === 1 && r.stderr.trim() === ''));
     },
   };
   return self;
@@ -213,6 +223,9 @@ function linux(run: Runner): KeychainBackend {
  */
 const WINDOWS_SCRIPT = `
 $ErrorActionPreference = 'Stop'
+# The pipes to and from Node are UTF-8 (no BOM); the console's OEM code page would mangle non-ASCII secrets (Q-9).
+[Console]::InputEncoding = New-Object System.Text.UTF8Encoding $false
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -305,6 +318,15 @@ function windows(run: Runner): KeychainBackend {
     set(service, account, secret) {
       checkWritableName('service', service);
       checkWritableName('account', account);
+      // The script has never run on Windows (D-273): until a real run proves the UTF-8 pipes, a secret that would need
+      // them is refused instead of being stored mangled, because the read-back goes through the same path (Q-9, D-293).
+      // eslint-disable-next-line no-control-regex
+      if (/[^\u0020-\u007e\r\n]/.test(secret)) {
+        throw new KeychainError(
+          `${b}: only ASCII secrets can be stored here (the access tokens and master keys of agility-bridge are ASCII).`,
+        );
+      }
+
       const r = ps('set', service, account, secret);
       if (r.failure !== undefined || r.status !== 0) throw unusable(b, r, 'powershell.exe');
       verify(self, service, account, secret);
@@ -317,9 +339,8 @@ function windows(run: Runner): KeychainBackend {
       throw unusable(b, r, 'powershell.exe');
     },
     available() {
-      return (
-        run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'exit 0']).failure === undefined
-      );
+      const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'exit 0']);
+      return r.failure === undefined && r.status === 0;
     },
   };
   return self;

@@ -78,6 +78,13 @@ export interface DoctorReport {
   readonly fixed: readonly FixAction[];
 }
 
+/** Raised in place of a keychain read under `--offline`: the check is skipped, not failed (Q-8, D-292). */
+class KeychainSkipped extends ConfigError {
+  constructor() {
+    super('A keychain: reference was not resolved (--offline reads nothing from the OS keychain).');
+  }
+}
+
 const MAX_CLIENT_FILE = 1_048_576;
 const MIN_NODE_MAJOR = 24;
 
@@ -86,12 +93,23 @@ const SECRET_ARG = /^--?(?:token|agility[-_]?token|password|secret|api[-_]?key|m
 const TOKEN_SHAPED = /^(?:ab_[A-Za-z0-9_-]{16,}|\d+\.[A-Za-z0-9+/=_-]{20,})$/;
 const SECRET_ENV_NAME = /(?:TOKEN|SECRET|PASSWORD|API[-_]?KEY|MASTER[-_]?KEY)/i;
 
+// biome-ignore lint/suspicious/noControlCharactersInRegex: removing control characters is the point
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
+/** Text from files we do not own (server names, variable names, paths) must not carry terminal escapes (S-6). */
+const printable = (text: string): string => text.replace(CONTROL, '?');
+
 const finding = (
   id: string,
   status: Status,
   message: string,
   extra: { hint?: string; fix?: FixAction } = {},
-): Finding => ({ id, status, message, ...extra });
+): Finding => ({
+  id,
+  status,
+  message: printable(message),
+  ...(extra.hint === undefined ? {} : { hint: printable(extra.hint) }),
+  ...(extra.fix === undefined ? {} : { fix: extra.fix }),
+});
 
 /** Group- or world-accessible on POSIX; the repair is the owner-only mode. */
 function modeFinding(
@@ -100,6 +118,8 @@ function modeFinding(
   kind: 'file' | 'dir',
   platform: NodeJS.Platform,
   what: string,
+  /** False for a path doctor did not choose to create: it is reported with the command, never repaired by --fix. */
+  fixable = true,
 ): Finding | undefined {
   if (platform === 'win32') return undefined;
   let st: ReturnType<typeof lstatSync>;
@@ -114,7 +134,7 @@ function modeFinding(
   const want = kind === 'dir' ? 0o700 : 0o600;
   return finding(id, 'warn', `${what} ${path} is accessible by other users.`, {
     hint: `chmod ${want.toString(8)} ${path}`,
-    fix: { path, mode: want },
+    ...(fixable ? { fix: { path, mode: want } } : {}),
   });
 }
 
@@ -182,7 +202,9 @@ function configChecks(deps: DoctorDeps): LoadedForDoctor {
     return { config: loaded, findings };
   } catch (error) {
     if (error instanceof ConfigError) {
-      findings.push(finding('config.stdio', 'fail', error.message));
+      findings.push(
+        finding('config.stdio', error instanceof KeychainSkipped ? 'skip' : 'fail', error.message),
+      );
       return { findings };
     }
     throw error;
@@ -333,9 +355,11 @@ async function serverChecks(deps: DoctorDeps): Promise<Finding[]> {
   } catch (error) {
     const hint = 'agility-bridge init writes a new one; docs/guide/secrets.md explains how to keep it.';
     findings.push(
-      keyVars || exists
-        ? finding('server.master-key', 'fail', (error as Error).message, { hint })
-        : finding('server.master-key', 'skip', (error as Error).message),
+      error instanceof KeychainSkipped
+        ? finding('server.master-key', 'skip', error.message)
+        : keyVars || exists
+          ? finding('server.master-key', 'fail', (error as Error).message, { hint })
+          : finding('server.master-key', 'skip', (error as Error).message),
     );
   }
   if (!exists) {
@@ -354,6 +378,8 @@ async function serverChecks(deps: DoctorDeps): Promise<Finding[]> {
     'dir',
     platform,
     'The data directory',
+    // An explicit AB_DB_PATH can sit in any directory, for example one shared with a group: only report it (S-6).
+    !env['AB_DB_PATH'],
   );
   if (dirFinding !== undefined) findings.push(dirFinding);
   const fileFinding = modeFinding('server.database-mode', dbPath, 'file', platform, 'The database');
@@ -536,8 +562,9 @@ function ourEntries(root: unknown): [string, Record<string, unknown>][] {
 function readSmall(path: string): string | 'symlink' | 'big' | 'unreadable' | undefined {
   let fd: number;
   try {
+    // A FIFO named like a client file would block the open: open without blocking, and `fstat` below skips it (S-6).
     // One descriptor for the checks and the read; O_NOFOLLOW refuses a link (POSIX).
-    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === 'ENOENT' || code === 'ENOTDIR') return undefined;
@@ -689,7 +716,15 @@ export function scrub(text: string, secrets: readonly string[]): string {
   return redact(out);
 }
 
-export async function runDoctor(opts: DoctorOptions, deps: DoctorDeps): Promise<DoctorReport> {
+export async function runDoctor(opts: DoctorOptions, given: DoctorDeps): Promise<DoctorReport> {
+  const deps: DoctorDeps = opts.offline
+    ? {
+        ...given,
+        keychain: () => {
+          throw new KeychainSkipped();
+        },
+      }
+    : given;
   const platform = deps.platform ?? process.platform;
   const home = deps.home ?? homedir();
   const cwd = deps.cwd ?? process.cwd();

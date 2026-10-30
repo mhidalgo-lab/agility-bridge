@@ -10,7 +10,7 @@ import { ConfigError } from '../config.ts';
 import type { AdminClient } from './client.ts';
 
 export const BUNDLE_FORMAT = 'agility-bridge-config';
-export const BUNDLE_VERSION = 1;
+export const BUNDLE_VERSION = 2;
 /** PBKDF2-HMAC-SHA-256 iterations (OWASP 2023 minimum for this PRF); a file naming another count is refused. */
 export const PBKDF2_ITERATIONS = 600_000;
 export const MIN_PASSPHRASE = 12;
@@ -35,8 +35,23 @@ const b64 = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes));
 const unb64 = (text: string): Bytes => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
 const enc = new TextEncoder();
 /** The header is authenticated with the ciphertext, so the format, version and cost cannot be edited in the file. */
-const aad = (iterations: number): Bytes =>
-  enc.encode(`${BUNDLE_FORMAT}|${BUNDLE_VERSION}|${KDF}|${iterations}`);
+const aad = (iterations: number, binding: string): Bytes =>
+  enc.encode(`${BUNDLE_FORMAT}|${BUNDLE_VERSION}|${KDF}|${iterations}|${binding}`);
+
+/**
+ * What ties a token to where it may be sent (S-1, D-287): the instances' canonical addresses and which instance each
+ * credential belongs to. It is part of the authenticated data, so editing `baseUrl` or re-pointing a credential in the
+ * file makes the passphrase check fail instead of sending a decrypted token to another host.
+ */
+export function bindingOf(bundle: {
+  readonly instances: readonly { ref: string; baseUrl: string }[];
+  readonly credentials: readonly { ref: string; instance: string }[];
+}): string {
+  return JSON.stringify({
+    i: bundle.instances.map((i) => [i.ref, canonicalOrSelf(i.baseUrl)]).sort(),
+    c: bundle.credentials.map((c) => [c.ref, c.instance]).sort(),
+  });
+}
 
 async function deriveKey(passphrase: string, salt: Bytes): Promise<Key> {
   const base = await crypto.subtle.importKey('raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
@@ -59,13 +74,14 @@ export function checkPassphrase(passphrase: string): void {
 export async function encryptSecrets(
   secrets: Readonly<Record<string, string>>,
   passphrase: string,
+  binding = '',
 ): Promise<EncryptedSecrets> {
   checkPassphrase(passphrase);
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(passphrase, salt);
   const sealed = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: iv, additionalData: aad(PBKDF2_ITERATIONS) },
+    { name: 'AES-GCM', iv: iv, additionalData: aad(PBKDF2_ITERATIONS, binding) },
     key,
     enc.encode(JSON.stringify(secrets)),
   );
@@ -81,6 +97,7 @@ export async function encryptSecrets(
 export async function decryptSecrets(
   sealed: EncryptedSecrets,
   passphrase: string,
+  binding = '',
 ): Promise<Record<string, string>> {
   if (sealed.kdf !== KDF || sealed.iterations !== PBKDF2_ITERATIONS) {
     throw new ConfigError(
@@ -93,7 +110,7 @@ export async function decryptSecrets(
       {
         name: 'AES-GCM',
         iv: unb64(sealed.iv),
-        additionalData: aad(PBKDF2_ITERATIONS),
+        additionalData: aad(PBKDF2_ITERATIONS, binding),
       },
       key,
       unb64(sealed.ciphertext),
@@ -288,7 +305,20 @@ export async function buildBundle(api: Api, input: ExportInput = {}): Promise<Bu
       const token = input.tokens.get(str(c['id']));
       if (token !== undefined) plain[credentialRef.get(str(c['id'])) as string] = token;
     }
-    secrets = await encryptSecrets(plain, input.passphrase);
+    secrets = await encryptSecrets(
+      plain,
+      input.passphrase,
+      bindingOf({
+        instances: instances.map((i) => ({
+          ref: instanceRef.get(str(i['id'])) as string,
+          baseUrl: str(i['baseUrl']),
+        })),
+        credentials: credentials.map((c) => ({
+          ref: credentialRef.get(str(c['id'])) as string,
+          instance: instanceRef.get(str(c['instanceId'])) as string,
+        })),
+      }),
+    );
   }
   const bundle = {
     format: BUNDLE_FORMAT,
@@ -354,6 +384,11 @@ export interface ImportOptions {
   readonly apply: boolean;
   /** Workspaces that enable writes or pass-through are created only with this. */
   readonly allowSensitive: boolean;
+  /**
+   * Finish a partly failed run (Q-3, D-288): service grants of the file whose workspace already exists are created when
+   * that workspace has no grant of the same label. Off by default: a file never opens a new way into what exists unasked.
+   */
+  readonly addGrants?: boolean;
   /** Decrypted tokens by credential reference; absent = no credential is created. */
   readonly secrets?: Readonly<Record<string, string>>;
 }
@@ -390,11 +425,23 @@ export async function importBundle(api: Api, bundle: Bundle, options: ImportOpti
   for (const i of await list(api, '/instances'))
     existingInstances.set(canonicalOrSelf(str(i['baseUrl'])), str(i['id']));
   const existingCredentials = await list(api, '/credentials');
-  const existingWorkspaces = new Set((await list(api, '/workspaces')).map((w) => str(w['slug'])));
+  const existingWorkspaceRows = await list(api, '/workspaces');
+  const existingWorkspaces = new Set(existingWorkspaceRows.map((w) => str(w['slug'])));
 
+  const instanceUrl = new Map(bundle.instances.map((i) => [i.ref, canonicalOrSelf(i.baseUrl)]));
   const instanceId = new Map<string, string>(); // bundle ref -> id (a planned one is `planned:<ref>`)
   const credentialId = new Map<string, string>();
   const workspaceId = new Map<string, string>();
+  /** Workspaces that existed and take grants only because of --add-grants. */
+  const adopted = new Set<string>();
+  const existingGrants =
+    options.addGrants === true
+      ? new Set(
+          (await list(api, '/grants'))
+            .filter((g) => g['revokedAt'] === null && g['userId'] === null)
+            .map((g) => `${str(g['workspaceId'])}/${str(g['label'])}`),
+        )
+      : new Set<string>();
   /** Whether a workspace of the target has a shared default credential (a grant without its own needs one). */
   const hasDefault = new Map<string, boolean>();
   const fail = (item: PlanItem, res: { status: number; body: unknown }) => {
@@ -407,15 +454,15 @@ export async function importBundle(api: Api, bundle: Bundle, options: ImportOpti
     const known = existingInstances.get(url);
     if (known !== undefined) {
       instanceId.set(i.ref, known);
-      add('instance', i.label, 'exists');
+      add('instance', `${i.label} (${url})`, 'exists');
       continue;
     }
     if (!options.apply) {
       instanceId.set(i.ref, `planned:${i.ref}`);
-      add('instance', i.label, 'create');
+      add('instance', `${i.label} (${url})`, 'create');
       continue;
     }
-    const item = add('instance', i.label, 'create');
+    const item = add('instance', `${i.label} (${url})`, 'create');
     const res = await api.request('POST', '/instances', {
       label: i.label,
       baseUrl: i.baseUrl,
@@ -428,7 +475,7 @@ export async function importBundle(api: Api, bundle: Bundle, options: ImportOpti
 
   for (const c of bundle.credentials) {
     const instance = instanceId.get(c.instance);
-    const label = `${c.label}`;
+    const label = `${c.label} (${instanceUrl.get(c.instance) ?? ''})`;
     if (instance === undefined) {
       add('credential', label, 'skip', 'its instance could not be created');
       continue;
@@ -482,12 +529,23 @@ export async function importBundle(api: Api, bundle: Bundle, options: ImportOpti
   for (const w of bundle.workspaces) {
     const instance = instanceId.get(w.instance);
     if (existingWorkspaces.has(w.slug)) {
-      // Left as it is, and no grant of the file is added to it: a file never opens a new way into what exists.
+      // Left as it is. Grants are added to it only with --add-grants (finishing a partly failed run).
+      const row = existingWorkspaceRows.find((x) => str(x['slug']) === w.slug);
+      if (options.addGrants === true && row !== undefined) {
+        workspaceId.set(w.slug, str(row['id']));
+        hasDefault.set(
+          w.slug,
+          row['defaultCredentialId'] !== null && row['defaultCredentialId'] !== undefined,
+        );
+        adopted.add(w.slug);
+      }
       add(
         'workspace',
         w.slug,
         'exists',
-        'left as it is: import never changes a workspace or adds grants to it',
+        options.addGrants === true
+          ? 'left as it is: only the grants it lacks are added'
+          : 'left as it is: import never changes a workspace or adds grants to it (--add-grants finishes a partly failed import)',
       );
       continue;
     }
@@ -548,6 +606,10 @@ export async function importBundle(api: Api, bundle: Bundle, options: ImportOpti
           ? 'the workspace exists: import adds no grants to it'
           : 'its workspace is not available',
       );
+      continue;
+    }
+    if (adopted.has(g.workspace) && existingGrants.has(`${workspace}/${g.label}`)) {
+      add('grant', name, 'exists');
       continue;
     }
     const credential = g.credential === null ? null : (credentialId.get(g.credential) ?? undefined);

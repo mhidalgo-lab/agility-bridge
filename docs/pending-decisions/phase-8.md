@@ -220,3 +220,44 @@
 - **Recommendation:** (a), built, as the task asks for a kill switch; it can be flipped to (b) if the live check (P8-15) finds a client problem.
 - **Owner:** *(open; built as (a))*
 
+### D-287 — The config bundle authenticates where each token may go *(P8-12, S-1)*
+- **Context:** Only the `secrets` block was sealed; `instances[].baseUrl` and the credential-to-instance map sat outside the authenticated data, so someone editing the file could point a decrypted token at another host (the import validates the credential against the instance URL), and the plan showed instance labels only.
+- **Options:** (a) put the canonical instance addresses and the credential-to-instance map into the AES-GCM additional data, bump the file version to 2, print addresses in the plan; (b) encrypt `{token, baseUrl}` per credential; (c) a detached signature.
+- **Recommendation:** (a), built. Cheapest, no second key, and the same one-message refusal. Version 1 files that carry tokens are refused (re-export them); token-less files only need `version: 2`.
+- **Owner:** *(open; built as (a))*
+
+### D-288 — `config import --add-grants` finishes a partly failed import *(P8-12, Q-3)*
+- **Context:** Import never adds grants to an existing workspace, so a run that created a workspace and then failed on a grant could not be completed by import.
+- **Options:** (a) an explicit flag, off by default: grants the file has and the existing workspace lacks (by label, not revoked) are created through the admin API; (b) always add missing grants; (c) document a manual recovery only.
+- **Recommendation:** (a), built, plus a recovery line on stderr when a run fails or leaves a workspace without its default credential. A file still never opens a new way into what exists unasked.
+- **Owner:** *(open; built as (a))*
+
+### D-289 — `doctor --fix` repairs only directories it would have chosen; foreign text is sanitised *(P8-12, S-6)*
+- **Context:** `--fix` did `chmod 0700` on the directory of `AB_DB_PATH`, which can be a group-shared directory; server names from a project's `.mcp.json` were printed raw; a FIFO named `.mcp.json` blocked the open.
+- **Options:** (a) the data-directory fix only without `AB_DB_PATH` (reported with the command otherwise), control characters replaced by `?` in every finding, `O_NONBLOCK` open plus `fstat`; (b) drop directory repairs; (c) ask per path.
+- **Recommendation:** (a), built.
+- **Owner:** *(open; built as (a))*
+
+### D-290 — Environment keychain references read the `agility-bridge` service only *(P8-12, S-2)*
+- **Context:** A project's `.mcp.json` can set `AB_AGILITY_TOKEN=keychain:<service>/<account>` and so make the server read another application's entry.
+- **Options:** (a) refuse non-default services in environment values (`AB_AGILITY_TOKEN`, `AB_MASTER_KEY*`), allow them in the user's own YAML file; (b) an allowlist variable (also settable by the same hostile file, so no protection); (c) bind each entry to an instance host.
+- **Recommendation:** (a), built. It protects other applications' secrets. It does not stop a hostile file from sending the user's own `agility-bridge` entry to another host: that needs (c), filed as P8-31.
+- **Owner:** *(open; built as (a))*
+
+### D-291 — The stdio server warns about settings only remote hosts read *(P8-12, Q-7)*
+- **Context:** `AB_QUOTA_*`, `AB_OTEL_*`, `AB_TASKS`, `AB_QUERY_CACHE_EDGE` and `AB_PUBLIC_TOOL_CATALOG` are valid names that stdio ignores, so a cost control could silently do nothing.
+- **Options:** (a) a stderr warning naming them when stdio starts configured; (b) refuse them (breaks shared env blocks); (c) implement them for stdio (P8-20 covers telemetry).
+- **Recommendation:** (a), built. The warning is not raised for a shell with no Agility configuration (doctor, management commands).
+- **Owner:** *(open; built as (a))*
+
+### D-292 — Keychain availability is a probe; `doctor --offline` skips keychain references *(P8-12, Q-8)*
+- **Context:** `available()` only checked that the tool started, and `secret-tool` has no documented `--version`; doctor resolved `keychain:` references even with `--offline`.
+- **Options:** (a) probe with a lookup of a random attribute (Linux: exit 1 with no message means a reachable store) and require exit 0 for the other tools; doctor skips keychain reads under `--offline` and reports the checks as skipped; (b) leave it.
+- **Recommendation:** (a), built.
+- **Owner:** *(open; built as (a))*
+
+### D-293 — The Windows keychain script pins UTF-8 and refuses non-ASCII secrets for now *(P8-12, Q-9)*
+- **Context:** The PowerShell script read and wrote through the console's OEM code page, and the read-back used the same path, so a mangled secret verified. The script has never run on Windows (D-273).
+- **Options:** (a) set `[Console]::InputEncoding` and `OutputEncoding` to UTF-8 without BOM, and refuse non-ASCII secrets until a real run proves it (P8-32); (b) only the encoding; (c) only the refusal.
+- **Recommendation:** (a), built. Access tokens and master keys are ASCII, so nothing is lost.
+- **Owner:** *(open; built as (a))*

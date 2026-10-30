@@ -81,6 +81,19 @@ describe('snippets', () => {
     },
   );
 
+  it('the claude-code command quotes every value, so a pasted address cannot run anything (S-7)', () => {
+    const url = "https://agility.example.com/Acme;touch${IFS}/tmp/x&$(id)|'q";
+    const s = snippet('claude-code', { url, keychain: 'work' });
+    const line = s.text.trimEnd();
+    expect(line).toContain("-e 'AB_AGILITY_URL=");
+    expect(line).toContain("-e 'AB_AGILITY_TOKEN=keychain:work'");
+    expect(line).toContain("-- npx -y 'agility-bridge'");
+    // Outside single quotes nothing but the fixed words remain.
+    const unquoted = line.replace(/'(?:[^']|'\\'')*'/g, '');
+    expect(unquoted).not.toMatch(/[;&$|()`]/);
+    expect(() => snippet('claude-code', { keychain: 'x; rm -rf ~\n' })).toThrow(/--keychain/);
+  });
+
   it('takes a validated instance address, a keychain name and a pinned version', () => {
     const s = snippet('claude-desktop', {
       url: 'https://agility.example.com/Acme/',

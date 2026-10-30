@@ -378,6 +378,8 @@ Status lives in each task file.
 | P8-19 | [Verify MCP Apps views in real clients](tasks/phase-8-power-features/P8-19-verify-apps-in-real-clients.md) | low | P8-03 | todo |
 | P8-20 | [Self-monitoring for the stdio server](tasks/phase-8-power-features/P8-20-stdio-telemetry.md) | low | P8-07 | todo |
 | P8-21 | [Stop the OAuth abuse tests timing out on busy CI runners](tasks/phase-8-power-features/P8-21-oauth-abuse-test-timeout.md) | low | — | todo |
+| P8-31 | [Bind a keychain token to the instance it was stored for](tasks/phase-8-power-features/P8-31-keychain-token-host-binding.md) | low | — | todo |
+| P8-32 | [Verify the Windows keychain backend on a real machine](tasks/phase-8-power-features/P8-32-windows-keychain-real-run.md) | low | — | todo |
 
 ### Phase 9
 

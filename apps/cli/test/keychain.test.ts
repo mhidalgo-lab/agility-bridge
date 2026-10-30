@@ -188,6 +188,17 @@ describe.each(platforms)('keychain backend: %s (fake tools)', (platform) => {
   });
 });
 
+describe.each(platforms)('keychain availability is a probe, not a start: %s (Q-8)', (platform) => {
+  it('is false when the tool starts but exits with an error, true when it answers', () => {
+    const broken = scripted({ status: 2, stderr: 'Cannot autolaunch D-Bus without X11 $DISPLAY' });
+    expect(keychainFor(platform, broken.run).available()).toBe(false);
+    const missing = scripted({ failure: 'ENOENT', status: null });
+    expect(keychainFor(platform, missing.run).available()).toBe(false);
+    const working = platform === 'linux' ? scripted({ status: 1, stderr: '' }) : scripted({ status: 0 });
+    expect(keychainFor(platform, working.run).available()).toBe(true);
+  });
+});
+
 describe('keychain: platform specifics', () => {
   it('macOS adds through `security -i` with the secret as hex on standard input', () => {
     const { run, calls } = store('darwin');
@@ -215,6 +226,18 @@ describe('keychain: platform specifics', () => {
     const script = Buffer.from(set?.args.at(-1) ?? '', 'base64').toString('utf16le');
     expect(script).toContain('CredWrite');
     expect(script).toContain('[Console]::In.ReadToEnd()');
+  });
+
+  it('Windows sets UTF-8 on both pipes and refuses a non-ASCII secret it cannot prove it stores (Q-9)', () => {
+    const { run, calls } = store('win32');
+    const kc = keychainFor('win32', run);
+    expect(() => kc.set('agility-bridge', 'token', 'pässword-with-umlaut')).toThrow(/only ASCII/);
+    expect(calls).toHaveLength(0);
+    kc.set('agility-bridge', 'token', SECRET);
+    const script = Buffer.from(calls[0]?.args.at(-1) ?? '', 'base64').toString('utf16le');
+    expect(script).toContain('[Console]::InputEncoding');
+    expect(script).toContain('[Console]::OutputEncoding');
+    expect(script.indexOf('InputEncoding')).toBeLessThan(script.indexOf('ReadToEnd'));
   });
 
   it('an unsupported platform is an error with an alternative, not a silent skip', () => {

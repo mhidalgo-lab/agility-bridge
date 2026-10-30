@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // `agility-bridge doctor` (P8-04, THREAT_MODEL T28, L-077): read-only, scrubbed, consent for the token check.
+import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
   lstatSync,
@@ -409,6 +410,72 @@ describe.skipIf(!posix)('doctor --fix', () => {
     expect(lstatSync(clientFile).mode & 0o777).toBe(0o600);
     // A second run has nothing left to repair.
     expect((await run(OPTS, env)).findings.some((f) => f.fix !== undefined)).toBe(false);
+  });
+});
+
+describe('doctor: hostile files and the keychain (Phase 8 review S-6, Q-8)', () => {
+  it('strips terminal control characters from a server name taken from a foreign file', async () => {
+    writeFileSync(
+      join(cwd, '.mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          'agility\u001b[2K\u001b[1A\rPASS': {
+            command: 'npx',
+            args: ['-y', 'agility-bridge', '--token', TOKEN],
+          },
+        },
+      }),
+    );
+    const report = await run(OPTS, {});
+    const shown = `${renderReport(report, OPTS)}\n${JSON.stringify(report)}`;
+    expect(shown).not.toContain('\u001b');
+    expect(shown).not.toContain('\r');
+    expect(byId(report, 'client.').some((f) => f.status === 'fail')).toBe(true);
+  });
+
+  it.skipIf(!posix)(
+    'does not hang on a FIFO named like a client file',
+    async () => {
+      execFileSync('mkfifo', [join(cwd, '.mcp.json')]);
+      const report = await run(OPTS, {});
+      expect(byId(report, 'client.')).toEqual([]);
+    },
+    5_000,
+  );
+
+  it.skipIf(!posix)(
+    '--fix does not chmod the directory of an explicit AB_DB_PATH, it only reports it',
+    async () => {
+      const { dataDir } = await makeServerData(generateMasterKey(1));
+      chmodSync(dataDir, 0o775);
+      const env = { AB_DB_PATH: join(dataDir, 'agility-bridge.db'), AB_MASTER_KEY: generateMasterKey(1) };
+      const report = await run({ ...OPTS, fix: true }, env);
+      const dirFinding = byId(report, 'server.data-dir-mode')[0];
+      expect(dirFinding?.status).toBe('warn');
+      expect(dirFinding?.fix).toBeUndefined();
+      expect(report.fixed).toEqual([]);
+      expect(lstatSync(dataDir).mode & 0o777).toBe(0o775);
+    },
+  );
+
+  it('--offline reads nothing from the keychain and reports the checks as skipped', async () => {
+    let reads = 0;
+    const keychain = () => {
+      reads++;
+      return 'FAKE';
+    };
+    const report = await run(
+      { ...OPTS, offline: true },
+      {
+        AB_AGILITY_URL: INSTANCE,
+        AB_AGILITY_TOKEN: 'keychain:agility-token',
+        AB_MASTER_KEY: 'keychain:master',
+      },
+      { keychain },
+    );
+    expect(reads).toBe(0);
+    expect(byId(report, 'config.stdio')[0]?.status).toBe('skip');
+    expect(report.findings.some((f) => f.status === 'fail')).toBe(false);
   });
 });
 

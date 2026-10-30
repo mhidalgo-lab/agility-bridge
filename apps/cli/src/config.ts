@@ -15,7 +15,13 @@ import {
 } from '@agility-bridge/core';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
-import { KeychainError, keychainFor, parseKeychainRef, readKeychainRef } from './keychain.ts';
+import {
+  DEFAULT_SERVICE,
+  KeychainError,
+  keychainFor,
+  parseKeychainRef,
+  readKeychainRef,
+} from './keychain.ts';
 
 export class ConfigError extends Error {
   override name = 'ConfigError';
@@ -291,6 +297,29 @@ function instanceUrl(value: string, where: string): string {
   }
 }
 
+/** Names that only a remote host (`serve`, the Worker) reads: stdio accepts them as valid but does nothing with them. */
+const SERVE_ONLY = [
+  'AB_QUOTA_DAILY',
+  'AB_QUOTA_MONTHLY',
+  'AB_OTEL_ENDPOINT',
+  'AB_OTEL_HEADERS',
+  'AB_TASKS',
+  'AB_QUERY_CACHE_EDGE',
+  'AB_PUBLIC_TOOL_CATALOG',
+] as const;
+
+/** A cost control or a trace export that silently does nothing is the worst kind (Q-7): say so on stderr. */
+function warnServeOnly(
+  env: Readonly<Record<string, string | undefined>>,
+  warn: ((message: string) => void) | undefined,
+): void {
+  const set = SERVE_ONLY.filter((k) => env[k] !== undefined && env[k] !== '');
+  if (set.length > 0 && warn !== undefined)
+    warn(
+      `${set.join(', ')} ${set.length === 1 ? 'is' : 'are'} read by a remote host only; the stdio server ignores ${set.length === 1 ? 'it' : 'them'} (no quota, trace export or task support is applied here).`,
+    );
+}
+
 /** Refuses `AB_` names that are not ours (usually a typo), listing the closest one. */
 export function checkEnvNames(env: Readonly<Record<string, string | undefined>>): void {
   const unknown = Object.keys(env).filter(
@@ -323,6 +352,7 @@ export function resolveSecretValue(
   value: string,
   what: string,
   keychain: KeychainReader = osKeychain,
+  anyService = false,
 ): string {
   let ref: ReturnType<typeof parseKeychainRef>;
   try {
@@ -331,6 +361,13 @@ export function resolveSecretValue(
     throw new ConfigError(`${what}: ${(error as Error).message}`);
   }
   if (ref === undefined) return value;
+  // A value from a client's env block can come from a project file the user did not write: it reads this tool's own
+  // namespace only, never another application's entries (S-2, D-290). The user's own YAML file may name any service.
+  if (!anyService && ref.service !== DEFAULT_SERVICE) {
+    throw new ConfigError(
+      `${what}: an environment value may refer only to entries of the "${DEFAULT_SERVICE}" service (keychain:<name>); a keychain:<service>/<account> reference of another service is allowed in the YAML configuration file only.`,
+    );
+  }
   const secret = keychain(ref.service, ref.account);
   if (secret === '') throw new ConfigError(`${what}: the keychain entry is empty.`);
   return secret;
@@ -349,7 +386,7 @@ function substitute(
   return parts
     .map((part) =>
       part.replace(REF, (_m, ref: string) => {
-        if (ref.startsWith('keychain:')) return resolveSecretValue(ref, path, keychain);
+        if (ref.startsWith('keychain:')) return resolveSecretValue(ref, path, keychain, true);
         if (!/^[A-Z_][A-Z0-9_]{0,99}$/.test(ref))
           throw new ConfigError(
             `${path}: "\${${ref}}" is not an environment variable or keychain reference.`,
@@ -568,7 +605,10 @@ export function loadConfig(
 ): LoadedConfig {
   checkEnvNames(env);
   const logLevel = level(env['AB_LOG_LEVEL']);
-  if (env['AB_CONFIG'] !== undefined && env['AB_CONFIG'] !== '') return fromYaml(env, options);
+  if (env['AB_CONFIG'] !== undefined && env['AB_CONFIG'] !== '') {
+    warnServeOnly(env, options.warn);
+    return fromYaml(env, options);
+  }
   const url = env['AB_AGILITY_URL'];
   const rawToken = env['AB_AGILITY_TOKEN'];
   if ((url === undefined || url === '') && (rawToken === undefined || rawToken === '')) {
@@ -586,6 +626,7 @@ export function loadConfig(
       'AB_AGILITY_URL is set but AB_AGILITY_TOKEN is missing: create an access token on the Agility Applications page.',
     );
   }
+  warnServeOnly(env, options.warn);
   // `keychain:<name>` keeps the token out of the client's configuration file (P8-08).
   const token = resolveSecretValue(rawToken, 'AB_AGILITY_TOKEN', options.keychain);
   return {
