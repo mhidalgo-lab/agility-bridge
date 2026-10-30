@@ -54,6 +54,22 @@ describe('workersPlan', () => {
     });
   });
 
+  it('per-grant quotas are off by default and take whole numbers from 1 (P8-09)', () => {
+    expect(parseServerSettings({}, PLAN_PRESETS.free).quota).toEqual({ daily: null, monthly: null });
+    expect(
+      parseServerSettings({ AB_QUOTA_DAILY: '2000', AB_QUOTA_MONTHLY: '40000' }, PLAN_PRESETS.free).quota,
+    ).toEqual({ daily: 2000, monthly: 40000 });
+    expect(parseServerSettings({ AB_QUOTA_DAILY: '5' }, PLAN_PRESETS.free).quota).toEqual({
+      daily: 5,
+      monthly: null,
+    });
+    for (const bad of ['0', '-1', 'x', '1.5'])
+      expect(() => parseServerSettings({ AB_QUOTA_MONTHLY: bad }, PLAN_PRESETS.free)).toThrow(
+        /AB_QUOTA_MONTHLY/,
+      );
+    expect(workerSettings({ AB_QUOTA_DAILY: '10' })).toEqual({ AB_QUOTA_DAILY: '10' });
+  });
+
   it('AB_PLAN is a Worker setting; Node-only settings are refused', () => {
     expect(workerSettings({ AB_PLAN: 'paid', DB: {} as never })).toEqual({ AB_PLAN: 'paid' });
     expect(() => workerSettings({ AB_DATA_DIR: '/data' })).toThrow(/AB_DATA_DIR/);

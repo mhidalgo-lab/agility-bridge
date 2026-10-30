@@ -38,7 +38,7 @@ How to use it:
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412 |
-| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414 |
+| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
@@ -1776,6 +1776,10 @@ Every caller of a pass-through workspace has the same credential id and acts wit
 **L-414 — A cache hit saves requests and latency, not Worker CPU: bench it before promising more.**
 On the bench a memory hit, a sealed shared-tier hit (decrypt and parse) and an uncached call against an instant fake cost about the same CPU, because a hit still parses the stored answer. What a hit removes is the Agility request (a subrequest on the Free plan) and its network time, so the guide claims exactly that and the bench records requests per call beside the CPU.
 *Applied in:* P8-01, `scripts/worker-bench.ts` (`cachePaths`), `docs/guide/query-cache.md`.
+
+**L-415 — Count a quota in memory per request and write it once: the storage budget, not the arithmetic, is the constraint.**
+One increment per upstream call would be up to 45 statements and 90 rows for one tool call, against a Free plan of 100,000 rows a day. The meter lives for one request (never module state), reads the counters once when the first upstream call is about to happen, decides locally, and adds its total to each period at the end, so a request costs one read and two increments and a request of cache hits costs none. The price, a small overshoot between concurrent requests of one grant, is written down next to the fail-open decision. A cold isolate's metadata requests count too: tests that use a tiny quota are refused halfway through the first call, which is the behaviour, not a bug.
+*Applied in:* P8-09, `agility/quota.ts`, `test/quota.test.ts`.
 
 ## P. Observability and logging
 

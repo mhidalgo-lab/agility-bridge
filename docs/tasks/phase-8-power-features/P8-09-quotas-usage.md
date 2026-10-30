@@ -2,7 +2,7 @@
 id: P8-09
 title: Per-grant quotas and usage
 phase: 8
-status: in-progress
+status: review
 priority: low
 depends_on: [P6-13]
 adr: ["0010"]

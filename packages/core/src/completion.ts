@@ -128,6 +128,8 @@ async function candidates(
       requestsUsed: ctx.budget.used,
     });
     return words.filter(accepts);
+  } finally {
+    await ctx.quota?.flush();
   }
   // The sprint list has no text filter: match here.
   const matching = names.filter((n) => needle === '' || n.toLowerCase().includes(needle));

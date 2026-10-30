@@ -438,42 +438,47 @@ export function buildMcpServer({
             // An observer never changes a tool result.
           }
         };
+        // The grant's quota counters are written once, when the call is over, whatever its outcome (P8-09).
         try {
-          const aliases: string[] = [];
-          const out = withDeepLinks(
-            ctx,
-            withDeprecationNotes(
-              def,
-              aliases,
-              await def.handler(parseInput(def, input, aliases), ctx),
-              (name) => warnOnce(logger, def.name, name),
-            ),
-          );
-          logger.debug('tool ok', { ms: ctx.clock.now() - started, requests: ctx.budget.used });
-          observe('ok', null, out);
-          return toCallToolResult(out);
-        } catch (error) {
-          if (error instanceof InputRequiredSignal) {
-            // 2026-07-28 approval: ask the person through the client and have it repeat the call (P7-01).
-            return inputRequired({
-              inputRequests: {
-                [APPROVAL_INPUT_KEY]: inputRequired.elicit({
-                  message: error.text,
-                  requestedSchema: error.requestedSchema as never,
-                }),
-              },
-              requestState: error.state,
-            }) as never;
+          try {
+            const aliases: string[] = [];
+            const out = withDeepLinks(
+              ctx,
+              withDeprecationNotes(
+                def,
+                aliases,
+                await def.handler(parseInput(def, input, aliases), ctx),
+                (name) => warnOnce(logger, def.name, name),
+              ),
+            );
+            logger.debug('tool ok', { ms: ctx.clock.now() - started, requests: ctx.budget.used });
+            observe('ok', null, out);
+            return toCallToolResult(out);
+          } catch (error) {
+            if (error instanceof InputRequiredSignal) {
+              // 2026-07-28 approval: ask the person through the client and have it repeat the call (P7-01).
+              return inputRequired({
+                inputRequests: {
+                  [APPROVAL_INPUT_KEY]: inputRequired.elicit({
+                    message: error.text,
+                    requestedSchema: error.requestedSchema as never,
+                  }),
+                },
+                requestState: error.state,
+              }) as never;
+            }
+            const result = toToolErrorResult(
+              error,
+              ctx.requestId,
+              errors ?? { renderUntrusted: envelopeRenderer(newEnvelopeId(ctx.random)) },
+            );
+            const code = (result._meta?.[ERROR_META_KEY] as { code?: string } | undefined)?.code ?? null;
+            logger.warn('tool error', { ms: ctx.clock.now() - started, code, error });
+            observe('error', code, undefined, isAbError(error) ? downloadFacts(error.audit) : undefined);
+            return result;
           }
-          const result = toToolErrorResult(
-            error,
-            ctx.requestId,
-            errors ?? { renderUntrusted: envelopeRenderer(newEnvelopeId(ctx.random)) },
-          );
-          const code = (result._meta?.[ERROR_META_KEY] as { code?: string } | undefined)?.code ?? null;
-          logger.warn('tool error', { ms: ctx.clock.now() - started, code, error });
-          observe('error', code, undefined, isAbError(error) ? downloadFacts(error.audit) : undefined);
-          return result;
+        } finally {
+          await ctx.quota?.flush();
         }
       },
     );
@@ -701,6 +706,8 @@ function registerResources(server: McpServer, reg: ResourceRegistration): void {
       observe(def, reader, started, { error });
       logger.warn('resource error', { ms: reader.ctx.clock.now() - started, error });
       throw toProtocolError(error);
+    } finally {
+      await reader.ctx.quota?.flush();
     }
   };
   for (const def of reg.resources) {

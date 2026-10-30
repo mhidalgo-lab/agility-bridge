@@ -47,6 +47,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | `PATCH` | `/grants/{id}` | Change a grant (owners and admins; write tools, widening the projects, asset types or end date of a grant that has them, the grant's own hourly write limit `rateLimit.writesPerHour`, which can only lower the server's, and `rateLimit.writeApproval` (`page_only`), which makes the grant's writes need the approval page: an owner with a recent sign-in) | `label`?: string \| null<br>`credentialId`?: string \| null<br>`tools`?: array \| null<br>`scopeIds`?: array \| null<br>`assetTypes`?: object \| null<br>`limits`?: object<br>`rateLimit`?: object \| null<br>`expiresAt`?: integer \| null | 200 object |
 | `DELETE` | `/grants/{id}` | Delete a grant and its tokens | — | 200 object |
 | `GET` | `/grants/{id}/write-budget` | One grant's writes used this hour and its limit (the lower of the server's and the grant's own cap), read without taking a unit. Owners and admins any grant, a member only their own (another is a 404). `{ enabled: false }` when write tools are off. | — | 200 WriteBudget |
+| `GET` | `/grants/{id}/usage` | One grant's Agility requests used today and this month (UTC) against the server's quotas (AB_QUOTA_DAILY, AB_QUOTA_MONTHLY), read without taking anything. Owners and admins any grant, a member only their own (another is a 404). `{ enabled: false }` when no quota is configured; `unknown` when the counters cannot be read, never "unlimited". | — | 200 GrantUsage |
 | `POST` | `/grants/{id}/revoke` | Revoke a grant | — | 200 Grant |
 
 ## instances
@@ -142,6 +143,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 - **DeviceToken**: `id`: string, `grantId`: string, `prefix`: string, `label`: string, `createdAt`: number, `expiresAt`: number \| null, `lastUsedAt`: number \| null, `revokedAt`: number \| null
 - **DeviceTokenListItem**: —
 - **Grant**: `id`: string, `workspaceId`: string, `userId`: string \| null, `label`: string \| null, `credentialId`: string \| null, `tools`: array \| null, `scopeIds`: array \| null, `assetTypes`: object \| null, `limits`: object, `rateLimit`: object \| null, `createdAt`: number, `updatedAt`: number, `expiresAt`: number \| null, `revokedAt`: number \| null
+- **GrantUsage**: `enabled`: boolean, `status`?: "ok" \| "unknown", `daily`?: object, `monthly`?: object
 - **Instance**: `id`: string, `label`: string, `baseUrl`: string, `tls`: object \| null, `numberPrefixes`: object \| null, `metaFingerprint`: string \| null, `createdAt`: number, `updatedAt`: number, `disabledAt`: number \| null
 - **KeyVersion**: `version`: number, `credentials`: number, `loaded`: boolean, `current`: boolean, `retired`: boolean
 - **MyGrant**: `grant`: Grant, `workspace`: object \| null

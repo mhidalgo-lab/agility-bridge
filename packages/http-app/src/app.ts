@@ -31,6 +31,8 @@ import {
   publicCatalogContext,
   publicCatalogTools,
   type QueryCache,
+  type QuotaGate,
+  type QuotaMeter,
   type Random,
   requestDeclaresApps,
   Secret,
@@ -147,6 +149,8 @@ export interface HostServices {
   readonly random: Random;
   /** The query cache (P8-01); absent = off. */
   readonly queryCache?: QueryCache;
+  /** The per-grant request quotas (P8-09); absent = none. */
+  readonly quota?: QuotaGate;
 }
 
 export interface HttpAppOptions extends EdgeOptions {
@@ -530,6 +534,9 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         }),
         ...(sessions === undefined ? {} : { revokeUserSessions: (id: string) => sessions.revokeUser(id) }),
         ...(options.writes?.budget === undefined ? {} : { writeBudget: options.writes.budget }),
+        ...(services.quota === undefined
+          ? {}
+          : { grantUsage: (grantId: string) => (services.quota as QuotaGate).usageOf(grantId) }),
         storage: options.storage,
         tools: options.access.tools,
         onChange: () => cache.clear(),
@@ -1051,6 +1058,8 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
                   : `pt:${passthroughFingerprint}`,
             },
           }),
+      // This request's meter of the grant's quota: written once when each call ends (P8-09, T5).
+      ...(services.quota === undefined ? {} : { quota: services.quota.meterFor(resolved.grant.id) }),
       logger: services.logger,
       clock: services.clock,
       random: services.random,

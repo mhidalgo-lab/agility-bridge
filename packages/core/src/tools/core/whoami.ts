@@ -1,12 +1,53 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from 'zod';
 import type { QueryCacheInfo } from '../../agility/query-cache.ts';
+import type { QuotaPeriodUsage, QuotaUsage } from '../../agility/quota.ts';
 import { resolveMember } from '../../identity/resolve.ts';
 import { metadataFor } from '../../metadata/service.ts';
 import { shapeOutput, untrusted } from '../../output/result.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import { callerWriteBudget } from '../../writes/budget.ts';
 import { compositeWarnings } from '../reports/siblings.ts';
+
+const iso = (ms: number): string => new Date(ms).toISOString();
+
+/** The quota as `whoami` shows it: numbers and reset instants of this grant only. */
+function quotaView(usage: QuotaUsage) {
+  if (usage.status !== 'ok') return { status: 'unknown' as const };
+  const part = (p: QuotaPeriodUsage | undefined) =>
+    p === undefined
+      ? {}
+      : { used: p.used, limit: p.limit, remaining: p.remaining, resetsAt: iso(p.resetsAt), warning: p.warn };
+  return {
+    status: 'ok' as const,
+    ...(usage.daily === undefined ? {} : { daily: part(usage.daily) }),
+    ...(usage.monthly === undefined ? {} : { monthly: part(usage.monthly) }),
+  };
+}
+
+/** A note when a quota is nearly or fully used (80%, L-116), or cannot be read. */
+function quotaNotes(usage: QuotaUsage | undefined): string[] {
+  if (usage === undefined) return [];
+  if (usage.status !== 'ok')
+    return ['The Agility request quota of this connection cannot be read right now.'];
+  const out: string[] = [];
+  for (const [name, p] of [
+    ['today', usage.daily],
+    ['this month', usage.monthly],
+  ] as const) {
+    if (p === undefined) continue;
+    if (p.remaining === 0) {
+      out.push(
+        `This connection has used its Agility request quota for ${name}; reads are refused until ${iso(p.resetsAt)} (UTC).`,
+      );
+    } else if (p.warn) {
+      out.push(
+        `${p.used} of ${p.limit} Agility requests used ${name} (${p.remaining} left, resets ${iso(p.resetsAt)} UTC): use them sparingly.`,
+      );
+    }
+  }
+  return out;
+}
 
 /** Settings and the shared tier's proof only: hit counters are per process and would show other callers' activity (T16). */
 const cacheStatus = ({ mode, ttlSeconds, shared }: QueryCacheInfo) => ({ mode, ttlSeconds, shared });
@@ -45,6 +86,9 @@ export const whoami: ToolDefinition = defineTool({
     const hidden = ctx.hiddenByBudget ?? [];
     // The grant's own write budget for this hour, read without taking a unit (P7-16).
     const writeBudget = workspace.writes.enabled ? await callerWriteBudget(ctx) : undefined;
+    // The grant's Agility request quota (P8-09): used, left and when it restarts, read with one statement; unknown when the
+    // counters cannot be read, never "unlimited".
+    const quota = ctx.quota === undefined ? undefined : await ctx.quota.usage();
     const structured = {
       member: { oid: member.oid, name: member.name, ...(username === undefined ? {} : { username }) },
       instance: {
@@ -76,10 +120,15 @@ export const whoami: ToolDefinition = defineTool({
       ...(ctx.queryCache === undefined || ctx.workspace.writes.enabled
         ? {}
         : { queryCache: cacheStatus(ctx.queryCache.cache.info()) }),
+      ...(quota === undefined ||
+      (quota.status === 'ok' && quota.daily === undefined && quota.monthly === undefined)
+        ? {}
+        : { quota: quotaView(quota) }),
       ...(warnings.length === 0 ? {} : { warnings }),
       ...(hidden.length === 0 ? {} : { hiddenByBudget: hidden.map((t) => t.name) }),
     };
     const notes = [
+      ...quotaNotes(quota),
       ...warnings.map((w) => w.message),
       ...(hidden.length === 0
         ? []

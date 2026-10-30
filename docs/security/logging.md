@@ -50,6 +50,8 @@ carry `requestId`.
 | warn | `query cache lookup failed`, `query cache store failed` | `error` (class) | [client.ts](../../packages/core/src/agility/client.ts) |
 | warn | `query cache shared tier read failed`, `query cache shared tier write failed` | `error` (class) | [query-cache.ts](../../packages/core/src/agility/query-cache.ts) |
 | warn | `AB_QUERY_CACHE_EDGE is on but this host has no shared tier: the query cache is in memory only.` | none | [server.ts](../../packages/http-app/src/server.ts) |
+| warn | `quota counters could not be read`, `quota counters could not be updated` | `error` (class) | [quota.ts](../../packages/core/src/agility/quota.ts) |
+| warn | `grant quota reached 80%` | `grant` (id), `period`, `limit` | [quota.ts](../../packages/core/src/agility/quota.ts) |
 | debug | `agility error body` | `status`, the first 500 characters of the error body (redacted by the logger) | [client.ts](../../packages/core/src/agility/client.ts) |
 | warn | `agility refused the request` | `status`, Agility's `error` and up to five exception `messages` (500 characters each, redacted by the logger): the text withheld from the tool result (P6-33, L-333) | [client.ts](../../packages/core/src/agility/client.ts) |
 | error | `access resolution failed` | `requestId`, `error` (class) | [app.ts](../../packages/http-app/src/app.ts) |

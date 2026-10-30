@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { QueryCacheScope } from './agility/query-cache.ts';
+import type { QuotaMeter } from './agility/quota.ts';
 import { AbError, ErrorCode } from './errors.ts';
 import type { Logger } from './logger.ts';
 import type { MetadataService } from './metadata/service.ts';
@@ -276,6 +277,11 @@ export interface ToolContext {
    * shared by the requests of a process or isolate, but every entry id binds this request's whole scope.
    */
   readonly queryCache?: QueryCacheScope;
+  /**
+   * This request's meter of the grant's daily and monthly Agility request quota (P8-09, T5). Created per request by the
+   * host and flushed once when the request ends; absent means no quota. Never module state (T21).
+   */
+  readonly quota?: QuotaMeter;
   readonly logger: Logger;
   readonly clock: Clock;
   readonly random: Random;

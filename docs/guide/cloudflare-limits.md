@@ -85,6 +85,10 @@ unset it is 60, and a larger value stops the Worker at its first request, like t
 (P7-30, D-211). 60 an hour is at most 1,440 writes and about 45,000 rows a day, under half the budget. One grant at its
 default 20 an hour is about 15,000 rows a day. The Paid plan (50 million rows a day included) keeps the default of 200. The `tool_call` audit rows of reads are in the same budget (three rows each).
 
+## Quotas and the D1 row budget
+
+The optional per-grant [quotas](query-limits.md) (`AB_QUOTA_DAILY`, `AB_QUOTA_MONTHLY`) keep their counters in `kv`: one read when a request first reaches Agility and one increment per configured period when it ends, about 2 more rows written per read call that reaches Agility (the row accounting is *unverified*, as above). On Free that is the difference between about 33,000 and 20,000 read calls a day, so they are off unless you set them.
+
 ## Where usage shows
 
 - **Audit log**: every tool call's row holds `agilityRequests`, the requests it used (`GET /api/admin/v1/audit`,

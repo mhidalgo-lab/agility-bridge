@@ -33,6 +33,7 @@ import {
   one,
   parseCredential,
   parseGrant,
+  parseGrantUsage,
   parseToken,
   parseTool,
   parseUser,
@@ -41,6 +42,7 @@ import {
   rows,
   type Tool,
   type User,
+  usageText,
   type Workspace,
 } from './data.ts';
 import {
@@ -644,15 +646,18 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
       const g = await loadGrant(c, principal, id);
       if ('status' in g) return loadFailed(c, g, principal);
       const ws = await loadWorkspace(c, principal, g.workspaceId);
-      const [tokens, users, creds, tools, budget] = await Promise.all([
+      const [tokens, users, creds, tools, budget, usage] = await Promise.all([
         load(kit, c, principal, adminPath`/grants/${id}/tokens`, (b) => rows(b, parseToken)),
         usersOf(c, principal),
         'status' in ws ? Promise.resolve([] as Credential[]) : credentialsOf(c, principal, ws.instanceId),
         catalogue(c, principal),
         // This grant's writes this hour (P7-16); a failed read is shown as unknown.
         kit.callAdmin(c, principal, { method: 'GET', path: adminPath`/grants/${id}/write-budget` }),
+        // This grant's Agility requests today and this month against the server's quotas (P8-09).
+        kit.callAdmin(c, principal, { method: 'GET', path: adminPath`/grants/${id}/usage` }),
       ]);
       const writeBudget = isOk(budget) ? parseWriteBudget(budget.body, 'grant') : null;
+      const grantUsage = isOk(usage) ? parseGrantUsage(usage.body) : null;
       const person = users.find((u) => u.id === g.userId);
       const credential = creds.find((k) => k.id === g.credentialId);
       const t = now();
@@ -714,6 +719,9 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
                 ],
                 ['Limits', limitsSummary(g.limits).join('; ') || 'inherited from the workspace'],
                 ['Rate', g.perMinute === null ? "the server's default" : `${g.perMinute} requests a minute`],
+                ...(grantUsage !== null && grantUsage.state === 'off'
+                  ? []
+                  : ([['Agility requests', usageText(grantUsage)]] as [string, string][])),
                 ...(writeBudget !== null && writeBudget.state === 'off'
                   ? []
                   : ([['Writes this hour', budgetText(writeBudget)]] as [string, string][])),
