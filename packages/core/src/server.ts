@@ -359,6 +359,14 @@ export function toCallToolResult(out: ToolOutput): CallToolResult {
   };
 }
 
+/** Writes the request's quota counters: in the background where the host has one (the counters are approximate by design). */
+async function flushQuota(ctx: ToolContext): Promise<void> {
+  const meter = ctx.quota;
+  if (meter === undefined) return;
+  if (ctx.background === undefined) return meter.flush();
+  ctx.background(meter.flush());
+}
+
 /**
  * The context with this request's approval channel and what it means for `whoami` (P7-01): the channel comes from the
  * capabilities the request declared (elicitation), else the host's out-of-band channel, else none. No write runtime
@@ -489,7 +497,7 @@ export function buildMcpServer({
             return result;
           }
         } finally {
-          await ctx.quota?.flush();
+          await flushQuota(ctx);
         }
       },
     );
@@ -718,7 +726,7 @@ function registerResources(server: McpServer, reg: ResourceRegistration): void {
       logger.warn('resource error', { ms: reader.ctx.clock.now() - started, error });
       throw toProtocolError(error);
     } finally {
-      await reader.ctx.quota?.flush();
+      await flushQuota(reader.ctx);
     }
   };
   for (const def of reg.resources) {

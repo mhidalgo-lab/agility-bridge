@@ -263,6 +263,8 @@ export interface HttpApp {
 interface PreparedRequest {
   /** MCP Apps views are offered to this request (it declared Apps, P8-03); absent: none. */
   readonly apps?: 'on';
+  /** The anonymous public catalogue (P8-11): it advertises no extension (S-10). */
+  readonly anonymous?: true;
   readonly tools: readonly ToolDefinition[];
   readonly ctx: ToolContext;
   readonly onToolCall: (event: ToolCallEvent) => void;
@@ -423,7 +425,9 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         onToolCall: prepared.onToolCall,
         ...(prepared.apps === undefined ? {} : { apps: prepared.apps }),
         // Advertised in `server/discover`; a request still has to declare it to get a task (L-016).
-        ...(services.tasks === undefined ? {} : { extensions: { [TASKS_EXTENSION]: {} } }),
+        ...(services.tasks === undefined || prepared.anonymous === true
+          ? {}
+          : { extensions: { [TASKS_EXTENSION]: {} } }),
       });
     },
     { legacy: 'stateless' },
@@ -432,6 +436,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
   let publicPrepared: PreparedRequest | undefined;
   const publicCatalog = (): PreparedRequest =>
     (publicPrepared ??= {
+      anonymous: true,
       tools: publicCatalogTools(registry.select({ groups: PUBLIC_CATALOG_GROUPS })),
       ctx: publicCatalogContext(),
       onToolCall: () => {},
@@ -818,6 +823,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         endMs: services.clock.now(),
         // A trace is joined only for an authenticated caller; the header is parsed strictly and never forwarded or returned.
         traceparent: access === null ? null : (c.req.header('traceparent') ?? null),
+        unauthenticated: access === null,
       });
       if (work !== undefined) keepAlive(c, work);
     };
@@ -1111,6 +1117,10 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
           }),
       // This request's meter of the grant's quota: written once when each call ends (P8-09, T5).
       ...(services.quota === undefined ? {} : { quota: services.quota.meterFor(resolved.grant.id) }),
+      // Workers: accounting work (quota counters, the cache's shared tier) finishes after the response (P-2).
+      ...(options.background === undefined
+        ? {}
+        : { background: (work: Promise<unknown>) => keepAlive(c, work) }),
       logger: services.logger,
       clock: services.clock,
       random: services.random,
@@ -1158,14 +1168,28 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
               params: { name: call.name, arguments: call.arguments, _meta: message.params?.['_meta'] },
             }),
           });
-          const res = await handler.fetch(inner, {
-            authInfo: {
-              token: 'device',
-              clientId: resolved.tokenId ?? 'device',
-              scopes: [],
-              extra: { prepared },
-            },
+          // The poll that runs the report has the same deadline as any request: a report that does not fit fails the task
+          // (a stored failure, not a lease that outlives the client, Q-2).
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          const late = new Promise<'late'>((resolve) => {
+            timer = setTimeout(
+              () => resolve('late'),
+              Math.max(1, deadlineMs - (services.clock.now() - started)),
+            );
           });
+          const res = await Promise.race([
+            handler.fetch(inner, {
+              authInfo: {
+                token: 'device',
+                clientId: resolved.tokenId ?? 'device',
+                scopes: [],
+                extra: { prepared },
+              },
+            }),
+            late,
+          ]).finally(() => clearTimeout(timer));
+          if (res === 'late')
+            return { error: { code: -32603, message: 'The report took too long for one request.' } };
           const text = await res.text();
           const data = text.startsWith('event:')
             ? (text.split('\n').find((l) => l.startsWith('data:')) ?? '').slice(5)

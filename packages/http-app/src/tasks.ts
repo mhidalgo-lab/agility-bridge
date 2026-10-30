@@ -9,7 +9,7 @@
 // device, grant or workspace asks about does not exist. Web-standard only; no module state (T21).
 import type { EffectiveAccess } from '@agility-bridge/auth';
 import { KeyPurpose, type Keyring } from '@agility-bridge/auth';
-import type { Clock, Random, ToolDefinition } from '@agility-bridge/core';
+import { type Clock, canonicalJson, type Random, type ToolDefinition } from '@agility-bridge/core';
 import type { KvStore } from '@agility-bridge/storage';
 
 export const TASKS_EXTENSION = 'io.modelcontextprotocol/tasks';
@@ -17,6 +17,12 @@ export const TASKS_EXTENSION = 'io.modelcontextprotocol/tasks';
 export const TASK_TTL_MS = 15 * 60_000;
 /** How long one poll may own the running of a task before another may try again (the request deadline is 180 s). */
 const RUN_LEASE_MS = 200_000;
+/** The most serialised argument bytes a task may carry (S-3). */
+const MAX_ARGUMENT_BYTES = 8 * 1024;
+/** Tasks one grant may start per 15-minute window (S-3): storage and write amplification, not a quota of reports. */
+const MAX_TASKS_PER_WINDOW = 30;
+/** Characters of result a record may hold: sealed and base64-encoded it must fit one `kv` value (262,144 characters, P-5). */
+const MAX_RESULT_CHARS = 150_000;
 const POLL_INTERVAL_MS = 2_000;
 const PROTOCOL_VERSION_KEY = 'io.modelcontextprotocol/protocolVersion';
 const CAPABILITIES_KEY = 'io.modelcontextprotocol/clientCapabilities';
@@ -55,6 +61,8 @@ interface TaskRecord {
   readonly createdAt: number;
   readonly expiresAt: number;
   status: Status;
+  /** A digest of the scope the result was computed under; a finished result is returned only while it still holds (S-4). */
+  scope?: string;
   /** The stored `tools/call` (name and arguments). */
   readonly request: { readonly name: string; readonly arguments: unknown };
   result?: unknown;
@@ -67,6 +75,8 @@ export interface TaskServiceOptions {
   readonly keyring: Keyring;
   readonly clock: Clock;
   readonly random: Random;
+  /** Override of the run lease (tests); the route sets nothing. */
+  readonly leaseMs?: number;
 }
 
 /** What the route hands the service for one request. */
@@ -113,8 +123,14 @@ const iso = (ms: number): string => new Date(ms).toISOString();
 
 export function createTaskService(options: TaskServiceOptions): TaskService {
   const { kv, keyring, clock, random } = options;
+  const leaseMs = options.leaseMs ?? RUN_LEASE_MS;
   const recordKey = (hash: string) => `task:${hash}`;
   const leaseKey = (hash: string) => `taskrun:${hash}`;
+  const cancelKey = (hash: string) => `taskcancel:${hash}`;
+  const scopeOf = (access: EffectiveAccess): Promise<string> =>
+    sha256Hex(
+      canonicalJson({ projects: access.projects, assetTypes: access.assetTypes, limits: access.limits }),
+    );
 
   async function load(hash: string): Promise<TaskRecord | null> {
     const text = await kv.get(recordKey(hash));
@@ -146,7 +162,7 @@ export function createTaskService(options: TaskServiceOptions): TaskService {
       status: r.status,
       createdAt: iso(r.createdAt),
       lastUpdatedAt: iso(r.updatedAt),
-      ttlMs: TASK_TTL_MS,
+      ttlMs: Math.max(0, r.expiresAt - clock.now()),
       ...(r.status === 'working' ? { pollIntervalMs: POLL_INTERVAL_MS } : {}),
     };
     if (r.status === 'completed') return { ...base, result: r.result };
@@ -179,8 +195,33 @@ export function createTaskService(options: TaskServiceOptions): TaskService {
           if (!tools.some((t) => t.name === name && t.group === 'reports')) {
             return rpcError(id, -32602, 'This tool cannot run as a task.');
           }
-          const taskId = toBase64Url(random.bytes(32));
+          const args = params['arguments'] ?? {};
+          const tool = tools.find((t) => t.name === name);
+          if (args === null || typeof args !== 'object' || Array.isArray(args)) {
+            return rpcError(id, -32602, 'The arguments must be an object.');
+          }
+          if (JSON.stringify(args).length > MAX_ARGUMENT_BYTES) {
+            return rpcError(id, -32602, 'The arguments are too large for a task.');
+          }
+          // The call is checked now, so a bad one never becomes a stored task that fails later (S-3).
+          if (tool?.deprecatedArguments === undefined && !tool?.inputSchema.safeParse(args).success) {
+            return rpcError(id, -32602, `The arguments do not match the input schema of ${name}.`);
+          }
           const now = clock.now();
+          const window = Math.floor(now / TASK_TTL_MS);
+          const allowed = await kv.increment(`taskn:${encodeURIComponent(access.grant.id)}:${window}`, {
+            by: 1,
+            max: MAX_TASKS_PER_WINDOW,
+            expiresAt: (window + 1) * TASK_TTL_MS,
+          });
+          if (allowed === null) {
+            return rpcError(
+              id,
+              -32000,
+              'Too many tasks were started recently for this connection. Wait a few minutes.',
+            );
+          }
+          const taskId = toBase64Url(random.bytes(32));
           const record: TaskRecord = {
             v: 1,
             grantId: access.grant.id,
@@ -190,7 +231,7 @@ export function createTaskService(options: TaskServiceOptions): TaskService {
             updatedAt: now,
             expiresAt: now + TASK_TTL_MS,
             status: 'working',
-            request: { name, arguments: params['arguments'] ?? {} },
+            request: { name, arguments: args },
           };
           await save(await sha256Hex(taskId), record);
           const { resultType: _omit, ...task } = view(taskId, record) as Json;
@@ -215,37 +256,81 @@ export function createTaskService(options: TaskServiceOptions): TaskService {
 
         if (m.method === 'tasks/cancel') {
           if (record.status === 'working') {
-            record.status = 'cancelled';
-            record.updatedAt = clock.now();
-            await save(hash, record);
+            // The marker first: a poll that finishes the report at this moment checks it after saving (Q-5).
+            await kv.set(cancelKey(hash), '1', { expiresAt: record.expiresAt });
+            const latest = await load(hash);
+            if (latest?.status === 'working') {
+              latest.status = 'cancelled';
+              latest.updatedAt = clock.now();
+              await save(hash, latest);
+            }
           }
           return ok({ resultType: 'complete' });
         }
 
         if (m.method !== 'tasks/get') return rpcError(id, -32601, 'Method not found.');
+        if (record.status === 'completed') {
+          // The result was computed under the scope of that poll; it is returned only while the caller still has the tool
+          // and the same scope (S-4).
+          const stillAllowed =
+            tools.some((t) => t.name === record.request.name && t.group === 'reports') &&
+            record.scope === (await scopeOf(access));
+          return stillAllowed ? ok(view(taskId, record)) : notFound;
+        }
         if (record.status !== 'working') return ok(view(taskId, record));
 
         // The first poll to take the lease runs the call; any other poll sees it working. A lease that outlives the
         // request deadline lets a later poll try again (reports only read, so a repeat is safe).
-        const claimed = await kv.setIfAbsent(leaseKey(hash), '1', { expiresAt: clock.now() + RUN_LEASE_MS });
+        const claimed = await kv.setIfAbsent(leaseKey(hash), '1', { expiresAt: clock.now() + leaseMs });
         if (!claimed) return ok(view(taskId, record));
-        const outcome = await run(record.request);
-        // A cancel that arrived while the report ran wins: the result is dropped.
-        const current = await load(hash);
-        if (current === null) return notFound;
-        if (current.status === 'working') {
-          current.updatedAt = clock.now();
-          if ('result' in outcome) {
-            current.status = 'completed';
-            current.result = outcome.result;
-          } else {
-            current.status = 'failed';
-            current.error = outcome.error;
+        try {
+          let outcome: Awaited<ReturnType<TaskRequest['run']>>;
+          try {
+            outcome = await run(record.request);
+          } catch {
+            // A runner that threw is a failed task, not a lease nobody releases (Q-2).
+            outcome = { error: { code: -32603, message: 'The report could not be produced.' } };
           }
-          await save(hash, current);
+          // A cancel that arrived while the report ran wins: the result is dropped.
+          const current = await load(hash);
+          if (current === null) return notFound;
+          if (current.status === 'working') {
+            current.updatedAt = clock.now();
+            if ('result' in outcome) {
+              current.status = 'completed';
+              current.result = outcome.result;
+              current.scope = await scopeOf(access);
+            } else {
+              current.status = 'failed';
+              current.error = outcome.error;
+            }
+            const tooLarge =
+              current.status === 'completed' && JSON.stringify(current.result).length > MAX_RESULT_CHARS;
+            try {
+              if (tooLarge) throw new Error('too large');
+              await save(hash, current);
+            } catch {
+              // The report ran and cannot be kept: say so once, never run it again for it (P-5).
+              current.status = 'failed';
+              delete current.result;
+              delete current.scope;
+              current.error = { code: -32603, message: 'The result is too large to keep as a task.' };
+              await save(hash, current);
+            }
+            // A cancel that landed between the read and the save still wins (Q-5).
+            if ((await kv.get(cancelKey(hash))) !== null) {
+              current.status = 'cancelled';
+              delete current.result;
+              delete current.error;
+              delete current.scope;
+              current.updatedAt = clock.now();
+              await save(hash, current);
+            }
+          }
+          return ok(view(taskId, current));
+        } finally {
+          await kv.delete(leaseKey(hash)).catch(() => {});
         }
-        await kv.delete(leaseKey(hash));
-        return ok(view(taskId, current));
       } catch {
         return rpcError(id, -32603, 'The task service is not available right now.');
       }

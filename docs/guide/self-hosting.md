@@ -159,6 +159,10 @@ and it is safe by construction:
   bytes, so it cannot be used to find out which workspaces exist.
 - Everything else, `tools/call`, prompts, resources and any request that presents a credential, valid or not, is `401` as before.
   The per-address request limit still applies.
+- It advertises **no extension**: `server/discover` lists the Tasks extension only to callers who signed in, so an anonymous
+  caller cannot learn that deployment flag.
+- Each answer is rebuilt per request (about 38 KB for `tools/list`); the address limiter is the only brake on the egress, and a
+  cached response is [P8-35](../tasks/phase-8-power-features/P8-35-catalogue-cache-single-flight.md).
 - Tool descriptions are public documentation (they are in this repository), so listing them reveals nothing about your Agility
   instance or your people.
 

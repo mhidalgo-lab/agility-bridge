@@ -93,6 +93,43 @@ describe('counting over HTTP', () => {
   });
 });
 
+describe('the counters on Workers (P-2)', () => {
+  it('are written after the response when the host has a background hook, and not lost', async () => {
+    const clock = { t: Date.UTC(2026, 9, 30, 12) };
+    const g = gateFor({ daily: 100, monthly: null }, () => clock.t);
+    const background: Promise<unknown>[] = [];
+    // A counter write that waits for us: the response must not.
+    let release = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const slow: QuotaGate = {
+      ...g.gate,
+      meterFor: (grant) => {
+        const meter = g.gate.meterFor(grant);
+        return {
+          ...meter,
+          flush: async () => {
+            await gate;
+            await meter.flush();
+          },
+        };
+      },
+    };
+    const w = await world(
+      { background: (_c, work) => background.push(work) },
+      { admin: true, services: { quota: slow } },
+    );
+    g.bind(w);
+    const res = await post(w, 'team-a', w.tokens.alice, GET('B-00001'));
+    expect(await res.text()).toContain('In A');
+    expect(await counter(w, `qt:d:${w.ids.aliceGrant}:${DAY(clock.t)}`)).toBeNull();
+    release();
+    await Promise.all(background);
+    expect(await counter(w, `qt:d:${w.ids.aliceGrant}:${DAY(clock.t)}`)).not.toBeNull();
+  });
+});
+
 describe('refusal over HTTP', () => {
   it('refuses a grant over its quota with no Agility call and no data, and leaves other grants alone', async () => {
     const { w, clock } = await rig({ daily: 100, monthly: null });

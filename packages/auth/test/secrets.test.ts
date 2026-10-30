@@ -16,6 +16,7 @@ import {
   tokenHint,
   verifyKeyring,
 } from '../src/index.ts';
+import { fromBase64, toBase64 } from '../src/secrets/keyring.ts';
 
 const TOKEN = '1.TestTokenNotRealAbCdEfGhIjKlMnOpQrStUvWxYz0123456789';
 const K1 = generateMasterKey(1);
@@ -104,6 +105,21 @@ describe('sealing (AES-256-GCM)', () => {
     expect(
       await ring.open(KeyPurpose.Credentials, 'c', await ring.seal(KeyPurpose.Credentials, 'c', unicode)),
     ).toBe(unicode);
+  });
+
+  it('encodes bodies of any size, around the slice boundaries, exactly like btoa (P-1)', async () => {
+    const ring = await Keyring.create(K1);
+    for (const size of [0, 1, 2, 3, 0x1fff, 0x2000, 0x2001, 0x4000, 0x4001, 100_000]) {
+      const bytes = new Uint8Array(size).map((_, i) => (i * 31 + 7) & 0xff);
+      let reference = '';
+      for (const b of bytes) reference += String.fromCharCode(b);
+      expect(toBase64(bytes), String(size)).toBe(btoa(reference));
+      expect(fromBase64(toBase64(bytes))).toEqual(bytes);
+    }
+    const text = 'é'.repeat(70_000);
+    expect(
+      await ring.open(KeyPurpose.Credentials, 'c', await ring.seal(KeyPurpose.Credentials, 'c', text)),
+    ).toBe(text);
   });
 
   it('refuses a wrong key, tampered ciphertext or IV, another record id, another version or another purpose', async () => {

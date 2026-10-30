@@ -29,7 +29,9 @@ about a dozen asset types in a first call (on Workers they are kept in D1 afterw
 `AB_LIMIT_QUOTA`, the period, the limit, what was used and the UTC instant the counter restarts. It is an ordinary tool
 error (the connection keeps working for tools that need no request), not an HTTP `429`. A write's POST is counted but not
 refused by the quota: writes have their own hourly limit and an approval, and a write the person already approved should
-not die on a read quota. A call stops in the middle when it reaches the limit: its earlier requests stay counted.
+not die on a read quota. A call stops in the middle when it reaches the limit: its earlier requests stay counted. A
+refused read costs nothing else either: it spends no unit of the call's request budget and is not reported as a request
+that reached Agility (the quota is asked before the budget is spent, D-299).
 
 **Warning at 80%.** `whoami` shows `quota` (used, limit, remaining, `resetsAt`, `warning`) and a note once a period is at
 or above 80%; the grant page of the admin panel shows "Agility requests"; the server logs `grant quota reached 80%` once
@@ -42,7 +44,11 @@ goes ahead, the outage is logged (`quota counters could not be read`) and `whoam
 the write limiter, which fails closed because a limiter that opens on failure would not limit writes (L-080); a quota is
 a cost control, and blocking every read when D1 hiccups would hurt more than a few uncounted requests. Counters are
 approximate under concurrency: a request is checked against what the others had written when it started, so several
-simultaneous requests of one grant can overshoot by at most the calls they were already making.
+simultaneous requests of one grant can overshoot. The bound is the requests of that grant in flight at once times the
+calls each may still make (its call budget, 45 on Workers Free): a quota is a **soft cap**, not a reservation (D-296). On
+Workers the total is written after the response (D-295), so a request that starts in the first moments after another ends
+can still read the old count. A hard cap would need an atomic reservation per call, which is a D1 write per Agility
+request (the budget this design exists to save, L-415).
 
 Quotas apply to the remote hosts (`serve` and the Worker). `agility-bridge stdio` has no grants and no shared store.
 

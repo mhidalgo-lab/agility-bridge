@@ -21,6 +21,11 @@ export interface SpanInput extends SpanFacts {
   readonly endMs: number;
   /** The raw `traceparent` header, only when the request was authenticated; the caller of `record` decides, we never see a token. */
   readonly traceparent?: string | null | undefined;
+  /**
+   * The request never authenticated (a 401, a 429 from the IP limiter, the public catalogue). Such spans are sampled by a
+   * per-minute budget so unauthenticated traffic cannot set the volume of the collector's bill or of subrequests (P-3).
+   */
+  readonly unauthenticated?: boolean;
 }
 
 export interface Telemetry {
@@ -32,7 +37,12 @@ export interface Telemetry {
   /** Sends what is queued. Never throws. */
   flush(): Promise<void>;
   /** Spans dropped (full queue) and batches that failed to export, since start: for the operator's own health line. */
-  readonly stats: () => { readonly dropped: number; readonly failedBatches: number };
+  readonly stats: () => {
+    readonly dropped: number;
+    readonly failedBatches: number;
+    /** Unauthenticated spans not recorded because the minute's budget was used. */
+    readonly sampledOut: number;
+  };
 }
 
 export interface TelemetryOptions {
@@ -49,6 +59,8 @@ export interface TelemetryOptions {
   readonly maxQueue?: number;
   /** Flush when this many are queued. Default 64. */
   readonly batchSize?: number;
+  /** Unauthenticated spans recorded per minute and process or isolate; the rest are counted, not exported. Default 30. */
+  readonly unauthenticatedPerMinute?: number;
 }
 
 /** The resource attributes of every exported batch. */
@@ -73,6 +85,10 @@ export function createTelemetry(options: TelemetryOptions): Telemetry {
   let queue: FinishedSpan[] = [];
   let dropped = 0;
   let failedBatches = 0;
+  let sampledOut = 0;
+  let minute = Number.NEGATIVE_INFINITY;
+  let minuteSpent = 0;
+  const unauthenticatedBudget = options.unauthenticatedPerMinute ?? 30;
   let warnedAt = Number.NEGATIVE_INFINITY;
 
   const flush = async (): Promise<void> => {
@@ -98,6 +114,18 @@ export function createTelemetry(options: TelemetryOptions): Telemetry {
   return {
     record(input) {
       try {
+        if (input.unauthenticated === true) {
+          const now = Math.floor(options.clock.now() / 60_000);
+          if (now !== minute) {
+            minute = now;
+            minuteSpent = 0;
+          }
+          if (minuteSpent >= unauthenticatedBudget) {
+            sampledOut += 1;
+            return undefined;
+          }
+          minuteSpent += 1;
+        }
         const attributes = spanAttributes(input, options.knownTools);
         const parent = parseTraceparent(input.traceparent);
         const span: FinishedSpan = {
@@ -123,7 +151,7 @@ export function createTelemetry(options: TelemetryOptions): Telemetry {
       }
     },
     flush,
-    stats: () => ({ dropped, failedBatches }),
+    stats: () => ({ dropped, failedBatches, sampledOut }),
   };
 }
 

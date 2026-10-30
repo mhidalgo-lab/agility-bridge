@@ -11,6 +11,7 @@ import {
   randomMac,
   type SharedTier,
   type ToolContext,
+  type WriteRuntime,
 } from '../../src/index.ts';
 import { makeContext } from '../helpers/context.ts';
 import { fakeFetch, json } from './fake.ts';
@@ -103,7 +104,7 @@ describe('QueryCache storage', () => {
   });
 
   it('uses the shared tier on a miss, promotes the answer, and treats a failing tier as a miss', async () => {
-    const stored = new Map<string, string>([['k', 'from-tier']]);
+    const stored = new Map<string, string>([['k', '0:from-tier']]);
     const tier: SharedTier = {
       get: async (id) => stored.get(id),
       set: async (id, text) => void stored.set(id, text),
@@ -114,7 +115,7 @@ describe('QueryCache storage', () => {
     expect(await cache.get('k', false)).toBe('from-tier');
     expect(await cacheWith({ shared: tier }).cache.get('k', false)).toBeUndefined();
     await cache.put('n', 'new', true);
-    expect(stored.get('n')).toBe('new');
+    expect(stored.get('n')).toBe('0:new');
     await cache.put('only-memory', 'v', false);
     expect(stored.has('only-memory')).toBe(false);
     const broken = cacheWith({
@@ -127,6 +128,38 @@ describe('QueryCache storage', () => {
     await broken.put('x', 'y', true);
     expect(await broken.get('z', true)).toBeUndefined();
     expect(broken.info().shared).toBe('unavailable');
+  });
+});
+
+describe('the shared tier and the clock (Q-1)', () => {
+  const tierOver = (stored: Map<string, string>): SharedTier => ({
+    get: async (id) => stored.get(id),
+    set: async (id, text) => void stored.set(id, text),
+    status: () => 'verified',
+  });
+
+  it('a promoted copy keeps the age it had in the shared tier, so an answer never lives past one TTL', async () => {
+    const stored = new Map<string, string>();
+    const a = cacheWith({ shared: tierOver(stored), ttlMs: 30_000 }, { t: 0 });
+    await a.cache.put('k', 'v', true);
+    // Another isolate reads it at 29 s and keeps it in memory.
+    const b = cacheWith({ shared: tierOver(stored), ttlMs: 30_000 }, { t: 29_000 });
+    expect(await b.cache.get('k', true)).toBe('v');
+    // At 31 s the data is older than the TTL: neither the promoted copy nor the shared tier may answer.
+    b.clock.t = 31_000;
+    expect(await b.cache.get('k', true)).toBeUndefined();
+    b.clock.t = 55_000;
+    expect(await b.cache.get('k', true)).toBeUndefined();
+  });
+
+  it('treats an entry without a readable write time, or from the future, as a miss or as fresh-now', async () => {
+    const stored = new Map<string, string>([
+      ['bare', 'no-prefix'],
+      ['future', '99999:later'],
+    ]);
+    const { cache } = cacheWith({ shared: tierOver(stored), ttlMs: 30_000 }, { t: 1_000 });
+    expect(await cache.get('bare', true)).toBeUndefined();
+    expect(await cache.get('future', true)).toBe('later');
   });
 });
 
@@ -199,13 +232,32 @@ describe('the client with a cache', () => {
     expect(fresh.fetch.calls).toHaveLength(2);
     expect(fresh.cache.size).toBe(0);
 
-    const writer = build({
-      workspace: { ...makeContext().workspace, writes: { enabled: true, approval: 'page' } },
-    });
+    const writer = build({ writes: {} as WriteRuntime });
     await writer.client.query(QUERY);
     await writer.client.query(QUERY);
     expect(writer.fetch.calls).toHaveLength(2);
     expect(writer.cache.size).toBe(0);
+  });
+
+  it('is bypassed by the caller own write tools, not by the workspace enabling writes (Q-11)', async () => {
+    const readOnly = build({
+      workspace: { ...makeContext().workspace, writes: { enabled: true, approval: 'page' } },
+    });
+    await readOnly.client.query(QUERY);
+    await readOnly.client.query(QUERY);
+    expect(readOnly.fetch.calls).toHaveLength(1);
+  });
+
+  it('does not encode or store an answer above the entry cap (P-4)', async () => {
+    const { cache } = cacheWith({ maxEntryBytes: 20 });
+    const fetch = fakeFetch(() => json(ROWS));
+    const client = agilityClient(makeContext({ fetch, queryCache: scopeFor(cache) }));
+    await client.query(QUERY);
+    await client.query(QUERY);
+    expect(fetch.calls).toHaveLength(2);
+    expect(cache.size).toBe(0);
+    expect(cache.accepts(21)).toBe(false);
+    expect(cache.accepts(20)).toBe(true);
   });
 
   it('does not cache a failed read and keeps working when the cache itself fails', async () => {
