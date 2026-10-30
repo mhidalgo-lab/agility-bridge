@@ -2,7 +2,7 @@
 id: P8-01
 title: Query cache
 phase: 8
-status: in-progress
+status: review
 priority: medium
 depends_on: [P6-13]
 adr: ["0010"]

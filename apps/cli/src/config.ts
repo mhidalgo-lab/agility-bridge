@@ -55,6 +55,8 @@ export interface StdioConfig {
   readonly maxRows: number;
   readonly maxResponseBytes: number;
   readonly callBudget: number;
+  /** Seconds a repeated read is answered from memory (P8-01); 0 or absent is off. */
+  readonly queryCacheTtlSeconds?: number;
   readonly logLevel: LogLevel;
 }
 
@@ -86,6 +88,7 @@ const KNOWN_ENV = new Set([
   'AB_LIMITS_MAX_LIMIT',
   'AB_LIMITS_MAX_RESPONSE_BYTES',
   'AB_CALL_BUDGET',
+  'AB_QUERY_CACHE_TTL',
   'AB_CA_FILE',
   'AB_WRITE_TOOLS',
   'AB_WRITE_APPROVAL',
@@ -119,6 +122,7 @@ const KNOWN_ENV = new Set([
   'AB_ALLOWED_ORIGINS',
   'AB_TRUSTED_PROXY_HOPS',
   'AB_ACCESS_CACHE_TTL',
+  'AB_QUERY_CACHE_EDGE',
   'AB_ADMIN_TOKEN',
   'AB_ADMIN_URL',
   'AB_ADMIN_TOKEN_FILE',
@@ -532,6 +536,7 @@ function fromYaml(env: Readonly<Record<string, string | undefined>>, options: Lo
     maxRows: resolved.limits?.max_limit ?? DEFAULTS.maxRows,
     maxResponseBytes: resolved.limits?.max_response_bytes ?? DEFAULTS.maxResponseBytes,
     callBudget: resolved.limits?.call_budget ?? DEFAULTS.callBudget,
+    queryCacheTtlSeconds: int('AB_QUERY_CACHE_TTL', env['AB_QUERY_CACHE_TTL'], 0, 0, 60),
     logLevel:
       env['AB_LOG_LEVEL'] !== undefined ? level(env['AB_LOG_LEVEL']) : (shape.data.log_level ?? 'info'),
   };
@@ -621,6 +626,7 @@ export function loadConfig(
       64 * 1024 * 1024,
     ),
     callBudget: int('AB_CALL_BUDGET', env['AB_CALL_BUDGET'], DEFAULTS.callBudget, 1, 10_000),
+    queryCacheTtlSeconds: int('AB_QUERY_CACHE_TTL', env['AB_QUERY_CACHE_TTL'], 0, 0, 60),
     logLevel,
   };
 }

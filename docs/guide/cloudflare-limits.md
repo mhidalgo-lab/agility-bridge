@@ -26,6 +26,10 @@ Why these numbers:
   raise or lower them.
 - Workers open at most 6 connections at a time per request, so a call runs at most 6 Agility requests in parallel.
 
+## Repeated reads
+
+An optional [query cache](query-cache.md) (`AB_QUERY_CACHE_TTL`) answers repeated reads without Agility requests, which saves subrequests on the Free plan; its sealed Cache API tier (`AB_QUERY_CACHE_EDGE`) adds Cache API calls whose subrequest accounting is *unverified* (P8-13), so it is off unless you set it.
+
 ## Tools that cannot fit
 
 Every tool declares the most Agility requests one call can cost ([tool reference](../reference/tools.md)). A tool

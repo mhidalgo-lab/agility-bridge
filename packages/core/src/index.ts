@@ -18,6 +18,17 @@ export {
   type InstanceUrlOptions,
 } from './agility/instance.ts';
 export { CredentialLimiters, Semaphore } from './agility/limiter.ts';
+export {
+  canonicalJson,
+  MAX_QUERY_CACHE_TTL_SECONDS,
+  QueryCache,
+  type QueryCacheInfo,
+  type QueryCacheOptions,
+  type QueryCacheScope,
+  randomMac,
+  type SharedTier,
+  type SharedTierStatus,
+} from './agility/query-cache.ts';
 export { parseXml, type XmlElement } from './agility/xml.ts';
 export { COMPLETION_SOURCES, MAX_COMPLETIONS } from './completion.ts';
 export {

@@ -23,6 +23,8 @@ import {
 } from '@agility-bridge/core';
 import {
   assembleServer,
+  type CacheLike,
+  EdgeQueryTier,
   type HostFeatures,
   type HttpApp,
   MemoryRateLimiter,
@@ -166,6 +168,10 @@ export async function boot(
     KeyPurpose.KeyCheck,
     KeyPurpose.AuditIdentity,
     KeyPurpose.Login,
+    // The query cache's entry ids and its shared tier (P8-01); only derived when a TTL is set.
+    ...(settings.queryCache.ttlSeconds > 0
+      ? [KeyPurpose.CacheId, ...(settings.queryCache.edge ? [KeyPurpose.CacheBody] : [])]
+      : []),
   ]);
   const storage = await openSqlStorage(createD1Driver(env.DB));
   const check = await verifyKeyring(storage, keyring);
@@ -202,6 +208,13 @@ export async function boot(
       'OAuth client metadata documents are off: the global_fetch_strictly_public compatibility flag is not set. Dynamic registration still works.',
     );
   }
+  // The shared tier of the query cache: the Workers Cache API with sealed bodies, only when asked for (P8-01, L-098). It
+  // proves itself by reading its first write back; `whoami` reports what it found.
+  const edgeCache = (globalThis as { caches?: { default?: CacheLike } }).caches?.default;
+  const queryCacheShared =
+    settings.queryCache.edge && settings.queryCache.ttlSeconds > 0 && edgeCache !== undefined
+      ? new EdgeQueryTier({ cache: edgeCache, keyring, clock: systemClock })
+      : undefined;
   const { app, services } = assembleServer({
     settings,
     storage,
@@ -220,6 +233,7 @@ export async function boot(
     version,
     isolation: 'request',
     registry: REGISTRY,
+    ...(queryCacheShared === undefined ? {} : { queryCacheShared }),
     background: (c, work) => c.executionCtx.waitUntil(work),
     ...(oauthConsent === undefined ? {} : { oauthConsent }),
     ...(clientMetadataFetch === null ? {} : { clientMetadataFetch }),
@@ -235,6 +249,8 @@ export async function boot(
   logger.info('booted', {
     plan,
     callBudget: settings.callBudget,
+    queryCacheTtlSeconds: settings.queryCache.ttlSeconds,
+    queryCacheEdge: queryCacheShared !== undefined,
     writeDeploymentPerHour: settings.writeRates.deployment,
     adminApi: adminVerifier !== undefined || settings.identity !== undefined,
     publicUrl: settings.publicUrl ?? null,

@@ -91,7 +91,10 @@ export async function openChildren(ctx: ToolContext, type: string, oid: string):
     );
   }
   if (queries.length === 0) return 0;
-  const res = await agilityClient(ctx).query<unknown[]>(queries.map((q) => q.body));
+  const res = await agilityClient(ctx).query<unknown[]>(
+    queries.map((q) => q.body),
+    { fresh: true },
+  );
   let count = 0;
   for (const [i, q] of queries.entries()) {
     count += pageOf(ctx, q, Array.isArray(res.data) ? res.data[i] : undefined).rows.length;

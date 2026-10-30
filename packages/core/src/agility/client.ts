@@ -6,6 +6,7 @@ import type { ToolContext } from '../context.ts';
 import { AbError, ErrorCode } from '../errors.ts';
 import { VERSION } from '../version.ts';
 import { readCapped } from './body.ts';
+import { decodeResponse, encodeResponse } from './query-cache.ts';
 import { parseXml, type XmlElement } from './xml.ts';
 
 export interface AgilityResponse<T> {
@@ -272,21 +273,51 @@ export class AgilityClient {
     this.#backoffBaseMs = options.backoffBaseMs ?? 500;
   }
 
-  /** `POST query.v1` with one query or several (one result set per query). */
-  query<T = unknown[]>(
+  /**
+   * `POST query.v1` with one query or several (one result set per query). Answered from the query cache when the call's
+   * context has one and the caller has no write tools (P8-01); `fresh` skips it, and the write layer's own reads use it
+   * (a write must decide on current data, ADR-0013).
+   */
+  async query<T = unknown[]>(
     queries: QueryBody | readonly QueryBody[],
-    options: { legacy?: boolean } = {},
+    options: { legacy?: boolean; fresh?: boolean } = {},
   ): Promise<AgilityResponse<T>> {
-    return this.#send({
-      endpoint: options.legacy === true ? 'query.legacy.v1' : 'query.v1',
-      method: 'POST',
-      segments: [options.legacy === true ? 'query.legacy.v1' : 'query.v1'],
-      body: JSON.stringify(queries),
-      contentType: 'application/json',
-      expect: 'json',
-      write: false,
-      what: 'the Agility query',
-    }) as Promise<AgilityResponse<T>>;
+    const endpoint = options.legacy === true ? 'query.legacy.v1' : 'query.v1';
+    const send = () =>
+      this.#send({
+        endpoint,
+        method: 'POST',
+        segments: [endpoint],
+        body: JSON.stringify(queries),
+        contentType: 'application/json',
+        expect: 'json',
+        write: false,
+        what: 'the Agility query',
+      }) as Promise<AgilityResponse<T>>;
+    const scope = this.#ctx.queryCache;
+    // Writers always read live: a stale answer next to a write would mislead the person approving it and the agent
+    // checking it, so a caller with write tools never caches.
+    if (scope === undefined || options.fresh === true || this.#ctx.workspace.writes.enabled) return send();
+    let id: string;
+    try {
+      id = await scope.cache.key(this.#ctx, scope, endpoint, queries);
+      const text = await scope.cache.get(id, true);
+      const hit = text === undefined ? undefined : decodeResponse<T>(text);
+      if (hit !== undefined) {
+        this.#ctx.logger.debug('agility query cache hit', { endpoint });
+        return hit;
+      }
+    } catch (error) {
+      this.#ctx.logger.warn('query cache lookup failed', { error: (error as Error).name });
+      return send();
+    }
+    const res = await send();
+    try {
+      await scope.cache.put(id, encodeResponse(res), true);
+    } catch (error) {
+      this.#ctx.logger.warn('query cache store failed', { error: (error as Error).name });
+    }
+    return res;
   }
 
   /** `GET meta.v1/<type>` (one asset type, about 90 KB) or the whole schema (about 5 MB: not on Workers). */

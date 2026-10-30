@@ -12,6 +12,8 @@
 // (two calls), with the Agility requests and the approval-ledger storage operations per call beside the CPU.
 // Approval page and limiter (P7-31): the page view, the pending list and the decision POST in the panel world, and a write
 // with the real deployment limiter over counted counters (one read and two increments per write).
+// Query cache (P8-01): search_work_items with a memory hit and with a shared-tier hit (sealed body, cold memory), against
+// the uncached warm call, with the Agility requests per call.
 //   pnpm bench:worker            measure and compare with scripts/bench/worker-baseline.json
 //   pnpm bench:worker --update   rewrite the baseline
 import { execFileSync } from 'node:child_process';
@@ -161,6 +163,64 @@ async function warmCalls(): Promise<{ ms: Record<string, number>; requests: Reco
       if (call !== undefined) requests[name] = call.requestsUsed;
     }
     ms[name] = median(samples);
+  }
+  return { ms, requests };
+}
+
+/** The query cache (P8-01): the same read uncached, from memory and from the encrypted shared tier. */
+async function cachePaths(): Promise<{ ms: Record<string, number>; requests: Record<string, number> }> {
+  const { world, post } = await import('../packages/http-app/test/helpers/world.ts');
+  const core = await import('../packages/core/src/index.ts');
+  const { EdgeQueryTier } = await import('../packages/http-app/src/query-cache-edge.ts');
+  const { Keyring, generateMasterKey } = await import('../packages/auth/src/index.ts');
+  const stored = new Map<string, string>();
+  const tier = new EdgeQueryTier({
+    cache: {
+      match: async (r) => (stored.has(r.url) ? new Response(stored.get(r.url)) : undefined),
+      put: async (r, res) => void stored.set(r.url, await res.text()),
+    },
+    keyring: await Keyring.create(generateMasterKey(1)),
+    clock: { now: () => Date.now() },
+  });
+  const body = CALLS['search_work_items'];
+  const ms: Record<string, number> = {};
+  const requests: Record<string, number> = {};
+  const scenarios: Array<[string, boolean, boolean]> = [
+    ['query cache off: search_work_items', false, false],
+    ['query cache memory hit: search_work_items', true, false],
+    ['query cache shared-tier hit: search_work_items', true, true],
+  ];
+  for (const [name, cached, shared] of scenarios) {
+    const cache = cached
+      ? new core.QueryCache({
+          ttlMs: 60_000,
+          mac: core.randomMac(),
+          clock: { now: () => Date.now() },
+          ...(shared ? { shared: tier } : {}),
+        })
+      : undefined;
+    const w = await world(
+      { isolation: 'request', background: () => {} },
+      { detachedAudit: true, ...(cache === undefined ? {} : { services: { queryCache: cache } }) },
+    );
+    const clockMs = () => (w.now.t = Date.now());
+    clockMs();
+    for (let i = 0; i < 5; i++) {
+      if (shared) cache?.clear();
+      await (await post(w, 'team-a', w.tokens.alice, body)).text();
+    }
+    const samples: number[] = [];
+    for (let i = 0; i < 25; i++) {
+      // The shared tier answers a cold isolate: nothing in memory.
+      if (shared) cache?.clear();
+      const before = w.toolCalls.length;
+      const t = cpu();
+      await (await post(w, 'team-a', w.tokens.alice, body)).text();
+      samples.push(cpu() - t);
+      const call = w.toolCalls[before];
+      if (call !== undefined) requests[name] = call.requestsUsed;
+    }
+    ms[`warm: ${name}`] = median(samples);
   }
   return { ms, requests };
 }
@@ -561,6 +621,7 @@ async function main(argv: readonly string[]): Promise<number> {
   const phase6 = await metadataPaths();
   const writes = await writePaths();
   const approvals = await warmApprovals();
+  const queryCache = await cachePaths();
   const ms: Record<string, number> = {
     'cold: boot': Math.min(...cold.map((c) => c.boot)),
     ...Object.fromEntries(Object.entries(warm.ms).map(([k, v]) => [`warm: ${k}`, v])),
@@ -569,6 +630,7 @@ async function main(argv: readonly string[]): Promise<number> {
     ...Object.fromEntries(Object.entries(panel.ms).map(([k, v]) => [`warm: ${k}`, v])),
     ...phase6.ms,
     ...writes.ms,
+    ...queryCache.ms,
     ...Object.fromEntries(Object.entries(approvals).map(([k, v]) => [`warm: ${k}`, v])),
   };
   const relative = Object.fromEntries(
@@ -578,7 +640,13 @@ async function main(argv: readonly string[]): Promise<number> {
     calibrationMs,
     ms,
     relative,
-    requests: { ...warm.requests, ...panel.requests, ...phase6.requests, ...writes.requests },
+    requests: {
+      ...warm.requests,
+      ...panel.requests,
+      ...phase6.requests,
+      ...writes.requests,
+      ...queryCache.requests,
+    },
     storage: writes.storage,
   };
   console.log(JSON.stringify(result, null, 2));

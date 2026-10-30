@@ -30,6 +30,7 @@ import {
   PUBLIC_CATALOG_GROUPS,
   publicCatalogContext,
   publicCatalogTools,
+  type QueryCache,
   type Random,
   Secret,
   type ToolCallEvent,
@@ -143,6 +144,8 @@ export interface HostServices {
   readonly logger: Logger;
   readonly clock: Clock;
   readonly random: Random;
+  /** The query cache (P8-01); absent = off. */
+  readonly queryCache?: QueryCache;
 }
 
 export interface HttpAppOptions extends EdgeOptions {
@@ -799,6 +802,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     const agilityToken = c.req.header('x-agility-token');
     /** The caller's own Agility token on a pass-through workspace (P2-14); never stored, never logged. */
     let passthroughToken: string | null = null;
+    let passthroughFingerprint: string | null = null;
     if (presented === null && agilityToken !== undefined) {
       const pt = options.passthrough;
       if (pt === undefined) return unauthorized('passthrough_disabled');
@@ -846,6 +850,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         }
         access = decision.access;
         passthroughToken = agilityToken;
+        passthroughFingerprint = fingerprint;
       } catch (error) {
         services.logger.error('access resolution failed', { requestId, error: (error as Error).name });
         return finish(
@@ -1020,6 +1025,19 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       breaker: services.breakers.for(resolved.instance.id, resolved.credential.id),
       fetch: services.fetchFor(resolved.instance),
       metadata: services.metadata,
+      ...(services.queryCache === undefined
+        ? {}
+        : {
+            queryCache: {
+              cache: services.queryCache,
+              grantId: resolved.grant.id,
+              // A pass-through caller's Agility token is theirs alone: the entry binds its fingerprint, never the token.
+              principal:
+                passthroughFingerprint === null
+                  ? `cred:${resolved.credential.id}`
+                  : `pt:${passthroughFingerprint}`,
+            },
+          }),
       logger: services.logger,
       clock: services.clock,
       random: services.random,
@@ -1072,7 +1090,10 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     app,
     fetch: (request, env, executionCtx) =>
       executionCtx === undefined ? app.fetch(request, env) : app.fetch(request, env, executionCtx as never),
-    clearAccessCache: () => cache.clear(),
+    clearAccessCache: () => {
+      cache.clear();
+      services.queryCache?.clear();
+    },
     ...(oauth === undefined ? {} : { oauthRegistrations: oauth.registrations }),
   };
 }
