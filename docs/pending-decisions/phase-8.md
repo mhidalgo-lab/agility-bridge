@@ -353,53 +353,55 @@
 - **Context:** A project's `.mcp.json` can set `AB_AGILITY_URL` to another host while `AB_AGILITY_TOKEN=keychain:<name>` names the user's own entry (D-290 only protects other applications' entries). The binding has to work with the macOS `security`, Linux `secret-tool` and Windows Credential Manager backends without a secret on argv.
 - **Options:** (a) a sibling entry in the same service whose account is `<account>#host` and whose value is the canonical host (lower case, with a non-default port); (b) an attribute on the entry (`secret-tool` has free attributes, `security` has a comment field, Credential Manager has a comment, each needing its own code and read path); (c) one index entry holding every binding as JSON (a read-modify-write of a shared value).
 - **Recommendation:** (a), built. It needs only the `get`, `set` and `delete` every backend has, carries no secret, and `#` is outside the writable-name alphabet (D-274), so no secret can be stored under the binding's name through the commands. The host is the part of the instance address a token travels to; the path is not part of the binding.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-307 — A different host is refused at startup; only `keychain bind` confirms it *(P8-31)*
 - **Context:** When the resolved keychain token is used with an `AB_AGILITY_URL` whose host differs from the stored one, the server could warn, refuse, or accept an explicit confirmation.
 - **Options:** (a) refuse before the token is used, with a stderr message naming both hosts and the command that confirms it; the confirmation is `agility-bridge keychain bind <name> --for-url <url>`, run by the person; (b) refuse unless an environment variable (`AB_KEYCHAIN_ALLOW_HOST`) names the host; (c) warn only.
 - **Recommendation:** (a), built. The hostile file that redirects the URL can set any environment variable too, so (b) is no protection and (c) sends the token anyway. `bind` replaces the stored host and is the same command that migrates old entries; it is a deliberate keychain write that a client's env block cannot trigger. Hosts compare case-insensitively and a different port is a different host.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-308 — Entries stored without a host keep working with a warning, for now *(P8-31)*
 - **Context:** Entries made by v0.7.0 and earlier have no host. Refusing them would break every existing setup at the next upgrade; accepting them silently leaves the hole open for them.
 - **Options:** (a) accept with a stderr warning (and a `doctor` warning) that names `keychain bind <name> --for-url <url>`; refuse them in a later minor release (follow-up P8-41); (b) refuse at once; (c) bind on first use (trust on first use: a hostile file used first would bind the entry to its host).
 - **Recommendation:** (a), built. It closes the hole for every entry stored with `--for-url` or bound once, and tells everyone else how to close it; (c) is rejected because the first use is not necessarily the person's. The warning is the only protection of an unbound entry until P8-41.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-309 — Where the host is recorded and reported: `keychain set --for-url`, `keychain bind`, `status`, `doctor`, `client-config` *(P8-31)*
 - **Context:** The host has to be recorded when a token is stored, shown without a secret, and reported by diagnostics. `init --keychain` stores a master key, which belongs to a server and not to an Agility instance.
 - **Options:** (a) `keychain set <name> --for-url <url>` writes the secret and the binding (replacing a secret without the flag keeps the existing binding); `keychain bind <name> --for-url <url>` binds or moves an existing entry; `keychain delete` removes both; `keychain status --name` prints `boundTo`; `doctor` reports `ok` for a bound token, `warn` for an unbound one and `fail` for a different host; `client-config` snippets print `--for-url` with their `keychain set` hint; `init --keychain` and the master-key references are not bound; (b) bind through `init --keychain` too; (c) bind in the YAML file only.
 - **Recommendation:** (a), built. The binding applies to the stdio environment path (`AB_AGILITY_TOKEN`), the one a project file can reach. A `${keychain:...}` inside the user's own YAML file is not checked (the file is the user's; follow-up P8-42).
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-310 — The public catalogue keeps its three answers keyed on everything the answer could echo, with only the id substituted *(P8-35 (P-8))*
 - **Context:** The anonymous `tools/list` (about 38 KB), `initialize` and `server/discover` were rebuilt, serialised and, on a cold path, the SDK server built again for every request, bounded only by the per-address limiter.
 - **Options:** (a) keep the serialised bytes in a bounded table inside the app (an isolate on Workers), keyed on the method, the `accept` and MCP routing headers and the request's `params`, and substitute only the JSON-RPC `id` (strings and safe integers; anything else is answered the normal way); (b) key on method and protocol version only; (c) cache the tool list but still run the SDK handler.
 - **Recommendation:** (a), built. (b) would serve one client's `initialize` negotiation to another that asked for a different version, and (c) keeps most of the cost. The table is bounded (16 entries, 128 KB each, oldest first), holds no storage, workspace, grant or credential data, and a test compares every kept answer with a never-cached world's for several ids, workspace names and both protocol eras. No `Cache-Control`: a POST answer is not cacheable by browsers or the Cache API. Requests are counted apart as `catalog: 'built' | 'cached'` on the request event.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-311 — Single flight is per request context; nothing is shared across requests *(P8-35 (P-10))*
 - **Context:** The call budget allows six reads in parallel and identical misses each went to Agility. Workers forbid using a promise (an I/O object) created in another request.
 - **Options:** (a) a table of pending reads in a `WeakMap` keyed by the request's `ToolContext`, so identical concurrent misses inside one request send one request and each caller gets a `structuredClone` of the answer; (b) also share across requests on Node only; (c) a documented cross-request limit on Workers.
 - **Recommendation:** (a), built; it is the only form that is correct on both hosts and it cannot cross a scope (the entry id binds every dimension and the table dies with the context). A failure is every joined caller's failure and the next read tries again. A joined caller spends no budget unit and no quota unit, like a hit. The cross-request limit is documented in the query-cache guide: two requests that miss at once each ask Agility. Expired entries are also dropped anywhere in the map on every store (they used to hide behind a live head).
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-312 — OTLP span batching is not built here; it becomes its own task *(P8-35 (P-3))*
 - **Context:** P8-35 listed batching of spans per isolate on Workers, with a flush through `waitUntil`, as optional, to be done only if small and well tested on both hosts.
 - **Options:** (a) leave it for [P8-43](../tasks/phase-8-power-features/P8-43-batch-otlp-spans-on-workers.md); (b) build a per-isolate queue now.
 - **Recommendation:** (a). A per-isolate queue is state that outlives a request and needs a size and age flush, a flush racing `waitUntil`, and a decision about spans lost when an isolate is evicted; none of it is small, and D-304 already bounds the unauthenticated volume. The change that matters (the per-request flush) is unchanged.
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-313 — The shared tier takes entries up to 64 KiB, as an option of the tier *(P8-38)*
 - **Context:** The shared tier stored anything the memory tier accepted (256 KiB); sealing and opening cost CPU in proportion to size on a Free plan with 10 ms.
 - **Options:** (a) a cap of 64 KiB of text, an option (`maxEntryChars`) of `EdgeQueryTier` that the `SharedTier` interface exposes, checked by the cache before handing over and by the tier itself, with `whoami` showing it as `queryCache.sharedMaxEntryChars`; (b) 32 KiB; (c) an environment setting; (d) no cap, only the native base64.
 - **Recommendation:** (a), built. With the runtime's base64 a 64 KiB seal and open cost about 0.5 ms together on local workerd, and 256 KiB about 2.5 ms, so the cap is conservative for Paid and fair for Free (a 100 KB answer is already a large page of rows). Bigger answers stay in memory only. A setting is not worth an operator decision until the deployed measurement (P8-13) shows a need.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-314 — Use the runtime's base64 where it exists; keep the double parse *(P8-38)*
 - **Context:** The byte loop for base64 was most of the cost of a seal on workerd, and the review asked about the extra JSON parse of a hit.
 - **Options:** (a) `Uint8Array.prototype.toBase64` and `Uint8Array.fromBase64` when present, the existing loop and `btoa` otherwise; leave the stored format alone; (b) also change the stored format to avoid parsing the sealed wrapper.
 - **Recommendation:** (a), built. Measured on local workerd the wrapper parse is 0.01 to 0.3 ms from 8 to 256 KB, so (b) would trade a format change (every entry becomes a miss once) for nothing.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-316 — Metadata requests are not counted by the quota *(P8-39 (Q-10))*
 - **Context:** `meta.v1` requests (one to three per cold call, about a dozen on a cold isolate) counted like data queries, so how fast a small quota drained depended on isolate recycling rather than on what the caller asked.
@@ -411,10 +413,10 @@
 - **Context:** The meter added to the day and the month counter with two `increment` calls, so a request with a quota cost one read and two writes.
 - **Options:** (a) a new `kv.incrementMany(entries)`: one multi-row upsert with the same expiry rules, atomic as one statement, at most 10 distinct keys, uncapped (the quota is a soft cap, D-296); (b) `Promise.all` of two increments (two round trips); (c) a `batch` of two increments in the SQL driver only.
 - **Recommendation:** (a), built on all three adapters with a contract test and a statement count in each. `increment` with `max` is unchanged, so the capped atomic counters of the write limiter, tasks and OAuth abuse limits keep their semantics. D-248, D-249, D-295, D-296 and D-299 stay true: still one read and one write per request, fail open, written after the response on Workers, a soft cap, and the quota asked before the budget. Rows written do not fall (two counters are two rows, L-461); statements fall from three to two a request.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-318 — Deep links add at most 24,000 characters a result; the base is parsed once *(P8-40 (P-6))*
 - **Context:** The server added a `url` to every asset row after the output caps, and each link parsed the pinned base and then the finished link (`new URL` twice), about 3 microseconds a row. A 1,000-row result grew by about 90 KB the caps never saw.
 - **Options:** (a) parse the base once per result, build each link by concatenation after the strict OID or number check, prove it stays on the pinned prefix with one strict query pattern instead of a second parse, and stop adding links once they have added 24,000 characters (the default data block cap, about 250 rows), with the one fixed note saying how many rows got none; (b) omit all links above a fixed row count; (c) leave it and document the cost.
 - **Recommendation:** (a), built. Every T26 guarantee holds: origin and path are the parsed prefix, identities are matched by the same strict patterns plus a second pattern on the whole query, and a row with its own `url` (a Link asset) is untouched and costs no budget. (b) would drop links a caller can use for rows within the budget; the budget is a number a caller cannot raise, like the output caps.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
