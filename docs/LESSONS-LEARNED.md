@@ -31,7 +31,7 @@ How to use it:
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282, L-323 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-424, L-177, L-183, L-239, L-280, L-304, L-316 |
-| [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
+| [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-434, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267, L-345, L-409, L-410 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
@@ -799,6 +799,14 @@ group/world-readable key files.
 Define what moves (instances, credentials, workspaces, grants, tokens, audit) and what does not (sessions, OAuth devices); refuse a
 non-empty target.
 *Applied in:* P3-09.
+
+**L-434 — Build an export from an allowlist of fields, and read your own output back with the importer's strict reader.**
+An export that serialises records and drops what it must not leaks the next column someone adds. The export names every
+field it carries, takes nothing from personal credentials or people's grants because it never asks for them, and parses
+its own result with the same strict reader the import uses (unknown fields are errors), so a field that should not leave,
+or a file that could not be imported, fails the export instead of reaching a backup. The import is the same rule from the
+other side: it sends an explicit field list to the admin API and hard-codes `ownerUserId: null` and `userId: null`.
+*Applied in:* P8-05, `apps/cli/src/manage/config-bundle.ts`.
 
 **L-161 — Decide on `RETURNING` rows, not driver change counters.**
 After a cascading delete, D1 reports the cascaded rows in `meta.changes` while `node:sqlite` reports only the statement's

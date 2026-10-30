@@ -2,13 +2,27 @@
 // Management commands (P2-10): one table drives parsing, help and the generated reference (docs/reference/cli.md).
 // Every change goes through the admin API — remotely, or in process over the local database — so validation, guards
 // and audit are the same on every path (L-065). Output is JSON on stdout; messages go to stderr.
-import { generateAdminToken, generateMasterKey, rotateCredentialKeys } from '@agility-bridge/auth';
+import {
+  generateAdminToken,
+  generateMasterKey,
+  openCredentialToken,
+  rotateCredentialKeys,
+} from '@agility-bridge/auth';
 import { restoreSqliteBackup } from '@agility-bridge/storage-sqlite';
 import { ConfigError } from '../config.ts';
 import { exitCode, renderReport, runDoctor } from '../doctor.ts';
 import { type KeychainBackend, KeychainError, type KeychainRef, parseKeychainRef } from '../keychain.ts';
 import { createMasterKeyFile, defaultMasterKeyFile } from '../master-key.ts';
 import type { AdminClient } from './client.ts';
+import {
+  buildBundle,
+  decryptSecrets,
+  exportableCredentials,
+  importBundle,
+  MAX_BUNDLE_BYTES,
+  parseBundle,
+} from './config-bundle.ts';
+import { readBoundedFile, writeNewPrivateFile } from './private-file.ts';
 import { readSecret } from './secret-input.ts';
 
 export type OptionKind = 'string' | 'int' | 'flag' | 'list';
@@ -33,7 +47,7 @@ export interface Runtime {
   /** The admin client (local unless `AB_ADMIN_URL` is set). */
   client(): Promise<AdminClient>;
   /** The local database and keys (for `keys …`). */
-  local(): Promise<Parameters<NonNullable<CommandSpec['local']>>[0]>;
+  local(): Promise<Parameters<NonNullable<CommandSpec['local']>>[0] & Pick<AdminClient, 'request' | 'close'>>;
   readonly stdin: () => Promise<string>;
   /** The OS keychain of this machine (P8-08). */
   keychain(): KeychainBackend;
@@ -271,6 +285,170 @@ export const COMMANDS: readonly CommandSpec[] = [
       }
       r.out(JSON.stringify({ backend: kc.label, available, ...(entry === undefined ? {} : { entry }) }));
       return available ? 0 : 1;
+    },
+  },
+  {
+    words: ['config', 'export'],
+    summary:
+      'Write instances, shared credentials, workspaces and service grants to a file; tokens only with --with-tokens (local, encrypted with a passphrase)',
+    options: [
+      {
+        name: 'out',
+        kind: 'string',
+        help: 'New file to write (mode 0600, never overwritten); default: standard output',
+      },
+      {
+        name: 'with-tokens',
+        kind: 'flag',
+        help: "Include the shared credentials' tokens, encrypted with a passphrase (needs --out and the local database)",
+      },
+      {
+        name: 'passphrase-file',
+        kind: 'string',
+        help: 'Read the passphrase from this 0600 file (else AB_CONFIG_PASSPHRASE, standard input or a hidden prompt)',
+      },
+    ],
+    async run(r, p) {
+      const withTokens = p.opts['with-tokens'] === true;
+      const out = typeof p.opts['out'] === 'string' ? p.opts['out'] : undefined;
+      if (withTokens && out === undefined)
+        throw new ConfigError(
+          '--with-tokens needs --out: encrypted tokens are not written to standard output.',
+        );
+      if (withTokens && r.env['AB_ADMIN_URL'])
+        throw new ConfigError(
+          '--with-tokens works on the local database only (it needs the master key); unset AB_ADMIN_URL.',
+        );
+      const passphrase = withTokens
+        ? await readSecret({
+            ...(typeof p.opts['passphrase-file'] === 'string' ? { file: p.opts['passphrase-file'] } : {}),
+            envName: 'AB_CONFIG_PASSPHRASE',
+            env: r.env,
+            stdin: r.stdin,
+            what: 'passphrase for the exported tokens',
+          })
+        : undefined;
+      let text: string;
+      let counts: Record<string, number>;
+      let written: string | undefined;
+      if (withTokens) {
+        const ctx = await r.local();
+        try {
+          const tokens = new Map<string, string>();
+          for (const c of await exportableCredentials(ctx)) {
+            const record = await ctx.storage.credentials.get(String(c['id']));
+            if (record === null) continue;
+            try {
+              tokens.set(record.id, await openCredentialToken(ctx.keyring, record));
+            } catch {
+              throw new ConfigError(
+                `The token of credential "${String(c['label']).slice(0, 80)}" cannot be decrypted with the loaded master key (a previous key may be needed).`,
+              );
+            }
+          }
+          const bundle = await buildBundle(ctx, {
+            tokens,
+            ...(passphrase === undefined ? {} : { passphrase }),
+          });
+          counts = {
+            instances: bundle.instances.length,
+            credentials: bundle.credentials.length,
+            workspaces: bundle.workspaces.length,
+            grants: bundle.grants.length,
+            tokens: tokens.size,
+          };
+          text = `${JSON.stringify(bundle, null, 2)}\n`;
+          // The file first (exclusive: an existing path is refused), then the audit row: a refused export leaves none.
+          // Taking tokens out of the database is an administrative event: ids and counts, never a value.
+          written = writeNewPrivateFile(out as string, text);
+          await ctx.storage.audit.append({
+            id: crypto.randomUUID(),
+            ts: Date.now(),
+            kind: 'admin',
+            action: 'config.export',
+            status: 'ok',
+            details: { via: 'cli', withTokens: true, ...counts },
+          });
+        } finally {
+          await ctx.close();
+        }
+      } else {
+        const client = await r.client();
+        try {
+          const bundle = await buildBundle(client);
+          counts = {
+            instances: bundle.instances.length,
+            credentials: bundle.credentials.length,
+            workspaces: bundle.workspaces.length,
+            grants: bundle.grants.length,
+          };
+          text = `${JSON.stringify(bundle, null, 2)}\n`;
+        } finally {
+          await client.close();
+        }
+      }
+      if (out === undefined) r.out(text.trimEnd());
+      else {
+        const path = written ?? writeNewPrivateFile(out, text);
+        r.out(JSON.stringify({ file: path, ...counts }));
+      }
+      r.err(
+        withTokens
+          ? "agility-bridge: tokens are encrypted with your passphrase (PBKDF2-HMAC-SHA-256, 600,000 iterations, AES-256-GCM); keep the file and the passphrase apart. Users, people's grants, personal credentials and device tokens are never exported."
+          : "agility-bridge: no tokens exported: shared credentials are listed by name only. Users, people's grants, personal credentials and device tokens are never exported.",
+      );
+      return 0;
+    },
+  },
+  {
+    words: ['config', 'import'],
+    summary:
+      'Add what a configuration file describes and the deployment lacks (additive; a dry run unless --apply; never changes or deletes anything that exists)',
+    args: [id('file', 'A file written by `config export`')],
+    options: [
+      { name: 'apply', kind: 'flag', help: 'Make the changes; without it only the plan is shown' },
+      {
+        name: 'allow-sensitive',
+        kind: 'flag',
+        help: 'Also create workspaces that enable writes or pass-through (review the plan first)',
+      },
+      {
+        name: 'passphrase-file',
+        kind: 'string',
+        help: 'Read the passphrase from this 0600 file (else AB_CONFIG_PASSPHRASE, standard input or a hidden prompt)',
+      },
+    ],
+    async run(r, p) {
+      const bundle = parseBundle(readBoundedFile(p.args[0] as string, MAX_BUNDLE_BYTES));
+      let secrets: Record<string, string> | undefined;
+      if (bundle.secrets !== null) {
+        const passphrase = await readSecret({
+          ...(typeof p.opts['passphrase-file'] === 'string' ? { file: p.opts['passphrase-file'] } : {}),
+          envName: 'AB_CONFIG_PASSPHRASE',
+          env: r.env,
+          stdin: r.stdin,
+          what: 'passphrase of the file',
+        });
+        secrets = await decryptSecrets(bundle.secrets, passphrase);
+      }
+      const apply = p.opts['apply'] === true;
+      const client = await r.client();
+      try {
+        const result = await importBundle(client, bundle, {
+          apply,
+          allowSensitive: p.opts['allow-sensitive'] === true,
+          ...(secrets === undefined ? {} : { secrets }),
+        });
+        r.out(JSON.stringify(result, null, 2));
+        r.err(
+          apply
+            ? `agility-bridge: ${result.counts.create} created, ${result.counts.exists} already there, ${result.counts.skip} skipped, ${result.counts.failed} failed.`
+            : 'agility-bridge: dry run, nothing was written. Re-run with --apply to make these changes.',
+        );
+        return result.counts.failed > 0 ? 1 : 0;
+      } finally {
+        await client.close();
+      }
     },
   },
   {

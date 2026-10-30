@@ -129,6 +129,9 @@ const KNOWN_ENV = new Set([
   'AB_ADMIN_TOKEN',
   'AB_ADMIN_URL',
   'AB_ADMIN_TOKEN_FILE',
+  // Secrets for management commands (P8-05, P8-08): read from the environment, never from a flag.
+  'AB_CONFIG_PASSPHRASE',
+  'AB_KEYCHAIN_SECRET',
   'AB_AUDIT_RETENTION_DAYS',
   'AB_CREDENTIAL_REVALIDATION_HOURS',
   'AB_PASSTHROUGH',

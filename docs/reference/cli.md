@@ -87,6 +87,41 @@ agility-bridge keychain status [--name <value>]
 
 Runs without a server.
 
+## config
+
+### `config export`
+
+Write instances, shared credentials, workspaces and service grants to a file; tokens only with --with-tokens (local, encrypted with a passphrase).
+
+```text
+agility-bridge config export [--out <value>] [--with-tokens] [--passphrase-file <value>]
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `--out` | string | New file to write (mode 0600, never overwritten); default: standard output |
+| `--with-tokens` | flag | Include the shared credentials' tokens, encrypted with a passphrase (needs --out and the local database) |
+| `--passphrase-file` | string | Read the passphrase from this 0600 file (else AB_CONFIG_PASSPHRASE, standard input or a hidden prompt) |
+
+Runs without a server.
+
+### `config import`
+
+Add what a configuration file describes and the deployment lacks (additive; a dry run unless --apply; never changes or deletes anything that exists).
+
+```text
+agility-bridge config import <file> [--apply] [--allow-sensitive] [--passphrase-file <value>]
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `<file>` | argument | A file written by `config export` |
+| `--apply` | flag | Make the changes; without it only the plan is shown |
+| `--allow-sensitive` | flag | Also create workspaces that enable writes or pass-through (review the plan first) |
+| `--passphrase-file` | string | Read the passphrase from this 0600 file (else AB_CONFIG_PASSPHRASE, standard input or a hidden prompt) |
+
+Runs without a server.
+
 ## admin-token
 
 ### `admin-token`

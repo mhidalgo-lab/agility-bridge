@@ -95,3 +95,27 @@
 - **Options:** (a) `keychain set|delete|status` (secret from file, `AB_KEYCHAIN_SECRET`, standard input or a hidden prompt, never a flag) and `init --keychain <name>` (generates the master key into the keychain; refuses to replace an entry; says the keychain is not a backup); (b) documentation of the OS commands only; (c) `keychain get` as well (prints a secret: not offered).
 - **Recommendation:** (a), built. `status --name` answers only whether an entry exists.
 - **Owner:** *(open; built as (a))*
+
+### D-276 — Import and export are composed on the admin API, client side *(P8-05)*
+- **Context:** L-065: every alternate writer is an authorization boundary. An import could write the database directly, or ask the server for an import endpoint, or drive the existing admin API one record at a time.
+- **Options:** (a) the CLI reads the lists and posts creations through the admin API (local in process, or remote with the admin token): validation, owner guards and audit rows are the ones every other command gets, and a remote deployment (a Worker too) works; (b) a new server endpoint `POST /config/import` (one more writer to guard and to document, and a large body for the API to cap); (c) write the storage directly (bypasses every guard).
+- **Recommendation:** (a), built. Export of tokens is the exception: only the local database and master key can decrypt a token, so `--with-tokens` is local-only and writes an audit row.
+- **Owner:** *(open; built as (a))*
+
+### D-277 — What an export carries, and what an import may do *(P8-05)*
+- **Context:** L-078 asks that what moves and what does not be defined. People, their grants and personal credentials belong to the target's sign-in; a personal credential must never be assigned to anyone else (T29).
+- **Options:** (a) instances (without TLS file paths), shared credentials, workspaces and service grants; import only creates, matches on instance address, shared credential label and workspace slug, never updates or deletes, and adds grants only to workspaces it creates itself (a file never opens a new way into what exists); a personal credential with the same label is skipped, never used; a workspace that enables writes or pass-through needs `--allow-sensitive`; (b) also users and people's grants (needs the target to hold the same sign-in identities; a grant could then name a user the importer does not control); (c) update existing records to match the file (can widen a workspace).
+- **Recommendation:** (a), built. A file cannot widen what exists, name a person or an owner (the reader is strict), or carry a token in the clear.
+- **Owner:** *(open; built as (a))*
+
+### D-278 — Import is a dry run unless `--apply` *(P8-05)*
+- **Context:** The task asks for an additive import with a dry run. A default that writes is quicker, one that plans is safer: the file may come from somewhere else.
+- **Options:** (a) the plan by default, `--apply` to write (a second explicit word for the one risky step); (b) write by default and `--dry-run` to plan; (c) always ask interactively (not scriptable).
+- **Recommendation:** (a), built. The plan names every item as create, exists, skip (with the reason) or failed.
+- **Owner:** *(open; built as (a))*
+
+### D-279 — The passphrase seal binds its own header, and the cost is fixed *(P8-05)*
+- **Context:** The task fixes PBKDF2-HMAC-SHA-256 at 600,000 iterations and AES-256-GCM. A file that names its own cost would let a crafted file cost minutes of CPU or choose a weak setting.
+- **Options:** (a) the algorithm and the cost are constants: a file naming anything else is refused before deriving a key; the header (format, version, KDF, cost) is the AES-GCM additional data, so editing it fails the open; a wrong passphrase and a changed file give the same message; a passphrase is 12 to 1,024 characters; (b) honour the file's cost within a range; (c) scrypt or Argon2id (not what the task says, and not in Web Crypto).
+- **Recommendation:** (a), built.
+- **Owner:** *(open; built as (a))*
