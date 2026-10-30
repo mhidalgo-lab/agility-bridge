@@ -38,8 +38,8 @@ How to use it:
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412 |
-| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416 |
-| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
+| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452 |
+| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241, L-402 |
@@ -1818,6 +1818,30 @@ One increment per upstream call would be up to 45 statements and 90 rows for one
 **L-416 — Without background work, the poll is the worker: claim with one atomic marker, run inside the request, drop a result the owner cancelled.**
 On Workers nothing may run after a response, so a task cannot be "started" at creation. The creating call stores the request and returns a handle; the first `tasks/get` takes a lease (`setIfAbsent`, expiring after the request deadline), runs the stored call through the normal pipeline, re-reads the record and writes the result only if it is still `working`, so a cancel that arrived meanwhile wins and a concurrent poll sees `working` instead of running it twice. Tests hold the tool on a gate to prove both orderings.
 *Applied in:* P8-10, `http-app/src/tasks.ts`, `test/tasks.test.ts`.
+
+**L-448 — A tier that copies an entry must copy its age.**
+The shared tier of the query cache stored only the text, so an isolate that promoted a hit into memory started a fresh TTL and an answer could live up to twice as long as the guide promised; no test advanced the clock past the first TTL after a promotion. The write time now travels inside the sealed body and the promoted copy lives only until `writtenAt + ttl`; a missing or unreadable time is a miss and a time in the future is clamped. Test every promotion, replica and read-through with a clock that moves past the first lifetime.
+*Applied in:* P8-12, `agility/query-cache.ts`, `test/agility/query-cache.test.ts` (L-113).
+
+**L-449 — Ask the cheapest refusal first, so a refusal costs nothing.**
+The call budget was spent before the quota was asked, so a refused call showed up as a request in the audit row, the log and the span. Order gates by what they cost to undo: the quota (a read, nothing spent) before the budget unit, and an exhausted budget before the quota so a call that cannot happen counts no quota unit. Assert the counters of every gate in the refusal test, not only the number of fetches.
+*Applied in:* P8-12, `agility/client.ts` (`#send`), `test/agility/quota.test.ts` (L-116, L-330).
+
+**L-450 — Work that moves after the response must not decide the response.**
+Quota counters and the cache's shared-tier store were awaited before the answer returned, three D1 round trips and several cache operations on Workers. They move to `waitUntil` through one optional context hook, and only because they prove nothing: authorization, the budget, audit intent and the write limiter stay where they were. When deferring, write down what the next request can then see (an old counter for a few milliseconds) and keep the hook absent where the process outlives the request.
+*Applied in:* P8-12, `ToolContext.background`, `server.ts` (`flushQuota`), `agility/client.ts` (L-096, L-415).
+
+**L-451 — A poll that does the work needs a deadline, a lease released in `finally`, and a way to say "failed".**
+The first `tasks/get` ran the report outside the request deadline, and a runner that threw, a result that could not be saved or a dropped client left a 200-second lease and then a second run. The run now races the deadline, any failure is stored as a failed task, the lease is released in `finally`, and a cancel is a marker the finishing poll re-checks, so both orders of cancel and completion end the same way. What cannot be fixed without a background runner (a client that vanishes mid-poll) is said in the guide.
+*Applied in:* P8-12, `http-app/src/tasks.ts`, `app.ts`, `test/tasks.test.ts` (L-416, L-073).
+
+**L-452 — Validate at creation what a deferred job will run, and bound what it may store.**
+A task stored whatever arguments arrived and failed later, in a poll, after spending a budget. Creation now checks the arguments against the tool's own schema and an 8 KiB cap, limits creations per grant per window with an atomic capped counter, and refuses to return a stored result once the caller's tools or scope changed. A deferred result carries the scope it was computed under.
+*Applied in:* P8-12, `http-app/src/tasks.ts` (L-016, L-063).
+
+**L-453 — Telemetry for unauthenticated traffic needs its own budget.**
+One span per request is cheap for authenticated callers and an amplifier for everyone else: on Workers each 401 or 429 made an outgoing OTLP request. Spans of requests that never authenticated are sampled by a per-minute budget and counted; authenticated spans are never sampled. Any per-request side effect an unauthenticated caller can trigger is a cost lever for the caller.
+*Applied in:* P8-12, `telemetry/telemetry.ts` (`unauthenticatedPerMinute`), `app.ts` (L-118, L-079).
 
 ## P. Observability and logging
 

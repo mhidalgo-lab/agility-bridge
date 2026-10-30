@@ -296,8 +296,9 @@ export class AgilityClient {
       }) as Promise<AgilityResponse<T>>;
     const scope = this.#ctx.queryCache;
     // Writers always read live: a stale answer next to a write would mislead the person approving it and the agent
-    // checking it, so a caller with write tools never caches.
-    if (scope === undefined || options.fresh === true || this.#ctx.workspace.writes.enabled) return send();
+    // checking it, so a caller with write tools never caches. It is the caller's own tools that decide (Q-11), not the
+    // workspace: a read-only grant next to a writing one may see up to one TTL of staleness after the other's write.
+    if (scope === undefined || options.fresh === true || this.#ctx.writes !== undefined) return send();
     let id: string;
     try {
       id = await scope.cache.key(this.#ctx, scope, endpoint, queries);
@@ -312,11 +313,14 @@ export class AgilityClient {
       return send();
     }
     const res = await send();
-    try {
-      await scope.cache.put(id, encodeResponse(res), true);
-    } catch (error) {
+    // An answer above the entry cap is not even encoded: the response size is known (P-4).
+    if (!scope.cache.accepts(res.bytes)) return res;
+    const store = scope.cache.put(id, encodeResponse(res), true).catch((error: unknown) => {
       this.#ctx.logger.warn('query cache store failed', { error: (error as Error).name });
-    }
+    });
+    // The memory tier is filled at once; the shared tier (seal, put, first read-back) may finish after the answer (P-2).
+    if (this.#ctx.background === undefined) await store;
+    else this.#ctx.background(store);
     return res;
   }
 
@@ -428,10 +432,15 @@ export class AgilityClient {
     for (let attempt = 1; ; attempt++) {
       const openMs = breaker.openForMs();
       if (openMs > 0) throw rateLimited(Math.ceil(openMs / 1000), true);
-      budget.spend(1, call.what);
       // One quota unit per logical upstream call: the first attempt, never a retry (L-116). A hit in the query cache never
-      // gets here. Writes are counted but not refused (their own limits and approval apply, D-249).
-      if (attempt === 1) await this.#ctx.quota?.beforeCall({ write: call.write });
+      // gets here. Writes are counted but not refused (their own limits and approval apply, D-249). The quota is asked
+      // before the budget is spent, so a refusal costs no unit and is not reported as a request (Q-4); an exhausted
+      // budget is refused first, so it counts no quota unit either.
+      if (attempt === 1) {
+        if (!budget.canSpend(1)) budget.spend(1, call.what);
+        await this.#ctx.quota?.beforeCall({ write: call.write });
+      }
+      budget.spend(1, call.what);
       const outcome = await limiter.run(() => this.#attempt(call, attempt));
       if (outcome.ok) {
         breaker.onSuccess();

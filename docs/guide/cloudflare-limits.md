@@ -90,6 +90,23 @@ default 20 an hour is about 15,000 rows a day. The Paid plan (50 million rows a 
 
 The optional per-grant [quotas](query-limits.md) (`AB_QUOTA_DAILY`, `AB_QUOTA_MONTHLY`) keep their counters in `kv`: one read when a request first reaches Agility and one increment per configured period when it ends, about 2 more rows written per read call that reaches Agility (the row accounting is *unverified*, as above). On Free that is the difference between about 33,000 and 20,000 read calls a day, so they are off unless you set them.
 
+The write flows above gain the same three statements (one read, one increment per period, about 2 rows) when a quota is set,
+because a write's POST is counted too: a confirmed call with push elicitation is then 8 statements and about 15 rows. On
+Workers the counters are written after the response (`waitUntil`), so they add no latency to the call, only D1 work.
+
+## Tasks and telemetry
+
+[MCP Tasks](tasks.md) cost D1 rows only for the tasks that are used: creating one is 2 statements (the per-grant creation
+counter and the sealed record), the poll that runs the report is about 6 (read, lease, read, save, the cancel marker, delete the
+lease) plus the tool call's own audit row and quota, so a task is on the order of a dozen rows written (derived from the
+schema, *unverified* against `meta.rows_written`; a poll of a finished task is one read). Cancelling is 4 statements. One grant
+may start 30 tasks per 15 minutes, which bounds this.
+
+[Self-monitoring](observability.md) uses no D1. It makes one outgoing request per authenticated request, after the response (counted
+with the Agility requests against the Free plan's 50); spans of requests that never authenticated (401, 429, the public catalogue)
+are limited to 30 a minute per isolate and the rest are only counted, so unauthenticated traffic cannot set the number of outgoing
+requests (P-3, D-304).
+
 ## Where usage shows
 
 - **Audit log**: every tool call's row holds `agilityRequests`, the requests it used (`GET /api/admin/v1/audit`,

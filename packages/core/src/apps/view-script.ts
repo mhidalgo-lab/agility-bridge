@@ -5,6 +5,9 @@
 // handed. Every piece of text, Agility's included, reaches the page through `textContent`; attributes only ever hold
 // fixed words or numbers that went through `Number()`. It never reads the network, storage or the URL, and never builds
 // markup from a string (no `innerHTML`, `eval` or `Function`): the test in `test/apps/views.test.ts` pins all of that.
+// `postMessage(m, '*')` is deliberate (review S-9): the view runs in a sandboxed frame whose host origin it cannot know (it
+// is opaque or host-specific), so a target origin cannot be named; the listener accepts only `e.source === window.parent`,
+// the messages carry no secret and the page has no network, so the only thing a wrong recipient could read is protocol framing.
 
 /** The script shared by both views. `VIEW` (set by the page) picks the drawing. */
 export const VIEW_SCRIPT = `'use strict';

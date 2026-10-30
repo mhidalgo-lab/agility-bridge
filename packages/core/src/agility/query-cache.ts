@@ -75,6 +75,12 @@ export function canonicalJson(value: unknown): string {
   return `{${parts.join(',')}}`;
 }
 
+/** What the shared tier stores: the time Agility was asked, then the text. An entry without it is a miss. */
+function splitStored(stored: string): { writtenAt: number; text: string } | undefined {
+  const m = /^(\d{1,15}):/.exec(stored);
+  return m === null ? undefined : { writtenAt: Number(m[1]), text: stored.slice(m[0].length) };
+}
+
 /** A random per-process keyed hash for hosts without a keyring (stdio); the key is made on first use and ids never leave the process. */
 export function randomMac(): (data: string) => Promise<string> {
   let key: ReturnType<typeof crypto.subtle.importKey> | undefined;
@@ -154,11 +160,16 @@ export class QueryCache {
     const tier = shared ? this.#opts.shared : undefined;
     if (tier !== undefined) {
       try {
-        const text = await tier.get(id);
-        if (text !== undefined) {
-          this.#remember(id, text, now);
-          this.#hits++;
-          return text;
+        const stored = await tier.get(id);
+        const written = stored === undefined ? undefined : splitStored(stored);
+        // The copy keeps the age it had, so an answer is never served past one TTL since Agility was asked (Q-1).
+        if (written !== undefined) {
+          const writtenAt = Math.min(written.writtenAt, now);
+          if (writtenAt + this.#opts.ttlMs > now) {
+            this.#remember(id, written.text, now, writtenAt + this.#opts.ttlMs);
+            this.#hits++;
+            return written.text;
+          }
         }
       } catch (error) {
         this.#opts.logger?.warn('query cache shared tier read failed', { error: (error as Error).name });
@@ -168,22 +179,28 @@ export class QueryCache {
     return undefined;
   }
 
+  /** Whether an answer of this many response bytes can be stored; checked before it is encoded (P-4). */
+  accepts(responseBytes: number): boolean {
+    return responseBytes <= this.#maxEntryBytes;
+  }
+
   async put(id: string, text: string, shared: boolean): Promise<void> {
     if (text.length > this.#maxEntryBytes) return;
-    this.#remember(id, text, this.#opts.clock.now());
+    const now = this.#opts.clock.now();
+    this.#remember(id, text, now, now + this.#opts.ttlMs);
     const tier = shared ? this.#opts.shared : undefined;
     if (tier === undefined) return;
     try {
-      await tier.set(id, text, this.#opts.ttlMs);
+      await tier.set(id, `${now}:${text}`, this.#opts.ttlMs);
     } catch (error) {
       this.#opts.logger?.warn('query cache shared tier write failed', { error: (error as Error).name });
     }
   }
 
-  #remember(id: string, text: string, now: number): void {
+  #remember(id: string, text: string, now: number, until: number): void {
     const old = this.#entries.get(id);
     if (old !== undefined) this.#drop(id, old);
-    this.#entries.set(id, { text, until: now + this.#opts.ttlMs });
+    this.#entries.set(id, { text, until });
     this.#bytes += text.length;
     // Oldest first: expired entries, then the least recently used, until both bounds hold.
     for (const [k, e] of this.#entries) {

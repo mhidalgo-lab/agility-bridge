@@ -17,6 +17,17 @@ for the collector. A collector that is down, slow or refusing never changes or d
 one attempt and a warning (the error class only, at most one a minute) says so. On the Workers Free plan each request makes one
 more outgoing request for its span (45 Agility requests plus one is under the 50 allowed).
 
+**Unauthenticated traffic is sampled.** A request that never authenticated (a 401, a 429 from the address limiter, or the
+[public catalogue](self-hosting.md#public-tool-catalogue-optional)) is recorded as a span at most 30 times a minute per
+process or isolate; the rest are counted and not sent, so anyone who can reach the server cannot set the volume of the
+collector's bill or of the Worker's outgoing requests. Every authenticated request still has its span. A caller's
+`traceparent` is used only for authenticated requests, so a caller can attach a span to a trace id of their choosing (the span
+carries only the attributes below); it is never forwarded to Agility.
+
+**The collector is your choice.** `AB_OTEL_ENDPOINT` is operator configuration, not caller input, so it is not held to the
+public-address rule other outgoing requests follow: an internal collector (a private address or an internal name) is a normal
+target. Set it only to a collector you trust; it receives the attributes below and the `AB_OTEL_HEADERS` credential.
+
 stdio is not instrumented: it is a local process for one person, and the client already shows what it does
 ([P8-20](../tasks/phase-8-power-features/P8-20-stdio-telemetry.md)).
 

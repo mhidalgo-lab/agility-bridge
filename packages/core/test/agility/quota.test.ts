@@ -151,6 +151,26 @@ describe('refusal', () => {
     expect(store.data.get('qt:d:g1:20261030')).toBe(3);
   });
 
+  it('a refused call spends no unit of the request budget (Q-4)', async () => {
+    const { gate, store } = setup({ daily: 1, monthly: null });
+    store.data.set('qt:d:g1:20261030', 1);
+    const { client, ctx } = clientFor(gate, 'g1');
+    expect((await refusal(client.query(QUERY))).code).toBe('AB_LIMIT_QUOTA');
+    expect(ctx.budget.used).toBe(0);
+  });
+
+  it('an exhausted request budget refuses first and does not count a quota unit (Q-4)', async () => {
+    const { gate, store } = setup({ daily: 100, monthly: null });
+    const fetch = fakeFetch(() => json([[{ Name: 'x' }]]));
+    const meter = gate.meterFor('g1');
+    const ctx = makeContext({ fetch, budget: createBudget(1), quota: meter });
+    const client = agilityClient(ctx, { sleep: async () => {} });
+    await client.query(QUERY);
+    expect((await refusal(client.query({ ...QUERY, page: { size: 2 } }))).code).toBe('AB_BUDGET_EXHAUSTED');
+    await meter.flush();
+    expect(store.data.get('qt:d:g1:20261030')).toBe(1);
+  });
+
   it('the monthly period refuses too, and names itself', async () => {
     const { gate, store } = setup({ daily: 1000, monthly: 10 });
     store.data.set('qt:m:g1:202610', 10);

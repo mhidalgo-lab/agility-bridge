@@ -282,6 +282,12 @@ export interface ToolContext {
    * host and flushed once when the request ends; absent means no quota. Never module state (T21).
    */
   readonly quota?: QuotaMeter;
+  /**
+   * Keeps accounting work alive after the response (Workers: `waitUntil`); absent where the process outlives a request.
+   * Only for work that proves nothing and is never needed to decide the answer: the quota counters' write and the
+   * query cache's store. Authorization, the budget and audit intent never use it (P-2).
+   */
+  readonly background?: (work: Promise<unknown>) => void;
   readonly logger: Logger;
   readonly clock: Clock;
   readonly random: Random;

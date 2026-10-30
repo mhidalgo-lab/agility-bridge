@@ -57,9 +57,12 @@ const MASTER_KEY = /^(?:v([1-9][0-9]{0,2}):)?([A-Za-z0-9+/]{43}=)$/;
 const HKDF_SALT = new TextEncoder().encode('agility-bridge/hkdf/v1');
 
 export function toBase64(bytes: Uint8Array): string {
-  let s = '';
-  for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s);
+  // In slices: a per-byte string concatenation cost milliseconds on a 256 KB cache entry (P-1).
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.length; i += 0x2000) {
+    parts.push(String.fromCharCode(...bytes.subarray(i, i + 0x2000)));
+  }
+  return btoa(parts.join(''));
 }
 
 export function fromBase64(text: string): Uint8Array {

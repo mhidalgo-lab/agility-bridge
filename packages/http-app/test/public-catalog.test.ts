@@ -5,7 +5,13 @@
 import { CORE_TOOLS, PUBLIC_CATALOG_GROUPS } from '@agility-bridge/core';
 import type { Storage } from '@agility-bridge/storage';
 import { describe, expect, it } from 'vitest';
-import { parseServerSettings, SERVER_SETTING_NAMES, SettingsError, settingWarnings } from '../src/index.ts';
+import {
+  parseServerSettings,
+  SERVER_SETTING_NAMES,
+  SettingsError,
+  settingWarnings,
+  type TaskService,
+} from '../src/index.ts';
 import { type Era, ORIGIN, post, type World, world } from './helpers/world.ts';
 
 const INIT = {
@@ -54,6 +60,38 @@ describe('AB_PUBLIC_TOOL_CATALOG on', () => {
     const list = await post(w, 'team-a', null, LIST);
     expect(list.status).toBe(200);
     expect(await text(list)).toContain('"whoami"');
+  });
+
+  it('does not advertise the Tasks extension to an anonymous caller (S-10)', async () => {
+    const tasks = {
+      wants: () => false,
+      isTaskRequest: () => false,
+      handle: async () => ({}),
+    } as unknown as TaskService;
+    const w = await world(on, { services: { tasks } });
+    const discover = {
+      jsonrpc: '2.0',
+      id: 5,
+      method: 'server/discover',
+      params: {
+        _meta: {
+          'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+          'io.modelcontextprotocol/clientCapabilities': {},
+        },
+      },
+    };
+    const anonymous = await post(w, 'team-a', null, discover, {
+      'mcp-method': 'server/discover',
+      'mcp-protocol-version': '2026-07-28',
+    });
+    expect(anonymous.status).toBe(200);
+    expect(await text(anonymous)).not.toContain('io.modelcontextprotocol/tasks');
+    // An authenticated caller still sees it.
+    const signedIn = await post(w, 'team-a', w.tokens.alice, discover, {
+      'mcp-method': 'server/discover',
+      'mcp-protocol-version': '2026-07-28',
+    });
+    expect(await text(signedIn)).toContain('io.modelcontextprotocol/tasks');
   });
 
   it('answers the same for a real, an unknown, a disabled and a malformed workspace, and reads no storage', async () => {

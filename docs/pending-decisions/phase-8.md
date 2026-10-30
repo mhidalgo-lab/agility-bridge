@@ -260,4 +260,68 @@
 - **Context:** The PowerShell script read and wrote through the console's OEM code page, and the read-back used the same path, so a mangled secret verified. The script has never run on Windows (D-273).
 - **Options:** (a) set `[Console]::InputEncoding` and `OutputEncoding` to UTF-8 without BOM, and refuse non-ASCII secrets until a real run proves it (P8-32); (b) only the encoding; (c) only the refusal.
 - **Recommendation:** (a), built. Access tokens and master keys are ASCII, so nothing is lost.
+### D-295 — Accounting work finishes after the response on Workers *(P8-12 (P-2))*
+- **Context:** The quota counters' write (two D1 upserts) and the query cache's shared-tier store (seal, `cache.put`, first read-back) sat on the request's critical path: up to three D1 round trips plus the cache operations of added latency per read call.
+- **Options:** (a) hand both to the host's `background` hook (`waitUntil`) where it has one, and await them where it has none (Node, stdio); (b) keep them inline; (c) drop the shared tier's read-back.
+- **Recommendation:** (a), built, through an optional `ToolContext.background` set only by a host that has the hook. Only work that proves nothing and is not needed to decide the answer moves: the quota read that decides a refusal, authorization, the budget, audit intent and the write limiter stay on the request path. Cost: on Workers the next request in the first moments after another may read the old counter (the counters were already approximate and fail open, D-249). The memory tier is still filled before the answer returns.
+- **Owner:** *(open; built as (a))*
+
+### D-296 — The quota is a soft cap: document the overshoot bound, no per-call reservation *(P8-12 (S-5))*
+- **Context:** Parallel requests of one grant each read the counters once and each may spend up to its own call budget before any of them writes, so the quota can be overshot.
+- **Options:** (a) document the bound (requests in flight of one grant times the call budget) and keep one read and one write per request; (b) reserve units atomically with `kv.increment(max)` per call or per batch, a D1 write for every Agility request; (c) reserve a batch of units at the first call.
+- **Recommendation:** (a), built. A hard cap costs the D1 rows the design exists to save (L-415, 100,000 a day on Free) and the quota is a cost control that already fails open (D-249). (c) stays possible if an owner needs a hard cap, with a larger overshoot than the saving is worth on Free.
+- **Owner:** *(open; built as (a))*
+
+### D-297 — Shared-tier entries carry the time Agility was asked *(P8-12 (Q-1))*
+- **Context:** A copy promoted from the shared tier into an isolate's memory restarted the TTL, so an answer could be served up to twice the TTL (120 s at the 60 s maximum) after it was read, against a guide that promises one TTL.
+- **Options:** (a) store the write time in front of the text inside the sealed body (`<ms>:<text>`) and give the promoted copy the remaining life; (b) do not promote shared-tier hits to memory; (c) read the Cache API `Age` header.
+- **Recommendation:** (a), built in the cache itself, so every tier implementation keeps one rule and the body stays authenticated (the time is inside the sealed text, bound to the entry id). A time in the future (clock skew between isolates) is clamped to now; an entry without a readable time is a miss. (b) loses the memory saving; (c) depends on a header a no-op or foreign cache may not set.
+- **Owner:** *(open; built as (a))*
+
+### D-298 — The query cache is bypassed by the caller's own write tools, not by the workspace *(P8-12 (Q-11))*
+- **Context:** The bypass was keyed on `workspace.writes.enabled`, so a read-only grant in a writing workspace lost the cache (and `whoami`'s block) while the text promised that only a caller with write tools bypasses it.
+- **Options:** (a) key it on the caller's write runtime (`ctx.writes`, present only when the server switch and this caller's write tools hold); (b) keep the workspace rule and fix the text.
+- **Recommendation:** (a), built. The write layer's reads still pass `fresh`, and a writing caller never reads or fills the cache. Residual, documented: a read-only grant next to a writing one can show up to one TTL of data from before the other grant's write.
+- **Owner:** *(open; built as (a))*
+
+### D-299 — The quota is asked before the call budget is spent *(P8-12 (Q-4))*
+- **Context:** `#send` spent a budget unit and then the quota refused the call, so the audit row, the log and the span claimed a request that never reached Agility.
+- **Options:** (a) ask the quota first (an exhausted budget is refused before it, so no quota unit is counted for a call that cannot happen) and spend the unit after; (b) refund the unit on refusal.
+- **Recommendation:** (a), built; there is no refund path to get wrong.
+- **Owner:** *(open; built as (a))*
+
+### D-300 — A task poll has the request deadline; failures release the lease *(P8-12 (Q-2, P-5))*
+- **Context:** The poll that ran a report was outside the deadline race, and a thrown runner, an abandoned poll or a result that could not be saved left the lease for 200 s and then reran the report.
+- **Options:** (a) race the run against the request deadline and turn a late, thrown or unsaveable run into a stored `failed` task, release the lease in `finally`; (b) return `working` at once and run in `waitUntil`; (c) a Durable Object or queue.
+- **Recommendation:** (a), built. (b) cannot work for a report longer than Workers' post-response budget; (c) needs Cloudflare resources the owner has not allowed ([P8-36](../tasks/phase-8-power-features/P8-36-background-task-runner.md)). The residual is documented: a client that drops the poll can leave the task `working` until the lease ends, after which the next poll runs the report once more.
+- **Owner:** *(open; built as (a))*
+
+### D-301 — A cancel is a marker the finishing poll checks *(P8-12 (Q-5))*
+- **Context:** Cancel and completion each read, changed and saved the record, so a cancel acknowledged to the client could be overwritten by the result.
+- **Options:** (a) the cancel stores a marker first, then marks the record; the finishing poll saves its result and then checks the marker and rewrites `cancelled`; (b) a conditional write on the record (the `kv` has no compare-and-set on the value).
+- **Recommendation:** (a), built: both orders end `cancelled`, at the cost of one extra read in the finishing poll and one extra write in a cancel.
+- **Owner:** *(open; built as (a))*
+
+### D-302 — A task is validated and bounded at creation; a finished result needs the same scope *(P8-12 (S-3, S-4))*
+- **Context:** Creation stored arguments unchecked (up to the 1 MiB body), without a cap per grant, and a finished result was returned after the grant lost the tool or was narrowed.
+- **Options:** (a) arguments must be an object of at most 8 KiB valid for the tool's schema; 30 creations per grant per 15-minute window through an atomic capped counter; a result is returned only while the tool is still granted and a digest of projects, asset types and limits equals the one stored when it ran; (b) also write an audit row at creation; (c) count creation against the per-grant quota.
+- **Recommendation:** (a), built. Creation asks Agility nothing, so it takes no quota unit, and the report's own audit and quota apply when it runs (b and c would double count). Narrowing or widening limits both invalidate a stored result: simple and safe, at the price of a re-run after an admin change.
+- **Owner:** *(open; built as (a))*
+
+### D-303 — A result too large to keep ends the task as failed *(P8-12 (P-5))*
+- **Context:** A report result above about 190 KB made the save throw after the report ran.
+- **Options:** (a) a result above 150,000 characters (checked before sealing, which also saves CPU) or that fails to save becomes a short `failed` record; (b) truncate; (c) chunk across `kv` values.
+- **Recommendation:** (a), built; truncating would hand a client a partial report that looks complete (L-033).
+- **Owner:** *(open; built as (a))*
+
+### D-304 — Spans of requests that never authenticated are sampled *(P8-12 (P-3, S-8))*
+- **Context:** Every 401, 429 and public-catalogue request produced a span and, on Workers, an outgoing OTLP request, so anyone who can reach the server set the volume of the collector's bill and of subrequests.
+- **Options:** (a) at most 30 such spans a minute per process or isolate, the rest counted in `stats().sampledOut`; (b) never record them; (c) batch on Workers.
+- **Recommendation:** (a), built: refusals stay visible to the operator and the amplification is bounded; authenticated spans are never sampled. (c) stays for [P8-35](../tasks/phase-8-power-features/P8-35-catalogue-cache-single-flight.md).
+- **Owner:** *(open; built as (a))*
+
+### D-305 — Telemetry endpoint, caller trace ids and the view's `postMessage` target stay as built; the public catalogue advertises no extension *(P8-12 (S-8, S-9, S-10))*
+- **Context:** Three low observations: `AB_OTEL_ENDPOINT` has no public-address rule unlike other egress; a caller's `traceparent` trace id is adopted; the MCP Apps view posts to `'*'`; the anonymous `server/discover` listed the Tasks extension.
+- **Options:** (a) document the first three (operator-chosen collector, harmless trace id, the host's origin cannot be known) and stop advertising extensions to anonymous callers; (b) apply `checkPublicHost` to the endpoint unless private addresses are allowed; (c) pin a target origin.
+- **Recommendation:** (a), built. An internal collector is a legitimate target and the endpoint is operator configuration, not caller input; (c) is impossible for a sandboxed frame. The catalogue fix is a plain defect fix: the anonymous prepared request carries no extensions.
 - **Owner:** *(open; built as (a))*

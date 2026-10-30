@@ -117,7 +117,7 @@ export const whoami: ToolDefinition = defineTool({
       },
       // Honest cache status (P8-01, L-098): whether answers may be reused, for how long, and whether the shared tier was
       // proven by a read-back. Configuration and counters only, never cached data.
-      ...(ctx.queryCache === undefined || ctx.workspace.writes.enabled
+      ...(ctx.queryCache === undefined || ctx.writes !== undefined
         ? {}
         : { queryCache: cacheStatus(ctx.queryCache.cache.info()) }),
       ...(quota === undefined ||

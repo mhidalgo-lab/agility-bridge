@@ -60,6 +60,21 @@ function setup(over: Partial<Parameters<typeof createTelemetry>[0]> = {}) {
   return { telemetry, exported, logs, now };
 }
 
+describe('unauthenticated spans (P-3)', () => {
+  it('keeps a per-minute budget for spans of requests that never authenticated, and counts the rest', async () => {
+    const { telemetry, exported, now } = setup({ flushEach: true, unauthenticatedPerMinute: 3 });
+    for (let i = 0; i < 10; i++) await telemetry.record(input({ status: 401, unauthenticated: true }));
+    expect(exported.flat()).toHaveLength(3);
+    expect(telemetry.stats().sampledOut).toBe(7);
+    // Authenticated spans are never sampled, and the next minute starts a new budget.
+    await telemetry.record(input());
+    expect(exported.flat()).toHaveLength(4);
+    now.t += 60_000;
+    await telemetry.record(input({ status: 401, unauthenticated: true }));
+    expect(exported.flat()).toHaveLength(5);
+  });
+});
+
 describe('traceRequest', () => {
   it('is the OTLP/JSON shape: string nanoseconds, string ints, server kind, error status only for an error', () => {
     const body = traceRequest({ attributes: telemetryResource({ version: '0.8.0', environment: 'test' }) }, [

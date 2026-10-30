@@ -98,7 +98,10 @@ function collector(
   };
 }
 
-function telemetryFor(c: Collector, over: { timeoutMs?: number; flushEach?: boolean } = {}): Telemetry {
+function telemetryFor(
+  c: Collector,
+  over: { timeoutMs?: number; flushEach?: boolean; unauthenticatedPerMinute?: number } = {},
+): Telemetry {
   const logs: string[] = [];
   return createTelemetry({
     exporter: createOtlpExporter({
@@ -120,6 +123,9 @@ function telemetryFor(c: Collector, over: { timeoutMs?: number; flushEach?: bool
     knownTools: new Set(CORE_TOOLS.map((t) => t.name)),
     service: { version: '0.0.0-test', environment: 'test' },
     flushEach: over.flushEach ?? false,
+    ...(over.unauthenticatedPerMinute === undefined
+      ? {}
+      : { unauthenticatedPerMinute: over.unauthenticatedPerMinute }),
   });
 }
 const telemetryLogger = {
@@ -143,6 +149,23 @@ async function call(
   return { res, text };
 }
 const rpc = (id: number, method: string, params: unknown = {}) => ({ jsonrpc: '2.0', id, method, params });
+
+describe('a flood of unauthenticated requests (P-3)', () => {
+  it('sends a bounded number of spans (and collector requests), the rest only counted; authenticated ones are all kept', async () => {
+    const c = collector();
+    const telemetry = telemetryFor(c, { flushEach: true, unauthenticatedPerMinute: 3 });
+    const w = await world({ telemetry });
+    for (let i = 0; i < 12; i++) {
+      expect((await call(w, 'team-a', null, rpc(i, 'tools/list'))).res.status).toBe(401);
+    }
+    await telemetry.flush();
+    expect(c.spans()).toHaveLength(3);
+    expect(telemetry.stats().sampledOut).toBe(9);
+    await call(w, 'team-a', w.tokens.alice, rpc(99, 'ping'));
+    await telemetry.flush();
+    expect(c.spans()).toHaveLength(4);
+  });
+});
 
 describe('every MCP method and every early refusal is one span', () => {
   it('names the method and class, whatever the answer', async () => {

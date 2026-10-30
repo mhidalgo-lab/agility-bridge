@@ -18,7 +18,9 @@ Agility request, no budget unit, and it does not count against a quota (L-116). 
 | `AB_QUERY_CACHE_EDGE` | `off` | Workers only: also keep sealed answers in the Cache API so other isolates of the same data centre can reuse them |
 
 Pick a TTL by how fresh an answer must be: 10 to 30 seconds takes the repeats out of a burst of related questions
-(an agent asking for the same sprint three times) without ever showing something older than half a minute.
+(an agent asking for the same sprint three times) without ever showing something older than half a minute. The TTL counts
+from when Agility was asked, in every tier: an answer another isolate read from the shared tier keeps the age it had
+(review Q-1, D-297), so nothing is ever older than one TTL.
 
 ## What is never shared
 
@@ -36,9 +38,11 @@ untrusted-data envelope as a live answer, so a cached title is as fenced as a fr
 ## When it is skipped
 
 - A caller who has **write tools** never reads or fills the cache, so a read after a write shows the write. The write
-  layer's own reads pass `fresh` as well.
+  layer's own reads pass `fresh` as well. It is the *caller's own tools* that decide, not the workspace: a read-only grant
+  in a workspace where another grant writes still uses the cache, so it can show up to one TTL of data from before the
+  other grant's write (review Q-11, D-298), and `whoami` shows the cache for it.
 - Errors are not cached. A cache failure (a broken shared tier) is a miss, never an error.
-- Answers above 256 KiB are not cached.
+- Answers above 256 KiB are not cached, and are not even encoded for it (the size is checked first).
 - Local admin changes (instances, credentials, workspaces, grants, tokens) clear the in-memory cache together with the
   access cache. Other processes keep their entries until the TTL ends: a changed project scope changes the key, a
   revoked grant is refused before the lookup, a replaced Agility token under the same credential id can show up to one
@@ -52,6 +56,9 @@ and its limits on the Free plan are not fully documented, so it is a second swit
 - bodies are **sealed** (AES-256-GCM, a key derived from the master key for this purpose, the entry id bound as
   additional data) before they leave the isolate, so what the cache holds is useless without the master key, and a body
   copied to another entry, edited, or read under another master key is a miss;
+- the store (seal, put, and the first read-back) finishes **after** the response, so a caller never waits for it (D-295);
+  sealing and opening cost Worker CPU in proportion to the size of the answer (milliseconds from about 64 KB), so on the Free
+  plan the tier suits small answers (a lower shared-tier size cap is [P8-38](../tasks/phase-8-power-features/P8-38-shared-tier-size-and-cpu.md));
 - the tier reports **`verified`** only after reading its first write back intact, and **`unavailable`** when the cache
   stored nothing or threw; an unavailable tier is not used and is tried again after 10 minutes;
 - `whoami` shows the truth: `queryCache: { mode: "memory+shared", ttlSeconds, shared: "off" | "unverified" | "verified" | "unavailable" }`.

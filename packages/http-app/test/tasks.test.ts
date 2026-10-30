@@ -2,6 +2,8 @@
 // The MCP Tasks extension (P8-10, THREAT_MODEL T32, L-016, L-073): only requests that declare it get a task, only the
 // owner device of a grant and workspace can read, cancel or update it, records are sealed and hashed, a task runs once,
 // and the kill switch removes the whole thing.
+
+import type { EffectiveAccess } from '@agility-bridge/auth';
 import { generateMasterKey, Keyring } from '@agility-bridge/auth';
 import {
   CORE_TOOLS,
@@ -12,6 +14,7 @@ import {
   webCryptoRandom,
 } from '@agility-bridge/core';
 import type { Storage } from '@agility-bridge/storage';
+import { createMemoryStorage } from '@agility-bridge/storage';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createTaskService, TASK_TTL_MS, TASKS_EXTENSION } from '../src/index.ts';
@@ -35,7 +38,7 @@ function reportTool(runs: { n: number }, gate?: Promise<void>): ToolDefinition {
     kind: 'read',
     group: 'reports',
     cost: 1,
-    inputSchema: z.object({}),
+    inputSchema: z.object({ rows: z.number().int().min(1).max(10).optional() }),
     handler: async (_input, ctx) => {
       runs.n++;
       if (gate !== undefined) await gate;
@@ -45,7 +48,7 @@ function reportTool(runs: { n: number }, gate?: Promise<void>): ToolDefinition {
   });
 }
 
-async function rig(options: { tasks?: boolean; gate?: Promise<void> } = {}) {
+async function rig(options: { tasks?: boolean; gate?: Promise<void>; deadlineMs?: number } = {}) {
   const runs = { n: 0 };
   const tool = reportTool(runs, options.gate);
   const info = new Map([...TOOL_INFO, [tool.name, { kind: tool.kind, group: tool.group }]]);
@@ -62,6 +65,7 @@ async function rig(options: { tasks?: boolean; gate?: Promise<void> } = {}) {
       : createTaskService({ kv: lazyKv, keyring, clock: { now: () => clock.t }, random: webCryptoRandom });
   const w = await world(
     {
+      ...(options.deadlineMs === undefined ? {} : { deadlineMs: options.deadlineMs }),
       tools: [...CORE_TOOLS, tool],
       access: {
         tools: info,
@@ -85,11 +89,11 @@ async function rig(options: { tasks?: boolean; gate?: Promise<void> } = {}) {
   return { w, runs, clock };
 }
 
-const call = (id: number, meta: object | undefined, name = 'test_report') => ({
+const call = (id: number, meta: object | undefined, name = 'test_report', args: unknown = {}) => ({
   jsonrpc: '2.0',
   id,
   method: 'tools/call',
-  params: { name, arguments: {}, ...(meta === undefined ? {} : { _meta: meta }) },
+  params: { name, arguments: args, ...(meta === undefined ? {} : { _meta: meta }) },
 });
 const taskMsg = (id: number, method: string, taskId: string, meta: object = MODERN_META) => ({
   jsonrpc: '2.0',
@@ -131,7 +135,7 @@ describe('creating a task', () => {
     expect(task).toMatchObject({ resultType: 'task', status: 'working', ttlMs: TASK_TTL_MS });
     expect(task.taskId).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(runs.n).toBe(0);
-    const keys = await w.storage.kv.list('task');
+    const keys = await w.storage.kv.list('task:');
     expect(keys).toHaveLength(1);
     expect(keys[0]).not.toContain(task.taskId);
     const stored = (await w.storage.kv.get(keys[0] as string)) as string;
@@ -315,5 +319,190 @@ describe('the kill switch', () => {
     expect(runs.n).toBe(1);
     const got = await rpc(w, w.tokens.alice, taskMsg(2, 'tasks/get', 'A'.repeat(43)));
     expect(got.error?.code).toBe(-32601);
+  });
+});
+
+describe('review fixes (P8-12)', () => {
+  it('reports the remaining life of a task, not always 15 minutes (Q-6)', async () => {
+    const { w, clock } = await rig();
+    const { taskId } = await create(w, w.tokens.alice);
+    await rpc(w, w.tokens.alice, taskMsg(2, 'tasks/get', taskId));
+    clock.t += 14 * 60_000;
+    const late = await rpc(w, w.tokens.alice, taskMsg(3, 'tasks/get', taskId));
+    expect(late.result?.['ttlMs']).toBe(TASK_TTL_MS - 14 * 60_000);
+  });
+
+  it('a report that does not fit the request deadline fails the task, frees the lease and is not run again (Q-2)', async () => {
+    const gate = new Promise<void>(() => {});
+    const { w, runs } = await rig({ gate, deadlineMs: 150 });
+    const { taskId } = await create(w, w.tokens.alice);
+    const first = await rpc(w, w.tokens.alice, taskMsg(2, 'tasks/get', taskId));
+    expect(first.result).toMatchObject({ status: 'failed' });
+    expect(JSON.stringify(first.result)).toContain('took too long');
+    expect(await w.storage.kv.list('taskrun:')).toHaveLength(0);
+    const again = await rpc(w, w.tokens.alice, taskMsg(3, 'tasks/get', taskId));
+    expect(again.result).toMatchObject({ status: 'failed' });
+    expect(runs.n).toBe(1);
+  });
+
+  it('refuses arguments that do not match the tool schema, or are too large, before storing anything (S-3)', async () => {
+    const { w } = await rig();
+    for (const args of [{ rows: 'many' }, { rows: 99 }, [], 'text', { note: 'x'.repeat(9_000) }]) {
+      const r = await rpc(w, w.tokens.alice, call(1, MODERN_META, 'test_report', args));
+      expect(r.error?.code, JSON.stringify(args).slice(0, 40)).toBe(-32602);
+      expect(JSON.stringify(r)).not.toContain('"taskId"');
+    }
+    expect(await w.storage.kv.list('task:')).toHaveLength(0);
+    const ok = await rpc(w, w.tokens.alice, call(2, MODERN_META, 'test_report', { rows: 3 }));
+    expect(ok.result).toMatchObject({ resultType: 'task' });
+  });
+
+  it('a finished task is not returned once the grant lost the tool (S-4)', async () => {
+    const { w } = await rig();
+    const { taskId } = await create(w, w.tokens.alice);
+    expect((await rpc(w, w.tokens.alice, taskMsg(2, 'tasks/get', taskId))).result).toMatchObject({
+      status: 'completed',
+    });
+    await w.storage.grants.update(w.ids.aliceGrant, { tools: ['whoami'] });
+    w.app.clearAccessCache();
+    const r = await rpc(w, w.tokens.alice, taskMsg(3, 'tasks/get', taskId));
+    expect(r.error?.code).toBe(-32602);
+    expect(JSON.stringify(r)).not.toContain('synthetic');
+  });
+});
+
+/** A service over a memory kv with a stub access, for what the HTTP rig cannot reach (clock, lease, races). */
+async function service(over: { leaseMs?: number } = {}) {
+  const clock = { t: Date.UTC(2026, 9, 30, 12) };
+  const storage = createMemoryStorage({ now: () => clock.t });
+  const keyring = await Keyring.create(generateMasterKey(1));
+  const runs = { n: 0 };
+  const tool = reportTool(runs);
+  const tasks = createTaskService({
+    kv: storage.kv,
+    keyring,
+    clock: { now: () => clock.t },
+    random: webCryptoRandom,
+    ...over,
+  });
+  const access = (grant = 'g1', projects: string[] = []) =>
+    ({
+      grant: { id: grant },
+      workspace: { id: 'w1' },
+      tokenId: 't1',
+      projects: { allowed: projects, includeChildren: false },
+      assetTypes: { deny: [] },
+      limits: { callBudget: 10 },
+    }) as unknown as EffectiveAccess;
+  const msg = (id: number, method: string, params: Record<string, unknown>) => ({
+    jsonrpc: '2.0',
+    id,
+    method,
+    params: { ...params, _meta: MODERN_META },
+  });
+  const done = { result: { content: [{ type: 'text', text: 'ok' }] } };
+  const make = async (run = async () => done, acc = access()) => {
+    const r = (await tasks.handle({
+      message: msg(1, 'tools/call', { name: 'test_report', arguments: {} }),
+      access: acc,
+      tools: [tool],
+      run,
+    })) as { result?: { taskId: string }; error?: unknown };
+    return r.result?.taskId as string;
+  };
+  const poll = (
+    taskId: string,
+    method: string,
+    run: Parameters<typeof tasks.handle>[0]['run'],
+    acc = access(),
+  ) =>
+    tasks.handle({ message: msg(2, method, { taskId }), access: acc, tools: [tool], run }) as Promise<{
+      result?: Record<string, unknown>;
+      error?: { message: string };
+    }>;
+  return { storage, clock, tasks, access, make, poll, done, tool };
+}
+
+describe('the task service on its own (P8-12)', () => {
+  it('a lease left by a runner that never returned lets a later poll run the report again, only after it expires (Q-2)', async () => {
+    const s = await service({ leaseMs: 60_000 });
+    const id = await s.make();
+    void s.poll(id, 'tasks/get', () => new Promise(() => {}));
+    await new Promise((r) => setTimeout(r, 20));
+    expect((await s.poll(id, 'tasks/get', async () => s.done)).result).toMatchObject({ status: 'working' });
+    s.clock.t += 60_001;
+    expect((await s.poll(id, 'tasks/get', async () => s.done)).result).toMatchObject({ status: 'completed' });
+  });
+
+  it('a runner that throws fails the task and frees the lease (Q-2)', async () => {
+    const s = await service();
+    const id = await s.make();
+    const r = await s.poll(id, 'tasks/get', () => Promise.reject(new Error('aborted')));
+    expect(r.result).toMatchObject({ status: 'failed' });
+    expect(await s.storage.kv.list('taskrun:')).toHaveLength(0);
+  });
+
+  it('a cancel that lands between the final read and the save still wins (Q-5)', async () => {
+    const s = await service();
+    const id = await s.make();
+    let sets = 0;
+    const kv = s.storage.kv;
+    const realSet = kv.set.bind(kv);
+    let cancelling: Promise<unknown> | undefined;
+    kv.set = async (key, value, options) => {
+      // The first record write after creation is the completion: a cancel arrives just before it.
+      if (key.startsWith('task:') && ++sets === 1) {
+        cancelling = s.poll(id, 'tasks/cancel', async () => s.done);
+        await cancelling;
+      }
+      return realSet(key, value, options);
+    };
+    await s.poll(id, 'tasks/get', async () => s.done);
+    expect((await s.poll(id, 'tasks/get', async () => s.done)).result).toMatchObject({ status: 'cancelled' });
+  });
+
+  it('a result too large to keep fails the task with a short error, frees the lease and is not run again (P-5)', async () => {
+    const s = await service();
+    const id = await s.make();
+    let runs = 0;
+    const big = async () => {
+      runs++;
+      return { result: { content: [{ type: 'text', text: 'x'.repeat(400_000) }] } };
+    };
+    const first = await s.poll(id, 'tasks/get', big);
+    expect(first.result).toMatchObject({ status: 'failed' });
+    expect(JSON.stringify(first.result)).toContain('too large');
+    expect(await s.storage.kv.list('taskrun:')).toHaveLength(0);
+    await s.poll(id, 'tasks/get', big);
+    expect(runs).toBe(1);
+  });
+
+  it('caps how many tasks one grant may start per window, and leaves other grants alone (S-3)', async () => {
+    const s = await service();
+    for (let i = 0; i < 30; i++) expect(await s.make()).toBeTruthy();
+    const refused = (await s.tasks.handle({
+      message: {
+        jsonrpc: '2.0',
+        id: 9,
+        method: 'tools/call',
+        params: { name: 'test_report', arguments: {}, _meta: MODERN_META },
+      },
+      access: s.access(),
+      tools: [s.tool],
+      run: async () => s.done,
+    })) as { error?: { message: string }; result?: unknown };
+    expect(refused.error?.message).toContain('Too many tasks');
+    expect(refused.result).toBeUndefined();
+    expect(await s.make(async () => s.done, s.access('g2'))).toBeTruthy();
+  });
+
+  it('does not return a finished result to a caller whose scope narrowed since it ran (S-4)', async () => {
+    const s = await service();
+    const id = await s.make();
+    expect((await s.poll(id, 'tasks/get', async () => s.done)).result).toMatchObject({ status: 'completed' });
+    expect((await s.poll(id, 'tasks/get', async () => s.done)).result).toMatchObject({ status: 'completed' });
+    const narrowed = await s.poll(id, 'tasks/get', async () => s.done, s.access('g1', ['Scope:1']));
+    expect(narrowed.result).toBeUndefined();
+    expect(narrowed.error?.message).toContain('Unknown or expired');
   });
 });
