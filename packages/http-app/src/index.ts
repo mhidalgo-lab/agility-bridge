@@ -96,7 +96,12 @@ export {
   type OAuthSettings,
   oauthSettingsFromEnv,
 } from './oauth/settings.ts';
-export { type CacheLike, EdgeQueryTier, type EdgeTierOptions } from './query-cache-edge.ts';
+export {
+  type CacheLike,
+  DEFAULT_SHARED_ENTRY_CHARS,
+  EdgeQueryTier,
+  type EdgeTierOptions,
+} from './query-cache-edge.ts';
 export {
   addressKey,
   clientAddress,

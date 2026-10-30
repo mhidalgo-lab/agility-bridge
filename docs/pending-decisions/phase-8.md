@@ -400,3 +400,15 @@
 - **Options:** (a) a new `kv.incrementMany(entries)`: one multi-row upsert with the same expiry rules, atomic as one statement, at most 10 distinct keys, uncapped (the quota is a soft cap, D-296); (b) `Promise.all` of two increments (two round trips); (c) a `batch` of two increments in the SQL driver only.
 - **Recommendation:** (a), built on all three adapters with a contract test and a statement count in each. `increment` with `max` is unchanged, so the capped atomic counters of the write limiter, tasks and OAuth abuse limits keep their semantics. D-248, D-249, D-295, D-296 and D-299 stay true: still one read and one write per request, fail open, written after the response on Workers, a soft cap, and the quota asked before the budget. Rows written do not fall (two counters are two rows, L-461); statements fall from three to two a request.
 - **Owner:** *(open; built as (a))*
+
+### D-313 — The shared tier takes entries up to 64 KiB, as an option of the tier *(P8-38)*
+- **Context:** The shared tier stored anything the memory tier accepted (256 KiB); sealing and opening cost CPU in proportion to size on a Free plan with 10 ms.
+- **Options:** (a) a cap of 64 KiB of text, an option (`maxEntryChars`) of `EdgeQueryTier` that the `SharedTier` interface exposes, checked by the cache before handing over and by the tier itself, with `whoami` showing it as `queryCache.sharedMaxEntryChars`; (b) 32 KiB; (c) an environment setting; (d) no cap, only the native base64.
+- **Recommendation:** (a), built. With the runtime's base64 a 64 KiB seal and open cost about 0.5 ms together on local workerd, and 256 KiB about 2.5 ms, so the cap is conservative for Paid and fair for Free (a 100 KB answer is already a large page of rows). Bigger answers stay in memory only. A setting is not worth an operator decision until the deployed measurement (P8-13) shows a need.
+- **Owner:** *(open; built as (a))*
+
+### D-314 — Use the runtime's base64 where it exists; keep the double parse *(P8-38)*
+- **Context:** The byte loop for base64 was most of the cost of a seal on workerd, and the review asked about the extra JSON parse of a hit.
+- **Options:** (a) `Uint8Array.prototype.toBase64` and `Uint8Array.fromBase64` when present, the existing loop and `btoa` otherwise; leave the stored format alone; (b) also change the stored format to avoid parsing the sealed wrapper.
+- **Recommendation:** (a), built. Measured on local workerd the wrapper parse is 0.01 to 0.3 ms from 8 to 256 KB, so (b) would trade a format change (every entry becomes a miss once) for nothing.
+- **Owner:** *(open; built as (a))*

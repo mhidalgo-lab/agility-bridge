@@ -50,7 +50,13 @@ function quotaNotes(usage: QuotaUsage | undefined): string[] {
 }
 
 /** Settings and the shared tier's proof only: hit counters are per process and would show other callers' activity (T16). */
-const cacheStatus = ({ mode, ttlSeconds, shared }: QueryCacheInfo) => ({ mode, ttlSeconds, shared });
+const cacheStatus = ({ mode, ttlSeconds, shared, sharedMaxEntryChars }: QueryCacheInfo) => ({
+  mode,
+  ttlSeconds,
+  shared,
+  // Answers above this many characters are kept in memory only, never in the shared tier (P8-38).
+  ...(sharedMaxEntryChars === undefined ? {} : { sharedMaxEntryChars }),
+});
 
 export const whoami: ToolDefinition = defineTool({
   name: 'whoami',

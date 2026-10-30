@@ -572,6 +572,16 @@ Checked 2026-10 in Cloudflare documentation; P0-09 measures with Agility-shaped 
   Rate Limiting binding let 8 of 10 calls through against a limit of 5 per 10 s (a backstop only); an untrusted certificate fails `fetch` on workerd with an opaque `internal error;
   reference = …` (L-160); local D1 and `node:sqlite` agree on STRICT tables, foreign keys, `ON CONFLICT … DO UPDATE …
   WHERE … RETURNING` and JSON functions, but D1's `meta.changes` includes cascaded rows (L-161). *live (local), P0-09*
+- **Sealing a shared-tier entry on workerd (2026-10-30, P8-38; local workerd 1.20261006.1 through miniflare, *local and
+  indicative*, not a deployed Worker).** Measured by timing from outside one request that loops an operation (timers do not
+  advance while code computes in an isolate), on a machine with a load average of about 2, best of three, per call, for 8 /
+  64 / 100 / 256 KB of JSON: `toBase64` with the byte-slice loop 0.2 / 1.8 / 2.7 / 7.3 ms, with the runtime's own
+  `Uint8Array.prototype.toBase64` 0.0 / 0.02 / 0.01 / 0.05 ms (workerd has it; Node 24 does not, so the loop stays as the
+  fallback); `seal` 0.25 / 2.2 / 3.2 / 8.7 ms before and 0.04 / 0.24 / 0.37 / 1.1 ms after using it; `open` 0.05 / 0.45 / 0.73 /
+  2.0 ms before and 0.04 / 0.29 / 0.45 / 1.4 ms after; parsing the sealed wrapper and the body (the "double parse") 0.01 to
+  0.3 ms even at 256 KB, so it does not matter. A hit costs about `open` plus the body parse; a miss about `seal` plus
+  `Cache.put` and the first read-back. Not measured: `Cache.put` and `Cache.match` themselves, CPU as Cloudflare bills it, a
+  deployed Worker (needs P8-13). — [Uint8Array base64 proposal](https://github.com/tc39/proposal-arraybuffer-base64)
 - **Browser Integrity Check / bot protection** on custom domains can answer non-browser MCP clients with error 1010 or
   403; a WAF exception for the MCP paths is needed.
 

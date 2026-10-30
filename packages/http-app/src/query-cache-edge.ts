@@ -21,7 +21,16 @@ export interface EdgeTierOptions {
   readonly origin?: string;
   /** How long an `unavailable` tier waits before it is tried again. */
   readonly retryAfterMs?: number;
+  /** The largest text the tier stores, in characters (default 64 KiB). Bigger answers stay in the isolate's memory only. */
+  readonly maxEntryChars?: number;
 }
+
+/**
+ * Default size cap of the shared tier (P8-38, D-313). The memory tier takes 256 KiB, but sealing and opening cost CPU in
+ * proportion to size, and the Free plan has 10 ms: on local workerd 64 KiB cost about 0.5 ms with the runtime's own base64
+ * and about 2.7 ms with the byte loop used where it is missing.
+ */
+export const DEFAULT_SHARED_ENTRY_CHARS = 64 * 1024;
 
 const DEFAULT_ORIGIN = 'https://query-cache.agility-bridge.invalid';
 
@@ -37,6 +46,7 @@ export class EdgeQueryTier implements SharedTier {
   readonly #opts: EdgeTierOptions;
   readonly #origin: string;
   readonly #retryAfterMs: number;
+  readonly maxEntryChars: number;
   #status: SharedTierStatus = 'unverified';
   #retryAt = 0;
 
@@ -44,6 +54,7 @@ export class EdgeQueryTier implements SharedTier {
     this.#opts = options;
     this.#origin = options.origin ?? DEFAULT_ORIGIN;
     this.#retryAfterMs = options.retryAfterMs ?? 10 * 60_000;
+    this.maxEntryChars = options.maxEntryChars ?? DEFAULT_SHARED_ENTRY_CHARS;
   }
 
   status(): SharedTierStatus {
@@ -78,7 +89,7 @@ export class EdgeQueryTier implements SharedTier {
   }
 
   async set(id: string, text: string, ttlMs: number): Promise<void> {
-    if (!this.#usable()) return;
+    if (!this.#usable() || text.length > this.maxEntryChars) return;
     const sealed = await this.#opts.keyring.seal(KeyPurpose.CacheBody, id, text);
     const response = new Response(JSON.stringify(sealed), {
       headers: {

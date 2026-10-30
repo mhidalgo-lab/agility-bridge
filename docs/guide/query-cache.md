@@ -45,6 +45,16 @@ the runtime forbids using another request's I/O object, and the table of pending
 joined it, and the next read tries again. Expired entries are also dropped as soon as anything is stored, not only when they
 reach the front of the least-recently-used order (review P-10).
 
+## Size cap of the shared tier
+
+The shared tier stores only answers of up to **64 KiB** of text (the memory tier takes up to 256 KiB). Sealing and opening
+cost CPU in proportion to size and the Free plan has 10 ms per request, so a bigger answer stays in the memory of the isolate
+that read it and is not offered to the tier; nothing else changes for it. `whoami` shows the cap as
+`queryCache.sharedMaxEntryChars` next to the tier's `shared` status, and shows nothing when there is no tier. The cap is an
+option of the tier (`EdgeQueryTier`'s `maxEntryChars`), not an environment setting. The Worker uses the runtime's own base64
+where it exists (about 100 times faster than the byte loop on workerd); the figures are in
+[RESEARCH](../RESEARCH.md), local and indicative.
+
 ## When it is skipped
 
 - A caller who has **write tools** never reads or fills the cache, so a read after a write shows the write. The write
@@ -91,7 +101,7 @@ Measured with `pnpm bench:worker` (Node, the V8 of workerd; fakes for Agility), 
 
 A hit saves **requests and latency, not Worker CPU**: it still parses the stored answer, and the fakes answer instantly.
 Shared-tier cost by body size (sealing, `Cache.put`, `Cache.match`, opening; one run on a shared machine, **local and
-indicative**, P8-37): 8 KB 0.7 ms, 64 KB 3.7 ms, 100 KB 6.2 ms, 256 KB 14.7 ms. A big body is not free on the 10 ms Free budget
+indicative**, P8-37): 8 KB 0.7 ms, 64 KB 3.7 ms, 100 KB 6.2 ms, 256 KB 14.7 ms (Node, which lacks the runtime's own base64, so the byte-loop fallback; on local workerd the same sizes cost under 2 ms for a seal and an open together, see the next section). A big body is not free on the 10 ms Free budget
 (see [P8-38](../tasks/phase-8-power-features/P8-38-shared-tier-size-and-cpu.md)); the baseline on an idle machine and a
 deployed Worker are still to be measured.
 

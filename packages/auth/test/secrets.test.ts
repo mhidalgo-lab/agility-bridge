@@ -122,6 +122,37 @@ describe('sealing (AES-256-GCM)', () => {
     ).toBe(text);
   });
 
+  it('uses the runtime base64 where it exists and gives the same bytes as the fallback (P8-38)', async () => {
+    const bytes = new Uint8Array(70_000).map((_, i) => (i * 17 + 3) & 0xff);
+    const fallback = toBase64(bytes);
+    const proto = Uint8Array.prototype as unknown as { toBase64?: () => string };
+    const ctor = Uint8Array as unknown as { fromBase64?: (s: string) => Uint8Array };
+    const calls = { to: 0, from: 0 };
+    // A stand-in for workerd's: counted, and exact (the same bytes the loop gives).
+    proto.toBase64 = function (this: Uint8Array) {
+      calls.to++;
+      return btoa(Array.from(this, (b) => String.fromCharCode(b)).join(''));
+    };
+    ctor.fromBase64 = (s) => {
+      calls.from++;
+      return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+    };
+    try {
+      expect(toBase64(bytes)).toBe(fallback);
+      expect(fromBase64(fallback)).toEqual(bytes);
+      const ring = await Keyring.create(K1);
+      const text = 'é'.repeat(30_000);
+      expect(
+        await ring.open(KeyPurpose.Credentials, 'c', await ring.seal(KeyPurpose.Credentials, 'c', text)),
+      ).toBe(text);
+      expect(calls.to).toBeGreaterThan(1);
+      expect(calls.from).toBeGreaterThan(1);
+    } finally {
+      delete proto.toBase64;
+      delete ctor.fromBase64;
+    }
+  });
+
   it('refuses a wrong key, tampered ciphertext or IV, another record id, another version or another purpose', async () => {
     const ring = await Keyring.create(K1);
     const sealed = await ring.seal(KeyPurpose.Credentials, 'cred-1', TOKEN);

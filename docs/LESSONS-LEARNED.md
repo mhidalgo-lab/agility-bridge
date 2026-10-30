@@ -35,7 +35,7 @@ How to use it:
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271, L-426, L-427 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267, L-345, L-409, L-410 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
-| [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
+| [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182, L-458 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461 |
@@ -1553,6 +1553,10 @@ a name mismatch, and reveal generated secrets before writing a backup file that 
 **L-101 — Count budgets in audit records, not headers.**
 Headers flush before streamed work completes, so they under-report.
 *Applied in:* P2-08, P3-03.
+
+**L-458 — Time compute on workerd from outside, in a loop, and prefer the runtime's own primitive.**
+Inside a Workers isolate the clock does not advance while code computes, so `performance.now()` around a call reads zero. Time one request that runs the operation `n` times from the caller (miniflare's `dispatchFetch`), subtract the same request with no operation, and divide. Done that way, base64 by a JavaScript loop was the whole cost of sealing a cache entry (2.7 ms of 3.2 ms at 100 KB) and the runtime's own `Uint8Array.prototype.toBase64` removed it; Node lacks it, so keep the loop as the tested fallback and test both paths.
+*Applied in:* P8-38, `auth/src/secrets/keyring.ts`, `docs/RESEARCH.md` (L-414, L-448).
 
 ## M. Node, Docker and self-hosting
 
