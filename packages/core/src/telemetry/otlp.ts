@@ -164,7 +164,7 @@ export function createOtlpExporter(options: OtlpExporterOptions): SpanExporter {
             method: 'POST',
             headers: { ...options.headers, 'content-type': 'application/json' },
             body: JSON.stringify(traceRequest(options.resource, spans)),
-            redirect: 'error',
+            redirect: 'manual',
             signal: controller.signal,
           }),
         );

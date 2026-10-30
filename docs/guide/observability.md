@@ -12,8 +12,14 @@ until you set an endpoint, and sends **no content**: no Agility text, no token, 
 | `AB_OTEL_HEADERS` | Optional `name=value,name2=value2` sent with every post, for a hosted collector's API key. **A secret:** never logged, never in any output; on Workers set it as a secret (`wrangler secret put AB_OTEL_HEADERS`). Needs `AB_OTEL_ENDPOINT` |
 
 At start the server logs one warning naming the collector's host (never the path or the headers). Node batches spans and
-sends them every five seconds and once more at shutdown; the Worker sends a request's span after the response, so nothing waits
-for the collector. A collector that is down, slow or refusing never changes or delays a response: the spans are dropped after
+sends them every five seconds and once more at shutdown. The Worker **batches per isolate** (D-324): finished spans (the
+allowlisted attributes only, nothing else) wait in a queue and leave in one request when 64 are queued, when about 128 KiB are
+queued, or after five seconds, whichever comes first. Every send runs in the `waitUntil` of the request that triggered it, so
+nothing waits for the collector, (in the local Miniflare test, 70 requests made two collector requests). The queue holds 512 spans and about
+256 KiB at most, with at most 4 sends in flight; past that the oldest span is dropped and counted. **Spans still queued when
+Cloudflare evicts an isolate are lost**, at most five seconds of them (an idle isolate is usually kept longer than that, and the
+wait that flushes the queue runs in the request that queued the first span); charts built from spans are statistics, not an audit
+log (the audit log is in the database). A collector that is down, slow or refusing never changes or delays a response: the spans are dropped after
 one attempt and a warning (the error class only, at most one a minute) says so. On the Workers Free plan each request makes one
 more outgoing request for its span (45 Agility requests plus one is under the 50 allowed).
 

@@ -2,7 +2,7 @@
 id: P8-43
 title: Batch OTLP spans per isolate on Workers
 phase: 8
-status: todo
+status: review
 priority: low
 depends_on: [P8-35]
 adr: ["0010"]
@@ -23,10 +23,14 @@ Cut the outgoing OTLP requests of the Worker from one per request to one per bat
 - The Node host keeps its periodic flush; the unauthenticated sampling of D-304 stays.
 
 ## Acceptance criteria
-- [ ] A test on the Worker host shows many requests produce fewer collector requests, with every span's attributes intact.
-- [ ] A test shows a collector that is down or slow neither delays a response nor grows the queue without bound.
-- [ ] The same tests run against the Node host's behaviour (no change in what is exported).
-- [ ] `pnpm bench:worker` shows the telemetry row (see P8-37) with and without batching.
+- [x] A test on the Worker host shows many requests produce fewer collector requests, with every span's attributes intact.
+- [x] A test shows a collector that is down or slow neither delays a response nor grows the queue without bound.
+- [x] The same tests run against the Node host's behaviour (no change in what is exported).
+- [x] `pnpm bench:worker` shows the telemetry row (see P8-37) with and without batching (off, flush each, batched).
+- [ ] Baseline on an idle machine and a real collector from a deployed Worker (owner; the local numbers are noise on a loaded machine: about 2.4 ms off, 2.6 flush each, 2.0 batched, indicative only).
+
+## Built
+Decisions D-324 to D-327 in [phase-8.md](../../pending-decisions/phase-8.md): `createTelemetry` gains `sleep`, `maxAgeMs`, `maxQueueBytes` and `maxInFlight`; the Worker passes `sleep` instead of `flushEach` (D-324, D-325), Node is unchanged (D-326). The Worker test also found that no span had ever left a Worker (`redirect: 'error'` is rejected by workerd, D-327, L-467).
 
 ## Security notes
 THREAT_MODEL T30: the attribute allowlist applies to queued spans exactly as to exported ones.

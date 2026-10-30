@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // The bundled Worker in workerd (P3-01): Miniflare with a local D1, no Cloudflare account. Setup goes through the
 // Worker's own admin API with the break-glass token; MCP calls use a device token against the synthetic Agility.
+
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -723,4 +725,52 @@ describe('sign-in on workerd (P4-01)', () => {
     expect(res.status).toBe(503);
     expect(await res.text()).not.toContain('AB_GOOGLE');
   });
+});
+
+describe('span batching in workerd (P8-43, D-324)', () => {
+  it('sends fewer collector requests than requests, through waitUntil, with every span whole', async () => {
+    const posts: string[] = [];
+    const collector = createServer((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (c: Buffer) => chunks.push(c));
+      req.on('end', () => {
+        posts.push(Buffer.concat(chunks).toString('utf8'));
+        res.writeHead(200, { 'content-type': 'application/json' }).end('{}');
+      });
+    });
+    await new Promise<void>((r) => collector.listen(0, '127.0.0.1', r));
+    try {
+      const port = (collector.address() as { port: number }).port;
+      const admin = generateAdminToken();
+      const mf = worker({
+        AB_MASTER_KEY: generateMasterKey(1),
+        AB_ADMIN_TOKEN: admin,
+        AB_OTEL_ENDPOINT: `http://127.0.0.1:${port}`,
+      });
+      const tokens = await setUp(mf, admin, [{ slug: 'team', scope: 'Scope:1001' }]);
+      const spanCount = () =>
+        posts.reduce(
+          (n, b) =>
+            n +
+            (
+              JSON.parse(b) as { resourceSpans: { scopeSpans: { spans: unknown[] }[] }[] }
+            ).resourceSpans.reduce((m, r) => m + r.scopeSpans.reduce((k, s) => k + s.spans.length, 0), 0),
+          0,
+        );
+      const total = 70;
+      for (let i = 0; i < total; i++) {
+        const res = await mcp(mf, 'team', tokens['team'] as string, { ...list, id: i });
+        expect(res.status).toBe(200);
+        await res.text();
+      }
+      // 64 spans leave by size; the rest wait for the age flush that the first request holds in its waitUntil.
+      const ok = await until(async () => spanCount() >= total, 30_000);
+      expect(ok).toBe(true);
+      expect(spanCount()).toBe(total);
+      expect(posts.length).toBeLessThan(total / 4);
+      expect(posts.join('\n')).not.toMatch(/Bearer|ab_|team/);
+    } finally {
+      await new Promise((r) => collector.close(r));
+    }
+  }, 60_000);
 });

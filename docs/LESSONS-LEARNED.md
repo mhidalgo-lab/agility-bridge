@@ -39,7 +39,7 @@ How to use it:
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462 |
-| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453 |
+| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453, L-467, L-468 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241, L-402 |
@@ -1858,6 +1858,14 @@ One span per request is cheap for authenticated callers and an amplifier for eve
 **L-457 — A kept answer is proved equal to a fresh one for every value you substitute into it, including the ones the SDK refuses.**
 The public catalogue's three discovery answers are kept per isolate with only the JSON-RPC `id` replaced. The first cut accepted any finite number, and a test that compared each substituted id with a never-cached world's answer showed that the SDK answers a fractional id with a 400 where the kept bytes said 200. Keep only ids the SDK accepts (strings and safe integers), key the entry on every request field the answer could echo, split the body around the id only where it can be shown to be the message's own, and test byte equality against an uncached build for each id, slug and protocol era.
 *Applied in:* P8-35, `http-app/src/public-catalog-cache.ts`, `test/public-catalog.test.ts` (L-113, T33).
+
+**L-467 — Test a Worker's outgoing request in workerd, not only against a fake `fetch`.**
+The OTLP exporter set `redirect: 'error'`, which Node accepts and workerd's `Request` rejects with a `TypeError`, so no span had ever left a Worker; unit and HTTP tests used a fake `fetch` and never built the real request in the real runtime. Anything the Worker sends on its own (spans, callbacks) gets one test in Miniflare against a loopback listener that counts what arrives. Use `redirect: 'manual'` and treat a 3xx as a failure.
+*Applied in:* P8-43, `telemetry/otlp.ts`, `apps/worker/test/worker.test.ts` (L-096).
+
+**L-468 — State that outlives a request holds plain data only, and the work that drains it belongs to a request.**
+Batching spans per isolate is safe because the queue holds already-sanitised records and each flush (by count, bytes or age) is created, awaited and handed to `waitUntil` by the request that triggered it; the age flush is a wait owned by one request and is replaced if that request was cut short. Bound the queue in count, bytes and exports in flight, drop the oldest and count it, and say what an evicted isolate loses. Test with a held wait and a collector that never answers.
+*Applied in:* P8-43, `telemetry/telemetry.ts`, `test/telemetry/batching.test.ts` (L-096, L-453).
 
 ## P. Observability and logging
 
