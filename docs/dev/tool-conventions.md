@@ -107,7 +107,7 @@ unknown`), not by `null`.
 | Owners | `owners` | `{ oid, name, username, email? }[]` | `email` only when the workspace enables it. |
 | Timestamps | `createdAt`, `changedAt`, `closedAt` | string | ISO 8601 UTC (L-149). A plain date attribute a caller selects, filters or sorts by (`ChangeDate`) is read through its `…UTC` sibling and keeps the requested key (L-335); a date with no sibling is returned raw with a note that it is local time of an unknown zone. |
 | Effort | `estimate`, `detailEstimateHours`, `toDoHours`, `actualHours` | number (optional) | Omitted when not set; `estimate` keeps the instance's estimate unit, reported once in `_meta`. |
-| UI link | `url` | string | Built from the pinned instance origin (`assetdetail.v1`). |
+| UI link | `url` | string | Added by the server to every asset row (`assetType` plus a valid `oid` or `number`), built from the pinned instance URL (`assetdetail.v1`, P8-02); a tool never builds one. |
 | More pages | `nextCursor` | string (optional) | Present only when more rows exist (the tool fetches `limit + 1`); pass back as `cursor`. |
 | Counts | `<thing>Count` | integer | `childCount`, `commentCount`, `itemCount`: never `items` (always the row array) or a bare `count` (D-115). |
 | Deliberately bounded list | `truncated` | boolean | Never `hasMore`, never together with `nextCursor`; the text says how to see the rest. |
