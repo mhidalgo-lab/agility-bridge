@@ -344,9 +344,9 @@ function withDeprecationNotes(
 /** Adds the deep links of the asset rows to `structuredContent` and one fixed note to the text (P8-02, T26). */
 function withDeepLinks(ctx: ToolContext, out: ToolOutput): ToolOutput {
   if (out.structured === null || typeof out.structured !== 'object') return out;
-  const { value, linked } = addLinks(ctx.instance.baseUrl, out.structured);
-  if (linked === 0) return out;
-  const note = linkNote(ctx.instance.baseUrl);
+  const { value, linked, omitted } = addLinks(ctx.instance.baseUrl, out.structured);
+  if (linked === 0 && omitted === 0) return out;
+  const note = linkNote(ctx.instance.baseUrl, omitted);
   return { ...out, structured: value, ...(note === undefined ? {} : { text: `${out.text}\n${note}` }) };
 }
 

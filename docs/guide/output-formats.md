@@ -58,6 +58,14 @@ its name in tables and CSV and its full object in JSON and `structuredContent`.
 A cut is always announced in a `Note:` line that says how to get the rest. A cut value ends with `…`. When the block cap
 stops a page early, `nextCursor` starts right after the last row shown, so paging never skips a row.
 
+## Deep links
+
+Every asset row in `structuredContent` that has an `oid` or a `number` gets a `url` that opens it in Agility (sign-in
+needed), built from your instance's URL, the fixed `assetdetail.v1` path and the row's own identity, never from Agility
+text. A row that already has a `url` (a Link asset) keeps it. The links of one result add at most 24,000 characters to it
+(about 250 rows); rows past that get no `url` and the text says how many ("N more row(s) have no url: ask for fewer
+rows to get them"), so a 1,000-row page does not grow by a third after the caps have been applied.
+
 ## `structuredContent`
 
 `structuredContent` holds **exactly the rows the text shows**, with the same cuts, as `items`, plus:

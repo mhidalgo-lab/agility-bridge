@@ -38,7 +38,7 @@ How to use it:
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182, L-458 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412 |
-| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461 |
+| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
@@ -1822,6 +1822,10 @@ One increment per upstream call would be up to 45 statements and 90 rows for one
 **L-461 — Merging statements saves round trips, not rows; count both, and exclude work the caller did not ask for.**
 Adding to the day and month counters in one `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` takes a request from three D1 statements to two, but D1 bills rows written, and two counters are still two rows. The saving that mattered for the Free budget and for fairness was not counting the metadata requests a cold isolate makes on the caller's behalf. Count statements in a test on every adapter (memory, SQLite, D1) with a counting driver, and say in the guide which number moved.
 *Applied in:* P8-39, `kv.incrementMany`, `agility/quota.ts`, `storage/test/contract.ts` (`quotaStatementContract`) (L-415).
+
+**L-462 — Whatever is added after the output caps needs a cap of its own.**
+Deep links were added to every row after the caps had been applied, so a 1,000-row result grew by about 90 KB that no cap counted, and each link parsed the base and itself with `new URL`. Parse the fixed part once per result, build by concatenation after the strict identity check, prove the shape with one anchored pattern rather than a second parse, and give the addition a character budget that omits rows with a visible note instead of growing the result. Test the added bytes of a 1,000-row result against the budget.
+*Applied in:* P8-40, `output/links.ts`, `test/output/links.test.ts` (L-423, L-038).
 
 **L-416 — Without background work, the poll is the worker: claim with one atomic marker, run inside the request, drop a result the owner cancelled.**
 On Workers nothing may run after a response, so a task cannot be "started" at creation. The creating call stores the request and returns a handle; the first `tasks/get` takes a lease (`setIfAbsent`, expiring after the request deadline), runs the stored call through the normal pipeline, re-reads the record and writes the result only if it is still `working`, so a cancel that arrived meanwhile wins and a concurrent poll sees `working` instead of running it twice. Tests hold the tool on a gate to prove both orderings.
