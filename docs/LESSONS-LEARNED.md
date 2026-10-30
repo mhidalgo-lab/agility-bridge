@@ -32,7 +32,7 @@ How to use it:
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282, L-323 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-424, L-177, L-183, L-239, L-280, L-304, L-316 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-434, L-161, L-173 |
-| [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271 |
+| [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271, L-426, L-427 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267, L-345, L-409, L-410 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
@@ -922,6 +922,21 @@ registrations sat at the start. The P5-10 test caught it only now and then (rand
 PR's CI. Wrap to the start, up to the cursor, until the slice is spent, and test the wrap with a cursor placed on purpose; run a
 test that depends on random order with `repeats` before trusting it.
 *Applied in:* P5-10 follow-up, `housekeeping.ts` (`sweepRegistrations`), `abuse.test.ts`.
+
+**L-426 — A span that carries the outcome of a call ends with the response stream, not with its headers.**
+An MCP answer is usually a server-sent-event stream: the HTTP layer hands back the response before the tool has run, so the
+status and the tool's error code are not known when the handler returns. A span or audit row written at that point says `200`
+and no error for every failed tool call. The host wraps the stream it already bounds with the deadline and emits the span when
+that stream ends (finished, cut at the deadline, cancelled or failed), with the outcome the tool reported by then; a request that
+never streams emits at once. The test reads the answer to its end before looking at the collector.
+*Applied in:* P8-07, `http-app/src/app.ts` (`withDeadline`, `sendSpan`), `http-app/test/telemetry.test.ts`.
+
+**L-427 — Classify faults into a closed set and make "unknown" the server's, with a test that no code is left out.**
+Error-rate alerts only work if a bad asset number and a database outage are different things. Every `AB_*` code maps to
+`caller`, `upstream` or `server`; a code that is not in the map is `server`, so a new failure is never quietly called the caller's,
+and a test fails when a code is added without a class. `upstream` (Agility down, slow or throttling) is kept apart from `server` so an
+Agility outage and a bug page different people; both mark the span `ERROR`, caller faults never do.
+*Applied in:* P8-07, `telemetry/attributes.ts`, `core/test/telemetry/attributes.test.ts`.
 
 ## J. OAuth and identity
 

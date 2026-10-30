@@ -112,6 +112,8 @@ carry `requestId`.
 | warn | `AB_RATE_LIMIT is off: no request, token or authentication-failure limits.` | — | [server.ts](../../packages/http-app/src/server.ts) |
 | warn | `AB_ALLOW_HTTP_INSTANCES is on: plain-HTTP loopback instance URLs are accepted (tests only).` | — | [server.ts](../../packages/http-app/src/server.ts) |
 | warn | `AB_PUBLIC_TOOL_CATALOG is on: anyone who can reach the server can list its read-only tools without signing in.` | — | [server.ts](../../packages/http-app/src/server.ts) |
+| warn | `AB_OTEL_ENDPOINT is set: allowlisted request metadata (MCP method, tool name, status, error code, duration, Agility request count) is sent to <collector host>; never Agility content, credentials or request values.` | — (the host of the endpoint only, never the path or `AB_OTEL_HEADERS`) | [server.ts](../../packages/http-app/src/server.ts) |
+| warn | `telemetry export failed` (at most one a minute) | `error` (class), `spans` | [telemetry.ts](../../packages/core/src/telemetry/telemetry.ts) |
 | warn | `AB_PASSTHROUGH is on: pass-through workspaces accept any valid Agility token of their instance.` | — | [server.ts](../../packages/http-app/src/server.ts) |
 | warn | `Not configured: tools are listed, and every call explains how to set AB_AGILITY_URL and AB_AGILITY_TOKEN.` | — | [stdio.ts](../../apps/cli/src/stdio.ts) |
 | warn | configuration and key warnings | the text only (data directory permissions, stranded or retired key versions, deprecated settings) | [serve.ts](../../apps/cli/src/serve.ts), [credentials.ts](../../packages/auth/src/secrets/credentials.ts) |

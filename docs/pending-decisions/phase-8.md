@@ -1,22 +1,45 @@
-# Pending decisions — Phase 8
 
-> Open questions and owner steps from Phase 8 (power features). Answer inline (`**Owner:** …` with a date).
 
-> The owner authorised the whole phase as a batch (2026-10-30): decisions marked *built as …* are implemented at their
-> recommendation; say so if you want the alternative.
-
-## Decisions
-
-### D-257 — Which messages answer without a credential on a public catalogue *(P8-11)*
-- **Context:** The task lists `initialize`, `server/discover`, `ping` and `tools/list`. A 2025-era client also sends `notifications/initialized` between `initialize` and `tools/list`; a `401` there ends its handshake and makes some clients start sign-in before they have listed anything. Prompts and resources are not tool discovery and their lists depend on the tools a caller has.
-- **Options:** (a) the four listed methods plus `notifications/initialized` (no effect, no data), everything else `401`; (b) exactly the four listed (strict; breaks the 2025-era handshake in clients that stop on a `401` notification); (c) also `prompts/list` and `resources/list` (a larger public surface, more per-workspace shape to keep identical).
-- **Recommendation:** (a), built. The notification changes nothing and returns nothing; every method that reads data or depends on a grant still needs a credential.
+### D-263 — Three fault classes, and which ones mark a span as an error *(P8-07)*
+- **Context:** L-118 says only server faults count toward the service error rate. Agility failing (down, slow, throttling) is not a caller fault, and it is not a bug of this server either, but users of the deployment see failures.
+- **Options:** (a) `caller`, `upstream`, `server`; the span status is `ERROR` for `server` and `upstream`, and the attribute splits them; (b) two classes, with Agility failures counted as `server`; (c) `ERROR` for `server` only, so an Agility outage never trips an error-rate alert.
+- **Recommendation:** (a), built. The error rate shows every failure users feel, and a dashboard can still separate whose it is. (c) hides an outage; (b) pages the wrong people.
 - **Owner:** *(open; built as (a))*
 
-### D-258 — What the public catalogue lists *(P8-11)*
-- **Context:** The catalogue must say nothing per tenant (D-64, D-201). Which tools exist for a caller depends on workspace groups, grants, budgets and the opt-in switches (reports, attachments, writes).
-- **Options:** (a) the read-only tools of the default groups, from the registry, the same list an unconfigured stdio server shows; (b) every read-only tool including the opt-in groups (tells a registry the full capability, but also that those groups exist on every deployment, true or not); (c) a hand-written static document (can drift from the registry).
-- **Recommendation:** (a), built, with the group list shared by stdio and HTTP (`PUBLIC_CATALOG_GROUPS`) and a test that pins them equal. A deployment that enables reports or attachments does not show it anonymously, so the list cannot reveal a configuration choice.
+### D-264 — One span per MCP request, ended with the exchange *(P8-07)*
+- **Context:** A tool call answers over a stream that is returned before the tool has run (L-426), and the audit already records tool calls separately.
+- **Options:** (a) one `SERVER` span per request, emitted when the response stream ends, carrying the tool's outcome; (b) a request span at the headers and a child span per tool call; (c) only tool calls.
+- **Recommendation:** (a), built. One span is one request, its duration is the user's wait, and (b) would double the volume for no extra attribute we are allowed to send. (c) would miss every other method (L-015).
+- **Owner:** *(open; built as (a))*
+
+### D-265 — OTLP/JSON by our own encoder, traces only *(P8-07)*
+- **Context:** The OpenTelemetry JavaScript SDK is large, uses Node APIs and context propagation we must not enable (it would forward trace headers to every outgoing request, Agility's included).
+- **Options:** (a) a small OTLP/HTTP JSON encoder and one `fetch`, spans only; the backend derives metrics from spans (`spanmetrics`); (b) the official SDK with an exporter; (c) also OTLP metrics and logs.
+- **Recommendation:** (a), built. No dependency, runs on Workers and Node alike, and nothing can instrument the Agility client by accident. Metrics from spans give the error rate and latency that were asked for; logs stay on stderr, redacted.
+- **Owner:** *(open; built as (a))*
+
+### D-266 — Trace context only from authenticated callers *(P8-07)*
+- **Context:** `traceparent` is caller input. An anonymous caller could write chosen trace ids into the operator's data, or use it to probe.
+- **Options:** (a) join the caller's trace only on an authenticated request and only if the header is strictly valid; `tracestate` and `baggage` never read; (b) join whenever the header is valid; (c) never join, always start a trace.
+- **Recommendation:** (a), built. A client of the deployment can link its trace to ours; a stranger cannot. (c) loses a useful feature for the people the server is for.
+- **Owner:** *(open; built as (a))*
+
+### D-267 — No workspace, person or address on a span, not even an opaque id *(P8-07)*
+- **Context:** Per-workspace dashboards are the obvious next ask. T30 says no ids of members or tokens; a workspace id is not a member id, but it is a tenant label, high in cardinality on a large deployment, and the audit log already holds it.
+- **Options:** (a) none; the `agility_bridge.request_id` joins a span to its audit row; (b) the workspace id behind a switch (`AB_OTEL_WORKSPACE_ATTRIBUTE=on`); (c) always.
+- **Recommendation:** (a), built. The list stays short enough to read and to prove; (b) is a later, separate decision if operators ask.
+- **Owner:** *(open; built as (a))*
+
+### D-268 — HTTP hosts only; stdio is not instrumented *(P8-07)*
+- **Context:** stdio is one local process for one person with no collector in sight; the spans' value is in shared deployments.
+- **Options:** (a) `serve` and the Worker; stdio as a follow-up task if anyone asks; (b) stdio too, through the same function.
+- **Recommendation:** (a), built; the follow-up is [P8-20](../tasks/phase-8-power-features/P8-20-stdio-telemetry.md).
+- **Owner:** *(open; built as (a))*
+
+### D-269 — The collector's key is an environment secret, one attempt, no redirect *(P8-07)*
+- **Context:** A hosted collector wants an API key. It is a credential this server holds.
+- **Options:** (a) `AB_OTEL_HEADERS` in the environment (Worker: a secret), validated without echo, never logged, sent only to the endpoint, no redirect followed, one attempt with a 3 s timeout; (b) a file setting like the master key; (c) store it encrypted in the database.
+- **Recommendation:** (a), built. It matches how the Worker's other secrets arrive and adds no storage. (b) and (c) are possible when an operator needs them.
 - **Owner:** *(open; built as (a))*
 
 ### D-242 — The query cache is off by default, with one TTL for everything *(P8-01)*

@@ -2,7 +2,7 @@
 id: P8-07
 title: Self-monitoring with OpenTelemetry
 phase: 8
-status: in-progress
+status: done
 priority: low
 depends_on: [P6-13]
 adr: []
@@ -45,17 +45,17 @@ single piece of Agility content, credential or caller value leaving the server.
   alerts; configuration guide; THREAT_MODEL T30; `docs/security/logging.md` for the new log lines.
 
 ## Acceptance criteria
-- [ ] Attribute allowlist test: hostile and extra attributes (workspace, user, token, query, URI, message) are dropped;
+- [x] Attribute allowlist test: hostile and extra attributes (workspace, user, token, query, URI, message) are dropped;
       every value is validated by type and shape; the payload of a full run contains none of the secrets or content used.
-- [ ] Error-rate semantics verified end to end with a local fake collector (a real HTTP server receiving OTLP/JSON): caller
+- [x] Error-rate semantics verified end to end with a local fake collector (a real HTTP server receiving OTLP/JSON): caller
       faults, upstream faults and server faults classified as above, and the error rate computed from the received spans
       counts only the last two.
-- [ ] Every MCP method and every early refusal produces one span (table test over the method classes).
-- [ ] `traceparent`: strict parsing (version, lengths, hex case, all-zero ids, extra fields), joined only when
+- [x] Every MCP method and every early refusal produces one span (table test over the method classes).
+- [x] `traceparent`: strict parsing (version, lengths, hex case, all-zero ids, extra fields), joined only when
       authenticated, never present on a request to Agility, never returned.
-- [ ] Off by default: no exporter, no request to any endpoint; a collector that is down, slow or answering errors never
+- [x] Off by default: no exporter, no request to any endpoint; a collector that is down, slow or answering errors never
       changes or delays a response.
-- [ ] Settings validated (`AB_OTEL_ENDPOINT`, `AB_OTEL_HEADERS`), secret never echoed; guide and recipes written.
+- [x] Settings validated (`AB_OTEL_ENDPOINT`, `AB_OTEL_HEADERS`), secret never echoed; guide and recipes written.
 
 ## Security notes
 THREAT_MODEL T30.

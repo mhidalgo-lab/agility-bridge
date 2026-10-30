@@ -269,6 +269,27 @@ export {
   withCachedJsonSchema,
 } from './server.ts';
 export {
+  type Attributes as TelemetryAttributes,
+  classify as classifyFault,
+  createOtlpExporter,
+  createTelemetry,
+  FAULT_OF_CODE,
+  type Fault,
+  type FinishedSpan,
+  flushPeriodically,
+  isServiceError,
+  otlpEndpoint,
+  otlpHeaders,
+  parseTraceparent,
+  type SpanExporter,
+  type SpanInput,
+  sanitizeAttributes,
+  spanAttributes,
+  type Telemetry,
+  telemetryResource,
+  traceRequest,
+} from './telemetry/index.ts';
+export {
   annotationsFor,
   defineTool,
   type InputSchema,

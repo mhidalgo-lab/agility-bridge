@@ -18,18 +18,25 @@ import {
   type SessionTimeouts,
 } from '@agility-bridge/auth';
 import {
+  AbError,
   CORE_TOOLS,
+  createOtlpExporter,
   createQuotaGate,
+  createTelemetry,
   DEFAULT_LIMITS,
   DEFAULT_WRITE_RATE_LIMITS,
   type FetchLike,
   type Logger,
   type LogLevel,
   MAX_QUERY_CACHE_TTL_SECONDS,
+  otlpEndpoint,
+  otlpHeaders,
   QueryCache,
   type QuotaLimits,
   type SharedTier,
+  type Telemetry,
   type ToolRegistry,
+  telemetryResource,
 } from '@agility-bridge/core';
 import type { Storage } from '@agility-bridge/storage';
 import type { Context } from 'hono';
@@ -96,6 +103,8 @@ export const SERVER_SETTING_NAMES: readonly string[] = Object.freeze([
   'AB_QUERY_CACHE_TTL',
   'AB_QUERY_CACHE_EDGE',
   'AB_MCP_APPS',
+  'AB_OTEL_ENDPOINT',
+  'AB_OTEL_HEADERS',
   ...IDENTITY_SETTING_NAMES,
   ...OAUTH_SETTING_NAMES,
 ]);
@@ -126,6 +135,11 @@ export interface ServerSettings {
   readonly passthrough: boolean;
   /** `AB_ALLOW_HTTP_INSTANCES=on`: plain-HTTP loopback instance URLs, for tests and local fixtures (P2-19). */
   readonly allowHttpInstances: boolean;
+  /**
+   * `AB_OTEL_ENDPOINT` (P8-07, T30): where finished request spans are sent over OTLP/HTTP. Absent (the default): nothing is
+   * measured or sent. `headers` (`AB_OTEL_HEADERS`) are a secret for a hosted collector and are never logged.
+   */
+  readonly otel?: { readonly endpoint: string; readonly headers?: Readonly<Record<string, string>> };
   /** `AB_PUBLIC_TOOL_CATALOG=on` (P8-11, T33): the static read-only catalogue is listed without a credential. Off by default. */
   readonly publicToolCatalog: boolean;
   /** `AB_MCP_APPS=off` (P8-03, T27): the kill switch for MCP Apps views; on by default, offered only to clients that declared Apps. */
@@ -336,6 +350,7 @@ export function parseServerSettings(
     allowHttpInstances: onOff('AB_ALLOW_HTTP_INSTANCES', env['AB_ALLOW_HTTP_INSTANCES'], false),
     publicToolCatalog: onOff('AB_PUBLIC_TOOL_CATALOG', env['AB_PUBLIC_TOOL_CATALOG'], false),
     mcpApps: onOff('AB_MCP_APPS', env['AB_MCP_APPS'], true),
+    ...otelSettings(env),
     writeTools: onOff('AB_WRITE_TOOLS', env['AB_WRITE_TOOLS'], false),
     writeRates: {
       perGrant: int(
@@ -366,6 +381,29 @@ export function parseServerSettings(
     ...(oauth === null ? {} : { oauth }),
     session: parseSessionSettings(env),
   };
+}
+
+/** `AB_OTEL_ENDPOINT` and `AB_OTEL_HEADERS` (P8-07). The messages name the variable, never the value (the headers are a secret). */
+function otelSettings(env: Env): Pick<ServerSettings, 'otel'> {
+  const endpoint = env['AB_OTEL_ENDPOINT'];
+  const headers = env['AB_OTEL_HEADERS'];
+  if (endpoint === undefined || endpoint === '') {
+    if (headers !== undefined && headers !== '')
+      throw new SettingsError('AB_OTEL_HEADERS needs AB_OTEL_ENDPOINT.');
+    return {};
+  }
+  try {
+    return {
+      otel: {
+        endpoint: otlpEndpoint(endpoint),
+        ...(headers === undefined || headers === '' ? {} : { headers: otlpHeaders(headers) }),
+      },
+    };
+  } catch (error) {
+    if (!(error instanceof AbError)) throw error;
+    const name = error.message.includes('headers') ? 'AB_OTEL_HEADERS' : 'AB_OTEL_ENDPOINT';
+    throw new SettingsError(`${name} is invalid: ${error.message}`);
+  }
 }
 
 /** `AB_SESSION_*` and `AB_LOGOUT_CLEAR_SITE_DATA` (P4-02). Bad values name the variable, never the value. */
@@ -400,6 +438,11 @@ export function settingWarnings(env: Env, settings: ServerSettings): string[] {
   if (settings.allowHttpInstances) {
     warnings.push(
       'AB_ALLOW_HTTP_INSTANCES is on: plain-HTTP loopback instance URLs are accepted (tests only).',
+    );
+  }
+  if (settings.otel !== undefined) {
+    warnings.push(
+      `AB_OTEL_ENDPOINT is set: allowlisted request metadata (MCP method, tool name, status, error code, duration, Agility request count) is sent to ${new URL(settings.otel.endpoint).host}; never Agility content, credentials or request values.`,
     );
   }
   if (settings.publicToolCatalog) {
@@ -503,6 +546,8 @@ export interface ServerParts {
   readonly queryCacheShared?: SharedTier;
   /** The tool registry built once (Workers: at module scope, P3-14). */
   readonly registry?: ToolRegistry;
+  /** The `fetch` that posts spans to the collector (tests: a fake collector; default: the global `fetch`). */
+  readonly telemetryFetch?: (request: Request) => Promise<Response>;
   /** A stand-in for the interactive step of `/oauth/authorize` (tests); default: the built-in consent screen (P5-04). */
   readonly oauthConsent?: OAuthConsentHandler;
 }
@@ -511,6 +556,8 @@ export interface AssembledServer {
   readonly app: HttpApp;
   readonly audit: AuditWriter;
   readonly services: AccessServices;
+  /** Self-monitoring (P8-07), only with `AB_OTEL_ENDPOINT`: the Node host flushes it on a timer and at shutdown. */
+  readonly telemetry?: Telemetry;
 }
 
 /** The app both hosts serve, with audit, admin API, rate limits and pass-through as configured. */
@@ -565,6 +612,32 @@ export function assembleServer(parts: ServerParts): AssembledServer {
       ? undefined
       : createQuotaGate({ counters: storage.kv, clock: host.clock, limits: settings.quota, logger });
   const authErrors = revalidateOnAuthErrors(services, logger, () => host.clock.now());
+  const telemetry: Telemetry | undefined =
+    settings.otel === undefined
+      ? undefined
+      : createTelemetry({
+          exporter: createOtlpExporter({
+            endpoint: settings.otel.endpoint,
+            ...(settings.otel.headers === undefined ? {} : { headers: settings.otel.headers }),
+            resource: {
+              attributes: telemetryResource({
+                version: parts.version,
+                environment: settings.environment === 'live' ? 'production' : 'test',
+              }),
+            },
+            ...(parts.telemetryFetch === undefined ? {} : { fetch: parts.telemetryFetch }),
+          }),
+          clock: host.clock,
+          random: host.random,
+          logger,
+          knownTools: new Set(CORE_TOOLS.map((t) => t.name)),
+          service: {
+            version: parts.version,
+            environment: settings.environment === 'live' ? 'production' : 'test',
+          },
+          // Workers: nothing in flight is shared between requests (L-096), so every request sends its own spans.
+          flushEach: parts.isolation === 'request',
+        });
   const app = createHttpApp({
     storage,
     keyring,
@@ -660,6 +733,7 @@ export function assembleServer(parts: ServerParts): AssembledServer {
           },
         }),
     clientIp: parts.clientIp,
+    ...(telemetry === undefined ? {} : { telemetry }),
     observer: audit.observer({
       toolCall: (e) => authErrors(e.access.credential.id, e.errorCode),
       request: (e) => {
@@ -680,5 +754,5 @@ export function assembleServer(parts: ServerParts): AssembledServer {
     ...(parts.background === undefined ? {} : { background: parts.background }),
     version: parts.version,
   });
-  return { app, audit, services };
+  return { app, audit, services, ...(telemetry === undefined ? {} : { telemetry }) };
 }

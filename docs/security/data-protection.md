@@ -33,7 +33,8 @@ the CLI (`… list`, `audit tail`); the database file itself is the operator's.
 |---|---|---|---|
 | The MCP client and its language model | Tool results: Agility content the member's token can read within the workspace (titles, descriptions as text, statuses, names), always inside the untrusted-data envelope; member **emails and usernames only when the workspace enables member emails** (`memberEmails`, off by default) | Field tiers, caps, project and asset-type scope, envelope ([tool output contract](../adr/0015-tool-output-contract.md)) | [envelope.ts](../../packages/core/src/output/envelope.ts), [result.ts](../../packages/core/src/output/result.ts) · [probe tests](../../packages/core/test/tools/core.test.ts) |
 | Digital.ai Agility | The member's token (to authenticate), the compiled queries | Only to the instance's pinned origin, TLS verified, no redirects | [client.ts](../../packages/core/src/agility/client.ts) |
-| Nobody else | — | No telemetry (OpenTelemetry is P8-07, off by default) | |
+| The operator's own OpenTelemetry collector | Only with `AB_OTEL_ENDPOINT` (off by default): per request the MCP method, the tool name, the HTTP status, our error code and fault class, the duration, the number of Agility requests and our own request id. Never Agility content, tokens, workspace, user, grant, address, arguments or queries | Operator-chosen, HTTPS or loopback; the list is enforced in one function and tested ([guide](../guide/observability.md)) | [attributes.ts](../../packages/core/src/telemetry/attributes.ts) |
+| Nobody else | — | No other telemetry | |
 
 Users of the server should know that tool results go to whichever model their MCP client uses; the server cannot
 control what that provider retains (THREAT_MODEL A11).
