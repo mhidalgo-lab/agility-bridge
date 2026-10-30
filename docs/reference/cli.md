@@ -22,6 +22,25 @@ agility-bridge init [--key-file <value>] [--version <value>]
 
 Runs without a server.
 
+## doctor
+
+### `doctor`
+
+Diagnose this setup without changing it: configuration, instance, keys, database and client files (read-only; `--fix` applies only the owner-only file modes it lists).
+
+```text
+agility-bridge doctor [--check-token] [--offline] [--fix] [--json]
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `--check-token` | flag | Also send one authenticated request to your instance to test the token (never printed) |
+| `--offline` | flag | Make no network request |
+| `--fix` | flag | Apply only the chmod repairs the report lists |
+| `--json` | flag | Print the report as JSON |
+
+Runs without a server.
+
 ## admin-token
 
 ### `admin-token`

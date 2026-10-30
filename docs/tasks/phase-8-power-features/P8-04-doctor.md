@@ -2,7 +2,7 @@
 id: P8-04
 title: doctor command
 phase: 8
-status: todo
+status: done
 priority: medium
 depends_on: [P6-13]
 adr: []
@@ -41,14 +41,14 @@ and the client files, and how to fix it.
   no key creation, no content edits, no symbolic links followed.
 
 ## Acceptance criteria
-- [ ] A test proves `doctor` without `--fix` never writes (directory snapshot of names, modes and contents before and
+- [x] A test proves `doctor` without `--fix` never writes (directory snapshot of names, modes and contents before and
       after, also with a database present) and that `--fix` changes only the listed modes.
-- [ ] Output is scrubbed: tokens, master keys and admin tokens never appear in text or JSON (tests with planted
+- [x] Output is scrubbed: tokens, master keys and admin tokens never appear in text or JSON (tests with planted
       secrets in the environment, the config file, the client files and the database).
-- [ ] The token check runs only with `--check-token`; without it no authenticated request is made (fake fetch).
-- [ ] Negative tests: an `http://` instance, a redirecting instance and a private address under `refuse` get no probe
+- [x] The token check runs only with `--check-token`; without it no authenticated request is made (fake fetch).
+- [x] Negative tests: an `http://` instance, a redirecting instance and a private address under `refuse` get no probe
       or no follow; a symbolic link is neither read as a client file nor changed by `--fix`.
-- [ ] `docs/reference/cli.md` regenerated; the troubleshooting page points to `doctor`.
+- [x] `docs/reference/cli.md` regenerated; the troubleshooting page points to `doctor`.
 
 ## Security notes
 THREAT_MODEL T28.

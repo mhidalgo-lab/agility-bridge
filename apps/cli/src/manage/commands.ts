@@ -5,6 +5,7 @@
 import { generateAdminToken, rotateCredentialKeys } from '@agility-bridge/auth';
 import { restoreSqliteBackup } from '@agility-bridge/storage-sqlite';
 import { ConfigError } from '../config.ts';
+import { exitCode, renderReport, runDoctor } from '../doctor.ts';
 import { createMasterKeyFile, defaultMasterKeyFile } from '../master-key.ts';
 import type { AdminClient } from './client.ts';
 import { readSecret } from './secret-input.ts';
@@ -148,6 +149,31 @@ export const COMMANDS: readonly CommandSpec[] = [
         `agility-bridge: wrote a new master key to ${path}. Start the server with AB_MASTER_KEY_FILE=${path}, and back the file up away from the database (docs/guide/secrets.md).`,
       );
       return 0;
+    },
+  },
+  {
+    words: ['doctor'],
+    summary:
+      'Diagnose this setup without changing it: configuration, instance, keys, database and client files (read-only; `--fix` applies only the owner-only file modes it lists)',
+    options: [
+      {
+        name: 'check-token',
+        kind: 'flag',
+        help: 'Also send one authenticated request to your instance to test the token (never printed)',
+      },
+      { name: 'offline', kind: 'flag', help: 'Make no network request' },
+      { name: 'fix', kind: 'flag', help: 'Apply only the chmod repairs the report lists' },
+      { name: 'json', kind: 'flag', help: 'Print the report as JSON' },
+    ],
+    async run(r, p) {
+      const opts = {
+        checkToken: p.opts['check-token'] === true,
+        offline: p.opts['offline'] === true,
+        fix: p.opts['fix'] === true,
+      };
+      const report = await runDoctor(opts, { env: r.env });
+      r.out(p.opts['json'] === true ? JSON.stringify(report, null, 2) : renderReport(report, opts));
+      return exitCode(report);
     },
   },
   {
