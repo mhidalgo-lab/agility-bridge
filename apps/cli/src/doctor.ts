@@ -531,27 +531,26 @@ function ourEntries(root: unknown): [string, Record<string, unknown>][] {
 }
 
 function readSmall(path: string): string | 'symlink' | 'big' | 'unreadable' | undefined {
-  let st: ReturnType<typeof lstatSync>;
+  let fd: number;
   try {
-    st = lstatSync(path);
-  } catch {
-    return undefined;
+    // One descriptor for the checks and the read; O_NOFOLLOW refuses a link (POSIX).
+    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') return undefined;
+    return code === 'ELOOP' ? 'symlink' : 'unreadable';
   }
-  if (st.isSymbolicLink()) return 'symlink';
-  if (!st.isFile()) return undefined;
-  if (st.size > MAX_CLIENT_FILE) return 'big';
   try {
-    const fd = openSync(path, 'r');
-    try {
-      if (fstatSync(fd).size > MAX_CLIENT_FILE) return 'big';
-      const buffer = new Uint8Array(MAX_CLIENT_FILE);
-      const n = readSync(fd, buffer, 0, buffer.length, 0);
-      return new TextDecoder().decode(buffer.subarray(0, n));
-    } finally {
-      closeSync(fd);
-    }
+    const st = fstatSync(fd);
+    if (!st.isFile()) return undefined;
+    if (st.size > MAX_CLIENT_FILE) return 'big';
+    const buffer = new Uint8Array(MAX_CLIENT_FILE);
+    const n = readSync(fd, buffer, 0, buffer.length, 0);
+    return new TextDecoder().decode(buffer.subarray(0, n));
   } catch {
     return 'unreadable';
+  } finally {
+    closeSync(fd);
   }
 }
 
