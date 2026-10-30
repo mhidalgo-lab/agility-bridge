@@ -177,7 +177,7 @@ plan's 50 subrequests is *unverified*. No Cloudflare measurement of these paths 
 3.3 ms): **local and indicative**, so compare rows of one run with each other, not with the CI history, and
 read the first-run figures as noisy. The baseline file is not refreshed from this run (it waits for an idle machine).
 What the rows say: deep links make a 25-row search about twice the cost of the old 2-row fixture and the 200-row search
-about twice again (P8-40 looks at the per-row cost); the quota adds 2 counter statements (3 before P8-39) and little CPU; telemetry with a
+about twice again (P8-40, below); the quota adds 2 counter statements (3 before P8-39) and little CPU; telemetry with a
 flush per call adds a few tenths of a millisecond; registering the Apps views is within noise; the public catalogue is
 the cheapest MCP path; and the shared tier's seal and open costs milliseconds from 64 KB (P8-38). Agility requests are
 counted by the fakes; D1 rows and the deployed Worker are *unverified* until the live pass (P8-13).
@@ -250,3 +250,10 @@ deployment-wide (L-081). Two Rate Limiting bindings add a **backstop** across is
   `rate limit binding failed` at most once a minute; a **missing** binding means per-isolate limits only, with a
   warning when the Worker starts. Rate limits never decide authorization.
 - An exact deployment-wide limiter (a Durable Object) is planned as an option (P3-12).
+
+Deep links after P8-40 (local and indicative, 2026-10-30, a machine with a high load average, calibration 3.3 ms): the
+25-row and 200-row searches took 4.0 ms (1.35×) and 11.3 ms (3.80×), so a row of the whole pipeline costs about 40 µs, most
+of it shaping and serialising. The link's own share is measured separately, with the instance URL parsed once per result and no second parse per
+link: about 1.2 µs a row against 3.4 µs before (200 rows, 1,000 repeats, same machine). A result's links add at most 24,000 characters ([output
+formats](output-formats.md)). Only the micro-measurement is under a few microseconds; the bench rows cannot show it
+because the links are a small part of a row, so that criterion of P8-40 stays unchecked until an idle-machine run.

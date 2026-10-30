@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { buildMcpServer, defineTool } from '../../src/index.ts';
-import { addLinks, assetLink, linkNote } from '../../src/output/links.ts';
+import { addLinks, assetLink, LINK_BUDGET_CHARS, linkNote } from '../../src/output/links.ts';
 import { makeContext } from '../helpers/context.ts';
 import { rpc } from '../helpers/mcp.ts';
 
@@ -113,6 +113,68 @@ describe('addLinks', () => {
   });
 });
 
+describe('deep links stay cheap and bounded (P8-40)', () => {
+  const rows = (n: number): Row[] =>
+    Array.from({ length: n }, (_, i) => ({
+      assetType: 'Story',
+      oid: `Story:${100_000 + i}`,
+      number: `B-${100_000 + i}`,
+    }));
+
+  it('parses the base once for a whole result, not once per row', () => {
+    const Real = URL;
+    let parsed = 0;
+    vi.stubGlobal(
+      'URL',
+      class extends Real {
+        constructor(...args: ConstructorParameters<typeof URL>) {
+          parsed++;
+          super(...args);
+        }
+      },
+    );
+    try {
+      const { linked } = addLinks(BASE, { items: rows(200) });
+      expect(linked).toBe(200);
+      expect(parsed).toBe(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('keeps the characters links add under the cap, and says how many rows got none', () => {
+    const { value, linked, omitted } = addLinks(BASE, { items: rows(1_000) });
+    expect(linked + omitted).toBe(1_000);
+    expect(omitted).toBeGreaterThan(0);
+    const urls = value.items.flatMap((i) => (typeof i['url'] === 'string' ? [i['url']] : []));
+    expect(urls).toHaveLength(linked);
+    // What the links add to the serialised result, byte for byte: each is `,"url":"<link>"`.
+    const bytes = JSON.stringify(value).length - JSON.stringify({ items: rows(1_000) }).length;
+    expect(bytes).toBeLessThanOrEqual(LINK_BUDGET_CHARS);
+    // The rows that fit are the first ones, and every link is still the strict pinned form.
+    expect(value.items[0]?.['url']).toBe(`${BASE}/assetdetail.v1?oid=Story:100000`);
+    expect(value.items[linked]).not.toHaveProperty('url');
+    for (const u of urls)
+      expect(u).toMatch(
+        /^https:\/\/agility\.example\.com\/SyntheticInstance\/assetdetail\.v1\?oid=Story:\d+$/,
+      );
+    expect(linkNote(BASE, omitted)).toContain(`${omitted} more row(s) have no url`);
+    expect(linkNote(BASE)).not.toContain('more row');
+  });
+
+  it('links every row of an ordinary result', () => {
+    const { linked, omitted } = addLinks(BASE, { items: rows(100) });
+    expect({ linked, omitted }).toEqual({ linked: 100, omitted: 0 });
+  });
+
+  it('a Link asset keeps its own url and costs no budget', () => {
+    const items = [{ assetType: 'Link', oid: 'Link:1', url: 'https://x.example/' }, ...rows(1)];
+    const { value, linked } = addLinks(BASE, { items }, 100);
+    expect(value.items[0]?.['url']).toBe('https://x.example/');
+    expect(linked).toBe(1);
+  });
+});
+
 describe('deep links through the server', () => {
   const rows = defineTool({
     name: 'rows_test',
@@ -127,6 +189,21 @@ describe('deep links through the server', () => {
       structured: { items: [{ assetType: 'Story', oid: 'Story:1', number: 'B-1' }, { oid: 'Scope:3' }] },
     }),
   });
+  const many = defineTool({
+    name: 'many_test',
+    title: 'Many',
+    description: 'Return a thousand asset rows (test tool).',
+    kind: 'read',
+    group: 'core',
+    cost: 0,
+    inputSchema: z.object({}),
+    handler: async () => ({
+      text: 'Rows.',
+      structured: {
+        items: Array.from({ length: 1_000 }, (_, i) => ({ assetType: 'Story', oid: `Story:${100_000 + i}` })),
+      },
+    }),
+  });
   const none = defineTool({
     name: 'none_test',
     title: 'None',
@@ -136,6 +213,23 @@ describe('deep links through the server', () => {
     cost: 0,
     inputSchema: z.object({}),
     handler: async () => ({ text: 'Nothing.', structured: { items: [] } }),
+  });
+
+  it('adds at most the link budget to a thousand rows and says so in the one note', async () => {
+    const ctx = makeContext();
+    const res = await rpc(() => buildMcpServer({ tools: [many], ctx }), 'tools/call', {
+      name: 'many_test',
+      arguments: {},
+    });
+    const items = (res['structuredContent'] as { items: Array<Record<string, unknown>> }).items;
+    const linked = items.filter((i) => 'url' in i).length;
+    expect(linked).toBeGreaterThan(100);
+    expect(linked).toBeLessThan(1_000);
+    const added = JSON.stringify(items).length - JSON.stringify(items.map(({ url: _u, ...r }) => r)).length;
+    expect(added).toBeLessThanOrEqual(LINK_BUDGET_CHARS);
+    const text = (res['content'] as Array<{ text: string }>)[0]?.text ?? '';
+    expect(text).toContain(`${1_000 - linked} more row(s) have no url`);
+    expect(text.split('\n')).toHaveLength(2);
   });
 
   it('adds url and one fixed note, only when something was linked', async () => {

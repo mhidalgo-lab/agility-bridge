@@ -389,6 +389,18 @@
 - **Options:** (a) leave it for [P8-43](../tasks/phase-8-power-features/P8-43-batch-otlp-spans-on-workers.md); (b) build a per-isolate queue now.
 - **Recommendation:** (a). A per-isolate queue is state that outlives a request and needs a size and age flush, a flush racing `waitUntil`, and a decision about spans lost when an isolate is evicted; none of it is small, and D-304 already bounds the unauthenticated volume. The change that matters (the per-request flush) is unchanged.
 
+### D-313 — The shared tier takes entries up to 64 KiB, as an option of the tier *(P8-38)*
+- **Context:** The shared tier stored anything the memory tier accepted (256 KiB); sealing and opening cost CPU in proportion to size on a Free plan with 10 ms.
+- **Options:** (a) a cap of 64 KiB of text, an option (`maxEntryChars`) of `EdgeQueryTier` that the `SharedTier` interface exposes, checked by the cache before handing over and by the tier itself, with `whoami` showing it as `queryCache.sharedMaxEntryChars`; (b) 32 KiB; (c) an environment setting; (d) no cap, only the native base64.
+- **Recommendation:** (a), built. With the runtime's base64 a 64 KiB seal and open cost about 0.5 ms together on local workerd, and 256 KiB about 2.5 ms, so the cap is conservative for Paid and fair for Free (a 100 KB answer is already a large page of rows). Bigger answers stay in memory only. A setting is not worth an operator decision until the deployed measurement (P8-13) shows a need.
+- **Owner:** *(open; built as (a))*
+
+### D-314 — Use the runtime's base64 where it exists; keep the double parse *(P8-38)*
+- **Context:** The byte loop for base64 was most of the cost of a seal on workerd, and the review asked about the extra JSON parse of a hit.
+- **Options:** (a) `Uint8Array.prototype.toBase64` and `Uint8Array.fromBase64` when present, the existing loop and `btoa` otherwise; leave the stored format alone; (b) also change the stored format to avoid parsing the sealed wrapper.
+- **Recommendation:** (a), built. Measured on local workerd the wrapper parse is 0.01 to 0.3 ms from 8 to 256 KB, so (b) would trade a format change (every entry becomes a miss once) for nothing.
+- **Owner:** *(open; built as (a))*
+
 ### D-316 — Metadata requests are not counted by the quota *(P8-39 (Q-10))*
 - **Context:** `meta.v1` requests (one to three per cold call, about a dozen on a cold isolate) counted like data queries, so how fast a small quota drained depended on isolate recycling rather than on what the caller asked.
 - **Options:** (a) exclude them from the count; (b) count one unit per request however many metadata documents it loaded; (c) keep counting them.
@@ -401,14 +413,8 @@
 - **Recommendation:** (a), built on all three adapters with a contract test and a statement count in each. `increment` with `max` is unchanged, so the capped atomic counters of the write limiter, tasks and OAuth abuse limits keep their semantics. D-248, D-249, D-295, D-296 and D-299 stay true: still one read and one write per request, fail open, written after the response on Workers, a soft cap, and the quota asked before the budget. Rows written do not fall (two counters are two rows, L-461); statements fall from three to two a request.
 - **Owner:** *(open; built as (a))*
 
-### D-313 — The shared tier takes entries up to 64 KiB, as an option of the tier *(P8-38)*
-- **Context:** The shared tier stored anything the memory tier accepted (256 KiB); sealing and opening cost CPU in proportion to size on a Free plan with 10 ms.
-- **Options:** (a) a cap of 64 KiB of text, an option (`maxEntryChars`) of `EdgeQueryTier` that the `SharedTier` interface exposes, checked by the cache before handing over and by the tier itself, with `whoami` showing it as `queryCache.sharedMaxEntryChars`; (b) 32 KiB; (c) an environment setting; (d) no cap, only the native base64.
-- **Recommendation:** (a), built. With the runtime's base64 a 64 KiB seal and open cost about 0.5 ms together on local workerd, and 256 KiB about 2.5 ms, so the cap is conservative for Paid and fair for Free (a 100 KB answer is already a large page of rows). Bigger answers stay in memory only. A setting is not worth an operator decision until the deployed measurement (P8-13) shows a need.
-- **Owner:** *(open; built as (a))*
-
-### D-314 — Use the runtime's base64 where it exists; keep the double parse *(P8-38)*
-- **Context:** The byte loop for base64 was most of the cost of a seal on workerd, and the review asked about the extra JSON parse of a hit.
-- **Options:** (a) `Uint8Array.prototype.toBase64` and `Uint8Array.fromBase64` when present, the existing loop and `btoa` otherwise; leave the stored format alone; (b) also change the stored format to avoid parsing the sealed wrapper.
-- **Recommendation:** (a), built. Measured on local workerd the wrapper parse is 0.01 to 0.3 ms from 8 to 256 KB, so (b) would trade a format change (every entry becomes a miss once) for nothing.
+### D-318 — Deep links add at most 24,000 characters a result; the base is parsed once *(P8-40 (P-6))*
+- **Context:** The server added a `url` to every asset row after the output caps, and each link parsed the pinned base and then the finished link (`new URL` twice), about 3 microseconds a row. A 1,000-row result grew by about 90 KB the caps never saw.
+- **Options:** (a) parse the base once per result, build each link by concatenation after the strict OID or number check, prove it stays on the pinned prefix with one strict query pattern instead of a second parse, and stop adding links once they have added 24,000 characters (the default data block cap, about 250 rows), with the one fixed note saying how many rows got none; (b) omit all links above a fixed row count; (c) leave it and document the cost.
+- **Recommendation:** (a), built. Every T26 guarantee holds: origin and path are the parsed prefix, identities are matched by the same strict patterns plus a second pattern on the whole query, and a row with its own `url` (a Link asset) is untouched and costs no budget. (b) would drop links a caller can use for rows within the budget; the budget is a number a caller cannot raise, like the output caps.
 - **Owner:** *(open; built as (a))*

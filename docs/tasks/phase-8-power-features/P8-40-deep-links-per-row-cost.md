@@ -2,7 +2,7 @@
 id: P8-40
 title: "Deep links: parse the base once and keep links under the output cap"
 phase: 8
-status: todo
+status: review
 priority: low
 depends_on: [P8-02]
 adr: ["0015"]
@@ -23,8 +23,8 @@ Make deep links cheap and bounded (review P-6): `pinnedBase` and a second `new U
 - Keep every T26 guarantee: the origin and path stay pinned, identities stay strict, a Link asset's own `url` is untouched.
 
 ## Acceptance criteria
-- [ ] The existing link tests pass unchanged and a new test pins the byte count under the cap.
-- [ ] The base is parsed once per call (a test counts `new URL`) and no second parse runs per link.
+- [x] The existing link tests pass unchanged and a new test pins the byte count under the cap.
+- [x] The base is parsed once per call (a test counts `new URL`) and no second parse runs per link.
 - [ ] A bench row (P8-37) shows the per-row cost under a few microseconds (local and indicative: the machine is loaded).
 
 ## Security notes
