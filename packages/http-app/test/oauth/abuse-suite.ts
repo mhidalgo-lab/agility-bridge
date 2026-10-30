@@ -4,7 +4,7 @@
 // what must hold is that the endpoint's work, the stored rows and the outbound fetches stay within budget, that the
 // refusals are `429` with `Retry-After`, that they are audited once, and that other addresses are not locked out.
 import { exchangeAuthorization } from '@modelcontextprotocol/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   auditRows,
   authorize,
@@ -28,7 +28,11 @@ const CIMD_IP = 20;
 /** The fixed windows of the counters (`ABUSE_WINDOW_S` and `CAP_WINDOW_S` in `oauth/server.ts`). */
 const ABUSE_WINDOW_S = 600;
 const HOUR_S = 3600;
-/** A flood takes a few seconds even on a loaded runner; it starts only when this much of its window is left. */
+/**
+ * A flood takes a few seconds even on a loaded runner; it starts only when this much of its window is left. The suite
+ * gets there by moving `Date` forward, never by waiting: the wait was up to this long, inside a test with a 5 s timeout,
+ * so a test that happened to start in the last 20 s of a ten-minute window timed out (P8-21).
+ */
 const NEAR_END_MS = 20_000;
 const sha256Hex = async (text: string): Promise<string> =>
   [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))]
@@ -36,23 +40,54 @@ const sha256Hex = async (text: string): Promise<string> =>
     .join('');
 const docUrl = (n: number): string => `https://client${n}.example.org/meta.json`;
 
-export function defineOAuthAbuseSuite(name: string, makeHost: () => Promise<OAuthHost>): void {
+export function defineOAuthAbuseSuite(
+  name: string,
+  makeHost: () => Promise<OAuthHost>,
+  /**
+   * `shared`: the host runs in this process, so moving `Date` moves its clock. `own` (default): it has a clock of its own
+   * (workerd), so the suite waits for the boundary, which needs a test timeout longer than the wait: the Worker and CLI
+   * projects set 60 s and 30 s.
+   */
+  clock: 'shared' | 'own' = 'own',
+): void {
   describe(`OAuth abuse controls: ${name}`, () => {
     const open: OAuthHost[] = [];
     afterEach(async () => {
+      vi.useRealTimers();
       await Promise.all(open.splice(0).map((h) => h.close()));
     });
     /**
      * A host whose clock is at least `NEAR_END_MS` from the end of the abuse window, so a flood cannot straddle two
-     * fixed windows (the counters reset at the boundary: a flood split in two is cut by neither, L-382).
+     * fixed windows (the counters reset at the boundary: a flood split in two is cut by neither, L-382). Near a
+     * boundary the clock (`Date` only: timers stay real, and it keeps ticking) is moved to just after it.
      */
     const host = async (windowSeconds = ABUSE_WINDOW_S): Promise<OAuthHost> => {
       const h = await makeHost();
       open.push(h);
       const left = windowSeconds * 1000 - (Date.now() % (windowSeconds * 1000));
-      if (left < NEAR_END_MS) await new Promise((r) => setTimeout(r, left + 50));
+      if (left < NEAR_END_MS) {
+        if (clock === 'shared')
+          vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true, now: Date.now() + left + 50 });
+        else await new Promise((r) => setTimeout(r, left + 50));
+      }
       return h;
     };
+
+    it.runIf(clock === 'shared')(
+      'a host started in the last seconds of a window moves the clock past it instead of waiting for it (P8-21)',
+      async () => {
+        const windowMs = ABUSE_WINDOW_S * 1000;
+        vi.useFakeTimers({
+          toFake: ['Date'],
+          shouldAdvanceTime: true,
+          now: Math.floor(Date.now() / windowMs) * windowMs + windowMs - 3_000,
+        });
+        const started = performance.now();
+        await host();
+        expect(performance.now() - started).toBeLessThan(1_000);
+        expect(windowMs - (Date.now() % windowMs)).toBeGreaterThanOrEqual(NEAR_END_MS);
+      },
+    );
     const rows = (h: OAuthHost, prefix: string) => h.storage.kv.list(prefix, { limit: 1000 });
     const authorizeUrl = (h: OAuthHost, over: Record<string, string> = {}): string =>
       `${h.origin}/oauth/authorize?${new URLSearchParams({

@@ -8,9 +8,11 @@ import { defineOAuthAbuseSuite } from './abuse-suite.ts';
 import { memoryHost } from './memory-host.ts';
 import type { OAuthHost } from './suite.ts';
 
-defineOAuthAbuseSuite('memory storage', () => memoryHost());
-defineOAuthAbuseSuite('memory storage, Workers shape (a new app per request)', () =>
-  memoryHost({ request: true }),
+defineOAuthAbuseSuite('memory storage', () => memoryHost(), 'shared');
+defineOAuthAbuseSuite(
+  'memory storage, Workers shape (a new app per request)',
+  () => memoryHost({ request: true }),
+  'shared',
 );
 
 const MINUTE = 60_000;
