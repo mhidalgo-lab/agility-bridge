@@ -161,8 +161,10 @@ and it is safe by construction:
   The per-address request limit still applies.
 - It advertises **no extension**: `server/discover` lists the Tasks extension only to callers who signed in, so an anonymous
   caller cannot learn that deployment flag.
-- Each answer is rebuilt per request (about 38 KB for `tools/list`); the address limiter is the only brake on the egress, and a
-  cached response is [P8-35](../tasks/phase-8-power-features/P8-35-catalogue-cache-single-flight.md).
+- `initialize`, `server/discover` and `tools/list` (about 38 KB) are built once per process or Worker isolate and then served
+  from memory with only the JSON-RPC `id` replaced, byte for byte what a fresh build gives (P8-35). They are counted apart from
+  signed-in requests (`catalog: built` or `cached` on the request event the observers get). A POST answer is not cacheable by browsers or the
+  Cache API, so no `Cache-Control` is added; the address limiter is still the brake on the number of requests.
 - Tool descriptions are public documentation (they are in this repository), so listing them reveals nothing about your Agility
   instance or your people.
 

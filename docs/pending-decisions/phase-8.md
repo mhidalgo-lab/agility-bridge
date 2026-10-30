@@ -372,6 +372,23 @@
 - **Options:** (a) `keychain set <name> --for-url <url>` writes the secret and the binding (replacing a secret without the flag keeps the existing binding); `keychain bind <name> --for-url <url>` binds or moves an existing entry; `keychain delete` removes both; `keychain status --name` prints `boundTo`; `doctor` reports `ok` for a bound token, `warn` for an unbound one and `fail` for a different host; `client-config` snippets print `--for-url` with their `keychain set` hint; `init --keychain` and the master-key references are not bound; (b) bind through `init --keychain` too; (c) bind in the YAML file only.
 - **Recommendation:** (a), built. The binding applies to the stdio environment path (`AB_AGILITY_TOKEN`), the one a project file can reach. A `${keychain:...}` inside the user's own YAML file is not checked (the file is the user's; follow-up P8-42).
 
+### D-310 — The public catalogue keeps its three answers keyed on everything the answer could echo, with only the id substituted *(P8-35 (P-8))*
+- **Context:** The anonymous `tools/list` (about 38 KB), `initialize` and `server/discover` were rebuilt, serialised and, on a cold path, the SDK server built again for every request, bounded only by the per-address limiter.
+- **Options:** (a) keep the serialised bytes in a bounded table inside the app (an isolate on Workers), keyed on the method, the `accept` and MCP routing headers and the request's `params`, and substitute only the JSON-RPC `id` (strings and safe integers; anything else is answered the normal way); (b) key on method and protocol version only; (c) cache the tool list but still run the SDK handler.
+- **Recommendation:** (a), built. (b) would serve one client's `initialize` negotiation to another that asked for a different version, and (c) keeps most of the cost. The table is bounded (16 entries, 128 KB each, oldest first), holds no storage, workspace, grant or credential data, and a test compares every kept answer with a never-cached world's for several ids, workspace names and both protocol eras. No `Cache-Control`: a POST answer is not cacheable by browsers or the Cache API. Requests are counted apart as `catalog: 'built' | 'cached'` on the request event.
+- **Owner:** *(open; built as (a))*
+
+### D-311 — Single flight is per request context; nothing is shared across requests *(P8-35 (P-10))*
+- **Context:** The call budget allows six reads in parallel and identical misses each went to Agility. Workers forbid using a promise (an I/O object) created in another request.
+- **Options:** (a) a table of pending reads in a `WeakMap` keyed by the request's `ToolContext`, so identical concurrent misses inside one request send one request and each caller gets a `structuredClone` of the answer; (b) also share across requests on Node only; (c) a documented cross-request limit on Workers.
+- **Recommendation:** (a), built; it is the only form that is correct on both hosts and it cannot cross a scope (the entry id binds every dimension and the table dies with the context). A failure is every joined caller's failure and the next read tries again. A joined caller spends no budget unit and no quota unit, like a hit. The cross-request limit is documented in the query-cache guide: two requests that miss at once each ask Agility. Expired entries are also dropped anywhere in the map on every store (they used to hide behind a live head).
+- **Owner:** *(open; built as (a))*
+
+### D-312 — OTLP span batching is not built here; it becomes its own task *(P8-35 (P-3))*
+- **Context:** P8-35 listed batching of spans per isolate on Workers, with a flush through `waitUntil`, as optional, to be done only if small and well tested on both hosts.
+- **Options:** (a) leave it for [P8-43](../tasks/phase-8-power-features/P8-43-batch-otlp-spans-on-workers.md); (b) build a per-isolate queue now.
+- **Recommendation:** (a). A per-isolate queue is state that outlives a request and needs a size and age flush, a flush racing `waitUntil`, and a decision about spans lost when an isolate is evicted; none of it is small, and D-304 already bounds the unauthenticated volume. The change that matters (the per-request flush) is unchanged.
+
 ### D-316 — Metadata requests are not counted by the quota *(P8-39 (Q-10))*
 - **Context:** `meta.v1` requests (one to three per cold call, about a dozen on a cold isolate) counted like data queries, so how fast a small quota drained depended on isolate recycling rather than on what the caller asked.
 - **Options:** (a) exclude them from the count; (b) count one unit per request however many metadata documents it loaded; (c) keep counting them.

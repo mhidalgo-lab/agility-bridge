@@ -35,6 +35,16 @@ purpose key on the Worker; ids are never shown to anyone.
 Answers from Agility stay **untrusted data**: a hit is parsed again and goes through the same output shaper and
 untrusted-data envelope as a live answer, so a cached title is as fenced as a fresh one.
 
+## Identical reads in flight together
+
+A tool that asks the same thing several times at once (the call budget allows several requests in parallel) sends **one**
+request: the others wait for it and each gets its own copy of the answer. This is *single flight*, and it only ever happens
+inside one request. A pending request is never shared with another request, another grant or another scope: on Workers
+the runtime forbids using another request's I/O object, and the table of pending reads belongs to the request's own context
+(the entry id still binds every scope dimension). It is on whenever the cache is. A read that fails fails every caller that
+joined it, and the next read tries again. Expired entries are also dropped as soon as anything is stored, not only when they
+reach the front of the least-recently-used order (review P-10).
+
 ## When it is skipped
 
 - A caller who has **write tools** never reads or fills the cache, so a read after a write shows the write. The write

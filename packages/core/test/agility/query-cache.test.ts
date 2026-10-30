@@ -99,6 +99,22 @@ describe('QueryCache storage', () => {
     expect(await bytes.get('c', false)).toBeUndefined();
   });
 
+  it('drops expired entries behind a live head, not only at the head of the map (P-10)', async () => {
+    const { cache, clock } = cacheWith({ ttlMs: 10_000 });
+    // The first entry (the head of the map) outlives the two after it.
+    clock.t = 5_000;
+    await cache.put('head', 'h', false);
+    clock.t = 0;
+    await cache.put('old-1', '1', false);
+    await cache.put('old-2', '2', false);
+    expect(cache.size).toBe(3);
+    clock.t = 10_500;
+    await cache.put('new', 'n', false);
+    expect(cache.size).toBe(2);
+    expect(await cache.get('head', false)).toBe('h');
+    expect(await cache.get('old-2', false)).toBeUndefined();
+  });
+
   it('rejects a TTL outside 1 ms to 60 s', () => {
     for (const ttlMs of [0, 60_001, 1.5]) expect(() => cacheWith({ ttlMs })).toThrow(RangeError);
   });
@@ -274,6 +290,90 @@ describe('the client with a cache', () => {
     const c2 = agilityClient(makeContext({ fetch: fetch2, queryCache: scopeFor(broken) }));
     expect((await c2.query(QUERY)).data).toEqual(ROWS);
     expect(fetch2.calls).toHaveLength(1);
+  });
+
+  describe('single flight within one request (P8-35)', () => {
+    /** A fetch that answers only when released, so identical reads can be in flight together. */
+    function held() {
+      const release: Array<() => void> = [];
+      const fetch = fakeFetch(
+        () => new Promise<Response>((resolve) => release.push(() => resolve(json(ROWS)))),
+      );
+      return {
+        fetch,
+        release: () => {
+          for (const r of release.splice(0)) r();
+        },
+      };
+    }
+
+    it('sends one request for identical reads in flight together and gives each caller its own copy', async () => {
+      const { cache } = cacheWith();
+      const h = held();
+      const ctx = makeContext({ fetch: h.fetch, budget: createBudget(10), queryCache: scopeFor(cache) });
+      const reads = [1, 2, 3, 4].map(() => agilityClient(ctx).query<unknown[][]>(QUERY));
+      await new Promise((r) => setTimeout(r, 10));
+      expect(h.fetch.calls).toHaveLength(1);
+      h.release();
+      const answers = await Promise.all(reads);
+      expect(h.fetch.calls).toHaveLength(1);
+      // One unit of budget for one request, and nothing is shared between the callers.
+      expect(ctx.budget.used).toBe(1);
+      expect(new Set(answers.map((a) => a.data)).size).toBe(4);
+      for (const a of answers) expect(a.data).toEqual(ROWS);
+      (answers[1]?.data[0] as unknown[]).length = 0;
+      expect(answers[2]?.data).toEqual(ROWS);
+      // The answer is stored as before: the next read is a hit.
+      await agilityClient(ctx).query(QUERY);
+      expect(h.fetch.calls).toHaveLength(1);
+    });
+
+    it('does not join a different query, and does not remember a flight once it ended', async () => {
+      const { cache } = cacheWith({ ttlMs: 1_000 }, { t: 0 });
+      const h = held();
+      const ctx = makeContext({ fetch: h.fetch, budget: createBudget(10), queryCache: scopeFor(cache) });
+      const a = agilityClient(ctx).query(QUERY);
+      const b = agilityClient(ctx).query({ ...QUERY, select: ['Number'] });
+      await new Promise((r) => setTimeout(r, 10));
+      expect(h.fetch.calls).toHaveLength(2);
+      h.release();
+      await Promise.all([a, b]);
+    });
+
+    it('never shares a flight between two contexts, scopes or requests', async () => {
+      const { cache } = cacheWith();
+      const h = held();
+      const make = (over: Partial<QueryCacheScope> = {}, ctxOver: Partial<ToolContext> = {}) =>
+        makeContext({ fetch: h.fetch, queryCache: scopeFor(cache, over), ...ctxOver });
+      const reads = [
+        agilityClient(make()).query(QUERY),
+        // The same scope in another request: a second request of its own (workerd forbids sharing the promise).
+        agilityClient(make()).query(QUERY),
+        agilityClient(make({ grantId: 'grant-2' })).query(QUERY),
+        agilityClient(make({ principal: 'pt:other' })).query(QUERY),
+        agilityClient(make({}, { projects: { allowed: ['Scope:9'], includeChildren: false } })).query(QUERY),
+      ];
+      await new Promise((r) => setTimeout(r, 10));
+      expect(h.fetch.calls).toHaveLength(5);
+      h.release();
+      await Promise.all(reads);
+    });
+
+    it('gives every joined caller the failure of the one request, and the next read tries again', async () => {
+      const { cache } = cacheWith();
+      let n = 0;
+      const fetch = fakeFetch(async () => {
+        await new Promise((r) => setTimeout(r, 5));
+        return ++n === 1 ? json({ error: 'x' }, { status: 404 }) : json(ROWS);
+      });
+      const ctx = makeContext({ fetch, budget: createBudget(10), queryCache: scopeFor(cache) });
+      const reads = [1, 2, 3].map(() => agilityClient(ctx).query(QUERY));
+      const settled = await Promise.allSettled(reads);
+      expect(settled.map((s) => s.status)).toEqual(['rejected', 'rejected', 'rejected']);
+      expect(fetch.calls).toHaveLength(1);
+      expect((await agilityClient(ctx).query(QUERY)).data).toEqual(ROWS);
+      expect(fetch.calls).toHaveLength(2);
+    });
   });
 
   it('keeps meta, data and history requests out of the cache', async () => {

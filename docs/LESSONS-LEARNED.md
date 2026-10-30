@@ -38,7 +38,7 @@ How to use it:
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412 |
-| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-461 |
+| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
@@ -1846,6 +1846,10 @@ A task stored whatever arguments arrived and failed later, in a poll, after spen
 **L-453 — Telemetry for unauthenticated traffic needs its own budget.**
 One span per request is cheap for authenticated callers and an amplifier for everyone else: on Workers each 401 or 429 made an outgoing OTLP request. Spans of requests that never authenticated are sampled by a per-minute budget and counted; authenticated spans are never sampled. Any per-request side effect an unauthenticated caller can trigger is a cost lever for the caller.
 *Applied in:* P8-12, `telemetry/telemetry.ts` (`unauthenticatedPerMinute`), `app.ts` (L-118, L-079).
+
+**L-457 — A kept answer is proved equal to a fresh one for every value you substitute into it, including the ones the SDK refuses.**
+The public catalogue's three discovery answers are kept per isolate with only the JSON-RPC `id` replaced. The first cut accepted any finite number, and a test that compared each substituted id with a never-cached world's answer showed that the SDK answers a fractional id with a 400 where the kept bytes said 200. Keep only ids the SDK accepts (strings and safe integers), key the entry on every request field the answer could echo, split the body around the id only where it can be shown to be the message's own, and test byte equality against an uncached build for each id, slug and protocol era.
+*Applied in:* P8-35, `http-app/src/public-catalog-cache.ts`, `test/public-catalog.test.ts` (L-113, T33).
 
 ## P. Observability and logging
 

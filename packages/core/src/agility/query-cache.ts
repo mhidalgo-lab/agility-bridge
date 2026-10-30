@@ -202,10 +202,12 @@ export class QueryCache {
     if (old !== undefined) this.#drop(id, old);
     this.#entries.set(id, { text, until });
     this.#bytes += text.length;
-    // Oldest first: expired entries, then the least recently used, until both bounds hold.
+    // Expired entries anywhere in the map (a live entry at the head used to hide the dead ones behind it, P-10): at most
+    // `maxEntries` of them, so a full pass is cheap.
+    for (const [k, e] of this.#entries) if (k !== id && e.until <= now) this.#drop(k, e);
+    // Then the least recently used, oldest first, until both bounds hold.
     for (const [k, e] of this.#entries) {
-      if (k === id) break;
-      if (this.#entries.size <= this.#maxEntries && this.#bytes <= this.#maxBytes && e.until > now) break;
+      if (k === id || (this.#entries.size <= this.#maxEntries && this.#bytes <= this.#maxBytes)) break;
       this.#drop(k, e);
     }
   }

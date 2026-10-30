@@ -69,6 +69,7 @@ import {
   type OAuthRegistrations,
   type OAuthRuntime,
 } from './oauth/server.ts';
+import { createPublicAnswerCache, usableId } from './public-catalog-cache.ts';
 import { createSessionManager, type SessionManager, type SessionOptions } from './session.ts';
 import { TASKS_EXTENSION, type TaskService } from './tasks.ts';
 import type { HttpWrites } from './writes.ts';
@@ -99,6 +100,8 @@ export interface RequestEvent {
   readonly mcp: ClassifiedRequest | null;
   /** Set once the caller is authenticated. */
   readonly access: EffectiveAccess | null;
+  /** Set on a public-catalogue answer: built for this request or served from the isolate's kept bytes (P8-35). */
+  readonly catalog?: 'built' | 'cached';
   /** Set when the request was refused; the deny reason of the resolver for authentication failures. */
   readonly refusal: RefusalReason | null;
 }
@@ -432,6 +435,8 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     },
     { legacy: 'stateless' },
   );
+  /** The public catalogue's answers kept for the life of the app (an isolate on Workers): bytes, no request data. */
+  const publicAnswers = createPublicAnswerCache();
   /** The public catalogue's tools and context, built on first use from the registry (no request data, T21). */
   let publicPrepared: PreparedRequest | undefined;
   const publicCatalog = (): PreparedRequest =>
@@ -827,6 +832,8 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       });
       if (work !== undefined) keepAlive(c, work);
     };
+    /** Set when the public catalogue answered: built now, or from the isolate's kept bytes (counted apart, P8-35). */
+    let catalog: 'built' | 'cached' | undefined;
     const finish = (res: Response, refusal: RefusalReason | null, spanLater = false): Response => {
       if (!spanLater) sendSpan(res.status, refusal);
       observe(c, 'request', {
@@ -838,6 +845,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         mcp,
         access,
         refusal,
+        ...(catalog === undefined ? {} : { catalog }),
       });
       return res;
     };
@@ -953,6 +961,17 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
               headers: c.req.raw.headers,
               body: body.bytes,
             });
+            // The three discovery answers are kept per isolate with the JSON-RPC id substituted (P8-35, T33).
+            const answerKey = publicAnswers.keyFor(body.message, (h) => c.req.header(h));
+            const rpcId = (body.message as { id?: unknown }).id;
+            if (answerKey !== undefined && usableId(rpcId)) {
+              const kept = publicAnswers.serve(answerKey, rpcId);
+              if (kept !== undefined) {
+                catalog = 'cached';
+                return finish(kept, null);
+              }
+            }
+            catalog = 'built';
             const response = await handler.fetch(forward, {
               authInfo: {
                 token: 'public',
@@ -961,6 +980,11 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
                 extra: { prepared: publicCatalog() },
               },
             });
+            if (answerKey !== undefined && usableId(rpcId) && response.status === 200) {
+              const text = await response.text();
+              publicAnswers.remember(answerKey, rpcId, response.status, response.headers, text);
+              return finish(new Response(text, { status: response.status, headers: response.headers }), null);
+            }
             return finish(response, null);
           }
         }
