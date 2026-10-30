@@ -30,7 +30,7 @@ How to use it:
 | [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315, L-317 – L-320, L-324 – L-326, L-328, L-333, L-360, L-366, L-367, L-423 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282, L-323 |
-| [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-177, L-183, L-239, L-280, L-304, L-316 |
+| [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-424, L-177, L-183, L-239, L-280, L-304, L-316 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267, L-345, L-409, L-410 |
@@ -659,6 +659,14 @@ row whose parent is not in the current frontier is dropped too, so it cannot gra
 OID from the answer, never taken as "the first row". A level that has more rows than the cap is reported, and the walk
 asks one more question below the last level (limit-capped) so a depth cut is known rather than guessed.
 *Applied in:* P6-01.
+
+**L-424 — A path that answers without authentication is a function of configuration, and is gated by absence, not by failure.**
+The public tool catalogue answers five discovery methods without a credential. It is reached only when the request presents no
+credential header at all, never as a fallback after a bad token (a caller with a wrong token must still learn it is wrong), and
+the methods are classified from the body, not from a header. The answer is built from the tool registry alone, so it cannot depend
+on the workspace in the URL; the test that proves it uses a storage double that fails on any call and compares bytes across a real,
+an unknown, a disabled and a malformed slug (D-64, D-201).
+*Applied in:* P8-11, `public-catalog.ts`, `http-app/test/public-catalog.test.ts`.
 
 ## G. Access model, tokens and isolation
 

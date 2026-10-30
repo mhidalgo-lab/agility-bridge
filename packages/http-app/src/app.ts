@@ -24,8 +24,12 @@ import {
   CredentialLimiters,
   createBudget,
   type FetchLike,
+  isPublicCatalogMethod,
   type Logger,
   type MetadataService,
+  PUBLIC_CATALOG_GROUPS,
+  publicCatalogContext,
+  publicCatalogTools,
   type Random,
   Secret,
   type ToolCallEvent,
@@ -65,6 +69,8 @@ import type { HttpWrites } from './writes.ts';
 
 /** 1 MiB (ARCHITECTURE §5 step 1). */
 export const MAX_BODY_BYTES = 1024 * 1024;
+/** An unauthenticated catalogue request is a few hundred bytes (P8-11); anything larger takes the normal path. */
+const PUBLIC_CATALOG_MAX_BODY_BYTES = 16 * 1024;
 /** The whole exchange, a streamed response included (ARCHITECTURE §6.5). */
 export const EXCHANGE_DEADLINE_MS = 180_000;
 
@@ -166,6 +172,12 @@ export interface HttpAppOptions extends EdgeOptions {
     /** Seconds a validated token's identity is reused (default 300). */
     readonly identityTtlSeconds?: number;
   };
+  /**
+   * `AB_PUBLIC_TOOL_CATALOG=on` (P8-11, T33): a request with no credential header at all may `initialize`, `ping`,
+   * `server/discover` and `tools/list`, answered from the static read-only catalogue (the same for every workspace, no
+   * storage read). Everything else without a credential is `401`, as without this option.
+   */
+  readonly publicToolCatalog?: boolean;
   /**
    * The OAuth 2.1 authorization server (P5-01): metadata, `/oauth/authorize`, `/oauth/token`, `/oauth/register`, and
    * OAuth access tokens accepted on `/w/{slug}/mcp` next to device tokens. Absent = those routes answer 404 and only
@@ -369,6 +381,14 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     },
     { legacy: 'stateless' },
   );
+  /** The public catalogue's tools and context, built on first use from the registry (no request data, T21). */
+  let publicPrepared: PreparedRequest | undefined;
+  const publicCatalog = (): PreparedRequest =>
+    (publicPrepared ??= {
+      tools: publicCatalogTools(registry.select({ groups: PUBLIC_CATALOG_GROUPS })),
+      ctx: publicCatalogContext(),
+      onToolCall: () => {},
+    });
 
   // Workers build the app in a request: the linear router has no compile step on its first match (P3-14).
   const app = perRequest ? new Hono({ router: new LinearRouter() }) : new Hono();
@@ -834,6 +854,35 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         );
       }
     } else if (presented === null) {
+      // Lazy authentication (P8-11): only a request with no credential header at all, and only for the discovery
+      // methods. The answer is a function of the registry: no storage, no slug, no tenant.
+      if (
+        options.publicToolCatalog === true &&
+        c.req.method === 'POST' &&
+        c.req.header('authorization') === undefined
+      ) {
+        const body = await readMcpBody(c.req.raw, PUBLIC_CATALOG_MAX_BODY_BYTES);
+        if (body.ok) {
+          const classified = classifyMcpMessage(body.message);
+          if (isPublicCatalogMethod(classified.method)) {
+            mcp = classified;
+            const forward = new Request(c.req.url, {
+              method: 'POST',
+              headers: c.req.raw.headers,
+              body: body.bytes,
+            });
+            const response = await handler.fetch(forward, {
+              authInfo: {
+                token: 'public',
+                clientId: 'public',
+                scopes: [],
+                extra: { prepared: publicCatalog() },
+              },
+            });
+            return finish(response, null);
+          }
+        }
+      }
       return unauthorized('no_token');
     } else if (isWellFormedDeviceToken(presented, options.access.environment)) {
       try {

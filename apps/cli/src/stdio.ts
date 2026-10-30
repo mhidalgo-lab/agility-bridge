@@ -19,6 +19,7 @@ import {
   MetadataService,
   memoryCounterStore,
   memoryLedgerStore,
+  PUBLIC_CATALOG_GROUPS,
   Secret,
   type SelectOptions,
   silentLogger,
@@ -79,7 +80,8 @@ function selection(
     return {
       registry,
       options: {
-        groups: STDIO_GROUPS.filter((g) => g !== 'attachments' && g !== 'reports' && g !== 'writes'),
+        // The same set the public catalogue lists (P8-11): an unconfigured server shows what a registry may see.
+        groups: STDIO_GROUPS.filter((g) => PUBLIC_CATALOG_GROUPS.includes(g)),
       },
     };
   const valid = registry.list().map((t) => t.name);
