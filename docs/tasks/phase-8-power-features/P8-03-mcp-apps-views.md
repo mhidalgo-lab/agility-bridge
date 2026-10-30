@@ -2,7 +2,7 @@
 id: P8-03
 title: MCP Apps views
 phase: 8
-status: in-progress
+status: review
 priority: low
 depends_on: [P6-13]
 adr: ["0015"]
@@ -34,19 +34,19 @@ Charts in clients that support MCP Apps, text everywhere else. Nothing changes f
 - Docs: `docs/guide/charts.md` (new), configuration guide, client-compatibility table, tool catalogue.
 
 ## Acceptance criteria
-- [ ] Policy test: each page's CSP allows only its own hashed script and style and no network, image, frame, object,
+- [x] Policy test: each page's CSP allows only its own hashed script and style and no network, image, frame, object,
       form or base URL; the hashes match the exact page text; the page has one script and one style and no element or
       attribute that loads anything.
-- [ ] The script is pinned by a test: no `innerHTML`, `eval`, `Function`, network, storage, navigation, `href` or `srcdoc`.
-- [ ] Injection tests on labels: hostile sprint names and category names (markup, script, quotes, bidi, template text)
+- [x] The script is pinned by a test: no `innerHTML`, `eval`, `Function`, network, storage, navigation, `href` or `srcdoc`.
+- [x] Injection tests on labels: hostile sprint names and category names (markup, script, quotes, bidi, template text)
       appear only as text; no attribute carries them; hostile numbers and dates draw nothing (fake DOM in CI; real
       Chromium in a sandboxed iframe checked by hand, no code ran and no request left the page).
-- [ ] The handshake is tested: `ui/initialize`, `initialized` after the result, teardown answered, other senders ignored.
-- [ ] Offered only to a client that declared Apps: 2026-07-28 request with and without the declaration, stdio connection
+- [x] The handshake is tested: `ui/initialize`, `initialized` after the result, teardown answered, other senders ignored.
+- [x] Offered only to a client that declared Apps: 2026-07-28 request with and without the declaration, stdio connection
       with and without it, 2025-era stateless HTTP (never); a caller without the linking tool never sees the resource.
-- [ ] `AB_MCP_APPS=off` removes the resources and the tool metadata on every host.
+- [x] `AB_MCP_APPS=off` removes the resources and the tool metadata on every host.
 - [ ] Rendering verified in at least two real clients (VS Code, Claude) (*unverified*: needs the clients; left for the
-      owner and the Phase 8 review's live pass, tracked as a follow-up task).
+      owner and the Phase 8 review's live pass, tracked as [P8-19](P8-19-verify-apps-in-real-clients.md)).
 
 ## Security notes
 THREAT_MODEL T27.

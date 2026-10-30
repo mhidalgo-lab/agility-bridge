@@ -32,6 +32,7 @@ import {
   publicCatalogTools,
   type QueryCache,
   type Random,
+  requestDeclaresApps,
   Secret,
   type ToolCallEvent,
   type ToolContext,
@@ -222,6 +223,11 @@ export interface HttpAppOptions extends EdgeOptions {
    * registered nor selected, whatever the access records say.
    */
   readonly writes?: HttpWrites;
+  /**
+   * `AB_MCP_APPS` (P8-03): offer MCP Apps views to a request that declared the extension (default true; false is the
+   * kill switch). Only 2026-07-28 requests carry their capabilities, so a 2025-era stateless request is never offered Apps.
+   */
+  readonly mcpApps?: boolean;
 }
 
 export interface HttpApp {
@@ -239,6 +245,8 @@ export interface HttpApp {
 }
 
 interface PreparedRequest {
+  /** MCP Apps views are offered to this request (it declared Apps, P8-03); absent: none. */
+  readonly apps?: 'on';
   readonly tools: readonly ToolDefinition[];
   readonly ctx: ToolContext;
   readonly onToolCall: (event: ToolCallEvent) => void;
@@ -380,7 +388,12 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     ({ authInfo }) => {
       const prepared = authInfo?.extra?.['prepared'] as PreparedRequest | undefined;
       if (prepared === undefined) throw new Error('unreachable: the route authenticates first');
-      return buildMcpServer({ tools: prepared.tools, ctx: prepared.ctx, onToolCall: prepared.onToolCall });
+      return buildMcpServer({
+        tools: prepared.tools,
+        ctx: prepared.ctx,
+        onToolCall: prepared.onToolCall,
+        ...(prepared.apps === undefined ? {} : { apps: prepared.apps }),
+      });
     },
     { legacy: 'stateless' },
   );
@@ -1045,6 +1058,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       ...(writes === undefined ? {} : { writes }),
     };
     const prepared: PreparedRequest = {
+      ...(options.mcpApps !== false && requestDeclaresApps(body.message) ? { apps: 'on' as const } : {}),
       tools,
       ctx,
       onToolCall: (event) => observe(c, 'toolCall', { ...event, requestId, access: resolved }),

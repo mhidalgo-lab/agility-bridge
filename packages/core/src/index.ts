@@ -30,6 +30,15 @@ export {
   type SharedTierStatus,
 } from './agility/query-cache.ts';
 export { parseXml, type XmlElement } from './agility/xml.ts';
+export {
+  APP_VIEWS,
+  APPS_EXTENSION,
+  APPS_MIME_TYPE,
+  type AppView,
+  appViewById,
+  clientSupportsApps,
+  requestDeclaresApps,
+} from './apps/index.ts';
 export { COMPLETION_SOURCES, MAX_COMPLETIONS } from './completion.ts';
 export {
   ACTIVE_ATTACHMENT_TYPES,

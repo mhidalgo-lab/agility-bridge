@@ -41,6 +41,11 @@ export interface ToolDefinition<I extends InputSchema = InputSchema, O = unknown
    * old name to the new one before validating and adds a deprecation note to the result.
    */
   readonly deprecatedArguments?: Readonly<Record<string, string>>;
+  /**
+   * The MCP Apps view that draws this tool's result (`APP_VIEWS`, P8-03). Only a client that declared Apps ever sees the
+   * link; the text result is the same for everyone.
+   */
+  readonly view?: string;
   /** Open output schema (extra properties allowed, ADR-0015). */
   readonly outputSchema?: z.ZodType<O>;
   /** For `write` / `destructive` tools: repeating the same call has no further effect. Reads are always idempotent. */

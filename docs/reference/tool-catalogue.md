@@ -180,8 +180,9 @@ absent there). Regression plans and suites have no validated example yet
 
 ## MCP Apps and Tasks (Phase 8)
 
-- **Apps**: `ui://agility-bridge/sprint-burndown` and `ui://agility-bridge/status-distribution`, linked from
-  `get_sprint` and `sprint_health`; strict CSP, no network access, data from `structuredContent`; text tables for
-  clients without Apps.
+- **Apps** (P8-03, [guide](../guide/charts.md)): `ui://agility-bridge/sprint-burndown` is linked from `get_sprint` and
+  `ui://agility-bridge/status-distribution` from `sprint_health` (which now also returns `byStatusCategory`); strict CSP, no
+  network access, data from `structuredContent`; offered only to a client that declared Apps and unless `AB_MCP_APPS=off`;
+  the text result is the same for every client.
 - **Tasks**: reports and large `query_assets` exports run as MCP Tasks for clients that declare the extension; inline
   results or explicit continuation otherwise.

@@ -252,7 +252,7 @@ changes. Older builds dropped custom headers; P1-14 records the working form.
 - [ ] Remote with a device token; refusal on another workspace URL; revocation takes effect.
 - [ ] OAuth (Phase 5): discovery, consent, refresh under parallel calls, disconnect, reconnect.
 - [ ] Writes (Phase 7): dry run, approval through the client's channel, refusal, idempotent repeat.
-- [ ] MCP Apps rendering and fallback (Phase 8); Tasks (Phase 8).
+- [ ] MCP Apps rendering and fallback ([P8-19](../tasks/phase-8-power-features/P8-19-verify-apps-in-real-clients.md): the views are built and tested on fakes and in a sandboxed Chromium frame, not yet in a real client); Tasks (Phase 8).
 - [ ] After an upgrade: reconnect refreshes the tool list.
 
 ## Sources

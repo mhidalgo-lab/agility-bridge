@@ -8,6 +8,14 @@ import {
   type ServerContext,
   type StandardSchemaWithJSON,
 } from '@modelcontextprotocol/server';
+import {
+  APPS_MIME_TYPE,
+  appViewById,
+  clientSupportsApps,
+  toolViewMeta,
+  VIEW_RESOURCE_META,
+  viewHtml,
+} from './apps/index.ts';
 import { type CompletionEvent, completionShape } from './completion.ts';
 import { freezeContext, type ToolContext } from './context.ts';
 import {
@@ -143,6 +151,13 @@ export interface BuildServerOptions {
    * promise one (ADR-0005, L-016); stdio may pass true.
    */
   readonly listChanged?: boolean;
+  /**
+   * MCP Apps views (P8-03, T27). `off` (default): none. `on`: the client of this request declared Apps (an HTTP host read
+   * the declaration of a 2026-07-28 request), so the views the tools link are registered now. `detect`: a connection that
+   * keeps its capabilities (stdio) registers them when the client's `initialized` arrives and only if it declared Apps.
+   * A view is registered only when a tool in `tools` links it.
+   */
+  readonly apps?: 'off' | 'on' | 'detect';
   /** How error details that may contain Agility text are shown. Default: the untrusted-data envelope (P1-05). */
   readonly errors?: ToolErrorOptions;
   /** Called after every tool call. Must not throw; a throw is swallowed. */
@@ -377,14 +392,16 @@ export function buildMcpServer({
   listChanged = false,
   errors,
   onToolCall,
+  apps = 'off',
 }: BuildServerOptions): McpServer {
   const server = new McpServer(
     { name: info.name, version: info.version },
     { capabilities: { tools: { listChanged } } },
   );
   const contextFor = typeof context === 'function' ? context : () => context;
+  const registeredTools = new Map<string, ReturnType<McpServer['registerTool']>>();
   for (const def of tools) {
-    server.registerTool(
+    const registered = server.registerTool(
       def.name,
       {
         title: def.title,
@@ -460,7 +477,9 @@ export function buildMcpServer({
         }
       },
     );
+    registeredTools.set(def.name, registered);
   }
+  if (apps !== 'off') registerAppViews(server, tools, registeredTools, apps);
   registerResources(server, {
     tools,
     resources: availableEntries(
@@ -477,6 +496,68 @@ export function buildMcpServer({
     registerPrompt(server, def, { tools, contextFor, onToolCall });
   }
   return server;
+}
+
+/**
+ * MCP Apps (P8-03, T27): links each granted tool to its view and serves the views' static pages as `ui://` resources.
+ * Nothing here reads a request, Agility or storage; a page is the same for everyone. `detect` waits for the client's
+ * `initialized` and does nothing unless that client declared Apps.
+ */
+function registerAppViews(
+  server: McpServer,
+  tools: readonly ToolDefinition[],
+  registered: ReadonlyMap<string, ReturnType<McpServer['registerTool']>>,
+  mode: 'on' | 'detect',
+): void {
+  const linked = tools.flatMap((t) => {
+    const view = t.view === undefined ? undefined : appViewById(t.view);
+    return view === undefined ? [] : [{ tool: t.name, view }];
+  });
+  if (linked.length === 0) return;
+  const views = new Map<string, NonNullable<ReturnType<typeof appViewById>>>();
+  for (const { view } of linked) views.set(view.id, view);
+  // Registered now, so the server declares `resources` before the connection opens; a `detect` server keeps them
+  // disabled (neither listed nor readable) until the client's `initialized` shows it declared Apps.
+  const resources = [...views.values()].map((view) => {
+    const entry = server.registerResource(
+      `app_${view.id}`,
+      view.uri,
+      {
+        title: view.name,
+        description: view.description,
+        mimeType: APPS_MIME_TYPE,
+        _meta: { ...VIEW_RESOURCE_META },
+      },
+      async (uri) => ({
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: APPS_MIME_TYPE,
+            text: await viewHtml(view),
+            _meta: { ...VIEW_RESOURCE_META },
+          },
+        ],
+      }),
+    );
+    if (mode === 'detect') entry.disable();
+    return entry;
+  });
+  const activate = (): void => {
+    for (const { tool, view } of linked) {
+      const entry = registered.get(tool);
+      if (entry !== undefined) entry._meta = { ...entry._meta, ...toolViewMeta(view) };
+    }
+    for (const entry of resources) entry.enable();
+  };
+  if (mode === 'on') {
+    activate();
+    return;
+  }
+  const previous = server.server.oninitialized;
+  server.server.oninitialized = () => {
+    previous?.();
+    if (clientSupportsApps(server.server.getClientCapabilities())) activate();
+  };
 }
 
 /** Registers one available prompt: arguments validated by its schema, then its static text built from them. */

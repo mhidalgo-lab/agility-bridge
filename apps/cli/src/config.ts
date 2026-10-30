@@ -39,6 +39,8 @@ export interface StdioConfig {
   readonly attachmentDownload: boolean;
   /** The composite reports group (P6-07, D-101): off by default. */
   readonly reports: boolean;
+  /** MCP Apps views (P8-03): on by default, offered only to a client that declared Apps; `AB_MCP_APPS=off` is the kill switch. */
+  readonly mcpApps: boolean;
   /**
    * `AB_WRITE_TOOLS=on` (P7-01, ADR-0013): write tools may be offered, and only the ones `AB_TOOLS` names ("all tools"
    * never includes a write). Off by default.
@@ -83,6 +85,7 @@ const KNOWN_ENV = new Set([
   'AB_MEMBER_EMAILS',
   'AB_ATTACHMENT_DOWNLOAD',
   'AB_REPORTS',
+  'AB_MCP_APPS',
   'AB_ATTACHMENT_MAX_BYTES',
   'AB_ATTACHMENT_TYPES',
   'AB_LIMITS_MAX_LIMIT',
@@ -372,6 +375,7 @@ const workspaceSchema = z.strictObject({
     .optional(),
   generic_query: z.boolean().optional(),
   reports: z.boolean().optional(),
+  mcp_apps: z.boolean().optional(),
   writes: z
     .strictObject({
       enabled: z.boolean().optional(),
@@ -520,6 +524,7 @@ function fromYaml(env: Readonly<Record<string, string | undefined>>, options: Lo
     genericQuery: resolved.generic_query ?? true,
     memberEmails: resolved.member_emails ?? false,
     reports: resolved.reports ?? false,
+    mcpApps: resolved.mcp_apps ?? true,
     writeTools: resolved.writes?.enabled ?? false,
     writeApproval: resolved.writes?.approval ?? 'required',
     writeCustomFields: resolved.writes?.custom_fields ?? [],
@@ -595,6 +600,7 @@ export function loadConfig(
     genericQuery: bool('AB_GENERIC_QUERY', env['AB_GENERIC_QUERY'], true),
     memberEmails: bool('AB_MEMBER_EMAILS', env['AB_MEMBER_EMAILS'], false),
     reports: bool('AB_REPORTS', env['AB_REPORTS'], false),
+    mcpApps: bool('AB_MCP_APPS', env['AB_MCP_APPS'], true),
     writeTools: bool('AB_WRITE_TOOLS', env['AB_WRITE_TOOLS'], false),
     writeApproval: writeApproval(env['AB_WRITE_APPROVAL']),
     writeCustomFields: customFields(env['AB_WRITE_CUSTOM_FIELDS']),

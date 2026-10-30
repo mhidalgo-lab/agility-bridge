@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from 'zod';
+import { appViewById } from './apps/index.ts';
 import type { ToolDefinition, ToolKind } from './tool.ts';
 
 const NAME_RE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
@@ -102,6 +103,9 @@ export class ToolRegistry {
       }
       if (def.group !== 'writes')
         throw new RegistryError(`Write tool "${def.name}" must be in the writes group.`);
+    }
+    if (def.view !== undefined && appViewById(def.view) === undefined) {
+      throw new RegistryError(`Tool "${def.name}" names an unknown MCP Apps view "${def.view}".`);
     }
     if (typeof def.group !== 'string' || !NAME_RE.test(def.group)) {
       throw new RegistryError(`Tool "${def.name}" needs a snake_case group.`);
