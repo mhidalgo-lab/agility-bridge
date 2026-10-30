@@ -400,6 +400,10 @@ function checkTokenBinding(
   instance: string,
   hostFor: KeychainHostReader,
   warn: ((message: string) => void) | undefined,
+  where: { readonly token: string; readonly url: string; readonly file?: boolean } = {
+    token: 'AB_AGILITY_TOKEN',
+    url: 'AB_AGILITY_URL',
+  },
 ): void {
   let ref: ReturnType<typeof parseKeychainRef>;
   try {
@@ -413,18 +417,26 @@ function checkTokenBinding(
   const bound = hostFor(ref.service, ref.account);
   if (bound === undefined) {
     warn?.(
-      `keychain:${name} is not bound to an instance, so it would be sent to any AB_AGILITY_URL a client file sets (${host} now). Bind it: agility-bridge keychain bind ${name} --for-url ${instance}`,
+      `keychain:${name} is not bound to an instance, so it would be sent to any ${where.url} ${where.file === true ? 'the file names' : 'a client file sets'} (${host} now). Bind it: agility-bridge keychain bind ${name} --for-url ${instance}`,
     );
     return;
   }
   if (bound !== host) {
     throw new ConfigError(
-      `AB_AGILITY_TOKEN: keychain:${name} was stored for ${bound}, but AB_AGILITY_URL points at ${host}; the token is not sent there. A project's client file may have changed the address. If ${host} is really your instance, confirm it yourself: agility-bridge keychain bind ${name} --for-url ${instance}`,
+      `${where.token}: keychain:${name} was stored for ${bound}, but ${where.url} points at ${host}; the token is not sent there. ${where.file === true ? 'The file may have been copied or edited' : "A project's client file may have changed the address"}. If ${host} is really your instance, confirm it yourself: agility-bridge keychain bind ${name} --for-url ${instance}`,
     );
   }
 }
 
 const REF = /\$\{([^}]{1,200})\}/g;
+
+/** The `${keychain:...}` references inside a YAML token value, in order (an escaped `$${` is not one). */
+function keychainRefs(value: string): string[] {
+  const out: string[] = [];
+  for (const part of value.split('$${'))
+    for (const m of part.matchAll(REF)) if (m[1]?.startsWith('keychain:')) out.push(m[1]);
+  return out;
+}
 
 /** Replaces `${NAME}` and `${keychain:service/account}` in one string value; `$${` stands for a literal `${`. */
 function substitute(
@@ -602,6 +614,17 @@ function fromYaml(env: Readonly<Record<string, string | undefined>>, options: Lo
   const { token: rawToken, ...instanceRest } = ws.instance;
   if (hasReference({ ...ws, instance: instanceRest })) {
     throw new ConfigError(`workspaces.${id}: \${…} references are allowed only in instance.token.`);
+  }
+  // The same binding as the environment path (P8-42, D-309): a token is sent only to the host it was stored for, also
+  // when the user's own file names it, and before any secret is read.
+  const instance = instanceUrl(ws.instance.url, `workspaces.${id}.instance.url`);
+  const hostFor = hostReader(options);
+  for (const ref of keychainRefs(rawToken)) {
+    checkTokenBinding(ref, instance, hostFor, options.warn, {
+      token: `workspaces.${id}.instance.token`,
+      url: `workspaces.${id}.instance.url`,
+      file: true,
+    });
   }
   const token = substitute(rawToken, env, options.keychain ?? osKeychain, `workspaces.${id}.instance.token`);
   if (token === '') throw new ConfigError(`workspaces.${id}.instance.token is empty.`);

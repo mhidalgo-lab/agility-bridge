@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
-import { ConfigError, type FileAccess, loadConfig } from '../src/config.ts';
+import { ConfigError, type FileAccess, type KeychainReader, loadConfig } from '../src/config.ts';
 
 const URL = 'https://agility.example.com/SyntheticInstance';
 
@@ -138,9 +138,94 @@ workspaces:
     expect(c.kind === 'configured' && c.token.reveal()).toBe('FAKE-1');
     const k = loadConfig(
       { AB_CONFIG: '/cfg.yaml', AB_WORKSPACE: 'other' },
-      { files: files(YAML), keychain: (s, a) => `FAKE-${s}-${a}` },
+      { files: files(YAML), keychain: (s, a) => `FAKE-${s}-${a}`, keychainHost: () => 'agility.example.com' },
     );
     expect(k.kind === 'configured' && k.token.reveal()).toBe('FAKE-agility-ann');
+  });
+
+  describe('a keychain token named in the file is sent only to the host it was stored for (P8-42, T8, T23)', () => {
+    const env = { AB_CONFIG: '/cfg.yaml', AB_WORKSPACE: 'other' };
+    const secrets: string[] = [];
+    const keychain: KeychainReader = (s, a) => {
+      secrets.push(`${s}/${a}`);
+      return 'FAKE-SECRET';
+    };
+
+    it('loads when the stored host is the instance host, for the default and for any other service', () => {
+      const own = loadConfig(env, {
+        files: files(YAML),
+        keychain,
+        keychainHost: () => 'agility.example.com',
+      });
+      expect(own.kind).toBe('configured');
+      const other = loadConfig(env, {
+        files: files(YAML.replace('agility/ann', 'corp/ann')),
+        keychain,
+        keychainHost: (s, a) => (s === 'corp' && a === 'ann' ? 'agility.example.com' : 'wrong.example.net'),
+      });
+      expect(other.kind).toBe('configured');
+    });
+
+    it('refuses a different host before the secret is read, naming the command that confirms it', () => {
+      secrets.length = 0;
+      expect(() =>
+        loadConfig(env, { files: files(YAML), keychain, keychainHost: () => 'evil.example.net' }),
+      ).toThrow(
+        /workspaces\.other\.instance\.token: keychain:agility\/ann was stored for evil\.example\.net, but workspaces\.other\.instance\.url points at agility\.example\.com.*keychain bind agility\/ann --for-url/s,
+      );
+      expect(secrets).toEqual([]);
+    });
+
+    it('treats a different port as a different host and compares case-insensitively', () => {
+      expect(() =>
+        loadConfig(env, { files: files(YAML), keychain, keychainHost: () => 'agility.example.com:8443' }),
+      ).toThrow(/stored for agility\.example\.com:8443/);
+      const c = loadConfig(env, { files: files(YAML), keychain, keychainHost: () => 'agility.example.com' });
+      expect(c.kind).toBe('configured');
+    });
+
+    it('checks every reference of the token value, not only the first', () => {
+      const body = YAML.replace('${keychain:agility/ann}', '${keychain:ann}-${keychain:corp/other}');
+      expect(() =>
+        loadConfig(env, {
+          files: files(body),
+          keychain,
+          keychainHost: (s) => (s === 'corp' ? 'evil.example.net' : 'agility.example.com'),
+        }),
+      ).toThrow(/keychain:corp\/other was stored for evil\.example\.net/);
+    });
+
+    it('warns about an entry stored without a host and still loads it (D-308)', () => {
+      const warnings: string[] = [];
+      const c = loadConfig(env, {
+        files: files(YAML),
+        keychain,
+        keychainHost: () => undefined,
+        warn: (m) => warnings.push(m),
+      });
+      expect(c.kind).toBe('configured');
+      expect(
+        warnings.some(
+          (w) => w.includes('keychain:agility/ann is not bound') && w.includes('keychain bind agility/ann'),
+        ),
+      ).toBe(true);
+    });
+
+    it('does not look at bindings for a token that names no keychain entry', () => {
+      let reads = 0;
+      const c = loadConfig(
+        { AB_CONFIG: '/cfg.yaml', AB_WORKSPACE: 'mobile', MY_AGILITY_TOKEN: 'FAKE-1' },
+        {
+          files: files(YAML),
+          keychainHost: () => {
+            reads++;
+            return 'evil.example.net';
+          },
+        },
+      );
+      expect(c.kind).toBe('configured');
+      expect(reads).toBe(0);
+    });
   });
 
   it('warns on stderr when a setting only a remote host reads is set for stdio (Q-7)', () => {

@@ -64,8 +64,12 @@ token and, next to it, the host (lower case, with the port when it is not the de
 - `keychain status --name <name>` prints the bound host (never the token); `keychain delete` removes both entries;
   storing a new token under an existing name keeps its host unless you pass `--for-url`. `doctor` reports a bound
   token as `ok`, an unbound one as a warning and a different host as a failure.
-- Master keys (`init --keychain`) belong to a server, not to an instance, and are not bound. A `${keychain:...}` in your
-  own YAML configuration file is not checked either.
+- A `${keychain:...}` in the `instance.token` of your YAML configuration file is checked the same way, against
+  `instance.url` of that workspace and before any secret is read. The file may still name any service
+  (`${keychain:other-app/token}`), and the binding applies to it too: `keychain bind other-app/token --for-url <address>`
+  writes the `#host` entry next to it. A copied or edited file that points an entry at another host stops with both hosts
+  named; an unbound entry works with the same warning.
+- Master keys (`init --keychain`) belong to a server, not to an instance, and are not bound.
 
 | System | Tool | Notes |
 |---|---|---|
