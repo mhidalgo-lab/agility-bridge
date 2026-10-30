@@ -9,6 +9,8 @@ import {
   rotateCredentialKeys,
 } from '@agility-bridge/auth';
 import { restoreSqliteBackup } from '@agility-bridge/storage-sqlite';
+import pkg from '../../package.json' with { type: 'json' };
+import { CLIENTS, type Client, snippet } from '../client-snippets.ts';
 import { ConfigError } from '../config.ts';
 import { exitCode, renderReport, runDoctor } from '../doctor.ts';
 import { type KeychainBackend, KeychainError, type KeychainRef, parseKeychainRef } from '../keychain.ts';
@@ -449,6 +451,48 @@ export const COMMANDS: readonly CommandSpec[] = [
       } finally {
         await client.close();
       }
+    },
+  },
+  {
+    words: ['client-config'],
+    summary:
+      'Print the setup snippet (and install link where the client has one) for an MCP client: vscode, claude-code, claude-desktop, cursor, copilot-cli or windsurf; never holds a token',
+    args: [id('client', CLIENTS.join(', '))],
+    options: [
+      { name: 'url', kind: 'string', help: 'Your instance address (default: a placeholder to replace)' },
+      {
+        name: 'keychain',
+        kind: 'string',
+        help: 'Refer to the token as keychain:<name> in the OS keychain (default name agility-token for clients that store plain text)',
+      },
+      { name: 'pin', kind: 'flag', help: 'Pin the package to this version instead of running the latest' },
+      { name: 'link', kind: 'flag', help: 'Print only the install link (vscode and cursor)' },
+    ],
+    async run(r, p) {
+      const client = p.args[0] as string;
+      if (!(CLIENTS as readonly string[]).includes(client))
+        throw new ConfigError(`Unknown client "${client.slice(0, 40)}". Use one of: ${CLIENTS.join(', ')}.`);
+      let result: ReturnType<typeof snippet>;
+      try {
+        result = snippet(client as Client, {
+          ...(typeof p.opts['url'] === 'string' ? { url: p.opts['url'] } : {}),
+          ...(typeof p.opts['keychain'] === 'string' ? { keychain: p.opts['keychain'] } : {}),
+          ...(p.opts['pin'] === true ? { version: pkg.version } : {}),
+        });
+      } catch (error) {
+        throw new ConfigError((error as Error).message);
+      }
+      if (p.opts['link'] === true) {
+        if (result.link === undefined) throw new ConfigError(`${client} has no install link.`);
+        r.out(result.link);
+        return 0;
+      }
+      r.out(result.text.trimEnd());
+      r.err(`agility-bridge: put this in ${result.where}.`);
+      for (const note of result.notes) r.err(`agility-bridge: ${note}`);
+      if (result.link !== undefined)
+        r.err('agility-bridge: an install link for this client: run again with --link.');
+      return 0;
     },
   },
   {

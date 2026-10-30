@@ -12,6 +12,39 @@ instead and keep the token in the operating system's keychain (`agility-bridge k
 
 After upgrading agility-bridge, restart or reconnect the server in your client: clients cache the tool list (L-027).
 
+## One-step installs
+
+`agility-bridge client-config <client>` prints the snippet below for your client with your instance address filled in
+(`--url`), and where the client has one, an install link (`--link`). None of it holds a token: VS Code prompts, the
+others refer to the token in your OS keychain (`--keychain <name>`, see [secrets](secrets.md#keeping-secrets-in-the-os-keychain)).
+
+| Client | One step |
+|---|---|
+| VS Code | `agility-bridge client-config vscode --link` prints a `vscode:mcp/install?…` link (and the notes show a web link that opens VS Code); VS Code asks for the token |
+| Claude Code | the [plugin](#claude-code-plugin), or `agility-bridge client-config claude-code` prints the `claude mcp add` command |
+| Cursor | `agility-bridge client-config cursor --link` prints a `cursor://` link with a token placeholder to replace in the dialog |
+| Claude Desktop, Copilot CLI, Windsurf | `agility-bridge client-config <client>` prints the JSON to paste |
+
+These links and snippets are generated from one source and tested for shape and for holding no secret; they have **not**
+yet been run in each client: a real install is recorded in the [compatibility matrix](../reference/client-compatibility.md)
+when it is done.
+
+### Claude Code plugin
+
+The repository is a Claude Code plugin marketplace (`.claude-plugin/marketplace.json`) with one plugin,
+`plugins/agility-bridge`: the MCP server, four read-only commands (`/agility-bridge:my-work`, `find-item`,
+`sprint-status`, `standup`) and two skills (how to answer with the tools; how to handle untrusted Agility data).
+
+```text
+/plugin marketplace add mhidalgo-lab/agility-bridge
+/plugin install agility-bridge@agility-bridge
+```
+
+Claude Code asks for your instance address and token when the plugin is enabled and keeps the token in the system
+credential store. The plugin starts `agility-bridge` at the plugin's own version; update the plugin and the server
+updates with it (reconnect after, L-027). Listing in other marketplaces is described in the
+[registry listing](registry-listing.md).
+
 ## GitHub Copilot in VS Code
 
 `.vscode/mcp.json` in the workspace (or *MCP: Open User Configuration* for every workspace). VS Code asks for the token

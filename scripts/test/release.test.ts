@@ -15,12 +15,14 @@ import {
   IMAGE_REPOSITORY,
   imageTags,
   pendingChangesets,
+  pluginManifestVersion,
   type ReleaseState,
   readVersionConst,
   releaseRef,
   resolveTagCommit,
   SEMVER_RE,
   versionablePackages,
+  writePluginManifestVersion,
   writeVersionConst,
 } from '../release.ts';
 import { evalGuard } from './gha-expr.ts';
@@ -562,5 +564,18 @@ describe('.github/workflows/release.yml (THREAT_MODEL T18, P1-16)', () => {
       expect(r.status).toBe(1);
       expect(r.stdout).toMatch(/too old/);
     });
+  });
+});
+
+describe('the Claude Code plugin version (P8-06)', () => {
+  const manifest = '{\n  "name": "agility-bridge",\n  "version": "0.7.0",\n  "description": "x"\n}\n';
+  it('rewrites only the version', () => {
+    const out = writePluginManifestVersion(manifest, '0.8.1');
+    expect(pluginManifestVersion(out)).toBe('0.8.1');
+    expect(out).toBe(manifest.replace('0.7.0', '0.8.1'));
+  });
+  it('refuses a manifest without a version and a version that is not SemVer', () => {
+    expect(() => writePluginManifestVersion('{"name":"x"}', '0.8.0')).toThrow(/no version/);
+    expect(() => writePluginManifestVersion(manifest, 'latest')).toThrow(/SemVer/);
   });
 });

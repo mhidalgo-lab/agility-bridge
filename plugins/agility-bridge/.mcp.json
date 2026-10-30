@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "agility": {
+      "command": "npx",
+      "args": ["-y", "agility-bridge@0.7.0"],
+      "env": {
+        "AB_AGILITY_URL": "${user_config.agility_url}",
+        "AB_AGILITY_TOKEN": "${user_config.agility_token}"
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "agility-bridge",
+  "owner": { "name": "Matias Hidalgo", "url": "https://github.com/mhidalgo-lab" },
+  "description": "agility-bridge, an unofficial MCP server for Digital.ai Agility, as a Claude Code plugin.",
+  "plugins": [
+    {
+      "name": "agility-bridge",
+      "source": "./plugins/agility-bridge",
+      "description": "Work with Digital.ai Agility from Claude Code: backlog, sprints and work items, read-only by default.",
+      "category": "productivity"
+    }
+  ]
+}

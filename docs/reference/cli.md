@@ -122,6 +122,26 @@ agility-bridge config import <file> [--apply] [--allow-sensitive] [--passphrase-
 
 Runs without a server.
 
+## client-config
+
+### `client-config`
+
+Print the setup snippet (and install link where the client has one) for an MCP client: vscode, claude-code, claude-desktop, cursor, copilot-cli or windsurf; never holds a token.
+
+```text
+agility-bridge client-config <client> [--url <value>] [--keychain <value>] [--pin] [--link]
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `<client>` | argument | vscode, claude-code, claude-desktop, cursor, copilot-cli, windsurf |
+| `--url` | string | Your instance address (default: a placeholder to replace) |
+| `--keychain` | string | Refer to the token as keychain:<name> in the OS keychain (default name agility-token for clients that store plain text) |
+| `--pin` | flag | Pin the package to this version instead of running the latest |
+| `--link` | flag | Print only the install link (vscode and cursor) |
+
+Runs without a server.
+
 ## admin-token
 
 ### `admin-token`

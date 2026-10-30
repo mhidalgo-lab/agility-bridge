@@ -26,7 +26,7 @@ How to use it:
 |---|---|
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
-| [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
+| [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156, L-435 |
 | [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315, L-317 – L-320, L-324 – L-326, L-328, L-333, L-360, L-366, L-367, L-423, L-425 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282, L-323 |
@@ -208,6 +208,13 @@ flags, which leak through process listings. Use env, files, input prompts or the
 After an upgrade, users must reconnect or re-add the server before new parameters or output fields work. Every upgrade
 note and the troubleshooting page say so.
 *Applied in:* P1-14, P9-05.
+
+**L-435 — Generate every copy of a client entry from one module, and test the committed copies.**
+The stdio entry appears in six clients' formats, two install links, the docs and a plugin's `.mcp.json`. A copy edited by hand
+keeps the old argument or the old version after the next release. One module builds them all, the plugin's file is written by an
+import-free function that the release script runs, and a test compares each committed file with the generated one and scans
+every file for secret shapes. What no test can show (that a client accepts the link) is labelled unverified, not assumed.
+*Applied in:* P8-06, `apps/cli/src/client-snippets.ts`.
 
 **L-028 — Edge bot protection can block MCP clients.**
 CDN/WAF browser-integrity checks can reject non-browser clients before they reach the server ("403 from scripts, works

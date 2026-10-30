@@ -1,0 +1,26 @@
+{
+  "name": "agility-bridge",
+  "displayName": "Agility Bridge",
+  "version": "0.7.0",
+  "description": "Work with Digital.ai Agility from Claude Code: your backlog, sprints and work items through the agility-bridge MCP server, read-only by default.",
+  "author": { "name": "Matias Hidalgo", "url": "https://github.com/mhidalgo-lab" },
+  "homepage": "https://github.com/mhidalgo-lab/agility-bridge#readme",
+  "repository": "https://github.com/mhidalgo-lab/agility-bridge",
+  "license": "Apache-2.0",
+  "keywords": ["agility", "digital.ai", "versionone", "mcp", "backlog", "sprint"],
+  "userConfig": {
+    "agility_url": {
+      "type": "string",
+      "title": "Agility instance address",
+      "description": "The address you open Agility at, up to the instance name, for example https://www7.v1host.com/YourInstance (https only)",
+      "required": true
+    },
+    "agility_token": {
+      "type": "string",
+      "title": "Agility access token",
+      "description": "Create one on the Agility Applications page (your avatar, then Applications). It acts as you and does not expire: revoke it there when you stop using it",
+      "required": true,
+      "sensitive": true
+    }
+  }
+}

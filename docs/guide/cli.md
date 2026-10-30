@@ -70,6 +70,7 @@ only they can store it (in the admin panel under *My access*, [admin panel](admi
 | Check this setup (read-only; see [troubleshooting](troubleshooting.md)) | `agility-bridge doctor` (`--check-token` sends one request with your token, `--offline` none, `--fix` only repairs file modes it lists) |
 | Keep a token or the master key in the OS keychain ([secrets](secrets.md#keeping-secrets-in-the-os-keychain)) | `agility-bridge keychain set agility-token`, `agility-bridge keychain status --name agility-token`, `agility-bridge keychain delete agility-token`, `agility-bridge init --keychain master` |
 | Back up or move the configuration ([guide](migrating-config.md)) | `agility-bridge config export --out staging.json` (add `--with-tokens` to seal tokens with a passphrase), then `agility-bridge config import staging.json` (a dry run) and `agility-bridge config import staging.json --apply` |
+| Print the setup snippet or install link for a client ([clients](clients.md)) | `agility-bridge client-config vscode --url https://www7.v1host.com/YourInstance`, `agility-bridge client-config claude-code --keychain agility-token`, `agility-bridge client-config vscode --link` |
 | A new break-glass admin token | `agility-bridge admin-token` (put it in a `0600` file for `AB_ADMIN_TOKEN_FILE`) |
 | Master-key rotation (local only) | `agility-bridge keys status`, `agility-bridge keys rotate --reason "yearly"`, `agility-bridge keys retire 1 --reason "rotation done"` |
 

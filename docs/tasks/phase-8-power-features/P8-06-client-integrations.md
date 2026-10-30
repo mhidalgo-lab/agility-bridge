@@ -2,7 +2,7 @@
 id: P8-06
 title: Client integrations (Claude Code plugin, VS Code and Copilot snippets)
 phase: 8
-status: todo
+status: review
 priority: low
 depends_on: [P6-13]
 adr: ["0016"]

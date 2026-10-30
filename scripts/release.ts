@@ -7,7 +7,8 @@
 //                                                  are no pending changesets)
 //   node scripts/release.ts notes <version>      → prints the CHANGELOG section of <version>
 //   node scripts/release.ts sync-version [--check] → writes (or checks) VERSION in packages/core/src/version.ts and
-//                                                  the versions in the MCP Registry metadata (server.json, P7-14)
+//                                                  the versions in the MCP Registry metadata (server.json, P7-14) and
+//                                                  the Claude Code plugin's manifest and pinned package (P8-06)
 //   node scripts/release.ts check-changesets     → part of `pnpm lint` (P8-84): every pending changeset names only
 //                                                  packages changesets can version (not private, not ignored)
 //
@@ -15,12 +16,16 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { PLUGIN_PATH, pluginMcpJson } from '../apps/cli/src/plugin-mcp.ts';
 
 export const PACKAGE_NAME = 'agility-bridge';
 export const CLI_DIR = 'apps/cli';
 export const VERSION_FILE = 'packages/core/src/version.ts';
 /** MCP Registry metadata (P7-14): its own version and the npm package's must follow the CLI package. */
 export const SERVER_JSON = 'server.json';
+/** The Claude Code plugin (P8-06): its manifest version and its pinned package version follow the CLI's. */
+export const PLUGIN_MANIFEST = `${PLUGIN_PATH}/.claude-plugin/plugin.json`;
+export const PLUGIN_MCP = `${PLUGIN_PATH}/.mcp.json`;
 
 /** Strict SemVer (no build metadata), so the value is safe to put into workflow outputs and tag names. */
 export const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
@@ -316,6 +321,22 @@ export function writeServerJsonVersion(text: string, version: string): string {
   return out;
 }
 
+/** The plugin manifest's `version`, or `undefined` when it has none. */
+export function pluginManifestVersion(text: string): unknown {
+  return (JSON.parse(text) as { version?: unknown }).version;
+}
+
+/** The manifest with its `"version"` set to `version`, the rest of the text untouched. */
+export function writePluginManifestVersion(text: string, version: string): string {
+  if (!SEMVER_RE.test(version)) throw new Error(`Not a SemVer version: ${version}`);
+  const old = pluginManifestVersion(text);
+  if (typeof old !== 'string') throw new Error(`${PLUGIN_MANIFEST}: no version`);
+  const out = text.replace(`"version": ${JSON.stringify(old)}`, `"version": ${JSON.stringify(version)}`);
+  if (pluginManifestVersion(out) !== version)
+    throw new Error(`${PLUGIN_MANIFEST}: could not set the version`);
+  return out;
+}
+
 export function cliVersion(root: string): string {
   const pkg = JSON.parse(readFileSync(`${root}/${CLI_DIR}/package.json`, 'utf8')) as {
     name: string;
@@ -468,10 +489,26 @@ function main(argv: readonly string[]): number {
           );
           return 1;
         }
+        const manifest = pluginManifestVersion(readFileSync(`${root}/${PLUGIN_MANIFEST}`, 'utf8'));
+        if (manifest !== version) {
+          console.error(
+            `✗ ${PLUGIN_MANIFEST} has version '${String(manifest)}', ${CLI_DIR}/package.json has '${version}'. Run node scripts/release.ts sync-version`,
+          );
+          return 1;
+        }
+        if (readFileSync(`${root}/${PLUGIN_MCP}`, 'utf8') !== pluginMcpJson(version)) {
+          console.error(
+            `✗ ${PLUGIN_MCP} does not pin agility-bridge@${version} (or was edited by hand). Run node scripts/release.ts sync-version`,
+          );
+          return 1;
+        }
         return 0;
       }
       writeFileSync(file, writeVersionConst(source, version));
       writeFileSync(serverFile, writeServerJsonVersion(serverText, version));
+      const manifestFile = `${root}/${PLUGIN_MANIFEST}`;
+      writeFileSync(manifestFile, writePluginManifestVersion(readFileSync(manifestFile, 'utf8'), version));
+      writeFileSync(`${root}/${PLUGIN_MCP}`, pluginMcpJson(version));
       return 0;
     }
     case 'image-tags': {
