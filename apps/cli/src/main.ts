@@ -3,6 +3,7 @@
 import { createLogger } from '@agility-bridge/core';
 import pkg from '../package.json' with { type: 'json' };
 import { ConfigError, loadConfig } from './config.ts';
+import { type KeychainBackend, keychainFor } from './keychain.ts';
 import { localClient, remoteClient } from './manage/client.ts';
 import { type CommandSpec, findCommand, parse, runCommand, UsageError, usage } from './manage/commands.ts';
 import { processStdin, readSecret } from './manage/secret-input.ts';
@@ -17,6 +18,8 @@ Usage:
   agility-bridge [stdio]      Serve MCP on stdin/stdout (the default; started by your MCP client)
   agility-bridge serve        Serve workspaces over HTTP at /w/<slug>/mcp (a team server; needs a master key)
   agility-bridge init         Write a new master key to ~/.config/agility-bridge/master.key
+  agility-bridge keychain set|delete|status
+                              Keep a token or the master key in the OS keychain: AB_AGILITY_TOKEN=keychain:<name>
   agility-bridge doctor       Diagnose this setup without changing it (--check-token, --offline, --fix, --json)
   agility-bridge admin-token  Print a new break-glass admin token for AB_ADMIN_TOKEN_FILE (shown once)
   agility-bridge user|instance|credential|workspace|grant|token|audit|keys <action> ...
@@ -37,6 +40,8 @@ export interface Io {
   readonly err: (text: string) => void;
   /** Piped standard input or a hidden prompt (management commands that take a secret). */
   readonly stdin?: (prompt: string) => () => Promise<string>;
+  /** The OS keychain (tests); this machine's by default. */
+  readonly keychain?: () => KeychainBackend;
 }
 
 /** Flags that look like secrets are refused with an explanation (L-026, T23). */
@@ -57,6 +62,7 @@ async function manage(spec: CommandSpec, rest: readonly string[], io: Io): Promi
       out: io.out,
       err: io.err,
       stdin: stdin('Agility access token (hidden): '),
+      keychain: () => io.keychain?.() ?? keychainFor(process.platform),
       local: () => localClient(io.env, logger),
       async client() {
         const url = io.env['AB_ADMIN_URL'];
@@ -80,6 +86,7 @@ async function manage(spec: CommandSpec, rest: readonly string[], io: Io): Promi
     // Expected refusals from the local database, files and keys: a message, not a stack trace.
     const expected = [
       'ConfigError',
+      'KeychainError',
       'UnsafeFileError',
       'MigrationError',
       'SecretsError',
