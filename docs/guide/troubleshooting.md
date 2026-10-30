@@ -5,6 +5,16 @@ JSON lines on stderr: your client shows them in its MCP output or log view (VS C
 Code: `claude --debug`; Copilot CLI: `~/.copilot/logs`). Set `AB_LOG_LEVEL=debug` for one line per Agility request;
 tokens are always redacted.
 
+**Start with `agility-bridge doctor`.** It reads your configuration, probes the instance over HTTPS without credentials,
+looks at the local database, the master key and the MCP client files of the common clients, and says what is wrong and
+how to fix it. It never changes anything: `--fix` repairs only the file modes it lists, and `--check-token` is the one
+option that sends your token (one request to your own instance). It reports on the environment of your shell, which can
+differ from the one your client starts the server with; its output never contains a token or key.
+
+```sh
+npx -y agility-bridge doctor            # add --check-token to test the token, --offline for no network
+```
+
 | You see | Likely cause | Fix |
 |---|---|---|
 | The server does not start; the client log shows `agility-bridge: …` | Invalid configuration (one line says which setting) | Fix that setting; the [configuration guide](configuration.md) lists them all. |

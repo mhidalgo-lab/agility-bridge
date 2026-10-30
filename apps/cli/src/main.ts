@@ -17,6 +17,7 @@ Usage:
   agility-bridge [stdio]      Serve MCP on stdin/stdout (the default; started by your MCP client)
   agility-bridge serve        Serve workspaces over HTTP at /w/<slug>/mcp (a team server; needs a master key)
   agility-bridge init         Write a new master key to ~/.config/agility-bridge/master.key
+  agility-bridge doctor       Diagnose this setup without changing it (--check-token, --offline, --fix, --json)
   agility-bridge admin-token  Print a new break-glass admin token for AB_ADMIN_TOKEN_FILE (shown once)
   agility-bridge user|instance|credential|workspace|grant|token|audit|keys <action> ...
                               Manage a server: the local database, or AB_ADMIN_URL's admin API (--help per command)
