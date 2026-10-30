@@ -80,5 +80,10 @@ Measured with `pnpm bench:worker` (Node, the V8 of workerd; fakes for Agility), 
 | shared-tier hit (decrypt and parse) | 0 | 0.65 |
 
 A hit saves **requests and latency, not Worker CPU**: it still parses the stored answer, and the fakes answer instantly.
+Shared-tier cost by body size (sealing, `Cache.put`, `Cache.match`, opening; one run on a shared machine, **local and
+indicative**, P8-37): 8 KB 0.7 ms, 64 KB 3.7 ms, 100 KB 6.2 ms, 256 KB 14.7 ms. A big body is not free on the 10 ms Free budget
+(see [P8-38](../tasks/phase-8-power-features/P8-38-shared-tier-size-and-cpu.md)); the baseline on an idle machine and a
+deployed Worker are still to be measured.
+
 On the Free plan (50 subrequests, 10 ms of CPU) the saving is the subrequests of repeated reads. Memory is bounded:
 200 entries and 8 MiB per process or isolate.

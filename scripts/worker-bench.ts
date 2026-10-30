@@ -14,11 +14,13 @@
 // with the real deployment limiter over counted counters (one read and two increments per write).
 // Query cache (P8-01): search_work_items with a memory hit and with a shared-tier hit (sealed body, cold memory), against
 // the uncached warm call, with the Agility requests per call.
+// Phase 8 hot paths (P8-37): a read with a quota set, a task create and its first poll, telemetry off and on, deep links
+// on 25 and 200 rows, the Apps views registration, the anonymous catalogue, and shared-tier bodies of 8 to 256 KB.
 //   pnpm bench:worker            measure and compare with scripts/bench/worker-baseline.json
 //   pnpm bench:worker --update   rewrite the baseline
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { register } from 'node:module';
+import { createRequire, register } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import type { MetadataStore } from '../packages/core/src/index.ts';
 
@@ -60,7 +62,7 @@ export interface BenchResult {
   readonly relative: Record<string, number>;
   /** Agility requests per call. */
   readonly requests: Record<string, number>;
-  /** Approval-ledger storage operations per call (write paths only). */
+  /** Storage statements per call (the write paths' approval ledger, the quota counters). */
   readonly storage?: Record<string, number>;
 }
 
@@ -587,6 +589,307 @@ async function warmApprovals(): Promise<Record<string, number>> {
   return ms;
 }
 
+/** The rows a Phase 8 read scenario searches: `n` stories in the workspace's one project. */
+function storyRows(n: number): Record<string, unknown>[] {
+  return Array.from({ length: n }, (_, i) => ({
+    _oid: `Story:${5000 + i}`,
+    Number: `B-${String(5000 + i).padStart(5, '0')}`,
+    Name: `Story ${i} with a realistic title`,
+    Description: 'A description of the work, a sentence or two long.',
+    AssetState: 64,
+    Scope: 'Scope:1001',
+  }));
+}
+
+/** The settings of a world that allows 500 rows and reports (the defaults allow 100). */
+async function wideAccess() {
+  const core = await import('../packages/core/src/index.ts');
+  const { TOOL_INFO } = await import('../packages/http-app/test/helpers/world.ts');
+  return {
+    tools: TOOL_INFO,
+    writesEnabled: false,
+    environment: 'live' as const,
+    limits: {
+      defaults: {
+        ...core.DEFAULT_LIMITS,
+        maxResponseBytes: 8 * 1024 * 1024,
+        callBudget: 1_000,
+        genericQuery: true,
+        reports: true,
+        maxRows: 500,
+      },
+      ceilings: {},
+    },
+  };
+}
+
+/** Phase 8 hot paths (P8-37). Local CPU on whatever machine runs it: compare rows of one run, not runs. */
+async function phase8Paths(): Promise<{
+  ms: Record<string, number>;
+  requests: Record<string, number>;
+  storage: Record<string, number>;
+}> {
+  const core = await import('../packages/core/src/index.ts');
+  const { world, post, ASSETS, TOOL_INFO } = await import('../packages/http-app/test/helpers/world.ts');
+  const { createTaskService, TASKS_EXTENSION } = await import('../packages/http-app/src/index.ts');
+  const { Keyring, generateMasterKey } = await import('../packages/auth/src/index.ts');
+  // zod is a dependency of the packages, not of the root: resolve it from core's own.
+  const { z } = (await import(
+    createRequire(new URL('../packages/core/package.json', import.meta.url)).resolve('zod')
+  )) as typeof import('../packages/core/node_modules/zod');
+  const ms: Record<string, number> = {};
+  const requests: Record<string, number> = {};
+  const storage: Record<string, number> = {};
+
+  type W = Awaited<ReturnType<typeof world>>;
+  /** Times `run` (warm-up first); the Agility requests of the last call are read from the world's tool-call log. */
+  const measure = async (name: string, w: W | undefined, run: () => Promise<unknown>, samples = 25) => {
+    for (let i = 0; i < 5; i++) await run();
+    const times: number[] = [];
+    for (let i = 0; i < samples; i++) {
+      const before = w?.toolCalls.length ?? 0;
+      const t = cpu();
+      await run();
+      times.push(cpu() - t);
+      const call = w?.toolCalls[before];
+      if (call !== undefined) requests[name] = call.requestsUsed;
+    }
+    ms[name] = median(times);
+  };
+  const text = async (res: Response) => {
+    const body = await res.text();
+    if (res.status >= 400) throw new Error(`${res.status}: ${body.slice(0, 200)}`);
+    return body;
+  };
+  const search = (limit: number, id = 3) => ({
+    jsonrpc: '2.0',
+    id,
+    method: 'tools/call',
+    params: { name: 'search_work_items', arguments: { limit } },
+  });
+
+  // Deep links (P8-02): every structured row carries one. The rows are more than the default fixture has.
+  for (const n of [25, 200]) {
+    const access = await wideAccess();
+    const w = await world(
+      { isolation: 'request', background: () => {}, access },
+      { detachedAudit: true, assets: { ...ASSETS, Story: storyRows(n) } },
+    );
+    const name = `phase 8: search_work_items, ${n} rows with deep links`;
+    const body = search(n);
+    const first = await text(await post(w, 'team-a', w.tokens.alice, body));
+    const links = first.split('assetdetail.v1').length - 1;
+    if (links < Math.min(n, 25)) throw new Error(`the ${n}-row scenario returned ${links} links`);
+    await measure(name, w, async () => text(await post(w, 'team-a', w.tokens.alice, body)), 15);
+  }
+
+  // A read with a quota set (P8-09): one counter read before, two increments after, over the world's own kv.
+  {
+    let kv: W['storage']['kv'] | undefined;
+    let statements = 0;
+    const gate = core.createQuotaGate({
+      limits: { daily: 1_000_000, monthly: 10_000_000 },
+      clock: core.systemClock,
+      counters: {
+        getMany: (keys) => (statements++, (kv as NonNullable<typeof kv>).getMany(keys)),
+        increment: (key, options) => (statements++, (kv as NonNullable<typeof kv>).increment(key, options)),
+      },
+    });
+    const w = await world(
+      { isolation: 'request', background: () => {} },
+      { detachedAudit: true, services: { quota: gate } },
+    );
+    kv = w.storage.kv;
+    const name = 'phase 8: search_work_items with a quota set';
+    const body = search(25);
+    await measure(name, w, async () => text(await post(w, 'team-a', w.tokens.alice, body)));
+    statements = 0;
+    await text(await post(w, 'team-a', w.tokens.alice, body));
+    storage[name] = statements;
+  }
+
+  // A task (P8-10): the create call (a handle and one sealed record), then the first poll (runs the report).
+  {
+    const tool = core.defineTool({
+      name: 'bench_report',
+      title: 'Bench report',
+      description: 'A synthetic report used by the benchmark.',
+      kind: 'read',
+      group: 'reports',
+      cost: 1,
+      inputSchema: z.object({}),
+      handler: async (_input, ctx) =>
+        core.shapeOutput(ctx, { summary: ['The report is ready.'], structured: { ready: true } }).output,
+    });
+    const info = new Map([...TOOL_INFO, [tool.name, { kind: tool.kind, group: tool.group }]]);
+    let kv: W['storage']['kv'] | undefined;
+    const lazyKv = new Proxy({} as W['storage']['kv'], {
+      get: (_t, key) => (kv as unknown as Record<string, unknown>)[key as string],
+    });
+    const tasks = createTaskService({
+      kv: lazyKv,
+      keyring: await Keyring.create(generateMasterKey(1)),
+      clock: core.systemClock,
+      random: core.webCryptoRandom,
+    });
+    const access = await wideAccess();
+    const w = await world(
+      {
+        isolation: 'request',
+        background: () => {},
+        tools: [...core.CORE_TOOLS, tool],
+        access: { ...access, tools: info },
+      },
+      { detachedAudit: true, tools: info, services: { tasks } },
+    );
+    kv = w.storage.kv;
+    const meta = {
+      'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+      'io.modelcontextprotocol/clientCapabilities': { extensions: { [TASKS_EXTENSION]: {} } },
+    };
+    const rpcModern = async (body: Record<string, unknown>, name: string) => {
+      const res = await post(w, 'team-a', w.tokens.alice, body, {
+        'mcp-method': String(body['method']),
+        'mcp-protocol-version': '2026-07-28',
+        'mcp-name': name,
+      });
+      const raw = await text(res);
+      const data = raw.startsWith('event:')
+        ? (raw.split('\n').find((l) => l.startsWith('data:')) ?? '').slice(5)
+        : raw;
+      return JSON.parse(data) as { result?: { taskId?: string; status?: string } };
+    };
+    const createBody = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: { name: 'bench_report', arguments: {}, _meta: meta },
+    };
+    const poll = (taskId: string) => ({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tasks/get',
+      params: { taskId, _meta: meta },
+    });
+    const createSamples: number[] = [];
+    const pollSamples: number[] = [];
+    for (let i = 0; i < 25; i++) {
+      const t = cpu();
+      const created = await rpcModern(createBody, 'bench_report');
+      const mid = cpu();
+      const taskId = created.result?.taskId;
+      if (taskId === undefined) throw new Error('the task scenario got no task');
+      const first = await rpcModern(poll(taskId), taskId);
+      const end = cpu();
+      if (first.result?.status !== 'completed') throw new Error('the first poll did not complete the task');
+      if (i >= 5) {
+        createSamples.push(mid - t);
+        pollSamples.push(end - mid);
+      }
+    }
+    ms['phase 8: task create (handle and sealed record)'] = median(createSamples);
+    ms['phase 8: task first poll (runs the report)'] = median(pollSamples);
+  }
+
+  // Telemetry (P8-07): the same read with it off and on, a fake collector, one flush per call (what Workers does).
+  for (const on of [false, true]) {
+    const telemetry = on
+      ? core.createTelemetry({
+          exporter: core.createOtlpExporter({
+            endpoint: 'https://collector.example.com',
+            fetch: async (request) => {
+              await request.text();
+              return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+            },
+            resource: { attributes: core.telemetryResource({ version: 'bench', environment: 'production' }) },
+          }),
+          clock: core.systemClock,
+          random: core.webCryptoRandom,
+          logger: core.createLogger({ level: 'error', sink: () => {} }),
+          knownTools: new Set(core.CORE_TOOLS.map((t) => t.name)),
+          service: { version: 'bench', environment: 'production' },
+          flushEach: false,
+        })
+      : undefined;
+    const w = await world(
+      { isolation: 'request', background: () => {}, ...(telemetry === undefined ? {} : { telemetry }) },
+      { detachedAudit: true },
+    );
+    const name = `phase 8: search_work_items, telemetry ${on ? 'on (fake collector, flush each)' : 'off'}`;
+    const body = search(25);
+    await measure(name, w, async () => {
+      await text(await post(w, 'team-a', w.tokens.alice, body));
+      await telemetry?.flush();
+    });
+  }
+
+  // The Apps views (P8-03): building the server and listing its tools, with the views registered and without.
+  {
+    const { makeContext } = await import('../packages/core/test/helpers/context.ts');
+    const { rpc } = await import('../packages/core/test/helpers/mcp.ts');
+    for (const apps of ['off', 'on'] as const) {
+      await measure(`phase 8: server build and tools/list, Apps views ${apps}`, undefined, () =>
+        rpc(() => core.buildMcpServer({ tools: core.CORE_TOOLS, ctx: makeContext(), apps }), 'tools/list'),
+      );
+    }
+  }
+
+  // The anonymous catalogue (P8-11): discovery answers without a credential.
+  {
+    const w = await world(
+      { isolation: 'request', background: () => {}, publicToolCatalog: true },
+      { detachedAudit: true },
+    );
+    const bodies: Record<string, unknown> = {
+      'tools/list': { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
+      initialize: {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-11-25',
+          capabilities: {},
+          clientInfo: { name: 'bench', version: '1' },
+        },
+      },
+    };
+    for (const [method, body] of Object.entries(bodies)) {
+      await measure(`phase 8: public catalogue ${method} (no credential)`, undefined, async () =>
+        text(await post(w, 'team-a', null, body)),
+      );
+    }
+  }
+
+  // The shared tier (P8-01, review P-1): seal, store, read and open a body of each size, cold memory.
+  {
+    const { EdgeQueryTier } = await import('../packages/http-app/src/query-cache-edge.ts');
+    const stored = new Map<string, string>();
+    const tier = new EdgeQueryTier({
+      cache: {
+        match: async (r) => (stored.has(r.url) ? new Response(stored.get(r.url)) : undefined),
+        put: async (r, res) => void stored.set(r.url, await res.text()),
+      },
+      keyring: await Keyring.create(generateMasterKey(1)),
+      clock: core.systemClock,
+    });
+    for (const kb of [8, 64, 100, 256]) {
+      const row = JSON.stringify({ id: 'Story:1', name: 'A title of some length', note: 'x'.repeat(120) });
+      const body = `[${Array.from({ length: Math.ceil((kb * 1024) / (row.length + 1)) }, () => row).join(',')}]`;
+      const id = `bench-${kb}`;
+      await measure(
+        `phase 8: shared tier set and get, ${kb} KB`,
+        undefined,
+        async () => {
+          await tier.set(id, body, 60_000);
+          if ((await tier.get(id)) !== body) throw new Error('the shared tier did not return what it stored');
+        },
+        15,
+      );
+    }
+  }
+  return { ms, requests, storage };
+}
+
 async function main(argv: readonly string[]): Promise<number> {
   if (argv[0] === '--child-cold') return coldBoot();
   if (argv[0] === '--child-panel') return coldPanel();
@@ -622,6 +925,7 @@ async function main(argv: readonly string[]): Promise<number> {
   const writes = await writePaths();
   const approvals = await warmApprovals();
   const queryCache = await cachePaths();
+  const phase8 = await phase8Paths();
   const ms: Record<string, number> = {
     'cold: boot': Math.min(...cold.map((c) => c.boot)),
     ...Object.fromEntries(Object.entries(warm.ms).map(([k, v]) => [`warm: ${k}`, v])),
@@ -631,6 +935,7 @@ async function main(argv: readonly string[]): Promise<number> {
     ...phase6.ms,
     ...writes.ms,
     ...queryCache.ms,
+    ...phase8.ms,
     ...Object.fromEntries(Object.entries(approvals).map(([k, v]) => [`warm: ${k}`, v])),
   };
   const relative = Object.fromEntries(
@@ -646,8 +951,9 @@ async function main(argv: readonly string[]): Promise<number> {
       ...phase6.requests,
       ...writes.requests,
       ...queryCache.requests,
+      ...phase8.requests,
     },
-    storage: writes.storage,
+    storage: { ...writes.storage, ...phase8.storage },
   };
   console.log(JSON.stringify(result, null, 2));
   if (argv.includes('--update')) {
