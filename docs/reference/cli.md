@@ -110,7 +110,7 @@ Runs without a server.
 Add what a configuration file describes and the deployment lacks (additive; a dry run unless --apply; never changes or deletes anything that exists).
 
 ```text
-agility-bridge config import <file> [--apply] [--allow-sensitive] [--passphrase-file <value>]
+agility-bridge config import <file> [--apply] [--allow-sensitive] [--add-grants] [--passphrase-file <value>]
 ```
 
 | Name | Kind | Meaning |
@@ -118,6 +118,7 @@ agility-bridge config import <file> [--apply] [--allow-sensitive] [--passphrase-
 | `<file>` | argument | A file written by `config export` |
 | `--apply` | flag | Make the changes; without it only the plan is shown |
 | `--allow-sensitive` | flag | Also create workspaces that enable writes or pass-through (review the plan first) |
+| `--add-grants` | flag | Also add the file's service grants that an existing workspace lacks (finishes a partly failed import) |
 | `--passphrase-file` | string | Read the passphrase from this 0600 file (else AB_CONFIG_PASSPHRASE, standard input or a hidden prompt) |
 
 Runs without a server.

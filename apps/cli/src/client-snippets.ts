@@ -4,6 +4,7 @@
 // (a test compares the committed files with this output). No snippet ever holds a token: it is a prompt or a variable the
 // client expands, a placeholder to replace, or a `keychain:<name>` reference (P8-08).
 import { canonicalInstanceUrl } from '@agility-bridge/core';
+import { parseKeychainRef } from './keychain.ts';
 
 export const SERVER_NAME = 'agility';
 export const PACKAGE_NAME = 'agility-bridge';
@@ -55,7 +56,17 @@ function pkg(options: SnippetOptions): string {
   return options.version === undefined ? PACKAGE_NAME : `${PACKAGE_NAME}@${options.version}`;
 }
 
+/** One POSIX shell word: single-quoted, so `; & $ ( ) |` and spaces in a pasted value are data, not syntax (S-7). */
+const shellQuote = (value: string): string => `'${value.replaceAll("'", `'\\''`)}'`;
+
 function keychainRef(options: SnippetOptions): string {
+  if (options.keychain !== undefined) {
+    try {
+      parseKeychainRef(`keychain:${options.keychain}`);
+    } catch (error) {
+      throw new Error(`--keychain: ${(error as Error).message}`);
+    }
+  }
   return `keychain:${options.keychain ?? DEFAULT_KEYCHAIN_NAME}`;
 }
 
@@ -130,7 +141,7 @@ export function snippet(client: Client, options: SnippetOptions = {}): Snippet {
         where:
           'your shell; this stores the entry in ~/.claude.json (use --scope project to write .mcp.json instead)',
         format: 'shell',
-        text: `claude mcp add ${SERVER_NAME} --scope user -e AB_AGILITY_URL=${url} -e AB_AGILITY_TOKEN=${token} -- npx -y ${pkg(options)}\n`,
+        text: `claude mcp add ${SERVER_NAME} --scope user -e ${shellQuote(`AB_AGILITY_URL=${url}`)} -e ${shellQuote(`AB_AGILITY_TOKEN=${token}`)} -- npx -y ${shellQuote(pkg(options))}\n`,
         notes: [
           keychainNote,
           'Check with /mcp inside Claude Code. The Claude Code plugin (plugins/agility-bridge) does the same with prompts.',

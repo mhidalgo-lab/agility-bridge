@@ -178,6 +178,15 @@ describe('the passphrase seal', () => {
     );
   });
 
+  it('the instances and the credential-to-instance map are part of what the passphrase authenticates (S-1)', async () => {
+    const binding = '{"i":[["i1","https://agility.example.com/Acme"]],"c":[["c1","i1"]]}';
+    const sealed = await encryptSecrets({ c1: AGILITY_TOKEN }, PASSPHRASE, binding);
+    expect(await decryptSecrets(sealed, PASSPHRASE, binding)).toEqual({ c1: AGILITY_TOKEN });
+    await expect(
+      decryptSecrets(sealed, PASSPHRASE, binding.replace('agility.example.com', 'attacker.example')),
+    ).rejects.toThrow('The passphrase is wrong, or the file was changed.');
+  });
+
   it('refuses a short passphrase', async () => {
     await expect(encryptSecrets({ c1: 'x' }, 'short')).rejects.toThrow(/12 to 1,024/);
   });
@@ -186,7 +195,7 @@ describe('the passphrase seal', () => {
 describe('reading a file', () => {
   const good = (): Bundle => ({
     format: 'agility-bridge-config',
-    version: 1,
+    version: 2,
     exportedAt: '2026-10-30T00:00:00.000Z',
     instances: [
       { ref: 'i1', label: 'Main', baseUrl: 'https://agility.example.com/Acme', numberPrefixes: null },
@@ -225,7 +234,7 @@ describe('reading a file', () => {
   const text = (b: unknown) => JSON.stringify(b);
 
   it('accepts a valid file', () => {
-    expect(parseBundle(text(good()))).toMatchObject({ version: 1 });
+    expect(parseBundle(text(good()))).toMatchObject({ version: 2 });
   });
 
   type Loose = Record<string, unknown> &
@@ -240,7 +249,7 @@ describe('reading a file', () => {
       (b) => void Object.assign(b.workspaces[0] ?? {}, { defaultCredentialId: 'crd_x' }),
     ],
     ['another format', (b) => void Object.assign(b, { format: 'something-else' })],
-    ['another version', (b) => void Object.assign(b, { version: 2 })],
+    ['another version', (b) => void Object.assign(b, { version: 3 })],
   ];
   it.each(cases)('refuses %s (strict: unknown fields are errors)', (_name, change) => {
     const b = good() as unknown as Loose;
@@ -457,6 +466,63 @@ describe('import', () => {
     );
   });
 
+  it('a file whose instance address was edited is refused before anything is created, the token goes nowhere (S-1)', async () => {
+    const a = envFor('a');
+    await seedSource(a);
+    const file = join(dir, 'sealed.json');
+    await ok(['config', 'export', '--with-tokens', '--out', file], a, PASSPHRASE);
+    const edited = JSON.parse(readFileSync(file, 'utf8')) as { instances: { baseUrl: string }[] };
+    (edited.instances[0] as { baseUrl: string }).baseUrl = 'https://attacker.example/Acme';
+    writeFileSync(file, JSON.stringify(edited));
+    const c = envFor('c');
+    const r = await cli(['config', 'import', file, '--apply'], c, PASSPHRASE);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain('wrong, or the file was changed');
+    expect(await names(c)).toEqual({ instances: 0, workspaces: [], credentials: [] });
+  });
+
+  it('the plan names the address each instance and credential would use (S-1)', async () => {
+    const a = envFor('a');
+    await seedSource(a);
+    const file = join(dir, 'sealed.json');
+    await ok(['config', 'export', '--with-tokens', '--out', file], a, PASSPHRASE);
+    const r = await cli(['config', 'import', file], envFor('c'), PASSPHRASE);
+    const items = (r.json as { items: { kind: string; name: string }[] }).items;
+    const url = parseBundle(readFileSync(file, 'utf8')).instances[0]?.baseUrl as string;
+    expect(items.find((i) => i.kind === 'instance')?.name).toContain(url.replace(/\/$/, ''));
+    expect(items.find((i) => i.kind === 'credential')?.name).toContain(url.replace(/\/$/, ''));
+  });
+
+  it('--add-grants finishes a partly failed import: a grant the existing workspace lacks is created, none twice (Q-3)', async () => {
+    const a = envFor('a');
+    await seedSource(a);
+    const file = join(dir, 'sealed.json');
+    await ok(['config', 'export', '--with-tokens', '--out', file], a, PASSPHRASE);
+    const c = envFor('c');
+    expect((await cli(['config', 'import', file, '--apply'], c, PASSPHRASE)).code).toBe(0);
+    const grants = (await ok(['grant', 'list'], c)) as unknown as { id: string }[];
+    await ok(['grant', 'revoke', String(grants[0]?.id)], c);
+    // Without the flag nothing is added, and the plan says how to finish.
+    const plain = await cli(['config', 'import', file, '--apply'], c, PASSPHRASE);
+    const plainItems = (plain.json as { items: { kind: string; action: string; reason?: string }[] }).items;
+    expect(plainItems.find((i) => i.kind === 'grant')).toMatchObject({ action: 'skip' });
+    expect(plainItems.find((i) => i.kind === 'workspace')?.reason).toContain('--add-grants');
+    const finish = await cli(['config', 'import', file, '--apply', '--add-grants'], c, PASSPHRASE);
+    expect(finish.code, finish.err).toBe(0);
+    expect(
+      (finish.json as { items: { kind: string; action: string }[] }).items.find((i) => i.kind === 'grant'),
+    ).toMatchObject({ action: 'create' });
+    const again = await cli(['config', 'import', file, '--apply', '--add-grants'], c, PASSPHRASE);
+    expect(
+      (again.json as { items: { kind: string; action: string }[] }).items.find((i) => i.kind === 'grant'),
+    ).toMatchObject({ action: 'exists' });
+    expect(
+      ((await ok(['grant', 'list'], c)) as unknown as { revokedAt: unknown }[]).filter(
+        (g) => g.revokedAt === null,
+      ),
+    ).toHaveLength(1);
+  });
+
   it('cannot widen access: an existing workspace is left as it is, with its projects', async () => {
     const a = envFor('a');
     await seedSource(a);
@@ -609,7 +675,7 @@ describe('import against a fake API', () => {
     };
     const bundle: Bundle = {
       format: 'agility-bridge-config',
-      version: 1,
+      version: 2,
       exportedAt: 'x',
       instances: [
         { ref: 'i1', label: 'Main', baseUrl: 'https://agility.example.com/Acme', numberPrefixes: null },

@@ -31,12 +31,12 @@ How to use it:
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282, L-323 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-424, L-177, L-183, L-239, L-280, L-304, L-316 |
-| [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-434, L-161, L-173 |
+| [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-434, L-443, L-444, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271, L-426, L-427 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267, L-345, L-409, L-410 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
-| [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433 |
+| [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
@@ -815,6 +815,19 @@ or a file that could not be imported, fails the export instead of reaching a bac
 other side: it sends an explicit field list to the admin API and hard-codes `ownerUserId: null` and `userId: null`.
 *Applied in:* P8-05, `apps/cli/src/manage/config-bundle.ts`.
 
+**L-443 — Authenticate a secret together with the place it may be sent.**
+Sealing the tokens of a portable file is not enough when the addresses and the credential-to-address mapping sit next to them
+in the clear: whoever edits the file chooses where the decrypted token goes, and a plan that names records by label hides it. Put
+the destination (canonical address, and which secret belongs to which) into the authenticated data, print it in every plan, and let
+a change fail the same way a wrong passphrase does.
+*Applied in:* P8-12 (S-1), `bindingOf` in `apps/cli/src/manage/config-bundle.ts`.
+
+**L-444 — Probe a platform tool for what you need, not for whether it starts.**
+"The binary ran" says nothing about a keyring daemon, a D-Bus session or an unlocked store, and a tool may have no `--version` at
+all. Ask it a harmless question whose normal answer you know (a lookup that finds nothing, exit 1 with no message) and treat every
+other answer as unavailable. A read-only diagnostic with an offline mode must not call such tools at all.
+*Applied in:* P8-12 (Q-8), `apps/cli/src/keychain.ts`, `apps/cli/src/doctor.ts`.
+
 **L-161 — Decide on `RETURNING` rows, not driver change counters.**
 After a cascading delete, D1 reports the cascaded rows in `meta.changes` while `node:sqlite` reports only the statement's
 own rows. Conditional writes (optimistic versions, capped counters, revocations) read their outcome from `RETURNING`,
@@ -1558,6 +1571,12 @@ nothing. Every `keychain set` therefore reads the entry again and refuses a mism
 next start. For the secret itself: hex on standard input (`-X`) and restricted names remove every quoting rule, and tests
 run the platform code against fake tools on every OS (the real keychain only when `AB_TEST_KEYCHAIN=1`).
 *Applied in:* P8-08, `apps/cli/src/keychain.ts`.
+
+**L-445 — Text from a file you did not write is data for the terminal too, and its path may not be a file.**
+A diagnostic that prints names taken from a project's configuration lets control characters rewrite the report, and one that opens a
+path named like a config file can block forever on a FIFO. Strip control characters where findings are built, `lstat` before opening
+and open without blocking.
+*Applied in:* P8-12 (S-6), `apps/cli/src/doctor.ts`.
 
 **L-104 — Test SQLite on Windows too.**
 File locks make clean-up and temporary databases behave differently.

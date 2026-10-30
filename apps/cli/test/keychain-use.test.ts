@@ -41,18 +41,23 @@ const reader = (kc: KeychainBackend) => (service: string, account: string) => {
 };
 
 describe('keychain references in configuration', () => {
-  it('AB_AGILITY_TOKEN=keychain:<name> reads the default service; keychain:<service>/<account> its own', () => {
+  it('AB_AGILITY_TOKEN=keychain:<name> reads the default service; keychain:<service>/<account> of another service is refused in env', () => {
     const kc = fakeKeychain({ 'agility-bridge/work': TOKEN, 'team/ann': 'FAKE-ANN-TOKEN-0000' });
     const a = loadConfig(
       { AB_AGILITY_URL: URL_, AB_AGILITY_TOKEN: 'keychain:work' },
       { keychain: reader(kc) },
     );
     expect(a.kind === 'configured' && a.token.reveal()).toBe(TOKEN);
+    // Another service is refused in an environment value (S-2): a project's client file must not read other apps' entries.
+    expect(() =>
+      loadConfig({ AB_AGILITY_URL: URL_, AB_AGILITY_TOKEN: 'keychain:team/ann' }, { keychain: reader(kc) }),
+    ).toThrow(/AB_AGILITY_TOKEN: an environment value may refer only/);
+    expect(kc.reads).toEqual(['agility-bridge/work']);
     const b = loadConfig(
-      { AB_AGILITY_URL: URL_, AB_AGILITY_TOKEN: 'keychain:team/ann' },
+      { AB_AGILITY_URL: URL_, AB_AGILITY_TOKEN: 'keychain:agility-bridge/work' },
       { keychain: reader(kc) },
     );
-    expect(b.kind === 'configured' && b.token.reveal()).toBe('FAKE-ANN-TOKEN-0000');
+    expect(b.kind === 'configured' && b.token.reveal()).toBe(TOKEN);
   });
 
   it('a plain token is used as it is and the keychain is never asked', () => {

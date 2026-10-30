@@ -41,7 +41,9 @@ agility-bridge config export --with-tokens --out staging.json
 This works on the local database only (it needs the master key to open the stored tokens) and writes an audit row with
 counts, never a value. The tokens are encrypted with AES-256-GCM under a key derived from your passphrase with
 PBKDF2-HMAC-SHA-256 (600,000 iterations, a fresh salt and IV each time); the file's header is authenticated, so editing
-it breaks the open. **Keep the file and the passphrase apart.** The passphrase is never a command-line flag.
+it breaks the open, and so does editing an instance address or re-pointing a credential at another instance, because those are
+authenticated with the tokens (the plan of an import also names each address). Files written before version 2 that carry
+tokens must be exported again. **Keep the file and the passphrase apart.** The passphrase is never a command-line flag.
 
 ## Import
 
@@ -53,7 +55,10 @@ agility-bridge config import staging.json --apply      # makes the changes
 Import is **additive**: it creates what is missing and never changes or deletes what is there. Matching is by instance
 address, shared-credential label and workspace slug; anything that matches is reported as `exists` and left alone,
 even when the file says something different (so an import cannot widen an existing workspace), and no grant of the file
-is added to a workspace that already exists: grants come only with the workspaces the same import creates. Every item in the plan is `create`, `exists`, `skip` (with the reason) or `failed`.
+is added to a workspace that already exists: grants come only with the workspaces the same import creates. To finish an
+import that failed half way (a workspace was created, a grant was not), fix the cause and run it again with
+`--add-grants`: it then also creates the file's grants that an existing workspace lacks, by label, through the same admin
+checks, and still changes nothing else. Every item in the plan is `create`, `exists`, `skip` (with the reason) or `failed`.
 
 - Each creation is an ordinary admin API call, so the same checks and the same [audit](audit-log.md) rows apply
   (including the probe that the address really is Agility, and the validation of a token).
