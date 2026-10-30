@@ -1,6 +1,6 @@
 {
   "name": "agility-bridge",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "mcpName": "io.github.mhidalgo-lab/agility-bridge",
   "description": "Unofficial MCP server for Digital.ai Agility: let AI agents work with every asset type using your own access token",
   "license": "Apache-2.0",
