@@ -89,6 +89,7 @@ export const SERVER_SETTING_NAMES: readonly string[] = Object.freeze([
   'AB_PUBLIC_TOOL_CATALOG',
   'AB_QUERY_CACHE_TTL',
   'AB_QUERY_CACHE_EDGE',
+  'AB_MCP_APPS',
   ...IDENTITY_SETTING_NAMES,
   ...OAUTH_SETTING_NAMES,
 ]);
@@ -121,6 +122,8 @@ export interface ServerSettings {
   readonly allowHttpInstances: boolean;
   /** `AB_PUBLIC_TOOL_CATALOG=on` (P8-11, T33): the static read-only catalogue is listed without a credential. Off by default. */
   readonly publicToolCatalog: boolean;
+  /** `AB_MCP_APPS=off` (P8-03, T27): the kill switch for MCP Apps views; on by default, offered only to clients that declared Apps. */
+  readonly mcpApps: boolean;
   /** `AB_WRITE_TOOLS=on` (P7-01, ADR-0013): write tools may be offered; every other layer still has to enable them. */
   readonly writeTools: boolean;
   /** Writes an hour per grant and per deployment (P7-03, D-169); the counters are shared in `kv`, so they hold across isolates. */
@@ -308,6 +311,7 @@ export function parseServerSettings(
     passthrough: onOff('AB_PASSTHROUGH', env['AB_PASSTHROUGH'], false),
     allowHttpInstances: onOff('AB_ALLOW_HTTP_INSTANCES', env['AB_ALLOW_HTTP_INSTANCES'], false),
     publicToolCatalog: onOff('AB_PUBLIC_TOOL_CATALOG', env['AB_PUBLIC_TOOL_CATALOG'], false),
+    mcpApps: onOff('AB_MCP_APPS', env['AB_MCP_APPS'], true),
     writeTools: onOff('AB_WRITE_TOOLS', env['AB_WRITE_TOOLS'], false),
     writeRates: {
       perGrant: int(
@@ -563,6 +567,7 @@ export function assembleServer(parts: ServerParts): AssembledServer {
     limits: createRequestLimits(parts.limiter, settings.rateLimits, logger),
     ...(settings.passthrough ? { passthrough: { validator, secure: parts.passthroughSecure } } : {}),
     ...(settings.publicToolCatalog ? { publicToolCatalog: true } : {}),
+    mcpApps: settings.mcpApps,
     // The admin API exists with the break-glass token, with sign-in (browser sessions, P4-02), or both.
     ...(parts.adminVerifier === undefined && settings.identity === undefined
       ? {}

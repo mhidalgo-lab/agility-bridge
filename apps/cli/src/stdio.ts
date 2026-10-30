@@ -304,5 +304,5 @@ export function startStdio(config: LoadedConfig, options: StartOptions): { close
     workspace: config.workspace.id,
     projects: config.projects.length,
   });
-  return serveStdio(() => buildMcpServer({ tools, ctx }));
+  return serveStdio(() => buildMcpServer({ tools, ctx, apps: config.mcpApps ? 'detect' : 'off' }));
 }

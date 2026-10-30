@@ -27,7 +27,7 @@ How to use it:
 | [A. Planning and process](#a-planning-and-process) | L-001 – L-010, L-158 |
 | [B. MCP protocol and SDK](#b-mcp-protocol-and-sdk) | L-011 – L-022 |
 | [C. MCP clients](#c-mcp-clients) | L-023 – L-029, L-154 – L-156 |
-| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315, L-317 – L-320, L-324 – L-326, L-328, L-333, L-360, L-366, L-367, L-423 |
+| [D. Tool design and the output contract](#d-tool-design-and-the-output-contract) | L-030 – L-045, L-150, L-153, L-171, L-272, L-275, L-288 – L-296, L-300 – L-303, L-305 – L-308, L-313 – L-315, L-317 – L-320, L-324 – L-326, L-328, L-333, L-360, L-366, L-367, L-423, L-425 |
 | [E. The Agility API client](#e-the-agility-api-client) | L-046 – L-056, L-152, L-160, L-167, L-281 |
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282, L-323 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-424, L-177, L-183, L-239, L-280, L-304, L-316 |
@@ -500,6 +500,14 @@ returns, by walking `structuredContent` for objects with an `assetType` and a va
 come only from the pinned instance URL; the identity must match a strict pattern, and a result that is not on the pinned origin
 and path is dropped. The text carries one fixed line instead of a URL per row.
 *Applied in:* P8-02, `output/links.ts`, `test/output/links.test.ts`.
+
+**L-425 — Offer an extension only where the transport can know the client declared it, and keep the text result identical.**
+MCP Apps views are linked from tool metadata and served as `ui://` resources, but only to a client that declared the extension.
+A 2026-07-28 request carries its capabilities, a stdio connection keeps them from `initialize`, and a 2025-era stateless HTTP
+request has none after `initialize`: that case is never offered the view instead of guessing. A server that registers its resources
+only after the handshake cannot add the `resources` capability then, so the views are registered (and disabled) up front. The view
+is the same page for everyone and draws only the tool result it is handed, so the tool's text and structured output never differ by client.
+*Applied in:* P8-03, `apps/views.ts`, `server.ts` (`registerAppViews`), `http-app/test/apps.test.ts`.
 
 ## E. The Agility API client
 

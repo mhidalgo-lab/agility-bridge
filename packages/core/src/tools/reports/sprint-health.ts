@@ -57,6 +57,7 @@ export const sprintHealth: ToolDefinition = defineTool({
     'Report a sprint’s health in one call: share done against share of time elapsed (a status only for a current sprint), scope change since the start, unestimated items, open defects, open items without an owner or unchanged for 3 days. Sections not granted or not read are named, never counted as zero. Not paged. Cold call: up to 54 Agility requests.',
   kind: 'read',
   group: 'reports',
+  view: 'status-distribution',
   // get_sprint and search_work_items, each capped at its own cost; the shared budget is capped here.
   cost: COST,
   inputSchema: z.object({
@@ -212,6 +213,14 @@ export const sprintHealth: ToolDefinition = defineTool({
                 ]),
           ]),
     ];
+    // The counts the status-distribution view draws: our own category codes and numbers only.
+    const statusCounts = byCategory.flatMap((c) => {
+      const category = strOf(c['category']);
+      const itemCount = numOf(c['itemCount']);
+      if (category === undefined || itemCount === undefined) return [];
+      const estimate = numOf(c['estimate']);
+      return [{ category, itemCount, ...(estimate === undefined ? {} : { estimate }) }];
+    });
     const brief = (r: Record<string, unknown>) => ({
       ...(strOf(r['number']) === undefined ? {} : { number: r['number'] }),
       assetType: r['assetType'],
@@ -261,6 +270,7 @@ export const sprintHealth: ToolDefinition = defineTool({
           ...(elapsedPercent === undefined ? {} : { elapsedPercent }),
         },
         ...(totals === undefined ? {} : { totals }),
+        ...(statusCounts.length === 0 ? {} : { byStatusCategory: statusCounts }),
         ...(committed === undefined ? {} : { committed }),
         ...(scopeChange === undefined ? {} : { scopeChange }),
         ...(openDefects === undefined

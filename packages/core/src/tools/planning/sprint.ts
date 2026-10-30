@@ -126,6 +126,7 @@ export const getSprint: ToolDefinition = defineTool({
     'Get one sprint: dates (UTC), schedule, backlog items and defects by status category with estimates, committed at the begin date vs done, scope change, carry-over of a past sprint and a daily burndown from bounded history. Not paged. Cold call: up to 30 Agility requests.',
   kind: 'read',
   group: 'planning',
+  view: 'sprint-burndown',
   // Capped at run time: team/project and sprint resolution, the sprint, metadata and status lists, up to three pages of
   // items, batched history requests.
   cost: COST,
