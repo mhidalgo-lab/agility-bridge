@@ -308,159 +308,162 @@
 - **Context:** The browser suites run the built server against a synthetic Agility that serves reads only (`query.v1`, metadata). A real `update_status` ends in a write request to `rest-1.v1/Data`, which the fixture does not answer, and the shape of that request is *unverified* until the sandbox (P7-07).
 - **Options:** (a) drive the real write tool with a client that cannot elicit as far as the pending answer, test the page (view, decline, approve, 404s, stale sign-in, tampering) and stop at the recorded approval; (b) add a fake write endpoint to the fixture so the repeat applies the change (a second copy of the write shapes, tested nowhere against a real Agility); (c) a test-only tool that does not touch Agility.
 - **Recommendation:** (a), built: the page and its approval ledger are what the browser suites can verify; the apply is covered by the unit tests on the fake write endpoint and by P7-07. (c) would test a tool that ships nowhere. URL-mode elicitation is deferred to P7-46 until a client that declares `elicitation.url` is known.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-220 — Write statistics are computed from the newest write rows, not by a new storage aggregate *(P7-11)*
 - **Context:** `audit.stats` aggregates `tool_call` rows in SQL in three adapters. Pairing an intent with its outcome needs `details.intentId`, which is inside the JSON column.
 - **Options:** (a) `GET /audit/write-stats` reads the newest `write` rows of the window (three pages of 1,000, so at most three queries, no new index) and pairs them in the API, saying when it stopped at the cap; (b) a new storage method with `json_extract` in the SQL adapters (exact over any window, three adapters and a contract test, and a scan of every write row); (c) a column or index for the pair key (one more written row per audit row, the tight quota on the Cloudflare free plan).
 - **Recommendation:** (a), built. Writes are rare (a per-grant hourly cap and human approval), so 3,000 rows is many weeks; the page says when the window held more.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-221 — An intent with no outcome is flagged after ten minutes *(P7-11)*
 - **Context:** The two rows are written seconds apart, but a write in flight has an intent and no outcome yet, and the outcome write is best effort.
 - **Options:** (a) flag an intent as "no outcome recorded" only after a ten minute grace period, and show "in progress" before; (b) flag at once (false alarms for every write in flight); (c) never flag (a lost outcome stays invisible).
 - **Recommendation:** (a), built. Ten minutes is longer than the longest write (the Worker limit, the approval is not inside it) and short enough to act on.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-222 — The viewer pairs inside the page and says so at the edges *(P7-11)*
 - **Context:** The log is keyset-paged newest first and cannot be filtered by `details.intentId`; a filter on the outcome status hides the intent rows.
 - **Options:** (a) pair within the rows of the page; an intent at the top of a continued page says its outcome is on the previous page, an outcome at the bottom of a page with a next page says its intent is on the next, and no row claims a missing partner while an outcome filter is set; (b) fetch the partner of every edge row (an extra query per page, and a filter on details that the storage does not have); (c) pair only in the statistics.
 - **Recommendation:** (a), built. The statistics are the authoritative count; the viewer never reports a false "missing".
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-223 — The pending list is reached from My access, with no count on the overview *(P7-14)*
 - **Context:** The task asks whether the overview needs a count. A count is one more `kv` read on every overview load for every person, and the overview is for owners and admins while any member can have a request.
 - **Options:** (a) `GET /admin/approve` (a page of the signed-in person's own requests) with a link on My access, shown only when the approval page exists; (b) also a count badge on the overview and in the menu (an extra read per page view); (c) a menu entry for everyone (a dead link on servers without writes).
 - **Recommendation:** (a), built. The page is for finding a lost link; the agent's own answer already carries the link when it is needed.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-224 — The bound of 20 open requests stays, and the list reads only the person's own prefix *(P7-14)*
 - **Context:** `MAX_PENDING_PER_USER` (20) drops the oldest request past it. The list reads one key range and at most 20 values (21 queries on D1, only when the page is opened).
 - **Options:** (a) keep 20 and list at most that many; (b) raise it (more values in `kv`, a longer list and a longer page); (c) store a summary row per request (one more write on every ask, on the tight Free-plan write quota).
 - **Recommendation:** (a), built. Real tools may show that 20 is too many or too few; P7-27 (request limits) owns the bound.
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-236 — Effort for another member: only an owner of the item *(P7-17)*
 - **Context:** `log_effort` logs for the caller. People also want to log hours for a teammate (a stand-up, a pair). Logging for anyone is a way to put time on a person who never worked on the item, and the Agility history then shows the token's member as the author (A6).
 - **Options:** (a) an optional `member`, accepted only when that member is already an owner of the item (re-checked at the re-read), the approval naming them as `Actual.Member`; (b) any member the workspace can see; (c) never (effort for yourself only); (d) a per-workspace switch.
 - **Recommendation:** (a), built: the narrowest policy that still serves the real case (the person who works on the item is its owner), needs no new setting, and keeps the approval honest because the member is a listed change. Adding an owner first (`assign_owners`) is itself an approved write. (b) would let an agent put hours on anyone; (d) can be added later without changing the argument.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-237 — Remaining to-do is a field of `update_fields`, not a second write in `log_effort` *(P7-17)*
 - **Context:** The task asked for an optional remaining `ToDo` update "in the same mutation" as an effort entry. An effort entry is a create of an `Actual`; the to-do is an attribute of the item: two Agility requests behind one approval, with no transaction between them and no retries allowed.
 - **Options:** (a) `todo` is a field of `update_fields` for a task or test (one request, old and new shown, the usual conflict and no-op rules); a person who wants both approves two small changes; (b) two requests behind one approval, with a partial-failure state to report; (c) skip it.
 - **Recommendation:** (a), built. A half-applied change behind one approval is exactly what the single-request rule prevents. `ToDo` is writable only on tasks and tests (it is a roll-up on stories and defects, refused).
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 
 ### D-204 — The approval is used up just before the send, not when it is found *(P7-28)*
 - **Context:** The approval (a page grant, an elicitation round) was taken from the ledger before the limiter, the re-read and the intent audit, so a limiter refusal, a conflict or an audit outage made the person approve again (review quality 8). Keeping it must never let one approval send twice.
 - **Options:** (a) find the approval with a read, run the limiter, the re-read and the intent audit, then use it up with the atomic `take` immediately before the send; a lost take refuses the call, writes an error outcome ("nothing was sent") and sends nothing; a push elicitation answer, which is stored nowhere, is written as a grant (`via: elicitation`) only when a later step refuses, so the repeated call is not asked again; (b) keep taking it first and document the cost; (c) take it last, after the send (an approval that is never consumed if the process dies: unsafe).
 - **Recommendation:** (a), built. The take is still the single-use guarantee (L-073); the cost is that two concurrent calls on one approval can both spend a limiter unit and write an intent row, of which one ends as an error outcome with no send. A conflict keeps the approval only when the new plan is the same change (the hash includes the old values).
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-205 — Approval requests are counted per grant, 30 an hour, before anyone is asked *(P7-27)*
 - **Context:** A prompt-injected agent can call a write tool with `confirm: true` and varying values without limit: unbounded elicitation prompts (approval fatigue), unbounded page records and ledger rounds.
 - **Options:** (a) a second purpose of the existing write limiter (`approval_request`): one unit of a per-grant hourly counter `wl:q:<grant>:<window>`, default 30, taken in the pipeline just before the channel is asked, fail closed, a grant or round that already exists is not counted, no deployment-wide counter, not configurable by environment variable yet; (b) count inside each channel (three implementations); (c) also a deployment counter and an env variable.
 - **Recommendation:** (a), built. 30 an hour is above what an honest session needs (one ask per distinct change; repeating after approval asks nothing) and well below a flood; an agent repeating the same pending change while the person is away spends units, which is the "do not poll" advice. The counter costs one `kv` increment per fresh ask (one D1 row write), small next to the page flow's 18 to 30. A setting can follow once real use shows a need.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-206 — A full pending list refuses the new request; it never drops the oldest *(P7-27)*
 - **Context:** At 20 open requests the page channel dropped the oldest to store the new one, so an agent could push the request a person was about to open out of the list (review L3). P7-14 kept the bound of 20 and left it to this task.
 - **Options:** (a) refuse the new request (`AB_LIMIT_RATE`, scope `approvals_pending`, nothing stored); the same change asked again still returns its own link; (b) keep evicting the oldest; (c) evict the newest of the same tool.
 - **Recommendation:** (a), built. The cost is that a flood can fill the 20 places for ten minutes and refuse the person's own later requests; that is a denial of approvals, never a way to make a change, and it clears when the person declines or the requests expire. The request counter (D-205) bounds how fast it can happen.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-225 — A grant's hourly write cap lives in its `rateLimit`, and only an owner can set it *(P7-15)*
 - **Context:** The task names a new `writeRate.perHour` field "in storage, admin API, CLI, panel". The grant already has a `rateLimit` JSON column (`perMinute`), validated by one schema.
 - **Options:** (a) add `writesPerHour` to `rateLimit` (no migration, three storage adapters untouched, the admin API and panel already carry the object), owner-only with a recent sign-in because it is a safety control; (b) a new column (a migration in memory, SQLite and D1 and a contract test); (c) any manager may set it (an administrator could then loosen what an owner chose).
 - **Recommendation:** (a), built. The deployment value stays authoritative: the limiter uses the minimum at run time, and the API refuses a higher value when it is set.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-226 — The CLI is not extended for the write cap; a `grant update` command is a follow-up *(P7-15)*
 - **Context:** The task says "CLI if that is how other grant settings work". Today no grant command sets any rate (`grant add` has no rate option and there is no `grant update`).
 - **Options:** (a) leave the CLI and file P7-40 (`grant update` with `--rate-per-minute` and `--writes-per-hour`); (b) add only a write-cap flag to `grant add` (a different setting from every other one, and a half-finished command).
 - **Recommendation:** (a), built. The CLI's in-process client already enforces the same owner rule and the cap (it is handed the server's value).
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-238 — Writable custom attributes: an owner list per workspace, typed by the instance's own kind *(P7-20)*
 - **Context:** D-181 refused custom attributes in wave 2 because a free attribute name is how an agent reaches anything (a status, a project, a security field), and A12 forbids naming instance attributes in tool descriptions.
 - **Options:** (a) a per-workspace allowlist in `writePolicy.customFields` (owner, recent sign-in; panel, API and, for stdio, `AB_WRITE_CUSTOM_FIELDS`), a static `custom` argument on `create_work_item` and `update_fields`, each attribute re-checked against the instance metadata (custom, writable, single-valued, text, long text or number) and the value typed by that kind; the write framework re-checks every custom field of a mutation against the same list; (b) a per-grant list (finer, but a second place to keep in step, and an owner already decides per workspace what may be written); (c) any `Custom_` attribute the metadata says is writable (no owner decision, the exact thing D-181 refused); (d) new tools per attribute.
 - **Recommendation:** (a), built. The list is the owner's decision and sits next to the other write settings; the metadata check keeps it honest when an attribute is changed or removed in Agility; `whoami` shows only how many are enabled, never which. Lists, dates and booleans are left out until the sandbox shows what the real custom fields are (P7-07).
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-239 — `PATCH /workspaces` replaces `writePolicy` as a whole; the panel sends both settings together *(P7-20)*
 - **Context:** `writePolicy` held one setting (`enabled`) and the API replaces the object, as it does for `limits`. A second setting (`customFields`) means a client that sends only one drops the other.
 - **Options:** (a) keep replace semantics, document it, and make the panel send `enabled` and `customFields` together when either changes; (b) merge the patch into the stored object (a client can no longer remove a key by omitting it, and `limits` would then differ); (c) a separate `customFields` field on the workspace (a storage change in three adapters and a migration).
 - **Recommendation:** (a), built. It matches `limits`, needs no migration and is the least surprising for an API that already says "replaced". The CLI has no write-setting option today and gets none here.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 
 ### D-208 — The default approval policy stays `any`; the owner confirms or changes it *(P7-26)*
 - **Context:** D-11 allowed elicitation-only remote writes. A client that auto-accepts elicitation (or an agent that answers it) proves no person answered (review M3). `page_only` is built per workspace and per grant; the question is what a workspace or grant that says nothing does, in particular for OAuth clients that are not allowlisted.
 - **Options:** (a) default `any`: elicitation where the client can ask, else the page (today's behaviour); owners opt into `page_only`; (b) default `page_only` everywhere (safest, but every write in Claude Code, Copilot CLI and VS Code needs a browser trip, which makes the feature much less usable); (c) `page_only` by default only for OAuth clients and tokens that are not on an allowlist of known interactive clients (needs an allowlist of clients and a way to maintain it); (d) a deployment-wide default switch an owner sets.
 - **Recommendation:** (a), built, with the owner deciding. The per-workspace and per-grant switches are the lever; (d) is a small follow-up (a server setting that supplies the default) if the owner wants the default flipped for a whole deployment, filed as P7-34 together with CLI flags. (c) needs real client evidence (P7-10).
-- **Owner:** *(open; built as (a). Please confirm the default or ask for (b) or (d).)*
+- **Owner (2026-10-30):** Decided: as recommended, (a); the default stays `any`, owners opt into `page_only`.
 
 ### D-209 — The grant's policy lives in `rateLimit.writeApproval`, accepts only `page_only`, and only an owner changes it *(P7-26)*
 - **Context:** A grant's JSON columns are `limits` (shared with workspaces, tightening rules for numbers and switches) and `rateLimit` (the grant's own, where P7-15 put the hourly write cap). A new column needs a migration on three adapters.
 - **Options:** (a) `rateLimit.writeApproval: "page_only"` beside `writesPerHour`: no migration, an absent key is the default, the value `any` is refused so the grant can only tighten; the guard treats set, change and removal as an owner act with a recent sign-in (an administrator sending a `rateLimit` without the key is a removal); (b) a switch in `limits` (it is also valid on a workspace, where an administrator could remove it); (c) a new column.
 - **Recommendation:** (a), built. The name `rateLimit` is a misnomer for a policy; renaming would be a migration for no behaviour, so a comment says so.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-207 — A value with the envelope phrase is shown with a JSON escape, not refused and not rewritten *(P7-29)*
 - **Context:** `neutralise()` rewrites `untrusted data` (any case, spaces, underscores, hyphens) to `untrusted~data` inside the untrusted-data envelope, so an approval of a title containing the phrase showed text different from what is sent (review L7).
 - **Options:** (a) write the first letter of each look-alike as a JSON escape in the already JSON-quoted value (`\u0075ntrusted data`) with one fixed note line; the envelope and `neutralise()` stay as they are; (b) refuse caller text with the phrase (blocks honest titles such as "Handle untrusted data in the importer") and rewrite Agility text with a visible note; (c) leave the rewrite and document it.
 - **Recommendation:** (a), built. It shows exactly what is sent (decoding the quoted value as JSON gives the value), refuses nothing, and does not touch the envelope. The cost is a slightly odd-looking `\u0075` in a rare value, explained by the note.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-227 — A caller is told its own grant's count and whether the deployment is spent, not the deployment's number *(P7-16)*
 - **Context:** The task asks that `whoami` and the dry run report the grant's remaining writes without showing another grant's count. The deployment counter is the sum of every grant's use.
 - **Options:** (a) the caller's grant `limit`, `used`, `remaining`, `resetsAt`, plus `deploymentFull: true` when the deployment is spent (so a refusal is explained); the deployment's numbers only to owners and admins; (b) also the deployment's remaining count (shows how busy the others are); (c) the grant's count only (a refusal for a full deployment would be unexplained).
 - **Recommendation:** (a), built.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-228 — Budget reads are two plain `get`s per read, and are not cached *(P7-16)*
 - **Context:** `whoami` and every dry run now read the grant's counter and the deployment's (two `kv` reads, none written). On D1 each is a query.
 - **Options:** (a) read each time, in parallel, only when writes are enabled for the caller; (b) cache for a few seconds (stale counts that mislead exactly when the limit is close); (c) put the count in the access cache.
 - **Recommendation:** (a), built. Two cheap reads on two calls that already make Agility requests; the admin overview adds one read per owner or admin page view.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-229 — The member's own count is in `whoami` and the API, not on My access *(P7-16)*
 - **Context:** A member has no grants page in the panel; My access lists their grants and tokens.
 - **Options:** (a) the member reads their grant's count through `whoami` (the agent) and `GET /grants/{id}/write-budget`; no new panel element; (b) one budget read per grant on My access (a query per grant on every page view).
 - **Recommendation:** (a), built; (b) is easy to add if people ask.
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-240 — Moving to another project and re-parenting: narrow rules, items in a sprint are not moved *(P7-21)*
 - **Context:** D-181 left `Scope` and the parent relations out of `update_fields`. A move changes which project (and so which sprint schedule, team workflow and members) an item belongs to; Agility's cascade to children and sprints is undocumented here.
 - **Options:** (a) `project` only for a story, defect or epic, to another open project inside the workspace, refused while the item is in a sprint of its current project (take it out first with `move_to_sprint` and `to_backlog`); `parent` for every item type, the new parent found inside the workspace, open, of the allowed type, never itself, and for a task or test of the item's own project; (b) also move tasks and tests (they follow their parent in Agility, which we cannot verify); (c) allow the move with a sprint and let Agility refuse; (d) leave both out.
 - **Recommendation:** (a), built. The sprint rule closes the one cascade we can see from the item's own row without asking Agility; children and epic links are the sandbox's question (P7-07) and Agility's validators still run. A cross-project re-parent of a task is the same question and is refused now.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-241 — Create with owners, team and sprint: at most three owners, and the costs say so *(P7-21)*
 - **Context:** Each member name can take up to three lookups, a relative sprint two reads and a state read, and each relation needs its type's metadata on a cold cache. The measured worst case of `create_work_item` went from 15 requests to 27, of `update_fields` from 11 to 18 (re-parent and move together).
 - **Options:** (a) `owners` at most three, `team` and `sprint` through the shared resolvers, declared costs 31 and 22 (measured plus 4, inside the D-199 margin), both under the Free budget of 45; (b) five owners like `assign_owners` (the declared cost would pass 35, and more calls hidden by small budgets); (c) no owners on create: add them with `assign_owners` afterwards (two approvals and a window where the item has no owner).
 - **Recommendation:** (a), built. More than three owners are added with `assign_owners`. The defaults Agility applies on create (`rest-1.v1/New`, D-180) are not shown yet: the response of that endpoint is a P7-07 question.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-230 — The device lists show whether the app holds `mcp:write`, as a badge from a boolean *(P7-32)*
 - **Context:** The granted scope is in the provider's grant record but the device lists did not show it, so a person could not tell a read-only app from one that can ask for changes.
 - **Options:** (a) a `canWrite` boolean derived on the server from the grant record's scope (`mcp:write` present), shown as "can ask for changes" or "read only" on My access and the administrators' list, with the plain wording that it is what the app was given and not that a write would run today; (b) show the scope strings (untrusted-looking text, and a string for something the person never needs to read); (c) compute "could write right now" from the live access layers (an extra access resolution per device on every page view).
 - **Recommendation:** (a), built. The badge cannot be forged by a client (it comes from the grant record the server wrote), and (c) is cost and meaning the person cannot act on: the way to remove it is the disconnect button either way (D-202).
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-210 — One read for the grant and the denial (`kv.getMany`), not one delete of both *(P7-30)*
 - **Context:** P7-30 asked for one statement (`DELETE ... WHERE key IN (?, ?) RETURNING`) for the grant and denial take. Since P7-28 a grant is read before the limiter and used up just before the send, so that a limiter refusal or conflict keeps it; a delete of both would use the grant up at the first look.
 - **Options:** (a) a new `KvStore.getMany(keys)` (one `SELECT ... IN`, at most 10 keys, memory and SQL adapters, contract test) used for the grant and the denial together, then `take` on the one acted on: single use unchanged; (b) the `DELETE ... RETURNING` of both, giving up P7-28; (c) leave two reads.
 - **Recommendation:** (a), built. Statements for the page flow stay at 18 (one fewer on the first call, one more on the repeat, which P7-28 added); both are reads, so rows written are unchanged. It does not reduce the total; it keeps P7-28's guarantee while removing the read the first call made twice.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-211 — Workers Free caps the deployment write cap at 60 an hour, and 60 is also its default *(P7-30)*
 - **Context:** A page-approved write writes about 31 D1 rows (unverified, computed from the schema); the default deployment cap of 200 an hour could use 149,000 rows a day against the Free plan's 100,000.
 - **Options:** (a) on Free, default 60 and refuse a larger explicit value at boot, like the other Free ceilings: 1,440 writes and about 45,000 rows a day at most, under half the budget; (b) cap the value silently and show it in `whoami`; (c) keep 200 and only document.
 - **Recommendation:** (a), built; the effective value is in the `booted` log line. Half the budget is left for reads (three rows each), OAuth counters and audit. The number is a judgement until the row count is read from a real D1 (P7-10); Paid keeps 200.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
 
 ### D-212 — The outcome audit row stays awaited; the intent stays first *(P7-31)*
 - **Context:** The outcome row of a write is awaited before the answer, while the `tool_call` row goes through the app's background (`waitUntil`). P7-31 asked whether the outcome may go the same way.
 - **Options:** (a) keep it awaited: the answer is sent after the outcome is stored (or its failure is logged); (b) hand it to `waitUntil` after the intent was stored and the change sent: one insert off the response path, a failed write logged inside the background task; (c) batch the outcome with the `tool_call` row.
 - **Recommendation:** (a), built (nothing changes). The benchmark measures CPU and the move changes wall-clock only by one insert, next to 5 to 15 Agility requests and the awaited intent insert; the outcome row is the evidence that a change was applied, so losing it to an evicted isolate or a crash would make the "intent with no outcome" state (flagged by the audit viewer after ten minutes, P7-11) more frequent for no measured gain. The intent is awaited and first in every option (ADR-0013). Revisit with staging latency figures (P7-10): if the insert is a real share, (b) is a small change behind the same sink, and the log line for a failed outcome already exists.
-- **Owner:** *(open; built as (a))*
+- **Owner (2026-10-30):** Decided: as recommended, (a).
