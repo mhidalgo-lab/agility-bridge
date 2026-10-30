@@ -25,7 +25,7 @@ instance host is P8-31. The info remark about `keychain set` replacing an item w
 
 **S-6 (low) — doctor: chmod of a shared directory, control characters, FIFO** — **fixed** (all three verified; D-289). `--fix` repairs
 the data directory only when `AB_DB_PATH` is not set (otherwise the command is printed); control characters are replaced in every
-finding; client files are `lstat`ed first and opened with `O_NONBLOCK` (a FIFO is skipped). Tests for each. Lesson L-445.
+finding; client files are opened with `O_NONBLOCK` and `fstat`ed (a FIFO is skipped; an `lstat` first was a race CodeQL flagged). Tests for each. Lesson L-445.
 
 **S-7 (low) — `client-config claude-code` unquoted** — **fixed**. Every interpolated value is single-quoted, `--keychain` is validated
 with the reference parser. The test feeds `;`, `&`, `$()`, `|` and a quote through `--url` and checks that nothing outside quotes

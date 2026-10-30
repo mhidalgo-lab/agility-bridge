@@ -562,9 +562,7 @@ function ourEntries(root: unknown): [string, Record<string, unknown>][] {
 function readSmall(path: string): string | 'symlink' | 'big' | 'unreadable' | undefined {
   let fd: number;
   try {
-    // A FIFO or device named like a client file would block the open: look first, and open without blocking (S-6).
-    const l = lstatSync(path);
-    if (!l.isSymbolicLink() && !l.isFile()) return undefined;
+    // A FIFO named like a client file would block the open: open without blocking, and `fstat` below skips it (S-6).
     // One descriptor for the checks and the read; O_NOFOLLOW refuses a link (POSIX).
     fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
   } catch (error) {

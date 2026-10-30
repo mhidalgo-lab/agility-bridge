@@ -1574,8 +1574,8 @@ run the platform code against fake tools on every OS (the real keychain only whe
 
 **L-445 — Text from a file you did not write is data for the terminal too, and its path may not be a file.**
 A diagnostic that prints names taken from a project's configuration lets control characters rewrite the report, and one that opens a
-path named like a config file can block forever on a FIFO. Strip control characters where findings are built, `lstat` before opening
-and open without blocking.
+path named like a config file can block forever on a FIFO. Strip control characters where findings are built, open without blocking
+(`O_NONBLOCK`) and `fstat` the descriptor (an `lstat` before the open is a race CodeQL rightly flags).
 *Applied in:* P8-12 (S-6), `apps/cli/src/doctor.ts`.
 
 **L-104 — Test SQLite on Windows too.**

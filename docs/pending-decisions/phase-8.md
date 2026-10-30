@@ -234,7 +234,7 @@
 
 ### D-289 — `doctor --fix` repairs only directories it would have chosen; foreign text is sanitised *(P8-12, S-6)*
 - **Context:** `--fix` did `chmod 0700` on the directory of `AB_DB_PATH`, which can be a group-shared directory; server names from a project's `.mcp.json` were printed raw; a FIFO named `.mcp.json` blocked the open.
-- **Options:** (a) the data-directory fix only without `AB_DB_PATH` (reported with the command otherwise), control characters replaced by `?` in every finding, `lstat` before open plus `O_NONBLOCK`; (b) drop directory repairs; (c) ask per path.
+- **Options:** (a) the data-directory fix only without `AB_DB_PATH` (reported with the command otherwise), control characters replaced by `?` in every finding, `O_NONBLOCK` open plus `fstat`; (b) drop directory repairs; (c) ask per path.
 - **Recommendation:** (a), built.
 - **Owner:** *(open; built as (a))*
 
