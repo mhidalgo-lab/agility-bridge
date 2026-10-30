@@ -2,7 +2,16 @@
 // `agility-bridge doctor` (P8-04, THREAT_MODEL T28, L-077): read-only diagnosis of a setup. It never creates, migrates
 // or edits anything; the only changes it can make are the `chmod` repairs it lists itself, and only with `--fix`.
 // Every message is scrubbed of the secrets it could have seen, and values from client files are never printed.
-import { chmodSync, closeSync, existsSync, fstatSync, lstatSync, openSync, readSync } from 'node:fs';
+import {
+  closeSync,
+  constants,
+  existsSync,
+  fchmodSync,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -709,10 +718,15 @@ export async function runDoctor(opts: DoctorOptions, deps: DoctorDeps): Promise<
       if (f.fix === undefined || done.has(f.fix.path)) continue;
       done.add(f.fix.path);
       try {
-        // Never through a link: the finding was made on an lstat of this path, and a link is not a fix target.
-        if (lstatSync(f.fix.path).isSymbolicLink()) continue;
-        chmodSync(f.fix.path, f.fix.mode);
-        fixed.push(f.fix);
+        // One descriptor for the check and the change (no swap in between); O_NOFOLLOW refuses a link, which is
+        // never a fix target.
+        const fd = openSync(f.fix.path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+        try {
+          fchmodSync(fd, f.fix.mode);
+          fixed.push(f.fix);
+        } finally {
+          closeSync(fd);
+        }
       } catch {
         // Reported by the unchanged finding on the next run.
       }
