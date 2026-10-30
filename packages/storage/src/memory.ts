@@ -18,7 +18,15 @@ import {
   statsKey,
   type TableName,
 } from './fields.ts';
-import { checkIncrement, checkKey, checkKeys, checkKvValue, checkPrefix, isLive } from './kv-rules.ts';
+import {
+  checkIncrement,
+  checkIncrements,
+  checkKey,
+  checkKeys,
+  checkKvValue,
+  checkPrefix,
+  isLive,
+} from './kv-rules.ts';
 import type {
   AccessToken,
   AccessTokenRepository,
@@ -556,6 +564,19 @@ export function createMemoryStorage(options: MemoryStorageOptions = {}): Storage
       if (next > max) return null;
       entry.value = String(next);
       return next;
+    },
+    async incrementMany(entries) {
+      const checked = checkIncrements(entries);
+      return checked.map(({ key, by, expiresAt }) => {
+        const entry = kvData.get(key);
+        if (entry === undefined || !isLive(entry.expiresAt, now())) {
+          kvData.set(key, { value: String(by), expiresAt });
+          return by;
+        }
+        const next = (Number.parseInt(entry.value, 10) || 0) + by;
+        entry.value = String(next);
+        return next;
+      });
     },
     async list(prefix, options = {}) {
       checkPrefix(prefix);

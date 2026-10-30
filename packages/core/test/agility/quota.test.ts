@@ -20,7 +20,7 @@ import { fakeFetch, json } from './fake.ts';
 /** In-memory counters that record how often they are touched. */
 function counters(over: Partial<QuotaCounters> = {}) {
   const data = new Map<string, number>();
-  const stats = { reads: 0, increments: 0 };
+  const stats = { reads: 0, writes: 0 };
   const c: QuotaCounters & { data: Map<string, number>; stats: typeof stats } = {
     data,
     stats,
@@ -28,11 +28,13 @@ function counters(over: Partial<QuotaCounters> = {}) {
       stats.reads++;
       return new Map(keys.filter((k) => data.has(k)).map((k) => [k, String(data.get(k))]));
     },
-    async increment(key, { by }) {
-      stats.increments++;
-      const next = (data.get(key) ?? 0) + by;
-      data.set(key, next);
-      return next;
+    async incrementMany(entries) {
+      stats.writes++;
+      return entries.map(({ key, by }) => {
+        const next = (data.get(key) ?? 0) + by;
+        data.set(key, next);
+        return next;
+      });
     },
     ...over,
   };
@@ -77,16 +79,44 @@ describe('counting', () => {
     const { client, meter } = clientFor(gate, 'g1');
     for (let i = 0; i < 5; i++) await client.query({ ...QUERY, page: { size: i + 1 } });
     await client.meta('Story');
-    expect(store.stats).toEqual({ reads: 1, increments: 0 });
+    expect(store.stats).toEqual({ reads: 1, writes: 0 });
     await meter.flush();
-    expect(store.stats).toEqual({ reads: 1, increments: 2 });
+    expect(store.stats).toEqual({ reads: 1, writes: 1 });
     expect([...store.data.entries()].sort()).toEqual([
-      ['qt:d:g1:20261030', 6],
-      ['qt:m:g1:202610', 6],
+      ['qt:d:g1:20261030', 5],
+      ['qt:m:g1:202610', 5],
     ]);
     // Nothing left to write: a second flush touches nothing.
     await meter.flush();
-    expect(store.stats.increments).toBe(2);
+    expect(store.stats.writes).toBe(1);
+  });
+
+  it('metadata requests are checked but never counted, so a cold isolate costs one read and no write (D-316)', async () => {
+    const { gate, store } = setup({ daily: 100, monthly: 1000 });
+    const { client, meter } = clientFor(gate, 'g1');
+    for (const type of ['Story', 'Epic', 'Defect']) await client.meta(type);
+    await client.meta();
+    await meter.flush();
+    expect(store.stats).toEqual({ reads: 1, writes: 0 });
+    expect(store.data.size).toBe(0);
+    // Data queries in the same request count, metadata around them does not.
+    await client.meta('Task');
+    await client.query(QUERY);
+    await client.meta('Test');
+    await meter.flush();
+    expect(store.stats).toEqual({ reads: 1, writes: 1 });
+    expect([...store.data.values()]).toEqual([1, 1]);
+  });
+
+  it('a used-up quota still refuses metadata, without counting it (D-316)', async () => {
+    const { gate, store } = setup({ daily: 2, monthly: null });
+    store.data.set('qt:d:g1:20261030', 2);
+    const { client, fetch, meter } = clientFor(gate, 'g1');
+    expect((await refusal(client.meta('Story'))).code).toBe('AB_LIMIT_QUOTA');
+    expect(fetch.calls).toHaveLength(0);
+    await meter.flush();
+    expect(store.data.get('qt:d:g1:20261030')).toBe(2);
+    expect(store.stats.writes).toBe(0);
   });
 
   it('counts a retried call once, not once per attempt', async () => {
@@ -184,7 +214,7 @@ describe('refusal', () => {
     const { gate } = setup({ daily: 2, monthly: null });
     const { client, fetch } = clientFor(gate, 'g1');
     await client.query(QUERY);
-    await client.meta('Story');
+    await client.query({ ...QUERY, page: { size: 2 } });
     expect((await refusal(client.query(QUERY))).code).toBe('AB_LIMIT_QUOTA');
     expect(fetch.calls).toHaveLength(2);
   });
@@ -218,7 +248,7 @@ describe('refusal', () => {
     const { client, meter } = clientFor(gate, 'g1');
     await client.query(QUERY);
     await meter.flush();
-    expect(store.stats).toEqual({ reads: 0, increments: 0 });
+    expect(store.stats).toEqual({ reads: 0, writes: 0 });
     expect(await gate.usageOf('g1')).toEqual({ status: 'ok' });
   });
 });
@@ -244,9 +274,9 @@ describe('periods', () => {
   it('give the counters an expiry at the end of their period', async () => {
     const seen: Array<{ key: string; expiresAt: number }> = [];
     const store = counters({
-      increment: async (key, o) => {
-        seen.push({ key, expiresAt: o.expiresAt });
-        return o.by;
+      incrementMany: async (entries) => {
+        for (const e of entries) seen.push({ key: e.key, expiresAt: e.expiresAt });
+        return entries.map((e) => e.by);
       },
     });
     const { gate } = setup({ daily: 10, monthly: 100 }, { counters: store });
@@ -310,7 +340,7 @@ describe('a counter outage fails open (L-080)', () => {
   });
 
   it('survives a failing increment: the result stands, the outage is logged, nothing throws', async () => {
-    const store = counters({ increment: () => Promise.reject(new Error('d1 down')) });
+    const store = counters({ incrementMany: () => Promise.reject(new Error('d1 down')) });
     const { gate, logs } = setup({ daily: 10, monthly: 10 }, { counters: store });
     const c = clientFor(gate, 'g1');
     expect((await c.client.query(QUERY)).data).toEqual([[{ Name: 'x' }]]);

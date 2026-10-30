@@ -22,8 +22,11 @@ grant of the deployment, and each grant has its own counters (a pass-through wor
 callers). A per-grant or per-workspace override is [P8-14](../tasks/phase-8-power-features/P8-14-quota-overrides.md).
 
 **What counts.** Each request the server sends to Agility counts once, at its first attempt: a retry is not a second
-one, and an answer from the [query cache](query-cache.md) is none (L-116). Metadata requests count: a cold isolate loads
-about a dozen asset types in a first call (on Workers they are kept in D1 afterwards). A write's POST counts.
+one, and an answer from the [query cache](query-cache.md) is none (L-116). **Metadata requests do not count** (D-316):
+a cold isolate loads about a dozen asset types in a first call (on Workers they are kept in D1 afterwards), which would
+drain a small quota faster than the caller's own use. Only data queries and writes count; a metadata request is still
+refused once a period is used up, and the call's request budget still bounds how many of them one call may make. A
+write's POST counts.
 
 **What happens at the limit.** A read that would pass it is refused before anything is sent, with the error
 `AB_LIMIT_QUOTA`, the period, the limit, what was used and the UTC instant the counter restarts. It is an ordinary tool
@@ -54,16 +57,18 @@ Quotas apply to the remote hosts (`serve` and the Worker). `agility-bridge stdio
 
 ## What it costs in storage (Workers Free: 100,000 D1 rows written a day)
 
-A request touches the counters at most three times, and not at all when it never reaches Agility (a cache hit, a
-refusal by the access model, `tools/list`):
+A request touches the counters at most twice, and not at all when it never reaches Agility (a cache hit, a
+refusal by the access model, `tools/list`). A request that made only metadata requests reads once and writes nothing:
 
 | When | D1 statements | Rows written (about) |
 |---|---|---|
 | First upstream call of a request | 1 read (`getMany`, both counters) | 0 |
-| The end of a request that made calls, per configured period | 1 increment each | 1 (an update; 2 for the first request of a day or month: the row and its expiry index) |
+| The end of a request that made counted calls | 1 statement that adds to both periods (`incrementMany`, D-317) | 1 per configured period (an update; 2 for the first request of a day or month: the row and its expiry index) |
 | `whoami` and the grant page | 1 read | 0 |
 
-So a read tool call that reaches Agility costs about 2 more rows than without a quota (both periods set; 1 with one) on
+One statement for both periods saves a D1 round trip (2 statements a request instead of 3), not rows: D1 counts the
+rows an upsert writes, so the rows below are the same as with one statement per period. What saves rows is that metadata is
+not counted. So a read tool call that reaches Agility costs about 2 more rows than without a quota (both periods set; 1 with one) on
 top of the 3 rows of its `tool_call` audit row, and the first call of each grant each day and month 4 more.
 At the Free plan's 100,000 rows that is about 20,000 read calls a day instead of 33,000; the Paid plan is not
 constrained. **The row accounting is computed from the schema, not read from a real D1 (`meta.rows_written`): unverified,**

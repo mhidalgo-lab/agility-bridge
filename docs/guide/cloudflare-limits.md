@@ -88,10 +88,10 @@ default 20 an hour is about 15,000 rows a day. The Paid plan (50 million rows a 
 
 ## Quotas and the D1 row budget
 
-The optional per-grant [quotas](query-limits.md) (`AB_QUOTA_DAILY`, `AB_QUOTA_MONTHLY`) keep their counters in `kv`: one read when a request first reaches Agility and one increment per configured period when it ends, about 2 more rows written per read call that reaches Agility (the row accounting is *unverified*, as above). On Free that is the difference between about 33,000 and 20,000 read calls a day, so they are off unless you set them.
+The optional per-grant [quotas](query-limits.md) (`AB_QUOTA_DAILY`, `AB_QUOTA_MONTHLY`) keep their counters in `kv`: one read when a request first reaches Agility and one statement that adds to every configured period when it ends (2 statements a request, not 3; metadata requests are not counted, so a request that only loaded metadata writes nothing), about 2 more rows written per read call that reaches Agility (the row accounting is *unverified*, as above). On Free that is the difference between about 33,000 and 20,000 read calls a day, so they are off unless you set them.
 
-The write flows above gain the same three statements (one read, one increment per period, about 2 rows) when a quota is set,
-because a write's POST is counted too: a confirmed call with push elicitation is then 8 statements and about 15 rows. On
+The write flows above gain the same two statements (one read, one increment for both periods, about 2 rows) when a quota is set,
+because a write's POST is counted too: a confirmed call with push elicitation is then 7 statements and about 15 rows. On
 Workers the counters are written after the response (`waitUntil`), so they add no latency to the call, only D1 work.
 
 ## Tasks and telemetry

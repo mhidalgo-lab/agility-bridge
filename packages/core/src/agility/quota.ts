@@ -2,9 +2,9 @@
 // Per-grant quotas over days and months (P8-09, ADR-0010, THREAT_MODEL T5/A10, L-116, L-080): the Agility tenant's own
 // request quota is shared by everyone behind it, so a deployment can cap how many Agility requests one grant may cause
 // per UTC day and per UTC month. A request is counted once per logical upstream call (a retry is not a second one, a
-// cache hit is none). To stay inside the Workers Free D1 row budget the shared counters are touched at most three times
-// per MCP request: one read when the first upstream call is about to happen, and one increment per period when the
-// request is over. Counters are in the storage `kv` table, so every isolate and replica sees them. The control fails
+// cache hit is none; metadata requests are checked but not counted, D-316). To stay inside the Workers Free D1 budget the
+// shared counters are touched at most twice per MCP request: one read when the first upstream call is about to happen,
+// and one statement that adds to both periods when the request is over (P8-39). Counters are in the storage `kv` table, so every isolate and replica sees them. The control fails
 // OPEN: a counter outage is logged and never blocks work (the write limiter, which fails closed, is a different
 // control, L-080). Web-standard only; a meter belongs to one request and is never shared (T21).
 import type { Clock } from '../context.ts';
@@ -14,7 +14,8 @@ import type { Logger } from '../logger.ts';
 /** The part of the storage `kv` table the quota needs (`KvStore` satisfies it structurally). */
 export interface QuotaCounters {
   getMany(keys: readonly string[]): Promise<Map<string, string>>;
-  increment(key: string, options: { by: number; expiresAt: number }): Promise<number | null>;
+  /** Adds to every counter in ONE statement and returns the new values in the order given (P8-39). */
+  incrementMany(entries: readonly { key: string; by: number; expiresAt: number }[]): Promise<number[]>;
 }
 
 /** Requests per grant and period; `null` leaves that period unlimited. */
@@ -51,9 +52,10 @@ export type QuotaUsage =
 export interface QuotaMeter {
   /**
    * Before one logical upstream call. Refuses a read with `AB_LIMIT_QUOTA` when a period is used up; a write is
-   * counted but never refused here (it has its own hourly limit and approval, ADR-0013). Fails open on a counter outage.
+   * counted but never refused here (it has its own hourly limit and approval, ADR-0013). `count: false` (metadata,
+   * D-316) is checked like a read but adds no unit. Fails open on a counter outage.
    */
-  beforeCall(options: { readonly write: boolean }): Promise<void>;
+  beforeCall(options: { readonly write: boolean; readonly count?: boolean }): Promise<void>;
   /** Adds this request's calls to the shared counters (once; later calls start over). Never throws. */
   flush(): Promise<void>;
   /** The grant's usage including this request's calls so far (`whoami`). */
@@ -198,7 +200,7 @@ export function createQuotaGate(options: QuotaGateOptions): QuotaGate {
         return loading;
       };
       return {
-        async beforeCall({ write }) {
+        async beforeCall({ write, count = true }) {
           if (ws.length === 0) return;
           await load();
           if (!failed && !write && stored !== null) {
@@ -207,19 +209,18 @@ export function createQuotaGate(options: QuotaGateOptions): QuotaGate {
               if (used >= w.limit) throw exceeded(w, used, clock.now());
             }
           }
-          calls++;
+          if (count) calls++;
         },
         async flush() {
           if (calls === 0 || ws.length === 0) return;
           const n = calls;
           calls = 0;
           try {
-            const totals = await Promise.all(
-              ws.map(
-                async (w) => [w, await counters.increment(w.key, { by: n, expiresAt: w.resetsAt })] as const,
-              ),
+            const values = await counters.incrementMany(
+              ws.map((w) => ({ key: w.key, by: n, expiresAt: w.resetsAt })),
             );
-            for (const [w, total] of totals) {
+            for (const [i, w] of ws.entries()) {
+              const total = values[i];
               stored?.set(w.key, (stored.get(w.key) ?? 0) + n);
               const before = (total ?? n) - n;
               // The first request to reach 80% of a period raises the warning, once per period.

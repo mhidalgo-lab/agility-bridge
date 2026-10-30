@@ -371,4 +371,15 @@
 - **Context:** The host has to be recorded when a token is stored, shown without a secret, and reported by diagnostics. `init --keychain` stores a master key, which belongs to a server and not to an Agility instance.
 - **Options:** (a) `keychain set <name> --for-url <url>` writes the secret and the binding (replacing a secret without the flag keeps the existing binding); `keychain bind <name> --for-url <url>` binds or moves an existing entry; `keychain delete` removes both; `keychain status --name` prints `boundTo`; `doctor` reports `ok` for a bound token, `warn` for an unbound one and `fail` for a different host; `client-config` snippets print `--for-url` with their `keychain set` hint; `init --keychain` and the master-key references are not bound; (b) bind through `init --keychain` too; (c) bind in the YAML file only.
 - **Recommendation:** (a), built. The binding applies to the stdio environment path (`AB_AGILITY_TOKEN`), the one a project file can reach. A `${keychain:...}` inside the user's own YAML file is not checked (the file is the user's; follow-up P8-42).
+
+### D-316 — Metadata requests are not counted by the quota *(P8-39 (Q-10))*
+- **Context:** `meta.v1` requests (one to three per cold call, about a dozen on a cold isolate) counted like data queries, so how fast a small quota drained depended on isolate recycling rather than on what the caller asked.
+- **Options:** (a) exclude them from the count; (b) count one unit per request however many metadata documents it loaded; (c) keep counting them.
+- **Recommendation:** (a), built. A metadata request is still refused when a period is used up (a used-up quota stops every read, and "nothing was asked of Agility" stays true), it is not counted, and the per-call budget still bounds how many one call may make. The tenant's own request quota still sees them; the aim of this quota is the caller's use, and `meta.v1` is cached in D1 on Workers.
+- **Owner (2026-10-30):** Decided: exclude metadata from the quota.
+
+### D-317 — One statement adds to both periods, as a new uncapped `kv.incrementMany` *(P8-39 (P-7))*
+- **Context:** The meter added to the day and the month counter with two `increment` calls, so a request with a quota cost one read and two writes.
+- **Options:** (a) a new `kv.incrementMany(entries)`: one multi-row upsert with the same expiry rules, atomic as one statement, at most 10 distinct keys, uncapped (the quota is a soft cap, D-296); (b) `Promise.all` of two increments (two round trips); (c) a `batch` of two increments in the SQL driver only.
+- **Recommendation:** (a), built on all three adapters with a contract test and a statement count in each. `increment` with `max` is unchanged, so the capped atomic counters of the write limiter, tasks and OAuth abuse limits keep their semantics. D-248, D-249, D-295, D-296 and D-299 stay true: still one read and one write per request, fail open, written after the response on Workers, a soft cap, and the quota asked before the budget. Rows written do not fall (two counters are two rows, L-461); statements fall from three to two a request.
 - **Owner:** *(open; built as (a))*

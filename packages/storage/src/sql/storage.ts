@@ -20,6 +20,7 @@ import {
 } from '../fields.ts';
 import {
   checkIncrement,
+  checkIncrements,
   checkKey,
   checkKeys,
   checkKvValue,
@@ -580,6 +581,23 @@ GROUP BY k`,
         [key, String(by), expiresAt, t, by, t, t, by, by, max],
       );
       return rows[0] === undefined ? null : Number(rows[0][0]);
+    },
+    async incrementMany(entries) {
+      const checked = checkIncrements(entries);
+      if (checked.length === 0) return [];
+      const t = now();
+      const expired = 'kv.expires_at IS NOT NULL AND kv.expires_at <= ?';
+      // One statement for every counter (one D1 round trip, one write each, P8-39); RETURNING is not ordered, so the
+      // values are matched by key.
+      const rows = await raw(
+        `INSERT INTO kv (key, value, expires_at) VALUES ${checked.map(() => '(?, ?, ?)').join(', ')} ` +
+          'ON CONFLICT (key) DO UPDATE SET ' +
+          `value = CASE WHEN ${expired} THEN excluded.value ELSE CAST(CAST(kv.value AS INTEGER) + CAST(excluded.value AS INTEGER) AS TEXT) END, ` +
+          `expires_at = CASE WHEN ${expired} THEN excluded.expires_at ELSE kv.expires_at END RETURNING key, value`,
+        [...checked.flatMap(({ key, by, expiresAt }) => [key, String(by), expiresAt]), t, t],
+      );
+      const byKey = new Map(rows.map((row) => [row[0] as string, Number(row[1])]));
+      return checked.map(({ key }) => byKey.get(key) ?? 0);
     },
     async list(prefix, options = {}) {
       checkPrefix(prefix);

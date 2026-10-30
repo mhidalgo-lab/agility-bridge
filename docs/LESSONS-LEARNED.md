@@ -38,7 +38,7 @@ How to use it:
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412 |
-| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452 |
+| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-461 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
@@ -1812,8 +1812,12 @@ On the bench a memory hit, a sealed shared-tier hit (decrypt and parse) and an u
 *Applied in:* P8-01, `scripts/worker-bench.ts` (`cachePaths`), `docs/guide/query-cache.md`.
 
 **L-415 — Count a quota in memory per request and write it once: the storage budget, not the arithmetic, is the constraint.**
-One increment per upstream call would be up to 45 statements and 90 rows for one tool call, against a Free plan of 100,000 rows a day. The meter lives for one request (never module state), reads the counters once when the first upstream call is about to happen, decides locally, and adds its total to each period at the end, so a request costs one read and two increments and a request of cache hits costs none. The price, a small overshoot between concurrent requests of one grant, is written down next to the fail-open decision. A cold isolate's metadata requests count too: tests that use a tiny quota are refused halfway through the first call, which is the behaviour, not a bug.
+One increment per upstream call would be up to 45 statements and 90 rows for one tool call, against a Free plan of 100,000 rows a day. The meter lives for one request (never module state), reads the counters once when the first upstream call is about to happen, decides locally, and adds its total to each period at the end, so a request costs one read and two increments and a request of cache hits costs none. The price, a small overshoot between concurrent requests of one grant, is written down next to the fail-open decision. A cold isolate's metadata requests counted too in the first version (superseded: they no longer count, L-461).
 *Applied in:* P8-09, `agility/quota.ts`, `test/quota.test.ts`.
+
+**L-461 — Merging statements saves round trips, not rows; count both, and exclude work the caller did not ask for.**
+Adding to the day and month counters in one `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` takes a request from three D1 statements to two, but D1 bills rows written, and two counters are still two rows. The saving that mattered for the Free budget and for fairness was not counting the metadata requests a cold isolate makes on the caller's behalf. Count statements in a test on every adapter (memory, SQLite, D1) with a counting driver, and say in the guide which number moved.
+*Applied in:* P8-39, `kv.incrementMany`, `agility/quota.ts`, `storage/test/contract.ts` (`quotaStatementContract`) (L-415).
 
 **L-416 — Without background work, the poll is the worker: claim with one atomic marker, run inside the request, drop a result the owner cancelled.**
 On Workers nothing may run after a response, so a task cannot be "started" at creation. The creating call stores the request and returns a handle; the first `tasks/get` takes a lease (`setIfAbsent`, expiring after the request deadline), runs the stored call through the normal pipeline, re-reads the record and writes the result only if it is still `working`, so a cancel that arrived meanwhile wins and a concurrent poll sees `working` instead of running it twice. Tests hold the tool on a gate to prove both orderings.

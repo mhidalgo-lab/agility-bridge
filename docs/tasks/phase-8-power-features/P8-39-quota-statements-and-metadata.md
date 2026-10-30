@@ -2,7 +2,7 @@
 id: P8-39
 title: "Quota: one statement per request, and metadata requests"
 phase: 8
-status: todo
+status: done
 priority: low
 depends_on: [P8-09]
 adr: ["0010"]
@@ -23,9 +23,9 @@ Reduce the quota's D1 cost and make drain independent of isolate recycling (revi
 - Add the missing quota test for the metadata case.
 
 ## Acceptance criteria
-- [ ] One read and one write statement per request for two periods (counted in a test).
-- [ ] The owner's decision on metadata is recorded and tested.
-- [ ] `docs/guide/query-limits.md` and `docs/guide/cloudflare-limits.md` state the new numbers.
+- [x] One read and one write statement per request for two periods (counted in a test).
+- [x] The owner's decision on metadata is recorded and tested.
+- [x] `docs/guide/query-limits.md` and `docs/guide/cloudflare-limits.md` state the new numbers.
 
 ## Security notes
 THREAT_MODEL T5, A10.
