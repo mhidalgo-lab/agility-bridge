@@ -7,7 +7,7 @@ does so. What each client supports is tracked in [client compatibility](../refer
 says which snippets were verified, with the client version and the date.
 
 Where a client's configuration file would hold the token in plain text, you can write `"AB_AGILITY_TOKEN": "keychain:agility-token"`
-instead and keep the token in the operating system's keychain (`agility-bridge keychain set agility-token`; see
+instead and keep the token in the operating system's keychain (`agility-bridge keychain set agility-token --for-url <your instance address>`, which also makes the token usable with that instance only; see
 [secrets](secrets.md#keeping-secrets-in-the-os-keychain)).
 
 After upgrading agility-bridge, restart or reconnect the server in your client: clients cache the tool list (L-027).

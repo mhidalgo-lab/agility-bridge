@@ -348,3 +348,27 @@
 - **Options:** (a) document the first three (operator-chosen collector, harmless trace id, the host's origin cannot be known) and stop advertising extensions to anonymous callers; (b) apply `checkPublicHost` to the endpoint unless private addresses are allowed; (c) pin a target origin.
 - **Recommendation:** (a), built. An internal collector is a legitimate target and the endpoint is operator configuration, not caller input; (c) is impossible for a sandboxed frame. The catalogue fix is a plain defect fix: the anonymous prepared request carries no extensions.
 - **Owner (2026-10-30):** Decided: as recommended, (a).
+
+### D-306 — The host an entry is for lives in a sibling keychain entry `<account>#host` *(P8-31, S-2)*
+- **Context:** A project's `.mcp.json` can set `AB_AGILITY_URL` to another host while `AB_AGILITY_TOKEN=keychain:<name>` names the user's own entry (D-290 only protects other applications' entries). The binding has to work with the macOS `security`, Linux `secret-tool` and Windows Credential Manager backends without a secret on argv.
+- **Options:** (a) a sibling entry in the same service whose account is `<account>#host` and whose value is the canonical host (lower case, with a non-default port); (b) an attribute on the entry (`secret-tool` has free attributes, `security` has a comment field, Credential Manager has a comment, each needing its own code and read path); (c) one index entry holding every binding as JSON (a read-modify-write of a shared value).
+- **Recommendation:** (a), built. It needs only the `get`, `set` and `delete` every backend has, carries no secret, and `#` is outside the writable-name alphabet (D-274), so no secret can be stored under the binding's name through the commands. The host is the part of the instance address a token travels to; the path is not part of the binding.
+- **Owner:** *(open; built as (a))*
+
+### D-307 — A different host is refused at startup; only `keychain bind` confirms it *(P8-31)*
+- **Context:** When the resolved keychain token is used with an `AB_AGILITY_URL` whose host differs from the stored one, the server could warn, refuse, or accept an explicit confirmation.
+- **Options:** (a) refuse before the token is used, with a stderr message naming both hosts and the command that confirms it; the confirmation is `agility-bridge keychain bind <name> --for-url <url>`, run by the person; (b) refuse unless an environment variable (`AB_KEYCHAIN_ALLOW_HOST`) names the host; (c) warn only.
+- **Recommendation:** (a), built. The hostile file that redirects the URL can set any environment variable too, so (b) is no protection and (c) sends the token anyway. `bind` replaces the stored host and is the same command that migrates old entries; it is a deliberate keychain write that a client's env block cannot trigger. Hosts compare case-insensitively and a different port is a different host.
+- **Owner:** *(open; built as (a))*
+
+### D-308 — Entries stored without a host keep working with a warning, for now *(P8-31)*
+- **Context:** Entries made by v0.7.0 and earlier have no host. Refusing them would break every existing setup at the next upgrade; accepting them silently leaves the hole open for them.
+- **Options:** (a) accept with a stderr warning (and a `doctor` warning) that names `keychain bind <name> --for-url <url>`; refuse them in a later minor release (follow-up P8-41); (b) refuse at once; (c) bind on first use (trust on first use: a hostile file used first would bind the entry to its host).
+- **Recommendation:** (a), built. It closes the hole for every entry stored with `--for-url` or bound once, and tells everyone else how to close it; (c) is rejected because the first use is not necessarily the person's. The warning is the only protection of an unbound entry until P8-41.
+- **Owner:** *(open; built as (a))*
+
+### D-309 — Where the host is recorded and reported: `keychain set --for-url`, `keychain bind`, `status`, `doctor`, `client-config` *(P8-31)*
+- **Context:** The host has to be recorded when a token is stored, shown without a secret, and reported by diagnostics. `init --keychain` stores a master key, which belongs to a server and not to an Agility instance.
+- **Options:** (a) `keychain set <name> --for-url <url>` writes the secret and the binding (replacing a secret without the flag keeps the existing binding); `keychain bind <name> --for-url <url>` binds or moves an existing entry; `keychain delete` removes both; `keychain status --name` prints `boundTo`; `doctor` reports `ok` for a bound token, `warn` for an unbound one and `fail` for a different host; `client-config` snippets print `--for-url` with their `keychain set` hint; `init --keychain` and the master-key references are not bound; (b) bind through `init --keychain` too; (c) bind in the YAML file only.
+- **Recommendation:** (a), built. The binding applies to the stdio environment path (`AB_AGILITY_TOKEN`), the one a project file can reach. A `${keychain:...}` inside the user's own YAML file is not checked (the file is the user's; follow-up P8-42).
+- **Owner:** *(open; built as (a))*

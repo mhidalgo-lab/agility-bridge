@@ -8,12 +8,22 @@ import {
   openCredentialToken,
   rotateCredentialKeys,
 } from '@agility-bridge/auth';
+import { canonicalInstanceUrl } from '@agility-bridge/core';
 import { restoreSqliteBackup } from '@agility-bridge/storage-sqlite';
 import pkg from '../../package.json' with { type: 'json' };
 import { CLIENTS, type Client, snippet } from '../client-snippets.ts';
-import { ConfigError } from '../config.ts';
+import { ConfigError, hostOf } from '../config.ts';
 import { exitCode, renderReport, runDoctor } from '../doctor.ts';
-import { type KeychainBackend, KeychainError, type KeychainRef, parseKeychainRef } from '../keychain.ts';
+import {
+  bindingAccount,
+  checkWritableName,
+  type KeychainBackend,
+  KeychainError,
+  type KeychainRef,
+  parseKeychainRef,
+  readBinding,
+  writeBinding,
+} from '../keychain.ts';
 import { createMasterKeyFile, defaultMasterKeyFile } from '../master-key.ts';
 import type { AdminClient } from './client.ts';
 import {
@@ -111,6 +121,21 @@ function keychainOp<T>(run: () => T): T {
     throw error;
   }
 }
+
+/** `--for-url` as the canonical host an entry is bound to (P8-31): the address you open Agility at. */
+function bindHost(value: string): string {
+  try {
+    return hostOf(canonicalInstanceUrl(value));
+  } catch (error) {
+    throw new ConfigError(`--for-url: ${(error as Error).message}`);
+  }
+}
+
+const FOR_URL: OptionSpec = {
+  name: 'for-url',
+  kind: 'string',
+  help: 'The instance address this token is for (https://…); the server then sends it to that host only',
+};
 
 async function agilityToken(r: Runtime, p: Parsed): Promise<string> {
   return readSecret({
@@ -243,9 +268,12 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary:
       'Store a secret in the OS keychain (from --from-file, AB_KEYCHAIN_SECRET, standard input or a hidden prompt); refer to it as keychain:<name>',
     args: [id('name', 'Entry name, or service/account (service defaults to agility-bridge)')],
-    options: [{ name: 'from-file', kind: 'string', help: 'Read the secret from this 0600 file' }],
+    options: [{ name: 'from-file', kind: 'string', help: 'Read the secret from this 0600 file' }, FOR_URL],
     async run(r, p) {
       const ref = keychainRef(p.args[0] as string);
+      // Only a writable name: the sibling entry that holds the host has a name no command can give a secret (P8-31).
+      keychainOp(() => checkWritableName('account', ref.account));
+      const host = typeof p.opts['for-url'] === 'string' ? bindHost(p.opts['for-url']) : undefined;
       const secret = await readSecret({
         ...(typeof p.opts['from-file'] === 'string' ? { file: p.opts['from-file'] } : {}),
         envName: 'AB_KEYCHAIN_SECRET',
@@ -254,11 +282,57 @@ export const COMMANDS: readonly CommandSpec[] = [
         what: 'secret to store',
       });
       const kc = r.keychain();
-      keychainOp(() => kc.set(ref.service, ref.account, secret));
-      r.out(JSON.stringify({ stored: `keychain:${p.args[0]}` }));
+      keychainOp(() => {
+        kc.set(ref.service, ref.account, secret);
+        if (host !== undefined) writeBinding(kc, ref, host);
+      });
+      const bound = host ?? keychainOp(() => readBinding(kc, ref));
+      r.out(
+        JSON.stringify({
+          stored: `keychain:${p.args[0]}`,
+          ...(bound === undefined ? {} : { boundTo: bound }),
+        }),
+      );
       r.err(
         `agility-bridge: stored in the ${kc.label}. Use keychain:${p.args[0]} where the secret would go (AB_AGILITY_TOKEN, AB_MASTER_KEY).`,
       );
+      if (bound === undefined) {
+        r.err(
+          `agility-bridge: not bound to an instance. For an Agility token, bind it so a project's client file cannot send it to another host: agility-bridge keychain bind ${p.args[0]} --for-url <https://your-instance> (docs/guide/secrets.md).`,
+        );
+      }
+      return 0;
+    },
+  },
+  {
+    words: ['keychain', 'bind'],
+    summary:
+      'Bind an existing keychain entry to the instance it is for (also how you confirm a changed address): the server sends the token to that host only',
+    args: [id('name', 'Entry name, or service/account')],
+    options: [{ ...FOR_URL, required: true }],
+    async run(r, p) {
+      const ref = keychainRef(p.args[0] as string);
+      keychainOp(() => checkWritableName('account', ref.account));
+      const host = bindHost(p.opts['for-url'] as string);
+      const kc = r.keychain();
+      const before = keychainOp(() => {
+        if (kc.get(ref.service, ref.account) === undefined) {
+          throw new KeychainError(
+            `${kc.label} has no entry "${ref.service}/${ref.account}"; store it first with \`agility-bridge keychain set ${p.args[0]} --for-url ${p.opts['for-url']}\`.`,
+          );
+        }
+        const previous = readBinding(kc, ref);
+        writeBinding(kc, ref, host);
+        return previous;
+      });
+      r.out(
+        JSON.stringify({
+          bound: `keychain:${p.args[0]}`,
+          boundTo: host,
+          ...(before === undefined ? {} : { was: before }),
+        }),
+      );
+      r.err(`agility-bridge: keychain:${p.args[0]} is now sent to ${host} only.`);
       return 0;
     },
   },
@@ -268,7 +342,12 @@ export const COMMANDS: readonly CommandSpec[] = [
     args: [id('name', 'Entry name, or service/account')],
     async run(r, p) {
       const ref = keychainRef(p.args[0] as string);
-      const deleted = keychainOp(() => r.keychain().delete(ref.service, ref.account));
+      const deleted = keychainOp(() => {
+        const kc = r.keychain();
+        const removed = kc.delete(ref.service, ref.account);
+        if (removed) kc.delete(ref.service, bindingAccount(ref.account));
+        return removed;
+      });
       r.out(JSON.stringify({ deleted }));
       return 0;
     },
@@ -282,11 +361,20 @@ export const COMMANDS: readonly CommandSpec[] = [
       const kc = r.keychain();
       const available = keychainOp(() => kc.available());
       let entry: boolean | undefined;
+      let boundTo: string | undefined;
       if (typeof p.opts['name'] === 'string' && available) {
         const ref = keychainRef(p.opts['name']);
         entry = keychainOp(() => kc.get(ref.service, ref.account)) !== undefined;
+        if (entry) boundTo = keychainOp(() => readBinding(kc, ref));
       }
-      r.out(JSON.stringify({ backend: kc.label, available, ...(entry === undefined ? {} : { entry }) }));
+      r.out(
+        JSON.stringify({
+          backend: kc.label,
+          available,
+          ...(entry === undefined ? {} : { entry }),
+          ...(boundTo === undefined ? {} : { boundTo }),
+        }),
+      );
       return available ? 0 : 1;
     },
   },

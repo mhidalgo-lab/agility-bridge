@@ -52,7 +52,7 @@ describe('keychain references in configuration', () => {
     expect(() =>
       loadConfig({ AB_AGILITY_URL: URL_, AB_AGILITY_TOKEN: 'keychain:team/ann' }, { keychain: reader(kc) }),
     ).toThrow(/AB_AGILITY_TOKEN: an environment value may refer only/);
-    expect(kc.reads).toEqual(['agility-bridge/work']);
+    expect(kc.reads).toEqual(['agility-bridge/work', 'agility-bridge/work#host']);
     const b = loadConfig(
       { AB_AGILITY_URL: URL_, AB_AGILITY_TOKEN: 'keychain:agility-bridge/work' },
       { keychain: reader(kc) },
@@ -209,5 +209,151 @@ describe('keychain commands', () => {
     const again = await cli(['init', '--keychain', 'master'], kc, {});
     expect(again.code).toBe(1);
     expect(kc.data.get('agility-bridge/master')).toBe(stored);
+  });
+});
+
+describe('a keychain token is sent only to the host it was stored for (P8-31, S-2, T8, T23)', () => {
+  const BOUND = { 'agility-bridge/work': TOKEN, 'agility-bridge/work#host': 'agility.example.com' };
+  const EVIL = 'https://evil.example.net/Acme';
+
+  it('works for the stored-for host, in any letter case, with no warning', () => {
+    const warnings: string[] = [];
+    for (const url of [URL_, 'https://AGILITY.example.com/Other']) {
+      const c = loadConfig(
+        { AB_AGILITY_URL: url, AB_AGILITY_TOKEN: 'keychain:work' },
+        { keychain: reader(fakeKeychain(BOUND)), warn: (m) => warnings.push(m) },
+      );
+      expect(c.kind === 'configured' && c.token.reveal()).toBe(TOKEN);
+    }
+    expect(warnings).toEqual([]);
+  });
+
+  it('refuses another host before the token is used, naming both hosts and the way to confirm, never the token', () => {
+    const kc = fakeKeychain(BOUND);
+    try {
+      loadConfig({ AB_AGILITY_URL: EVIL, AB_AGILITY_TOKEN: 'keychain:work' }, { keychain: reader(kc) });
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConfigError);
+      const message = (error as Error).message;
+      expect(message).toContain('agility.example.com');
+      expect(message).toContain('evil.example.net');
+      expect(message).toContain('keychain bind work --for-url');
+      expect(message).not.toContain(TOKEN);
+    }
+  });
+
+  it('a different port is a different host', () => {
+    expect(() =>
+      loadConfig(
+        { AB_AGILITY_URL: 'https://agility.example.com:8443/Acme', AB_AGILITY_TOKEN: 'keychain:work' },
+        { keychain: reader(fakeKeychain(BOUND)) },
+      ),
+    ).toThrow(/stored for agility.example.com, but AB_AGILITY_URL points at agility.example.com:8443/);
+  });
+
+  it('an environment setting cannot confirm it: only the binding in the keychain counts', () => {
+    expect(() =>
+      loadConfig(
+        { AB_AGILITY_URL: EVIL, AB_AGILITY_TOKEN: 'keychain:work', AB_KEYCHAIN_HOST: 'evil.example.net' },
+        { keychain: reader(fakeKeychain(BOUND)) },
+      ),
+    ).toThrow(/Unknown setting/);
+  });
+
+  it('an entry stored without a host still works, with a warning that says how to bind it', () => {
+    const warnings: string[] = [];
+    const kc = fakeKeychain({ 'agility-bridge/work': TOKEN });
+    const c = loadConfig(
+      { AB_AGILITY_URL: EVIL, AB_AGILITY_TOKEN: 'keychain:work' },
+      { keychain: reader(kc), warn: (m) => warnings.push(m) },
+    );
+    expect(c.kind).toBe('configured');
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('keychain bind work --for-url');
+    expect(warnings[0]).not.toContain(TOKEN);
+  });
+
+  it('a plain token is not bound to anything and the binding is never read', () => {
+    const kc = fakeKeychain(BOUND);
+    loadConfig({ AB_AGILITY_URL: EVIL, AB_AGILITY_TOKEN: TOKEN }, { keychain: reader(kc) });
+    expect(kc.reads).toEqual([]);
+  });
+
+  it('keychain set --for-url stores the token and the host; the host is canonical and the token is not echoed', async () => {
+    const kc = fakeKeychain();
+    const r = await cli(
+      ['keychain', 'set', 'work', '--for-url', 'https://AGILITY.example.com/Acme/'],
+      kc,
+      {},
+      `${TOKEN}\n`,
+    );
+    expect(r.code).toBe(0);
+    expect(kc.data.get('agility-bridge/work')).toBe(TOKEN);
+    expect(kc.data.get('agility-bridge/work#host')).toBe('agility.example.com');
+    expect(JSON.parse(r.out)).toEqual({ stored: 'keychain:work', boundTo: 'agility.example.com' });
+    expect(r.out + r.err).not.toContain(TOKEN);
+    expect(r.err).not.toContain('not bound');
+  });
+
+  it('keychain set without --for-url says the entry is unbound and keeps an existing binding', async () => {
+    const fresh = await cli(['keychain', 'set', 'work'], fakeKeychain(), {}, TOKEN);
+    expect(fresh.err).toContain('keychain bind work --for-url');
+    const kc = fakeKeychain(BOUND);
+    const again = await cli(['keychain', 'set', 'work'], kc, {}, `${TOKEN}2`);
+    expect(kc.data.get('agility-bridge/work#host')).toBe('agility.example.com');
+    expect(JSON.parse(again.out)).toMatchObject({ boundTo: 'agility.example.com' });
+  });
+
+  it('a bad --for-url or a name that is the binding of another entry stores nothing', async () => {
+    const kc = fakeKeychain();
+    for (const url of [
+      'not a url',
+      'http://agility.example.com/Acme',
+      'https://user:pw@agility.example.com/A',
+    ]) {
+      const r = await cli(['keychain', 'set', 'work', '--for-url', url], kc, {}, TOKEN);
+      expect(r.code, url).toBe(1);
+      expect(r.err + r.out).not.toContain(TOKEN);
+    }
+    expect((await cli(['keychain', 'set', 'work#host'], kc, {}, TOKEN)).code).toBe(1);
+    expect((await cli(['keychain', 'bind', 'work#host', '--for-url', URL_], kc, {})).code).toBe(1);
+    expect(kc.data.size).toBe(0);
+  });
+
+  it('bind migrates an unbound entry and is the explicit way to confirm a new address', async () => {
+    const kc = fakeKeychain({ 'agility-bridge/work': TOKEN });
+    const first = await cli(['keychain', 'bind', 'work', '--for-url', URL_], kc, {});
+    expect(first.code).toBe(0);
+    expect(JSON.parse(first.out)).toEqual({ bound: 'keychain:work', boundTo: 'agility.example.com' });
+    expect(() =>
+      loadConfig({ AB_AGILITY_URL: EVIL, AB_AGILITY_TOKEN: 'keychain:work' }, { keychain: reader(kc) }),
+    ).toThrow(/not sent there/);
+    const moved = await cli(['keychain', 'bind', 'work', '--for-url', EVIL], kc, {});
+    expect(JSON.parse(moved.out)).toMatchObject({ boundTo: 'evil.example.net', was: 'agility.example.com' });
+    expect(
+      loadConfig({ AB_AGILITY_URL: EVIL, AB_AGILITY_TOKEN: 'keychain:work' }, { keychain: reader(kc) }).kind,
+    ).toBe('configured');
+    expect(kc.data.get('agility-bridge/work')).toBe(TOKEN);
+  });
+
+  it('bind on a missing entry creates nothing and --for-url is required', async () => {
+    const kc = fakeKeychain();
+    const r = await cli(['keychain', 'bind', 'absent', '--for-url', URL_], kc, {});
+    expect(r.code).toBe(1);
+    expect(r.err).toContain('has no entry');
+    expect(kc.data.size).toBe(0);
+    expect(
+      (await cli(['keychain', 'bind', 'work'], fakeKeychain({ 'agility-bridge/work': TOKEN }), {})).code,
+    ).toBe(2);
+  });
+
+  it('status shows the host an entry is bound to; delete removes the binding with the entry', async () => {
+    const kc = fakeKeychain(BOUND);
+    const s = await cli(['keychain', 'status', '--name', 'work'], kc, {});
+    expect(JSON.parse(s.out)).toMatchObject({ entry: true, boundTo: 'agility.example.com' });
+    expect(s.out).not.toContain(TOKEN);
+    await cli(['keychain', 'delete', 'work'], kc, {});
+    expect(kc.data.size).toBe(0);
   });
 });

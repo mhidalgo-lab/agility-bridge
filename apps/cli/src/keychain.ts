@@ -106,6 +106,32 @@ export function checkWritableName(what: string, value: string): void {
   }
 }
 
+/**
+ * The host an entry was stored for lives in a sibling entry of the same service whose account is `<account>#host`
+ * (P8-31, D-306). `#` is outside the writable-name alphabet, so no secret can ever be given that name through the commands.
+ * It works on every backend with the calls they already have, and it carries no secret.
+ */
+export const BINDING_SUFFIX = '#host';
+export const bindingAccount = (account: string): string => `${account}${BINDING_SUFFIX}`;
+
+/** A writable account, or a writable account followed by the binding suffix. */
+function checkWritableAccount(account: string): void {
+  checkWritableName(
+    'account',
+    account.endsWith(BINDING_SUFFIX) ? account.slice(0, -BINDING_SUFFIX.length) : account,
+  );
+}
+
+/** The canonical host an entry is bound to, or undefined for an entry stored without one. */
+export function readBinding(backend: KeychainBackend, ref: KeychainRef): string | undefined {
+  const host = backend.get(ref.service, bindingAccount(ref.account));
+  return host === undefined || host === '' ? undefined : host;
+}
+
+export function writeBinding(backend: KeychainBackend, ref: KeychainRef, host: string): void {
+  backend.set(ref.service, bindingAccount(ref.account), host);
+}
+
 const label = (service: string, account: string) => `"${service}/${account}"`;
 
 function unusable(b: string, r: RunResult, tool: string): KeychainError {
@@ -149,7 +175,7 @@ function macos(run: Runner): KeychainBackend {
     },
     set(service, account, secret) {
       checkWritableName('service', service);
-      checkWritableName('account', account);
+      checkWritableAccount(account);
       // `security -i` reads its command from standard input, so the secret (as hex) is not in the argument list.
       const r = run(
         'security',
@@ -189,7 +215,7 @@ function linux(run: Runner): KeychainBackend {
     },
     set(service, account, secret) {
       checkWritableName('service', service);
-      checkWritableName('account', account);
+      checkWritableAccount(account);
       const r = run('secret-tool', ['store', '--label=agility-bridge', ...attrs(service, account)], secret);
       if (r.failure !== undefined || r.status !== 0) throw unusable(b, r, 'secret-tool');
       verify(self, service, account, secret);
@@ -317,7 +343,7 @@ function windows(run: Runner): KeychainBackend {
     },
     set(service, account, secret) {
       checkWritableName('service', service);
-      checkWritableName('account', account);
+      checkWritableAccount(account);
       // The script has never run on Windows (D-273): until a real run proves the UTF-8 pipes, a secret that would need
       // them is refused instead of being stored mangled, because the read-back goes through the same path (Q-9, D-293).
       // eslint-disable-next-line no-control-regex

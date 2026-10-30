@@ -16,10 +16,12 @@ import {
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import {
+  bindingAccount,
   DEFAULT_SERVICE,
   KeychainError,
   keychainFor,
   parseKeychainRef,
+  readBinding,
   readKeychainRef,
 } from './keychain.ts';
 
@@ -373,6 +375,55 @@ export function resolveSecretValue(
   return secret;
 }
 
+/** The host of an instance address (lower case, with a non-default port): what a keychain entry is bound to (P8-31). */
+export const hostOf = (canonicalUrl: string): string => new URL(canonicalUrl).host.toLowerCase();
+
+/** The host recorded for an entry, or undefined when it was stored without one. */
+export type KeychainHostReader = (service: string, account: string) => string | undefined;
+
+export const osKeychainHost: KeychainHostReader = (service, account) => {
+  try {
+    return readBinding(keychainFor(process.platform), { service, account });
+  } catch (error) {
+    if (error instanceof KeychainError) throw new ConfigError(error.message);
+    throw error;
+  }
+};
+
+/**
+ * A keychain token is sent only to the host it was stored for (P8-31, T8, S-2): the client file that names the entry
+ * can be a project file the user did not write and may point `AB_AGILITY_URL` anywhere. A mismatch stops startup; an
+ * entry stored without a host still works but is reported so the person can bind it.
+ */
+function checkTokenBinding(
+  rawToken: string,
+  instance: string,
+  hostFor: KeychainHostReader,
+  warn: ((message: string) => void) | undefined,
+): void {
+  let ref: ReturnType<typeof parseKeychainRef>;
+  try {
+    ref = parseKeychainRef(rawToken);
+  } catch {
+    return;
+  }
+  if (ref === undefined) return;
+  const name = ref.service === DEFAULT_SERVICE ? ref.account : `${ref.service}/${ref.account}`;
+  const host = hostOf(instance);
+  const bound = hostFor(ref.service, ref.account);
+  if (bound === undefined) {
+    warn?.(
+      `keychain:${name} is not bound to an instance, so it would be sent to any AB_AGILITY_URL a client file sets (${host} now). Bind it: agility-bridge keychain bind ${name} --for-url ${instance}`,
+    );
+    return;
+  }
+  if (bound !== host) {
+    throw new ConfigError(
+      `AB_AGILITY_TOKEN: keychain:${name} was stored for ${bound}, but AB_AGILITY_URL points at ${host}; the token is not sent there. A project's client file may have changed the address. If ${host} is really your instance, confirm it yourself: agility-bridge keychain bind ${name} --for-url ${instance}`,
+    );
+  }
+}
+
 const REF = /\$\{([^}]{1,200})\}/g;
 
 /** Replaces `${NAME}` and `${keychain:service/account}` in one string value; `$${` stands for a literal `${`. */
@@ -503,6 +554,8 @@ export const nodeFiles: FileAccess = {
 export interface LoadOptions {
   readonly files?: FileAccess;
   readonly keychain?: KeychainReader;
+  /** The host an entry was stored for; defaults to the sibling entry read through `keychain` (tests) or the OS keychain. */
+  readonly keychainHost?: KeychainHostReader;
   readonly warn?: (message: string) => void;
 }
 
@@ -598,6 +651,21 @@ function fromYaml(env: Readonly<Record<string, string | undefined>>, options: Lo
   };
 }
 
+function hostReader(options: LoadOptions): KeychainHostReader {
+  if (options.keychainHost !== undefined) return options.keychainHost;
+  const read = options.keychain;
+  if (read === undefined) return osKeychainHost;
+  // A given secret reader (tests, doctor): the sibling entry through it; a missing entry is "stored without a host".
+  return (service, account) => {
+    try {
+      return read(service, bindingAccount(account)) || undefined;
+    } catch (error) {
+      if (error instanceof ConfigError && /no entry|has no entry/.test(error.message)) return undefined;
+      throw error;
+    }
+  };
+}
+
 /** The stdio configuration from the environment the MCP client provides (L-026). */
 export function loadConfig(
   env: Readonly<Record<string, string | undefined>>,
@@ -629,11 +697,13 @@ export function loadConfig(
   warnServeOnly(env, options.warn);
   // `keychain:<name>` keeps the token out of the client's configuration file (P8-08).
   const token = resolveSecretValue(rawToken, 'AB_AGILITY_TOKEN', options.keychain);
+  const instance = instanceUrl(url, 'AB_AGILITY_URL');
+  checkTokenBinding(rawToken, instance, hostReader(options), options.warn);
   return {
     kind: 'configured',
     source: 'environment',
     workspace: { id: 'default', name: 'Default' },
-    instanceUrl: instanceUrl(url, 'AB_AGILITY_URL'),
+    instanceUrl: instance,
     token: new Secret(token),
     ...(env['AB_CA_FILE'] ? { caFile: env['AB_CA_FILE'] } : {}),
     projects: projectList(env['AB_PROJECTS']),

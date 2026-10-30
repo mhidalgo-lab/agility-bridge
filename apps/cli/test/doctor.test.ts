@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import { generateMasterKey, Keyring, verifyKeyring } from '@agility-bridge/auth';
 import { openSqliteStorage } from '@agility-bridge/storage-sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ConfigError } from '../src/config.ts';
 import { type DoctorDeps, type DoctorOptions, renderReport, runDoctor } from '../src/doctor.ts';
 import { main } from '../src/main.ts';
 
@@ -457,6 +458,28 @@ describe('doctor: hostile files and the keychain (Phase 8 review S-6, Q-8)', () 
       expect(lstatSync(dataDir).mode & 0o777).toBe(0o775);
     },
   );
+
+  it('reports a keychain token bound to another host as a failure, an unbound one as a warning, a bound one as ok (P8-31)', async () => {
+    const data: Record<string, string> = { 'agility-bridge/agility-token': 'FAKE-TOKEN-0000000000' };
+    const keychain = (service: string, account: string) => {
+      const v = data[`${service}/${account}`];
+      if (v === undefined) throw new ConfigError(`no entry "${service}/${account}"`);
+      return v;
+    };
+    const env = { AB_AGILITY_URL: INSTANCE, AB_AGILITY_TOKEN: 'keychain:agility-token' };
+    const unbound = await run({ ...OPTS, offline: false }, env, { keychain });
+    expect(unbound.findings.some((f) => f.id === 'config.warning' && f.message.includes('not bound'))).toBe(
+      true,
+    );
+    expect(byId(unbound, 'config.keychain-binding')).toEqual([]);
+    data['agility-bridge/agility-token#host'] = new URL(INSTANCE).host;
+    const ok = await run({ ...OPTS, offline: false }, env, { keychain });
+    expect(byId(ok, 'config.keychain-binding')[0]?.status).toBe('ok');
+    data['agility-bridge/agility-token#host'] = 'other.example.org';
+    const bad = await run({ ...OPTS, offline: false }, env, { keychain });
+    expect(byId(bad, 'config.stdio')[0]?.status).toBe('fail');
+    expect(byId(bad, 'config.stdio')[0]?.message).toContain('other.example.org');
+  });
 
   it('--offline reads nothing from the keychain and reports the checks as skipped', async () => {
     let reads = 0;

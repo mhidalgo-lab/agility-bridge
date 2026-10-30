@@ -35,7 +35,7 @@ management commands), and inside `${keychain:…}` in the YAML configuration. Th
 only the name:
 
 ```sh
-agility-bridge keychain set agility-token          # type or pipe the token; it is stored, never printed
+agility-bridge keychain set agility-token --for-url https://www7.v1host.com/YourInstance   # type or pipe the token; never printed
 agility-bridge init --keychain master              # a new master key straight into the keychain
 agility-bridge keychain status --name agility-token
 ```
@@ -47,6 +47,25 @@ agility-bridge keychain status --name agility-token
 ```sh
 AB_MASTER_KEY=keychain:master agility-bridge serve
 ```
+
+### Binding a token to its instance
+
+A client's configuration file can be a project file you did not write, and it can set `AB_AGILITY_URL` to any host while
+naming your own entry. So a token is stored **for** an instance: `keychain set <name> --for-url <address>` writes the
+token and, next to it, the host (lower case, with the port when it is not the default) in a second entry named
+`<name>#host` in the same keychain service. It holds no secret and works the same on macOS, Linux and Windows.
+
+- At start, if `AB_AGILITY_URL` has a different host than the one stored, the server stops before it uses the token and
+  prints both hosts on stderr. Nothing in the environment can override this; if the new address really is your
+  instance, confirm it yourself: `agility-bridge keychain bind <name> --for-url <new address>`.
+- Entries stored before this existed have no host. They still work, with a warning on stderr and in
+  `agility-bridge doctor`, so that nothing breaks at an upgrade: run
+  `agility-bridge keychain bind <name> --for-url <address>` once. A later release will refuse unbound entries.
+- `keychain status --name <name>` prints the bound host (never the token); `keychain delete` removes both entries;
+  storing a new token under an existing name keeps its host unless you pass `--for-url`. `doctor` reports a bound
+  token as `ok`, an unbound one as a warning and a different host as a failure.
+- Master keys (`init --keychain`) belong to a server, not to an instance, and are not bound. A `${keychain:...}` in your
+  own YAML configuration file is not checked either.
 
 | System | Tool | Notes |
 |---|---|---|
