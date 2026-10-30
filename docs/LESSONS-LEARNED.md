@@ -40,7 +40,7 @@ How to use it:
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241, L-402 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297, L-335 |
@@ -2018,6 +2018,14 @@ host now waits for the next window when fewer than 20 s are left. Separately, `s
 (migrations, commits, `VACUUM INTO`) and took 6 to 18 s on the Windows runner against the 5 s default; the project now sets
 60 s, as `apps/cli` does, instead of weakening the tests.
 *Applied in:* P6-60, `packages/http-app/test/oauth/abuse-suite.ts`, `packages/storage-sqlite/vitest.config.ts`, L-104, L-322.
+
+**L-446 — A test that must wait for a boundary moves the clock, it does not sleep inside its own timeout.**
+L-382's fix started floods at the beginning of a fixed window by sleeping to the next boundary when fewer than 20 s were left. On a
+5 s test timeout that wait was a timeout for about one start in thirty (20 s of a 600 s window), whatever the machine: the failure looked
+like a slow runner and rerunning "fixed" it. Measure where the time goes before touching a timeout: here it was the wait, not the
+requests. Where the host shares the process, fake `Date` only (timers stay real, shouldAdvanceTime on) and jump past the boundary;
+where the host has a clock of its own (workerd), the wait is inherent and the project's timeout must exceed it.
+*Applied in:* P8-21, `packages/http-app/test/oauth/abuse-suite.ts`.
 
 ## R. CI, release and supply chain
 

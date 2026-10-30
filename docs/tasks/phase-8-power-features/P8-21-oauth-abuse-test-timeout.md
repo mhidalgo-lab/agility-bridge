@@ -2,11 +2,11 @@
 id: P8-21
 title: "Stop the OAuth abuse tests timing out on busy CI runners"
 phase: 8
-status: todo
+status: done
 priority: low
 depends_on: []
 adr: []
-lessons: []
+lessons: [L-382, L-446]
 owner: ""
 ---
 
@@ -23,14 +23,15 @@ pull request a rerun.
   them a justified explicit timeout, without lowering what they assert.
 
 ## Acceptance criteria
-- [ ] The three tests finish well inside the default timeout on a loaded runner (measure on CI, several runs).
-- [ ] The assertions are unchanged.
+- [x] The three tests finish well inside the default timeout: the cause was not load but the suite's own wait for a window boundary (up to 20 s inside a 5 s test, so about one start in thirty timed out); the memory-storage suites now move `Date` past the boundary instead (regression test: a host started 3 s before a boundary returns in under a second). The workerd and SQLite suites keep the wait, under 60 s and 30 s timeouts.
+- [x] The assertions are unchanged.
 
 ## Security notes
 none: test timing only; the limits under test are unchanged.
 
 ## Lessons applied
-- none
+- L-382 — fixed-window tests start at the beginning of their window.
+- L-446 — move the clock, do not sleep inside the test timeout.
 
 ## Docs to update
 - none
