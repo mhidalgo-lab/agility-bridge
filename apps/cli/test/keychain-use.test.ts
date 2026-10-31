@@ -42,7 +42,11 @@ const reader = (kc: KeychainBackend) => (service: string, account: string) => {
 
 describe('keychain references in configuration', () => {
   it('AB_AGILITY_TOKEN=keychain:<name> reads the default service; keychain:<service>/<account> of another service is refused in env', () => {
-    const kc = fakeKeychain({ 'agility-bridge/work': TOKEN, 'team/ann': 'FAKE-ANN-TOKEN-0000' });
+    const kc = fakeKeychain({
+      'agility-bridge/work': TOKEN,
+      'agility-bridge/work#host': 'agility.example.com',
+      'team/ann': 'FAKE-ANN-TOKEN-0000',
+    });
     const a = loadConfig(
       { AB_AGILITY_URL: URL_, AB_AGILITY_TOKEN: 'keychain:work' },
       { keychain: reader(kc) },
@@ -84,7 +88,10 @@ describe('keychain references in configuration', () => {
   });
 
   it('the YAML form takes a bare name too', () => {
-    const kc = fakeKeychain({ 'agility-bridge/yaml': TOKEN });
+    const kc = fakeKeychain({
+      'agility-bridge/yaml': TOKEN,
+      'agility-bridge/yaml#host': 'agility.example.com',
+    });
     const yaml = `version: 1\nworkspaces:\n  a:\n    instance: { url: ${URL_}, token: "\${keychain:yaml}" }\n`;
     const c = loadConfig(
       { AB_CONFIG: '/cfg.yaml' },
@@ -261,17 +268,32 @@ describe('a keychain token is sent only to the host it was stored for (P8-31, S-
     ).toThrow(/Unknown setting/);
   });
 
-  it('an entry stored without a host still works, with a warning that says how to bind it', () => {
-    const warnings: string[] = [];
+  it('refuses an entry stored without a host before the token is used, naming keychain bind, never the token (P8-41)', () => {
     const kc = fakeKeychain({ 'agility-bridge/work': TOKEN });
+    for (const url of [URL_, EVIL]) {
+      try {
+        loadConfig({ AB_AGILITY_URL: url, AB_AGILITY_TOKEN: 'keychain:work' }, { keychain: reader(kc) });
+        expect.unreachable();
+      } catch (error) {
+        expect(error).toBeInstanceOf(ConfigError);
+        const message = (error as Error).message;
+        expect(message).toContain('AB_AGILITY_TOKEN: keychain:work is not bound');
+        expect(message).toContain(`keychain bind work --for-url ${url}`);
+        expect(message).not.toContain(TOKEN);
+      }
+    }
+  });
+
+  it('works again once the person binds the entry', () => {
+    const kc = fakeKeychain({
+      'agility-bridge/work': TOKEN,
+      'agility-bridge/work#host': 'agility.example.com',
+    });
     const c = loadConfig(
-      { AB_AGILITY_URL: EVIL, AB_AGILITY_TOKEN: 'keychain:work' },
-      { keychain: reader(kc), warn: (m) => warnings.push(m) },
+      { AB_AGILITY_URL: URL_, AB_AGILITY_TOKEN: 'keychain:work' },
+      { keychain: reader(kc) },
     );
-    expect(c.kind).toBe('configured');
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('keychain bind work --for-url');
-    expect(warnings[0]).not.toContain(TOKEN);
+    expect(c.kind === 'configured' && c.token.reveal()).toBe(TOKEN);
   });
 
   it('a plain token is not bound to anything and the binding is never read', () => {

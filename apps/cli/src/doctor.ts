@@ -189,11 +189,7 @@ function configChecks(deps: DoctorDeps): LoadedForDoctor {
       ),
     );
     const tokenValue = deps.env['AB_AGILITY_TOKEN'];
-    if (
-      loaded.source === 'environment' &&
-      tokenValue?.startsWith('keychain:') &&
-      !findings.some((f) => f.message.includes('is not bound to an instance'))
-    ) {
+    if (loaded.source === 'environment' && tokenValue?.startsWith('keychain:')) {
       findings.push(
         finding(
           'config.keychain-binding',
