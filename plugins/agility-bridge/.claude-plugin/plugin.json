@@ -1,7 +1,7 @@
 {
   "name": "agility-bridge",
   "displayName": "Agility Bridge",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Work with Digital.ai Agility from Claude Code: your backlog, sprints and work items through the agility-bridge MCP server, read-only by default.",
   "author": { "name": "Matias Hidalgo", "url": "https://github.com/mhidalgo-lab" },
   "homepage": "https://github.com/mhidalgo-lab/agility-bridge#readme",
