@@ -102,8 +102,10 @@ lease) plus the tool call's own audit row and quota, so a task is on the order o
 schema, *unverified* against `meta.rows_written`; a poll of a finished task is one read). Cancelling is 4 statements. One grant
 may start 30 tasks per 15 minutes, which bounds this.
 
-[Self-monitoring](observability.md) uses no D1. It makes one outgoing request per authenticated request, after the response (counted
-with the Agility requests against the Free plan's 50); spans of requests that never authenticated (401, 429, the public catalogue)
+[Self-monitoring](observability.md) uses no D1. Spans are queued per isolate and sent in batches (64 spans, about 128 KiB or five
+seconds), after the response, so a request makes at most one outgoing collector request and most make none (D-324); the send is
+counted with the Agility requests against the Free plan's 50 only for the request that carries it, and the wait for the age flush
+costs no CPU time; spans of requests that never authenticated (401, 429, the public catalogue)
 are limited to 30 a minute per isolate and the rest are only counted, so unauthenticated traffic cannot set the number of outgoing
 requests (P-3, D-304).
 

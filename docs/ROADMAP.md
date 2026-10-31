@@ -388,7 +388,7 @@ Status lives in each task file.
 | P8-40 | [Deep links: parse the base once and keep links under the output cap](tasks/phase-8-power-features/P8-40-deep-links-per-row-cost.md) | low | P8-02 | review |
 | P8-41 | [Refuse an unbound keychain token](tasks/phase-8-power-features/P8-41-refuse-unbound-keychain-token.md) | low | P8-31 | todo |
 | P8-42 | [Bind keychain tokens named in the YAML configuration](tasks/phase-8-power-features/P8-42-bind-yaml-keychain-tokens.md) | low | P8-31 | done |
-| P8-43 | [Batch OTLP spans per isolate on Workers](tasks/phase-8-power-features/P8-43-batch-otlp-spans-on-workers.md) | low | P8-35 | todo |
+| P8-43 | [Batch OTLP spans per isolate on Workers](tasks/phase-8-power-features/P8-43-batch-otlp-spans-on-workers.md) | low | P8-35 | review |
 
 ### Phase 9
 

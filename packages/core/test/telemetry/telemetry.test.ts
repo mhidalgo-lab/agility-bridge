@@ -201,7 +201,7 @@ describe('createOtlpExporter', () => {
     expect(req.method).toBe('POST');
     expect(req.headers.get('content-type')).toBe('application/json');
     expect(req.headers.get('authorization')).toBe('Bearer SECRET-KEY');
-    expect(req.redirect).toBe('error');
+    expect(req.redirect).toBe('manual');
     // The header values are not part of the body.
     expect(await req.text()).not.toContain('SECRET-KEY');
   });

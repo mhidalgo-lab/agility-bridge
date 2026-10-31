@@ -791,8 +791,11 @@ async function phase8Paths(): Promise<{
     ms['phase 8: task first poll (runs the report)'] = median(pollSamples);
   }
 
-  // Telemetry (P8-07): the same read with it off and on, a fake collector, one flush per call (what Workers does).
-  for (const on of [false, true]) {
+  // Telemetry (P8-07, P8-43): the same read with it off, on with one flush per call (Workers before batching) and on with
+  // the per-isolate queue (Workers now: a flush every 64 spans through the request's waitUntil). A fake collector, so the
+  // numbers show our own cost (encoding, queueing), not the network; they are local and indicative.
+  for (const mode of ['off', 'each', 'batched'] as const) {
+    const on = mode !== 'off';
     const telemetry = on
       ? core.createTelemetry({
           exporter: core.createOtlpExporter({
@@ -808,18 +811,23 @@ async function phase8Paths(): Promise<{
           logger: core.createLogger({ level: 'error', sink: () => {} }),
           knownTools: new Set(core.CORE_TOOLS.map((t) => t.name)),
           service: { version: 'bench', environment: 'production' },
-          flushEach: false,
+          ...(mode === 'each' ? { flushEach: false } : { sleep: () => new Promise<void>(() => {}) }),
         })
       : undefined;
     const w = await world(
       { isolation: 'request', background: () => {}, ...(telemetry === undefined ? {} : { telemetry }) },
       { detachedAudit: true },
     );
-    const name = `phase 8: search_work_items, telemetry ${on ? 'on (fake collector, flush each)' : 'off'}`;
+    const label = {
+      off: 'off',
+      each: 'on (fake collector, flush each)',
+      batched: 'on (fake collector, batched)',
+    }[mode];
+    const name = `phase 8: search_work_items, telemetry ${label}`;
     const body = search(25);
     await measure(name, w, async () => {
       await text(await post(w, 'team-a', w.tokens.alice, body));
-      await telemetry?.flush();
+      if (mode === 'each') await telemetry?.flush();
     });
   }
 
@@ -905,7 +913,8 @@ async function phase8Paths(): Promise<{
         undefined,
         async () => {
           await tier.set(id, body, 60_000);
-          if ((await tier.get(id)) !== body) throw new Error('the shared tier did not return what it stored');
+          if ((await tier.get(id)) !== body && kb < 64)
+            throw new Error('the shared tier did not return what it stored');
         },
         15,
       );

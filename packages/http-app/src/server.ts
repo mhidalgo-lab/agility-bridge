@@ -548,6 +548,10 @@ export interface ServerParts {
   readonly registry?: ToolRegistry;
   /** The `fetch` that posts spans to the collector (tests: a fake collector; default: the global `fetch`). */
   readonly telemetryFetch?: (request: Request) => Promise<Response>;
+  /** The wait of the age flush on Workers (tests: a fake timer); default `setTimeout`. */
+  readonly telemetrySleep?: (ms: number) => Promise<void>;
+  /** Workers only: send every request's spans on its own, as before P8-43 (tests, and the bench's "without batching"). */
+  readonly telemetryFlushEach?: boolean;
   /** A stand-in for the interactive step of `/oauth/authorize` (tests); default: the built-in consent screen (P5-04). */
   readonly oauthConsent?: OAuthConsentHandler;
 }
@@ -635,8 +639,16 @@ export function assembleServer(parts: ServerParts): AssembledServer {
             version: parts.version,
             environment: settings.environment === 'live' ? 'production' : 'test',
           },
-          // Workers: nothing in flight is shared between requests (L-096), so every request sends its own spans.
-          flushEach: parts.isolation === 'request',
+          // Workers (P8-43, D-324): plain spans are queued per isolate and flushed by count, bytes or age, always inside the
+          // `waitUntil` of the request that triggers it; no promise or stream is shared (L-096). Node flushes on a timer.
+          ...(parts.isolation === 'request'
+            ? parts.telemetryFlushEach === true
+              ? { flushEach: true }
+              : {
+                  sleep:
+                    parts.telemetrySleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms))),
+                }
+            : {}),
         });
   const app = createHttpApp({
     storage,

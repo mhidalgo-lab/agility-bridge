@@ -426,3 +426,27 @@
 - **Options:** (a) run the P8-31 check (`checkTokenBinding`) on every keychain reference of `workspaces.<id>.instance.token` against that workspace's `instance.url`, before any secret is read, for any service, with messages naming the YAML keys; (b) check the default service only; (c) leave the file unchecked and document it.
 - **Recommendation:** (a), built. One mechanism, no second code path to drift: the YAML path calls the function the environment path uses, with different wording. A reference to another application's entry is bound by `keychain bind <service>/<account>`, which stores the sibling `#host` entry in that service; an unbound entry keeps working with the D-308 warning (the file is the user's, so the warning is the only protection until P8-41 refuses them).
 - **Owner (2026-10-30):** Decided: as recommended, (a).
+
+### D-324 — Workers batch spans per isolate: plain spans queued, every flush inside a request's `waitUntil` *(P8-43)*
+- **Context:** The Worker flushed after every span, one outgoing OTLP request per request. D-312 deferred batching because a queue outlives a request, needs size and age flushes, can race `waitUntil` and loses spans when an isolate is evicted.
+- **Options:** (a) queue finished, already-sanitised spans (plain data) in the isolate and flush by count, by bytes, or by age, each flush returned to the request that triggered it for its own `waitUntil`; (b) keep one flush per request; (c) a Durable Object or queue to hold spans (new Cloudflare resource).
+- **Recommendation:** (a), built. The queue is the one `createTelemetry` already had for Node, so what is exported does not change and the T30 allowlist applies before a span is queued. No promise, stream or fetch is shared across requests: the exporter's fetch is created and awaited by the flush of one request. The age flush is a wait (`setTimeout`, a promise owned by one request) armed by the span that finds none pending and returned to that request for `waitUntil`; a wait that never finished (request cut short) is replaced after twice the age. A span that arrives with a full count (64) or half the byte bound (128 KiB) flushes at once. A request's own `waitUntil` therefore may carry up to `maxAge` (5 s) of waiting, which costs no CPU. Setting nothing is needed; on Workers batching is the default and no operator switch is added.
+- **Owner:** *(open; built as (a))*
+
+### D-325 — The queue is bounded in count, bytes and exports in flight; the oldest span is dropped and counted *(P8-43)*
+- **Context:** A slow or silent collector must neither delay a response nor let the queue grow.
+- **Options:** (a) 512 spans, 256 KiB estimated, at most 4 exports in flight per isolate; when exports are in flight the queue waits and then drops the oldest, counted in `stats().dropped`; a failed batch is counted in `failedBatches` and never queued again; (b) unbounded; (c) retry failed batches.
+- **Recommendation:** (a), built. One attempt per batch, as before (D-269). Spans of an isolate that is evicted with a queue are lost: the loss is bounded by the age limit (5 s) and by the queue bound, it is stated in the guide, and `dropped` does not count them (nothing can: the isolate is gone).
+- **Owner:** *(open; built as (a))*
+
+### D-326 — Node keeps its timer flush; batching there is already what it does *(P8-43)*
+- **Context:** `serve` queues spans and flushes by size and every five seconds with `unref`'d timer, and once at shutdown.
+- **Options:** (a) no change, `sleep` is not set on Node so no age wait is armed; (b) use the Worker mechanism on Node too.
+- **Recommendation:** (a). A process has a real timer and an end-of-life hook, so nothing is lost on eviction and nothing needs `waitUntil`. The byte and in-flight bounds of D-325 apply to Node as well, because they live in the shared queue.
+- **Owner:** *(open; built as (a))*
+
+### D-327 — The exporter follows no redirect by `redirect: 'manual'`, because workerd rejects `'error'` *(P8-43)*
+- **Context:** Building the Worker test showed that every OTLP export on Workers failed with a `TypeError`: workerd's `Request` accepts only `follow` and `manual`. Spans have never been delivered from a Worker (the failure only logged one warning a minute).
+- **Options:** (a) `redirect: 'manual'`, and a 3xx answer is a failed export like any non-2xx (it is never followed); (b) feature-detect per runtime.
+- **Recommendation:** (a), built; the guarantee (no redirect followed, T30) is the same, and the Worker test against a loopback collector now proves delivery in workerd.
+- **Owner:** *(open; built as (a))*
