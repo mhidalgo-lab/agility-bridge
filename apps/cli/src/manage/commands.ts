@@ -204,6 +204,46 @@ function workspaceBody(p: Parsed): Record<string, unknown> {
   });
 }
 
+/** A whole-number option that `none` clears (P7-40). */
+function limitOption(v: unknown, name: string, max: number): number | 'none' | undefined {
+  if (v === undefined) return undefined;
+  if (v === 'none') return 'none';
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 1 || n > max) {
+    throw new ConfigError(`--${name} must be a whole number from 1 to ${max}, or "none" to remove it.`);
+  }
+  return n;
+}
+
+/** The grant's `rateLimit` after the options given: keys not named stay as they are (the API replaces the whole value). */
+async function grantRateLimit(
+  r: Runtime,
+  grantId: string,
+  p: Parsed,
+): Promise<Record<string, unknown> | null | undefined> {
+  const perMinute = limitOption(p.opts['rate-per-minute'], 'rate-per-minute', 100_000);
+  const perHour = limitOption(p.opts['writes-per-hour'], 'writes-per-hour', 1_000);
+  const approval = p.opts['write-approval'];
+  if (approval !== undefined && approval !== 'page_only' && approval !== 'any') {
+    throw new ConfigError('--write-approval must be "page_only" or "any".');
+  }
+  if (perMinute === undefined && perHour === undefined && approval === undefined) return undefined;
+  const got = await (await r.client()).request('GET', `/grants/${enc(grantId)}`);
+  // A refusal (not found, not allowed) is reported by the PATCH that follows.
+  const current = got.status === 200 ? (got.body as { rateLimit?: unknown } | null)?.rateLimit : undefined;
+  const next: Record<string, unknown> =
+    current !== null && typeof current === 'object' ? { ...(current as Record<string, unknown>) } : {};
+  const set = (key: string, v: number | 'none' | undefined) => {
+    if (v === 'none') delete next[key];
+    else if (v !== undefined) next[key] = v;
+  };
+  set('perMinute', perMinute);
+  set('writesPerHour', perHour);
+  if (approval === 'page_only') next['writeApproval'] = 'page_only';
+  else if (approval === 'any') delete next['writeApproval'];
+  return Object.keys(next).length === 0 ? null : next;
+}
+
 export const COMMANDS: readonly CommandSpec[] = [
   {
     words: ['init'],
@@ -931,6 +971,54 @@ export const COMMANDS: readonly CommandSpec[] = [
           expiresAt: days === undefined || days === 'never' ? undefined : Date.now() + days * 86_400_000,
         }),
       };
+    },
+  },
+  {
+    words: ['grant', 'update'],
+    summary:
+      'Change a grant (only the options given): its rate and hourly write limit, write approval, tools, projects, end date (the API owner rules apply)',
+    args: [id('grant-id', 'Grant id')],
+    options: [
+      {
+        name: 'rate-per-minute',
+        kind: 'string',
+        help: 'Requests a minute for this grant (1-100000), or `none`',
+      },
+      {
+        name: 'writes-per-hour',
+        kind: 'string',
+        help: "The grant's own hourly write limit (1-1000; it can only lower the server's), or `none`",
+      },
+      {
+        name: 'write-approval',
+        kind: 'string',
+        help: '`page_only`: its writes need the approval page (owner, recent sign-in), or `any`',
+      },
+      { name: 'credential', kind: 'string', help: 'Credential' },
+      { name: 'tools', kind: 'list', help: 'Only these tools' },
+      {
+        name: 'project',
+        kind: 'string',
+        repeat: true,
+        help: 'Only these of the workspace projects (repeat)',
+      },
+      EXPIRES,
+    ],
+    api: async (r, p) => {
+      const grantId = p.args[0] as string;
+      const days = expiresInDays(p.opts['expires-days']);
+      const rateLimit = await grantRateLimit(r, grantId, p);
+      const body = defined({
+        credentialId: p.opts['credential'],
+        tools: list(p.opts['tools']),
+        scopeIds: p.opts['project'],
+        expiresAt: days === undefined ? undefined : days === 'never' ? null : Date.now() + days * 86_400_000,
+        rateLimit,
+      });
+      if (Object.keys(body).length === 0) {
+        throw new ConfigError('Give at least one option to change (see `agility-bridge help grant update`).');
+      }
+      return { method: 'PATCH', path: `/grants/${enc(grantId)}`, body };
     },
   },
   {

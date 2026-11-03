@@ -560,6 +560,27 @@ agility-bridge grant add --workspace <value> [--user <value>] [--service <value>
 
 Local or remote.
 
+### `grant update`
+
+Change a grant (only the options given): its rate and hourly write limit, write approval, tools, projects, end date (the API owner rules apply).
+
+```text
+agility-bridge grant update <grant-id> [--rate-per-minute <value>] [--writes-per-hour <value>] [--write-approval <value>] [--credential <value>] [--tools a,b] [--project <value>] [--expires-days <value>]
+```
+
+| Name | Kind | Meaning |
+|---|---|---|
+| `<grant-id>` | argument | Grant id |
+| `--rate-per-minute` | string | Requests a minute for this grant (1-100000), or `none` |
+| `--writes-per-hour` | string | The grant's own hourly write limit (1-1000; it can only lower the server's), or `none` |
+| `--write-approval` | string | `page_only`: its writes need the approval page (owner, recent sign-in), or `any` |
+| `--credential` | string | Credential |
+| `--tools` | list | Only these tools |
+| `--project` | string, repeatable | Only these of the workspace projects (repeat) |
+| `--expires-days` | string | Days until it expires, or `never` |
+
+Local or remote.
+
 ### `grant revoke`
 
 Revoke a grant (and so all its tokens).
