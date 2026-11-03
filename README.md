@@ -1,7 +1,5 @@
 # agility-bridge
 
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16294/badge)](https://www.bestpractices.dev/projects/16294)
-
 > **Status: pre-1.0 (0.x).** Published on npm and GHCR: the local stdio server, the team server (`agility-bridge serve`,
 > Docker or a Cloudflare Worker) with sign-in, an admin panel, workspaces, grants, per-device tokens and OAuth, typed
 > tools and reports, and opt-in writes. Minor releases may still contain breaking changes
@@ -9,6 +7,12 @@
 > ([roadmap](docs/ROADMAP.md)). Start with the
 > [local quickstart](docs/guide/quickstart-local.md) for one person, or the
 > [remote quickstart](docs/guide/quickstart-remote.md) for a team.
+
+[![npm](https://img.shields.io/npm/v/agility-bridge)](https://www.npmjs.com/package/agility-bridge)
+[![CI](https://github.com/mhidalgo-lab/agility-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/mhidalgo-lab/agility-bridge/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/mhidalgo-lab/agility-bridge/badge)](https://scorecard.dev/viewer/?uri=github.com/mhidalgo-lab/agility-bridge)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16294/badge)](https://www.bestpractices.dev/projects/16294)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 An open-source [Model Context Protocol](https://modelcontextprotocol.io) server that lets AI agents — GitHub Copilot
 (VS Code, JetBrains, CLI), Claude (Code, Desktop, claude.ai, mobile), Cursor, Windsurf and others — work with
