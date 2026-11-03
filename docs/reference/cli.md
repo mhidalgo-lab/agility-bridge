@@ -477,7 +477,7 @@ Local or remote.
 Change a workspace (only the options given).
 
 ```text
-agility-bridge workspace set <workspace-id> [--name <value>] [--project <value>] [--default-credential <value>] [--tools a,b] [--max-rows <n>] [--quota-daily <n>] [--quota-monthly <n>] [--credential-source <value>]
+agility-bridge workspace set <workspace-id> [--name <value>] [--project <value>] [--default-credential <value>] [--tools a,b] [--max-rows <n>] [--quota-daily <n>] [--quota-monthly <n>] [--credential-source <value>] [--writes <value>] [--write-approval <value>]
 ```
 
 | Name | Kind | Meaning |
@@ -491,6 +491,8 @@ agility-bridge workspace set <workspace-id> [--name <value>] [--project <value>]
 | `--quota-daily` | int | Agility requests per UTC day for each grant (only lowers the server's AB_QUOTA_DAILY; replaces the limits set before) |
 | `--quota-monthly` | int | Agility requests per UTC month for each grant (only lowers the server's AB_QUOTA_MONTHLY; replaces the limits set before) |
 | `--credential-source` | string | `stored` (default) or `passthrough`: callers send their own Agility token (owner; needs AB_PASSTHROUGH=on) |
+| `--writes` | string | `on` or `off`: whether write tools may be used in this workspace (owner, recent sign-in; the server needs AB_WRITE_TOOLS=on) |
+| `--write-approval` | string | `page_only`: every write needs the approval page, or `any` (owner, recent sign-in) |
 
 Local or remote.
 
