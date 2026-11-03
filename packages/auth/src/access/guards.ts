@@ -136,6 +136,11 @@ export interface GuardContext {
    * may be (P7-15). Absent = only the schema's ceiling applies.
    */
   readonly writeRateCap?: number;
+  /**
+   * The deployment's request quota per grant (`AB_QUOTA_DAILY`, `AB_QUOTA_MONTHLY`): the most a workspace's or a grant's
+   * own `limits.quota` may be (P8-14). A `null` period has no cap (any value only adds a limit); absent = no cap at all.
+   */
+  readonly quotaCap?: { readonly daily: number | null; readonly monthly: number | null };
 }
 
 /** The services, each call checked against the actor's role (and, for members, ownership). */
@@ -163,6 +168,39 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
       throw new InvalidInputError(
         `rateLimit.writesPerHour: at most ${ctx.writeRateCap}, the server's limit per grant; a grant can only lower it.`,
       );
+    }
+  }
+
+  /** `limits.quota.<period>` of a stored or submitted `limits` value; `null` when unset. */
+  const quotaOf = (limits: unknown, period: 'daily' | 'monthly'): number | null => {
+    const q = (limits as { quota?: unknown } | null | undefined)?.quota as
+      | Record<string, unknown>
+      | null
+      | undefined;
+    const v = q?.[period];
+    return typeof v === 'number' ? v : null;
+  };
+  /**
+   * A workspace's or a grant's own request quota (P8-14, T5): it can only lower the deployment's, so a value above the
+   * server's is refused naming the cap, and an administrator may add or lower one but not loosen it (raise it, or remove
+   * it) once set: that is the owner's, with a recent sign-in. Writing the same value again changes nothing.
+   */
+  function checkQuota(next: unknown, current: unknown, what: 'workspace' | 'grant'): void {
+    for (const period of ['daily', 'monthly'] as const) {
+      const n = quotaOf(next, period);
+      const c = quotaOf(current, period);
+      if (n === c) continue;
+      const cap = ctx.quotaCap?.[period] ?? null;
+      if (n !== null && cap !== null && n > cap) {
+        throw new InvalidInputError(
+          `limits.quota.${period}: at most ${cap}, the server's ${period} quota per grant; a ${what} can only lower it.`,
+        );
+      }
+      // Anything but a new or lower value loosens what is set.
+      if (c !== null && (n === null || n > c)) {
+        needOwner(actor, `loosen the ${period} request quota of a ${what}`);
+        needRecent(actor, `loosening the ${period} request quota of a ${what}`);
+      }
     }
   }
 
@@ -470,11 +508,15 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
     async create(input: NewWorkspaceInput): Promise<Workspace> {
       needManager(actor);
       checkWorkspaceWrites(input);
+      checkQuota(input.limits, null, 'workspace');
       return services.workspaces.create(input);
     },
     async update(id: string, patch: WorkspacePatchInput): Promise<Workspace> {
       needManager(actor);
       checkWorkspaceWrites(patch);
+      if (patch.limits !== undefined) {
+        checkQuota(patch.limits, (await load(storage.workspaces.get(id), 'workspace')).limits, 'workspace');
+      }
       // Where an owner has enabled writes, the owners also decide where they may land (ADR-0013, P4-09): another project or
       // asset type is a change of that decision, not of an administrator's.
       if (
@@ -525,6 +567,7 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
       }
       checkWriteRate(input.rateLimit, null);
       checkWriteApproval(input.rateLimit, null);
+      checkQuota(input.limits, null, 'grant');
       return services.grants.create(input);
     },
     async update(id: string, patch: GrantPatchInput): Promise<WithWarnings<Grant>> {
@@ -538,6 +581,7 @@ export function guardedServices(services: AccessServices, ctx: GuardContext, act
         checkWriteRate(patch.rateLimit, current.rateLimit);
         checkWriteApproval(patch.rateLimit, current.rateLimit);
       }
+      if (patch.limits !== undefined) checkQuota(patch.limits, current.limits, 'grant');
       if (patch.credentialId !== undefined && patch.credentialId !== current.credentialId) {
         await needCredentialOwner(patch.credentialId, "put a grant on someone's personal Agility token");
       }

@@ -90,6 +90,8 @@ export async function world(
     admin?: boolean;
     /** The deployment's writes per grant per hour, for the admin API's cap on a grant's own limit (P7-15). */
     writeRateCap?: number;
+    /** The deployment's request quota per grant, for the admin API's cap on a workspace's or grant's own (P8-14). */
+    quotaCap?: { daily: number | null; monthly: number | null };
     /** Agility rows by asset type (default: a small world in Scope:1001 and Scope:2001). */
     assets?: Record<string, Record<string, unknown>[]>;
     /** `ignore-filters`: a hostile upstream that returns rows outside the scope (L-064). */
@@ -236,6 +238,8 @@ export async function world(
           genericQuery: true,
         },
         ceilings: {},
+        // The deployment's quota is the gate's (`assembleServer` passes the same settings to both).
+        ...(options.services?.quota === undefined ? {} : { quota: options.services.quota.limits }),
       },
     },
     tools: CORE_TOOLS,
@@ -255,6 +259,7 @@ export async function world(
             services: svc,
             audit,
             ...(options.writeRateCap === undefined ? {} : { writeRateCap: options.writeRateCap }),
+            ...(options.quotaCap === undefined ? {} : { quotaCap: options.quotaCap }),
             // Tests pick the actor with a header; production uses the admin token (and sessions from P4-02).
             authenticate: async (c) => {
               const who = c.req.header('x-test-actor');

@@ -63,11 +63,15 @@ export interface QuotaMeter {
 }
 
 export interface QuotaGate {
+  /** The deployment's limits: what applies to a grant that has no lower one of its own. */
   readonly limits: QuotaLimits;
-  /** A meter for one request of one grant. */
-  meterFor(grantId: string): QuotaMeter;
-  /** The stored usage of a grant (admin panel); nothing is taken. */
-  usageOf(grantId: string): Promise<QuotaUsage>;
+  /**
+   * A meter for one request of one grant. `limits` is what applies to that grant (the lowest of the deployment's,
+   * workspace's and grant's, P8-14); omitted it is the deployment's.
+   */
+  meterFor(grantId: string, limits?: QuotaLimits): QuotaMeter;
+  /** The stored usage of a grant (admin panel) against `limits` (default the deployment's); nothing is taken. */
+  usageOf(grantId: string, limits?: QuotaLimits): Promise<QuotaUsage>;
 }
 
 export interface QuotaGateOptions {
@@ -159,8 +163,7 @@ function exceeded(w: Window, used: number, now: number): AbError {
 
 /** A quota gate over shared counters. Built per host; holds no request data. */
 export function createQuotaGate(options: QuotaGateOptions): QuotaGate {
-  const { counters, clock, limits, logger } = options;
-  const none = limits.daily === null && limits.monthly === null;
+  const { counters, clock, limits: deployment, logger } = options;
 
   const read = async (ws: readonly Window[]): Promise<Map<string, number>> => {
     const values = ws.length === 0 ? new Map<string, string>() : await counters.getMany(ws.map((w) => w.key));
@@ -168,10 +171,10 @@ export function createQuotaGate(options: QuotaGateOptions): QuotaGate {
   };
 
   return {
-    limits,
-    usageOf: async (grantId) => {
-      if (none) return { status: 'ok' };
+    limits: deployment,
+    usageOf: async (grantId, limits = deployment) => {
       const ws = windows(grantId, limits, clock.now());
+      if (ws.length === 0) return { status: 'ok' };
       try {
         return usageOf(ws, await read(ws));
       } catch (error) {
@@ -179,7 +182,7 @@ export function createQuotaGate(options: QuotaGateOptions): QuotaGate {
         return { status: 'unknown' };
       }
     },
-    meterFor(grantId) {
+    meterFor(grantId, limits = deployment) {
       const ws = windows(grantId, limits, clock.now());
       /** Calls of this request not yet written. */
       let calls = 0;

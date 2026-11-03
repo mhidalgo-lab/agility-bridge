@@ -38,6 +38,16 @@ export const limitsPolicySchema = z.strictObject({
   maxTimeRangeDays: z.number().int().min(1).max(3_660).optional(),
   /** Agility requests per tool call (ADR-0010). */
   callBudget: z.number().int().min(1).max(10_000).optional(),
+  /**
+   * Agility requests per UTC day and month (P8-14): a cap on the deployment's `AB_QUOTA_DAILY` / `AB_QUOTA_MONTHLY`. It
+   * can only lower them, never raise them; the effective value is the lowest of the deployment, workspace and grant.
+   */
+  quota: z
+    .strictObject({
+      daily: z.number().int().min(1).max(100_000_000).optional(),
+      monthly: z.number().int().min(1).max(1_000_000_000).optional(),
+    })
+    .optional(),
   /** Member emails in output (D-06). */
   memberEmails: z.boolean().optional(),
   /** The generic `query_assets` / `get_assets` tools. */
@@ -55,6 +65,31 @@ export const limitsPolicySchema = z.strictObject({
     .optional(),
 });
 export type LimitsPolicy = z.infer<typeof limitsPolicySchema>;
+
+/** Agility requests per UTC day and month, in requests (P8-14); `null` is no limit. */
+export interface QuotaValues {
+  readonly daily: number | null;
+  readonly monthly: number | null;
+}
+
+/**
+ * The quota that applies to a grant: the lowest of the deployment's, the workspace's and the grant's own, per period
+ * (P8-14, ADR-0010). A period is unlimited only when all three leave it unset; a value never raises another.
+ */
+export function effectiveQuota(
+  deployment: QuotaValues | undefined,
+  workspace: LimitsPolicy,
+  grant: LimitsPolicy,
+): QuotaValues {
+  const lowest = (...values: (number | null | undefined)[]): number | null => {
+    const set = values.filter((v): v is number => typeof v === 'number');
+    return set.length === 0 ? null : Math.min(...set);
+  };
+  return {
+    daily: lowest(deployment?.daily, workspace.quota?.daily, grant.quota?.daily),
+    monthly: lowest(deployment?.monthly, workspace.quota?.monthly, grant.quota?.monthly),
+  };
+}
 
 /** Writes per workspace (ADR-0013); write tools also need the server switch and an explicit listing (Phase 7). */
 export const writePolicySchema = z.strictObject({
@@ -129,6 +164,8 @@ export interface DeploymentLimits {
   readonly defaults: Limits & { readonly callBudget: number; readonly genericQuery: boolean };
   /** Values no workspace may exceed on this runtime (e.g. the Workers Free response cap). */
   readonly ceilings: Partial<Record<(typeof NUMBER_LIMITS)[number], number>>;
+  /** The deployment's request quota per grant (`AB_QUOTA_DAILY`, `AB_QUOTA_MONTHLY`); absent = none (P8-14). */
+  readonly quota?: QuotaValues;
 }
 
 export type EffectiveLimits = Limits & { readonly callBudget: number; readonly genericQuery: boolean };

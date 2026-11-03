@@ -38,6 +38,8 @@ export interface Opts {
   writeSwitch?: boolean;
   /** The deployment's writes per grant per hour, which a grant's own limit may not exceed (P7-15). */
   writeRateCap?: number;
+  /** The deployment's request quota per grant, which a workspace's or grant's own may not exceed (P8-14). */
+  quotaCap?: { daily: number | null; monthly: number | null };
 }
 
 export async function setup(options: Opts = {}) {
@@ -111,6 +113,7 @@ export async function setup(options: Opts = {}) {
     {
       admin: true,
       ...(options.writeRateCap === undefined ? {} : { writeRateCap: options.writeRateCap }),
+      ...(options.quotaCap === undefined ? {} : { quotaCap: options.quotaCap }),
       ...(options.oauth === undefined ? {} : { liveClock: true }),
       ...(options.services === undefined ? {} : { services: options.services }),
       ...(options.tools === undefined ? {} : { tools: options.tools }),

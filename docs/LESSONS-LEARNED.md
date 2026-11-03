@@ -38,7 +38,7 @@ How to use it:
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182, L-458, L-477 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412 |
-| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462 |
+| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462, L-473, L-474 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453, L-467, L-468 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
@@ -1870,6 +1870,14 @@ The OTLP exporter set `redirect: 'error'`, which Node accepts and workerd's `Req
 **L-468 — State that outlives a request holds plain data only, and the work that drains it belongs to a request.**
 Batching spans per isolate is safe because the queue holds already-sanitised records and each flush (by count, bytes or age) is created, awaited and handed to `waitUntil` by the request that triggered it; the age flush is a wait owned by one request and is replaced if that request was cut short. Bound the queue in count, bytes and exports in flight, drop the oldest and count it, and say what an evicted isolate loses. Test with a held wait and a collector that never answers.
 *Applied in:* P8-43, `telemetry/telemetry.ts`, `test/telemetry/batching.test.ts` (L-096, L-453).
+
+**L-473 — A cap that exists in several layers is resolved as the minimum when it is used, not when it is written.**
+A grant's or workspace's quota is stored next to a deployment value that an operator can lower later, and a restore can bring back an older row. The API refuses a value above the server's, but the request path never trusts that check: the effective quota is the lowest of the deployment, workspace and grant on every request, so a stored value above the server's still resolves to the server's. Test the resolver with a stored value the API would have refused.
+*Applied in:* P8-14, `auth/src/access/policy.ts` (`effectiveQuota`), `http-app/test/quota-overrides.test.ts` (L-116, L-080).
+
+**L-474 — A deployment-wide control that gains overrides takes its value from the resolver, and test helpers must mirror that wiring.**
+The quota gate was built from the deployment settings and passed to every request; with per-grant values each request has to hand its effective value to the meter, and the gate has to exist even where the deployment sets nothing. A test world that built the gate but left the deployment value out of the access settings silently turned the quota off for every existing test. Give the helper the same source as `assembleServer` (here the gate's own limits), and keep one test where the deployment has no quota and only a grant does.
+*Applied in:* P8-14, `http-app/src/app.ts`, `server.ts`, `test/helpers/world.ts` (L-063).
 
 ## P. Observability and logging
 

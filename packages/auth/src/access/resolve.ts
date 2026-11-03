@@ -9,8 +9,10 @@ import {
   type EffectiveLimits,
   effectiveAssetTypes,
   effectiveLimits,
+  effectiveQuota,
   type GrantPolicy,
   grantPolicySchema,
+  type QuotaValues,
   type WorkspacePolicy,
   workspacePolicySchema,
 } from './policy.ts';
@@ -113,6 +115,8 @@ export interface EffectiveAccess {
   readonly projects: { readonly allowed: readonly string[]; readonly includeChildren: boolean };
   readonly assetTypes: { readonly allow?: readonly string[]; readonly deny: readonly string[] };
   readonly limits: EffectiveLimits;
+  /** The lowest of the deployment's, workspace's and grant's request quota per UTC day and month (P8-14, T5). */
+  readonly quota: QuotaValues;
   readonly rateLimit: GrantPolicy['rateLimit'];
   /** When this access ends (the earlier of the token's and the grant's expiry): caches must not outlive it. */
   readonly expiresAt: number | null;
@@ -228,6 +232,7 @@ export function resolveAccess(
 
   const { limits, warnings: limitWarnings } = effectiveLimits(settings.limits, ws.limits, gp.limits);
   warnings.push(...limitWarnings);
+  const quota = effectiveQuota(settings.limits.quota, ws.limits, gp.limits);
 
   // Tools: workspace ∩ grant, known tools only; read tools unless every write condition holds.
   const known = settings.tools;
@@ -308,6 +313,7 @@ export function resolveAccess(
       projects: { allowed: Object.freeze([...projects]), includeChildren: ws.includeChildScopes },
       assetTypes,
       limits,
+      quota,
       rateLimit: gp.rateLimit,
       expiresAt: ends.length === 0 ? null : Math.min(...ends),
       warnings: Object.freeze(warnings),
@@ -371,6 +377,7 @@ export function resolvePassthroughAccess(
       projects: { allowed: Object.freeze([...ws.allowedScopeIds]), includeChildren: ws.includeChildScopes },
       assetTypes: effectiveAssetTypes(ws.assetTypes as AssetTypePolicy | null, null),
       limits,
+      quota: effectiveQuota(settings.limits.quota, ws.limits, {}),
       rateLimit: null,
       expiresAt: null,
       warnings: Object.freeze([]),

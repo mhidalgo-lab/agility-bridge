@@ -610,11 +610,10 @@ export function assembleServer(parts: ServerParts): AssembledServer {
       'AB_QUERY_CACHE_EDGE is on but this host has no shared tier: the query cache is in memory only.',
     );
   }
-  // Per-grant quotas (P8-09): counters in `kv`, so every isolate and replica sees them; off unless a limit is set.
-  const quota =
-    settings.quota.daily === null && settings.quota.monthly === null
-      ? undefined
-      : createQuotaGate({ counters: storage.kv, clock: host.clock, limits: settings.quota, logger });
+  // Per-grant quotas (P8-09, P8-14): counters in `kv`, so every isolate and replica sees them. The gate always exists
+  // because a workspace or a grant may set a quota the deployment has not; a request whose effective quota has no
+  // period never touches the counters.
+  const quota = createQuotaGate({ counters: storage.kv, clock: host.clock, limits: settings.quota, logger });
   const authErrors = revalidateOnAuthErrors(services, logger, () => host.clock.now());
   const telemetry: Telemetry | undefined =
     settings.otel === undefined
@@ -665,6 +664,8 @@ export function assembleServer(parts: ServerParts): AssembledServer {
           genericQuery: true,
         },
         ceilings: parts.ceilings ?? {},
+        // The deployment's quota: a workspace's or a grant's own can only lower it (P8-14).
+        quota: settings.quota,
       },
     },
     tools: CORE_TOOLS,
@@ -711,6 +712,7 @@ export function assembleServer(parts: ServerParts): AssembledServer {
             services,
             audit,
             writeRateCap: settings.writeRates.perGrant,
+            quotaCap: settings.quota,
             authenticate:
               parts.adminVerifier === undefined
                 ? async () => null
