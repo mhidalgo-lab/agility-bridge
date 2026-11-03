@@ -2,12 +2,12 @@
 id: P9-05
 title: Support, versioning and deprecation policy
 phase: 9
-status: todo
+status: in-progress
 priority: medium
 depends_on: [P8-12]
 adr: []
 lessons: [L-027, L-045]
-owner: ""
+owner: "claude (lane D)"
 ---
 
 # P9-05 — Support, versioning and deprecation policy
@@ -29,14 +29,14 @@ Users know what is supported, for how long, and how changes are announced.
 - Existing docs that contradict the policy are fixed.
 
 ## Acceptance criteria
-- [ ] `docs/guide/versioning.md` covers semver (breaking-change list), supported Node, Agility, protocol revisions and
+- [x] `docs/guide/versioning.md` covers semver (breaking-change list), supported Node, Agility, protocol revisions and
       clients, the deprecation window, and the security fix policy.
-- [ ] `docs/guide/upgrading.md` has the upgrade procedure (reconnect clients, storage migrations, rollback limits) and
+- [x] `docs/guide/upgrading.md` has the upgrade procedure (reconnect clients, storage migrations, rollback limits) and
       where release notes live.
-- [ ] The Node versions in the policy equal `engines` and the CI matrix.
-- [ ] The minimum on-premises Agility version is marked *unverified* and recorded as a decision.
-- [ ] Both pages are linked from SECURITY.md and the README; SECURITY.md's supported-versions table points to the policy.
-- [ ] Contradictions found in existing docs (README status, deprecation examples) are fixed.
+- [x] The Node versions in the policy equal `engines` and the CI matrix.
+- [x] The minimum on-premises Agility version is marked *unverified* and recorded as a decision.
+- [x] Both pages are linked from SECURITY.md and the README; SECURITY.md's supported-versions table points to the policy.
+- [x] Contradictions found in existing docs (README status, deprecation examples) are fixed.
 - [ ] *owner:* the owner confirms the 1.x support window (decision) before 1.0 (P9-08).
 
 ## Security notes
