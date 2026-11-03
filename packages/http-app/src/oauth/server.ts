@@ -1181,24 +1181,6 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
     if ((await env.OAUTH_KV.get(`client:${clientId}`)) !== null) return null;
     // Anonymous callers can make us fetch (T11, T20): bound the stored document clients, then the fetches one address
     // may cause (counted before the fetch, atomically; a failure is not cached, so failures count too).
-    const stored = await storage.kv.list(DOCUMENT_CLIENT_PREFIX, { limit: cimdMaxClients });
-    if (stored.length >= cimdMaxClients) {
-      // A stored document is only a cache: evicting one costs its next request a fetch. So the cap bounds storage
-      // without ever refusing a client, and a source that fills it (each document may be cached for a day) cannot keep
-      // everyone else out (P5-10, D-76). The fetch limits below still bound what one source and all of them can cause.
-      const victim = stored[randomBelow(stored.length)] as string;
-      await storage.kv.delete(victim);
-      logger.warn('oauth metadata document client cap reached; one stored document evicted', {
-        limit: cimdMaxClients,
-      });
-      await auditCapOnce(c, 'cimd_clients', {
-        action: 'oauth.client.evicted',
-        status: 'ok',
-        requestId: requestIdOf(c),
-        reason: 'client_cap',
-        details: { kind: 'metadata_document', limit: cimdMaxClients },
-      });
-    }
     const window = hourWindow();
     const fetches = await storage.kv.increment(`${CIMD_IP_PREFIX}${await callerKey(c)}:${window}`, {
       expiresAt: (window + 1) * CAP_WINDOW_S * 1000,
@@ -1223,12 +1205,35 @@ export function createOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntime {
       refuseAbuse(c, total);
       return 'fetch_budget';
     }
+    // Room for the new document, made only once it is fetched and valid: a request that is refused for budget, or whose
+    // document is bad, evicts nothing (P9-02 pre-review: eviction used to run before the budgets).
+    const makeRoom = async (): Promise<void> => {
+      const stored = await storage.kv.list(DOCUMENT_CLIENT_PREFIX, { limit: cimdMaxClients });
+      if (stored.length >= cimdMaxClients) {
+        // A stored document is only a cache: evicting one costs its next request a fetch. So the cap bounds storage
+        // without ever refusing a client, and a source that fills it (each document may be cached for a day) cannot keep
+        // everyone else out (P5-10, D-76). The fetch limits above still bound what one source and all of them can cause.
+        const victim = stored[randomBelow(stored.length)] as string;
+        await storage.kv.delete(victim);
+        logger.warn('oauth metadata document client cap reached; one stored document evicted', {
+          limit: cimdMaxClients,
+        });
+        await auditCapOnce(c, 'cimd_clients', {
+          action: 'oauth.client.evicted',
+          status: 'ok',
+          requestId: requestIdOf(c),
+          reason: 'client_cap',
+          details: { kind: 'metadata_document', limit: cimdMaxClients },
+        });
+      }
+    };
     try {
       const { client, ttlSeconds } = await fetchMetadataDocument(
         clientId,
         cimd.fetch,
         Math.floor(clock.now() / 1000),
       );
+      await makeRoom();
       await env.OAUTH_KV.put(`client:${clientId}`, JSON.stringify(client), { expirationTtl: ttlSeconds });
       audit(
         {

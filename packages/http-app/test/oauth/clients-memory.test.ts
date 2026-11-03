@@ -262,6 +262,29 @@ describe('OAuth client registration settings (memory storage)', () => {
     expect(await h.registrations?.count()).toEqual({ dynamic: 0, documents: 5 });
   });
 
+  it('a refused fetch, or a document that fails validation, evicts no stored document (P9-02 pre-review)', async () => {
+    const h = await host({ clientMetadataMaxClients: 2, clientMetadataFetchLimit: 3 });
+    for (const n of [1, 2]) {
+      serve(h, doc(n));
+      expect((await authorizeDoc(h, doc(n))).status).toBe(302);
+    }
+    expect(await h.registrations?.count()).toEqual({ dynamic: 0, documents: 2 });
+    // The same address has one fetch left: a document that cannot be fetched or is invalid uses it and makes no room.
+    expect((await authorizeDoc(h, doc(3))).status).toBe(400);
+    // The budget is now spent: every further unseen client id is refused, and none of them may evict anything.
+    for (const n of [4, 5, 6, 7, 8, 9, 10]) {
+      serve(h, doc(n));
+      expect((await authorizeDoc(h, doc(n))).status).toBe(400);
+    }
+    expect(await h.registrations?.count()).toEqual({ dynamic: 0, documents: 2 });
+    expect(await auditRows(h, (r) => r.action === 'oauth.client.evicted')).toEqual([]);
+    // The two original clients still connect without a fetch.
+    const before = h.documents.fetched().length;
+    expect((await authorizeDoc(h, doc(1))).status).toBe(302);
+    expect((await authorizeDoc(h, doc(2))).status).toBe(302);
+    expect(h.documents.fetched()).toHaveLength(before);
+  });
+
   it('the fetch limit per address is a setting, and refusing costs no fetch', async () => {
     const h = await host({ clientMetadataFetchLimit: 2 });
     for (const n of [1, 2, 3, 4]) await authorizeDoc(h, doc(n));

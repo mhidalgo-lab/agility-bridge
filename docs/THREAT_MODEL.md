@@ -478,3 +478,15 @@ code, the tests (file and title, checked by CI), the level of evidence and what 
   configuration bundle. No counter-example was found, so no code changed.
 - The status tables above keep their history; where they and the map differ, the map (which a test reads) is the current
   statement.
+
+## 8k. Internal pre-review for the external review (P9-02, 2026-11-03)
+
+[`reviews/phase-9-pre-review.md`](reviews/phase-9-pre-review.md) lists the findings of a read-only pass over the six areas of the
+[call for reviewers](security/call-for-reviewers.md). Changes to this file:
+
+| Id | Status | Evidence |
+|---|---|---|
+| T11 / T20 | corrected and verified | A stored client-metadata document is evicted at the cap only after the per-address and per-deployment fetch budgets passed and a valid document was fetched, right before it is stored, so a refused request evicts nothing (it used to run first: an address with no budget left could still evict one document per request). `packages/http-app/test/oauth/clients-memory.test.ts` "a refused fetch, or a document that fails validation, evicts no stored document". |
+| T9 / T15 / T10 | open, low | Code burn with a wrong verifier, the refresh claim lifetime, the revoke tombstone and compatibility-form client names: [P9-11](tasks/phase-9-hardening-launch/P9-11-oauth-pre-review-follow-ups.md), [P9-12](tasks/phase-9-hardening-launch/P9-12-client-name-lookalikes.md). Denial of service or display only; no token theft. |
+| A14 / T14 / A5 | open, low | Members read every instance (with `tls.caFile`), an admin can re-enable an instance (D-350), `grants.create` and A5 wording: [P9-10](tasks/phase-9-hardening-launch/P9-10-admin-api-pre-review-follow-ups.md). |
+

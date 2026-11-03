@@ -82,3 +82,13 @@
 - **Options:** (a) publish it as a self-assessment and say so on the page and in the 1.0 notes; (b) hold it until the external reviewer has checked it; (c) do not publish a mapping.
 - **Recommendation:** (a), built as (a). The page states that it is not a certification, and the test that reads it keeps it from drifting. Ask the external reviewer to challenge it (it is in the call for reviewers).
 
+### D-350 — An admin may switch an instance back on after an owner switched it off *(P9-02)*
+- **Context:** The internal pre-review found that `PATCH /instances/{id}` with `disabledAt: null` is open to admins, so a kill switch pulled by an owner can be undone by a lower role. The current design (and an existing test) gives admins add, rename, disable, enable and delete of instances; only an instance's origin and TLS trust are owner-only.
+- **Options:** (a) keep it and document it (admins are trusted managers of instances); (b) require an owner with a recent sign-in to re-enable a disabled instance; (c) record who disabled it and let only the same or a higher role re-enable.
+- **Recommendation:** (a), built as (a): nothing was changed, the pre-review lists it and P9-10 holds (b) if you decide otherwise. An admin who can already delete an instance and add another gains nothing real from the re-enable, and a role that cannot undo its own team's mistakes is a worse default.
+
+### D-351 — Coordinated disclosure window of 90 days *(P9-02)*
+- **Context:** The call for reviewers and SECURITY.md needed a disclosure term. Reviewers and reporters ask for one; none was stated.
+- **Options:** (a) 90 days from the report, or until a fixed release is out, whichever is first, and another time by agreement; (b) 45 days; (c) no fixed term.
+- **Recommendation:** (a), built as (a): the common industry default, and long enough for a volunteer-maintained project to fix, release and let users upgrade. SECURITY.md already commits to 30 days for a fix of high and critical issues.
+
