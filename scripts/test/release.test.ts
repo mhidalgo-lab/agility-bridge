@@ -14,6 +14,7 @@ import {
   extractNotes,
   IMAGE_REPOSITORY,
   imageTags,
+  newerInLine,
   pendingChangesets,
   pluginManifestVersion,
   type ReleaseState,
@@ -209,6 +210,30 @@ describe('decidePlan (idempotent reruns, tag safety)', () => {
 
   it('refuses a GitHub Release without the npm version', () => {
     expect(() => decidePlan({ ...base, released: true })).toThrow(/not on npm/);
+  });
+
+  it('refuses to publish a version older than one already on npm in the same line (L-128)', () => {
+    expect(() => decidePlan({ ...base, newerInLine: '1.2.5' })).toThrow(/never move backwards/);
+  });
+
+  it('still reruns a published version when a newer patch exists', () => {
+    expect(decidePlan({ ...base, published: true, newerInLine: '1.2.5' })).toBe('release');
+  });
+});
+
+describe('newerInLine', () => {
+  const released = ['1.1.9', '1.2.0', '1.2.3', '1.2.10', '1.3.0', '1.2.4-rc.1', '2.2.9'];
+
+  it('finds the highest higher patch of the same minor', () => {
+    expect(newerInLine('1.2.4', released)).toBe('1.2.10');
+    expect(newerInLine('1.2.3', released)).toBe('1.2.10');
+  });
+
+  it('is undefined for the newest patch, other lines and prereleases', () => {
+    expect(newerInLine('1.2.11', released)).toBeUndefined();
+    expect(newerInLine('1.4.0', released)).toBeUndefined();
+    expect(newerInLine('1.2.0-rc.1', released)).toBeUndefined();
+    expect(newerInLine('11.2.0', released)).toBeUndefined();
   });
 });
 
