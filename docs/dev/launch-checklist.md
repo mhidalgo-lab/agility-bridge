@@ -15,8 +15,8 @@ Legend: **[x]** done, with evidence · **[ ]** open · *owner:* only the owner (
       this dependency waived by the owner on 2026-11-03.
 - [ ] *owner:* v0.9.0 released: the Version Packages PR (#239) is the last 0.x release before 1.0 and carries the Phase 9
       changes so far.
-- [ ] Every open decision in [pending-decisions/phase-9.md](../pending-decisions/phase-9.md) answered (D-346 to D-351,
-      D-356 to D-371; D-366, the 1.x security support window, blocks 1.0 because the policy promises it).
+- [x] Every open decision in [pending-decisions/phase-9.md](../pending-decisions/phase-9.md) answered (D-346 to D-351,
+      D-356 to D-371; D-366, the 1.x security support window, blocks 1.0 because the policy promises it). All answered (a) by the owner on 2026-11-03.
 - [ ] No `todo` task of priority **high** left in any phase, or each one moved out of 1.0 by a decision
       (`pnpm tasks list --status todo`).
 
@@ -60,7 +60,7 @@ The matrix and the per-client checklist are in [client-compatibility.md](../refe
 - [x] OpenSSF Best Practices **passing** badge (project 16294, 2026-11-03,
       [answers](../security/best-practices-answers.md)); Scorecard triaged ([scorecard.md](../security/scorecard.md)).
 - [x] Internal pre-review of the riskiest areas ([phase-9-pre-review.md](../reviews/phase-9-pre-review.md), P9-02).
-- [ ] *owner:* residual risks R-1 to R-13 accepted (D-346).
+- [x] *owner:* residual risks R-1 to R-13 accepted (D-346, 2026-11-03).
 - [ ] *owner:* external security review done with the [call for reviewers](../security/call-for-reviewers.md); every
       finding fixed with a regression test or accepted; summary published
       ([P9-02](../tasks/phase-9-hardening-launch/P9-02-external-review.md)).
@@ -72,7 +72,7 @@ The matrix and the per-client checklist are in [client-compatibility.md](../refe
 - [x] Support, versioning and deprecation policy and the upgrade guide ([versioning.md](../guide/versioning.md),
       [upgrading.md](../guide/upgrading.md), P9-05), linked from SECURITY.md and the README.
 - [x] Every internal link and anchor in `docs/` checked by `pnpm lint`; the site build checks them again (P9-04).
-- [ ] *owner:* GitHub Pages enabled, the site live at <https://mhidalgo-lab.github.io/agility-bridge/>
+- [x] *owner:* GitHub Pages enabled, the site live at <https://mhidalgo-lab.github.io/agility-bridge/>
       ([P9-04](../tasks/phase-9-hardening-launch/P9-04-docs-site.md)).
 - [ ] README status block rewritten for 1.0 (no "pre-1.0"), with the version and what is still unverified.
 - [ ] The documented commands of the quickstarts run on the release candidate (L-133).

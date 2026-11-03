@@ -1,7 +1,7 @@
 # Support, versioning and deprecation policy
 
-> Policy for agility-bridge **0.8 and later** (P9-05). The 1.x support window below is a recommendation the owner
-> confirms before 1.0 ([D-366](../pending-decisions/phase-9.md)). Upgrading: [upgrading](upgrading.md). Reporting a
+> Policy for agility-bridge **0.8 and later** (P9-05). The 1.x support window below was confirmed by the owner on
+> 2026-11-03 ([D-366](../pending-decisions/phase-9.md)). Upgrading: [upgrading](upgrading.md). Reporting a
 > vulnerability: [SECURITY.md](../../SECURITY.md).
 
 ## Semantic versioning
@@ -82,7 +82,7 @@ versions are expected to work and older ones are not promised.
 |---|---|
 | Latest minor (`0.8.x` today) | Yes, as a patch release. |
 | Older `0.x` | No: upgrade to the latest minor. |
-| 1.x (recommended, [D-366](../pending-decisions/phase-9.md)) | The latest minor, and the **previous minor for 90 days** after a new minor is released, through a `release/x.y` branch ([backports](../dev/releasing.md)). Older minors: upgrade. |
+| 1.x ([D-366](../pending-decisions/phase-9.md)) | The latest minor, and the **previous minor for 90 days** after a new minor is released, through a `release/x.y` branch ([backports](../dev/releasing.md)). Older minors: upgrade. |
 
 A fix lands on `main` first. Severity targets, reporting and advisories in dependencies are in
 [SECURITY.md](../../SECURITY.md). Every backport is released with the same checks as any release (provenance, SBOM,
