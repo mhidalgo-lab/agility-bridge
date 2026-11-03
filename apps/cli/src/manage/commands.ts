@@ -298,7 +298,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       );
       if (bound === undefined) {
         r.err(
-          `agility-bridge: not bound to an instance. For an Agility token, bind it so a project's client file cannot send it to another host: agility-bridge keychain bind ${p.args[0]} --for-url <https://your-instance> (docs/guide/secrets.md).`,
+          `agility-bridge: not bound to an instance. An Agility token that is not bound is refused at start (a project's client file could send it to another host); bind it: agility-bridge keychain bind ${p.args[0]} --for-url <https://your-instance> (docs/guide/secrets.md).`,
         );
       }
       return 0;

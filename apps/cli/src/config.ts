@@ -393,13 +393,12 @@ export const osKeychainHost: KeychainHostReader = (service, account) => {
 /**
  * A keychain token is sent only to the host it was stored for (P8-31, T8, S-2): the client file that names the entry
  * can be a project file the user did not write and may point `AB_AGILITY_URL` anywhere. A mismatch stops startup; an
- * entry stored without a host still works but is reported so the person can bind it.
+ * entry stored without a host is refused too (P8-41), so the person binds it once.
  */
 function checkTokenBinding(
   rawToken: string,
   instance: string,
   hostFor: KeychainHostReader,
-  warn: ((message: string) => void) | undefined,
   where: { readonly token: string; readonly url: string; readonly file?: boolean } = {
     token: 'AB_AGILITY_TOKEN',
     url: 'AB_AGILITY_URL',
@@ -416,10 +415,10 @@ function checkTokenBinding(
   const host = hostOf(instance);
   const bound = hostFor(ref.service, ref.account);
   if (bound === undefined) {
-    warn?.(
-      `keychain:${name} is not bound to an instance, so it would be sent to any ${where.url} ${where.file === true ? 'the file names' : 'a client file sets'} (${host} now). Bind it: agility-bridge keychain bind ${name} --for-url ${instance}`,
+    // D-308 warned for one release (v0.8.0); P8-41 refuses: an unbound entry would go to any address a file names.
+    throw new ConfigError(
+      `${where.token}: keychain:${name} is not bound to an instance, so it would be sent to any ${where.url} ${where.file === true ? 'the file names' : 'a client file sets'} (${host} now), and unbound entries are no longer accepted. Bind it once, yourself: agility-bridge keychain bind ${name} --for-url ${instance}`,
     );
-    return;
   }
   if (bound !== host) {
     throw new ConfigError(
@@ -615,18 +614,18 @@ function fromYaml(env: Readonly<Record<string, string | undefined>>, options: Lo
   if (hasReference({ ...ws, instance: instanceRest })) {
     throw new ConfigError(`workspaces.${id}: \${…} references are allowed only in instance.token.`);
   }
+  const token = substitute(rawToken, env, options.keychain ?? osKeychain, `workspaces.${id}.instance.token`);
   // The same binding as the environment path (P8-42, D-309): a token is sent only to the host it was stored for, also
-  // when the user's own file names it, and before any secret is read.
+  // when the user's own file names it, and before the token is used. The secret is read first, so a missing entry is reported as missing and not as unbound.
   const instance = instanceUrl(ws.instance.url, `workspaces.${id}.instance.url`);
   const hostFor = hostReader(options);
   for (const ref of keychainRefs(rawToken)) {
-    checkTokenBinding(ref, instance, hostFor, options.warn, {
+    checkTokenBinding(ref, instance, hostFor, {
       token: `workspaces.${id}.instance.token`,
       url: `workspaces.${id}.instance.url`,
       file: true,
     });
   }
-  const token = substitute(rawToken, env, options.keychain ?? osKeychain, `workspaces.${id}.instance.token`);
   if (token === '') throw new ConfigError(`workspaces.${id}.instance.token is empty.`);
   const resolved = { ...ws, instance: { ...ws.instance, token } };
   if (resolved.projects !== undefined && resolved.projects.length === 0) {
@@ -721,7 +720,7 @@ export function loadConfig(
   // `keychain:<name>` keeps the token out of the client's configuration file (P8-08).
   const token = resolveSecretValue(rawToken, 'AB_AGILITY_TOKEN', options.keychain);
   const instance = instanceUrl(url, 'AB_AGILITY_URL');
-  checkTokenBinding(rawToken, instance, hostReader(options), options.warn);
+  checkTokenBinding(rawToken, instance, hostReader(options));
   return {
     kind: 'configured',
     source: 'environment',

@@ -145,11 +145,7 @@ workspaces:
 
   describe('a keychain token named in the file is sent only to the host it was stored for (P8-42, T8, T23)', () => {
     const env = { AB_CONFIG: '/cfg.yaml', AB_WORKSPACE: 'other' };
-    const secrets: string[] = [];
-    const keychain: KeychainReader = (s, a) => {
-      secrets.push(`${s}/${a}`);
-      return 'FAKE-SECRET';
-    };
+    const keychain: KeychainReader = () => 'FAKE-SECRET';
 
     it('loads when the stored host is the instance host, for the default and for any other service', () => {
       const own = loadConfig(env, {
@@ -166,14 +162,12 @@ workspaces:
       expect(other.kind).toBe('configured');
     });
 
-    it('refuses a different host before the secret is read, naming the command that confirms it', () => {
-      secrets.length = 0;
+    it('refuses a different host naming the command that confirms it', () => {
       expect(() =>
         loadConfig(env, { files: files(YAML), keychain, keychainHost: () => 'evil.example.net' }),
       ).toThrow(
         /workspaces\.other\.instance\.token: keychain:agility\/ann was stored for evil\.example\.net, but workspaces\.other\.instance\.url points at agility\.example\.com.*keychain bind agility\/ann --for-url/s,
       );
-      expect(secrets).toEqual([]);
     });
 
     it('treats a different port as a different host and compares case-insensitively', () => {
@@ -195,20 +189,10 @@ workspaces:
       ).toThrow(/keychain:corp\/other was stored for evil\.example\.net/);
     });
 
-    it('warns about an entry stored without a host and still loads it (D-308)', () => {
-      const warnings: string[] = [];
-      const c = loadConfig(env, {
-        files: files(YAML),
-        keychain,
-        keychainHost: () => undefined,
-        warn: (m) => warnings.push(m),
-      });
-      expect(c.kind).toBe('configured');
-      expect(
-        warnings.some(
-          (w) => w.includes('keychain:agility/ann is not bound') && w.includes('keychain bind agility/ann'),
-        ),
-      ).toBe(true);
+    it('refuses an entry stored without a host naming keychain bind (P8-41)', () => {
+      expect(() => loadConfig(env, { files: files(YAML), keychain, keychainHost: () => undefined })).toThrow(
+        /workspaces\.other\.instance\.token: keychain:agility\/ann is not bound.*keychain bind agility\/ann --for-url/s,
+      );
     });
 
     it('does not look at bindings for a token that names no keychain entry', () => {

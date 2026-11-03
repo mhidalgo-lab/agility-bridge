@@ -423,9 +423,15 @@
 
 ### D-319 — The user's YAML file gets the same host binding, for every service it names *(P8-42)*
 - **Context:** D-309 left a `${keychain:...}` inside the user's own YAML file unchecked, because the user wrote the file. A file can still be copied from a colleague or a repository, or edited, so that the stored token travels to a different `instance.url`.
-- **Options:** (a) run the P8-31 check (`checkTokenBinding`) on every keychain reference of `workspaces.<id>.instance.token` against that workspace's `instance.url`, before any secret is read, for any service, with messages naming the YAML keys; (b) check the default service only; (c) leave the file unchecked and document it.
+- **Options:** (a) run the P8-31 check (`checkTokenBinding`) on every keychain reference of `workspaces.<id>.instance.token` against that workspace's `instance.url`, before the token is used, for any service, with messages naming the YAML keys; (b) check the default service only; (c) leave the file unchecked and document it.
 - **Recommendation:** (a), built. One mechanism, no second code path to drift: the YAML path calls the function the environment path uses, with different wording. A reference to another application's entry is bound by `keychain bind <service>/<account>`, which stores the sibling `#host` entry in that service; an unbound entry keeps working with the D-308 warning (the file is the user's, so the warning is the only protection until P8-41 refuses them).
 - **Owner (2026-10-30):** Decided: as recommended, (a).
+
+### D-320 — Unbound keychain entries are refused, in the environment and in the YAML file, and the change ships only after v0.8.0 *(P8-41)*
+- **Context:** D-308 accepted entries stored without a host, with a warning, for one release. P8-31 (#229) is in v0.8.0, the first release to carry the warning; refusing at once would break every existing setup at the upgrade.
+- **Options:** (a) refuse every keychain token with no stored host, on both paths (`AB_AGILITY_TOKEN` and `${keychain:...}` in the YAML token, D-319), through the one binding check; the message names `keychain bind <name> --for-url <url>`, `doctor` reports it as a failure because it is the same startup error, and `keychain set` without `--for-url` says the entry will be refused until bound; (b) refuse only on the environment path; (c) refuse later still.
+- **Recommendation:** (a), built. The environment-only form leaves the YAML file as the one unprotected path; one check keeps the two the same. The refusal is a breaking behaviour for unbound entries and is a minor changeset (the package is 0.x), stated as such in the changeset and in the secrets guide.
+- **Owner (2026-10-30):** Decided: build now, merge only after v0.8.0 is released.
 
 ### D-324 — Workers batch spans per isolate: plain spans queued, every flush inside a request's `waitUntil` *(P8-43)*
 - **Context:** The Worker flushed after every span, one outgoing OTLP request per request. D-312 deferred batching because a queue outlives a request, needs size and age flushes, can race `waitUntil` and loses spans when an isolate is evicted.

@@ -58,17 +58,18 @@ token and, next to it, the host (lower case, with the port when it is not the de
 - At start, if `AB_AGILITY_URL` has a different host than the one stored, the server stops before it uses the token and
   prints both hosts on stderr. Nothing in the environment can override this; if the new address really is your
   instance, confirm it yourself: `agility-bridge keychain bind <name> --for-url <new address>`.
-- Entries stored before this existed have no host. They still work, with a warning on stderr and in
-  `agility-bridge doctor`, so that nothing breaks at an upgrade: run
-  `agility-bridge keychain bind <name> --for-url <address>` once. A later release will refuse unbound entries.
+- Entries stored before this existed have no host. Up to v0.8.0 they worked with a warning; **from the release after
+  v0.8.0 they are refused at start** (and by `agility-bridge doctor`, as a failure), with a message that names the
+  command. Run `agility-bridge keychain bind <name> --for-url <address>` once, before you upgrade, and nothing changes
+  for you. A new entry stored with `keychain set` and no `--for-url` is unbound and is refused the same way.
 - `keychain status --name <name>` prints the bound host (never the token); `keychain delete` removes both entries;
   storing a new token under an existing name keeps its host unless you pass `--for-url`. `doctor` reports a bound
-  token as `ok`, an unbound one as a warning and a different host as a failure.
+  token as `ok`, and an unbound one or a different host as a failure.
 - A `${keychain:...}` in the `instance.token` of your YAML configuration file is checked the same way, against
-  `instance.url` of that workspace and before any secret is read. The file may still name any service
+  `instance.url` of that workspace and before the token is used. The file may still name any service
   (`${keychain:other-app/token}`), and the binding applies to it too: `keychain bind other-app/token --for-url <address>`
   writes the `#host` entry next to it. A copied or edited file that points an entry at another host stops with both hosts
-  named; an unbound entry works with the same warning.
+  named; an unbound entry is refused like one named in the environment.
 - Master keys (`init --keychain`) belong to a server, not to an instance, and are not bound.
 
 | System | Tool | Notes |
