@@ -96,6 +96,15 @@ changes* box on the consent screen (P7-24, verified on fakes; no real client has
 person who does not tick, gets a read-only connection. Otherwise a write goes through a device token or stdio. Which client shows which channel is also reported by every dry run (`elicitation`, `page`,
 `not_required` or `unavailable`).
 
+### URL-mode elicitation (`elicitation.url`, P7-46)
+
+A client that declares `elicitation.url` (MCP 2025-11) is asked to open the approval page's link itself, where the server can
+push a request (a 2025-era connection that keeps its capabilities, such as stdio). Declared capability, **from vendor
+documentation only; no client has been run for it** (P7-12 is the real-client survey and stays open): Claude Code and GitHub
+Copilot CLI are documented as form + URL (see the matrix above); the other clients of the matrix are documented as form only, or
+not at all. A 2026-07-28 request and every client that does not declare `url` get the plain link in the answer, as before
+(D-344, D-345, P7-51). The link, the page and its checks do not change.
+
 ## v0.1 client snippets (P1-14)
 
 The snippets in the [client setup guide](../guide/clients.md) for VS Code, Claude Code, Copilot CLI and JetBrains are

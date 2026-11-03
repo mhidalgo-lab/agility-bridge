@@ -34,7 +34,7 @@ import { PROMPT_MANIFEST, type PromptDefinition } from './prompts.ts';
 import { isTemplate, RESOURCE_MANIFEST, type ResourceDefinition, type ResourceReader } from './resources.ts';
 import { annotationsFor, type ToolDefinition, type ToolOutput } from './tool.ts';
 import { VERSION } from './version.ts';
-import { APPROVAL_INPUT_KEY, elicitationChannel } from './writes/elicitation.ts';
+import { APPROVAL_INPUT_KEY, elicitationChannel, withUrlElicitation } from './writes/elicitation.ts';
 import { InputRequiredSignal } from './writes/runtime.ts';
 
 export interface ServerInfo {
@@ -380,8 +380,9 @@ function withWriteChannel(
   const rt = ctx.writes;
   if (rt === undefined) return ctx;
   // Under `page_only` (P7-26) the client is never asked: the page is the channel, or there is none.
+  const page = rt.page === undefined ? undefined : withUrlElicitation(rt.page, sdk, legacyCapabilities);
   const channel =
-    rt.approvalPolicy === 'page_only' ? rt.page : (elicitationChannel(sdk, legacyCapabilities) ?? rt.page);
+    rt.approvalPolicy === 'page_only' ? page : (elicitationChannel(sdk, legacyCapabilities) ?? page);
   const approval =
     rt.approval === 'off' ? 'not_required' : channel === undefined ? 'unavailable' : channel.kind;
   return {

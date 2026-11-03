@@ -2,12 +2,12 @@
 id: P7-46
 title: "URL-mode elicitation for the approval page"
 phase: 7
-status: todo
+status: review
 priority: low
 depends_on: [P7-13, P7-12]
 adr: ["0013"]
 lessons: [L-156]
-owner: ""
+owner: "agent (lane D)"
 ---
 
 # P7-46 — URL-mode elicitation for the approval page
@@ -23,8 +23,10 @@ A client that declares `elicitation.url` (MCP 2025-11) can open the approval pag
 - Tests: a client that declares it gets the URL request, a client that does not gets today's answer; the URL is the same-origin approval link and never carries the change.
 
 ## Acceptance criteria
-- [ ] Declared capability recorded per client, or a recorded decision that none declares it yet.
-- [ ] If built: tests for both capability cases, no change to the page's authorization.
+- [x] Declared capability recorded per client from vendor documentation (client compatibility reference; D-344).
+- [ ] *owner / live:* the declared capability confirmed against the real clients of the P7-12 matrix (depends on P7-12).
+- [x] Built for the push path (D-344, D-345): tests for both capability cases and for a decline, an error, a 2026-07-28 request and an unsafe link (`packages/http-app/test/write-url-elicitation.test.ts`); no change to the page's authorization.
+- [ ] URL mode on 2026-07-28 requests: P7-51.
 
 ## Security notes
 THREAT_MODEL A13, T31: the link is the same one-use, signed-in-person-only page; URL mode must not make an approval possible without that page.

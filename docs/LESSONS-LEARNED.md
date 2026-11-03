@@ -37,7 +37,7 @@ How to use it:
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182, L-458, L-477 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
-| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412, L-481 |
+| [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412, L-481, L-482 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462, L-473, L-474 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453, L-467, L-468 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446 |
@@ -1790,6 +1790,9 @@ refuse honest text and do not add a second, weaker envelope.
 **L-481 — A check after an irreversible step reports; it never fails the step.**
 The read-back after a write runs once the change was sent and its outcome stored, catches every failure (including an exhausted call budget) and turns it into `unknown`, so a lagging or broken read can neither hide an applied write behind an error nor tempt a retry. The same placement keeps the audit evidence ahead of any slow follow-up, and the extra read is declared in the tool's cost so the budget is not exhausted by surprise.
 *Applied in:* P7-19, `writes/pipeline.ts` (`readBackOf`), `test/writes/pipeline.test.ts` (L-047, L-108, L-114).
+**L-482 — A convenience in front of an out-of-band approval carries the link and nothing else.**
+Asking a client to open the approval page (URL mode) must stay a pointer: the request is a fixed text and the page's own http(s) link, it names nothing about the change, and its answer (accept, decline, error, timeout) is never read as approval, so the page's checks are the only way to approve. The link is returned in the plain answer whatever the client does, so a client that ignores or mishandles the request loses nothing.
+*Applied in:* P7-46, `writes/elicitation.ts` (`withUrlElicitation`), `http-app/test/write-url-elicitation.test.ts` (L-106, L-156).
 
 ## O. Caching, quotas and budgets
 
