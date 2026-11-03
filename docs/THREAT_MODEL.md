@@ -1,6 +1,6 @@
 # Threat model
 
-> Status: **draft** (2026-10-16). Every mitigation is *planned* until its task lands; the status column then moves to
+> Status: **final internal review done** (P9-01, 2026-11-03); external review pending (P9-02). First drafted 2026-10-16. Every mitigation is *planned* until its task lands; the status column then moves to
 > `implemented` (code + tests) and `verified` (reviewed or live-tested). Maintained in the **same PR** as any change to
 > authentication, authorization, storage, network exposure, tools, write side effects or deployment. Reviewed at every
 > phase review, finally in P9-01, and externally in P9-02.
@@ -283,7 +283,7 @@ keeps its access until disconnected or until the grant ends (no idle expiry or l
 
 - Update this file in the same PR as any security-relevant change (AGENTS.md).
 - Each phase review (P1-16, P2-17, …) re-reads it, updates statuses with evidence and adds new threats.
-- P9-01 maps every row to code, tests and residual risks; P9-02 is an external review.
+- P9-01 mapped every row to code, tests and residual risks in [`security/threat-evidence.md`](security/threat-evidence.md) (checked by `scripts/test/threat-evidence.test.ts`); P9-02 is an external review.
 
 ## 8e. Status after P5-08 (2026-10-24)
 
@@ -461,3 +461,20 @@ also what an operator reads (L-010, L-133).
 | T30 | implemented for stdio, verified on a loopback collector (P8-20, D-328, D-329) | The stdio server exports spans only with `AB_OTEL_ENDPOINT`, through the same `Telemetry` and `sanitizeAttributes`; a tracker on the transport reads only the method, the tool name, the id and the `AB_*` code of a frame (through `classifyMcpMessage`, bounded), never the arguments, the result's text or the client's `traceparent`. A tool name that is not registered is `unknown`. A collector that is down costs one stderr warning at most a minute (the error class only); frames on stdout are unchanged and in order (e2e test over a real pipe in both protocol eras). Residual: the operator's own collector receives the method and tool names of a local user's session; the in-flight table is capped at 256. |
 | T27 | implemented, verified on fakes only (review S-9) | The view posts to `'*'` because the sandboxed host's origin cannot be named; the listener accepts only the parent window as source, the messages carry no secret and the page has no network. Not exploitable; the reason is recorded next to the call in `view-script.ts`. |
 | T33 | implemented, verified on fakes only (review S-10, P-8) | The anonymous `server/discover` advertises no extension (the Tasks flag is not revealed; test: anonymous without, signed in with). The three discovery answers (`initialize`, `server/discover`, `tools/list`) are kept in the app's own table (an isolate on Workers) after the first build, with only the JSON-RPC `id` substituted (P8-35): the key is the method, the `accept`, protocol and routing headers and the request's `params`, so nothing that could change the answer shares an entry; the table is built from bytes of the registry-only answer and holds no storage, workspace, grant or credential data; at most 16 entries of at most 128 KB, oldest dropped first; only a 200 whose body can be split around its one top-level `id` is kept; ids the SDK refuses (fractional, null, objects) are never kept or served. `test/public-catalog.test.ts` (kept bytes equal a never-cached world's for six ids, five workspace names and three methods, a storage double that fails on any use, requests counted apart as `catalog: 'built' \| 'cached'`) and `test/public-catalog-cache.test.ts`. Residual: the per-address limiter is still the only brake on the number of requests; an attacker who varies `params` evicts entries and gets the rebuild, which is what it cost before. |
+
+## 8j. Final review (P9-01, 2026-11-03)
+
+Every `T1`-`T35` and `A1`-`A15` row now has an entry in [`security/threat-evidence.md`](security/threat-evidence.md): the
+code, the tests (file and title, checked by CI), the level of evidence and what is left. Result of the review:
+
+- **No row without evidence.** 35 rows are `A` (automated), 14 are `A+L` (automated, plus a part only a live tenant or a
+  real client can prove: L-1 to L-10 in the map, none of it claimed) and one is `P` (T18, pipeline controls checked by
+  lint).
+- **Accepted residual risks** R-1 to R-13 are collected in the map and in D-346; each was already stated in this file and
+  is now listed once, with its rows and the page a user reads about it.
+- **Fuzz and property coverage** extended to every parser that takes text across a trust boundary: rich text, redaction,
+  instance URLs and address classes, asset references, XML, CSV output, cursors, token formats, the bearer header, sealed
+  values, identity-provider JWTs, instance metadata, OAuth client ids, redirect URIs and registrations, MCP bodies, and the
+  configuration bundle. No counter-example was found, so no code changed.
+- The status tables above keep their history; where they and the map differ, the map (which a test reads) is the current
+  statement.

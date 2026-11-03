@@ -36,3 +36,13 @@
 - **Context:** The image tags and dist-tags never move backwards (L-128), but `plan` accepted publishing `1.2.3` after `1.2.4` existed if `1.2.3` itself was unpublished (for example a mis-versioned backport).
 - **Options:** (a) `plan` fails when a higher stable version of the same `major.minor` is on npm; (b) leave it to review; (c) forbid all out-of-order publishes across lines.
 - **Recommendation:** (a), built. Different lines legitimately publish out of global order (a `0.8.x` fix after `0.9.0`), so the check is per line.
+
+### D-346 — The residual risks R-1 to R-13 are accepted for 1.0 as written *(P9-01)*
+- **Context:** The final threat-model review found no row without evidence, but thirteen limits cannot be removed (prompt injection, a client-answered elicitation, provider retention, approximate per-isolate limits, private CAs on Workers, a master-key holder, private instance addresses by default, a pass-through timing difference, full-delegation tokens, a one-TTL cache window, the App view's `'*'` post target, the release chain's trust in GitHub and npm, an opt-in public catalogue). They are listed in `docs/security/threat-evidence.md`.
+- **Options:** (a) accept them as written and publish the register with 1.0; (b) accept all but turn some into work (for example padding the pass-through timing, R-8, or making `AB_INSTANCE_PRIVATE_ADDRESSES=refuse` the default, R-7); (c) hold 1.0 until the external review (P9-02) has seen the register.
+- **Recommendation:** (a), built as (a). The external reviewer sees the register first, and anything it ranks higher becomes a task before 1.0. R-7 as a default stays an open product question, not a security defect, because on-premises instances need private addresses.
+
+### D-347 — `fast-check` is a dev dependency of every package that has parser fuzz tests *(P9-01)*
+- **Context:** Fuzz tests live next to the parser they test (`packages/http-app`, `apps/cli` as well as `core` and `auth`), and pnpm's strict layout needs the dependency declared where it is imported.
+- **Options:** (a) declare `fast-check` (same pinned version) in each package that uses it; (b) move all fuzz tests to `packages/core/test` and import other packages' sources across the boundary; (c) a shared `test-utils` workspace package.
+- **Recommendation:** (a), built as (a): no new package, no cross-package source imports, and Renovate updates all of them in one PR. It adds nothing to a published runtime dependency list (dev only).
