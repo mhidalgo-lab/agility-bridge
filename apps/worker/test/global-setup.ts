@@ -16,4 +16,6 @@ export default function setup(): void {
   build(['--outdir', 'dist']);
   // The Worker plus the consent stand-in (test/fixtures/oauth-entry.ts), bundled by wrangler like the real one.
   build(['--outdir', 'dist/oauth-test', 'test/fixtures/oauth-entry.ts']);
+  // The Durable Object limiter's probe Worker and its misbehaving object classes (P3-12).
+  build(['--outdir', 'dist/shared-limiter-test', 'test/fixtures/shared-limiter-entry.ts']);
 }

@@ -79,7 +79,7 @@ The grant and the denial of a confirmed call are read with **one** statement (`k
 the approval page exists (P7-09, D-200); a read that finds nothing writes nothing, so this saves latency, not rows. The
 page flow stays at 18 statements: the first call saves one, the repeat costs one more for the read that lets a limiter
 refusal or a conflict keep the approval (P7-28). The deployment-wide cap (`AB_WRITE_RATE_DEPLOYMENT_HOURLY`,
-default 200 an hour) bounds the writes, not the rows: a deployment that really sustained 200 page-approved writes an hour
+default 200 an hour) bounds the writes, not the rows (with the optional [Durable Object limiter](#exact-limits-on-a-durable-object-optional) the two counters are not D1 rows at all, but the audit rows and the approval ledger still are): a deployment that really sustained 200 page-approved writes an hour
 would write about 4,800 x 31 = 149,000 rows a day, **above the Free plan's 100,000**, and the counters, OAuth limits and
 read-tool audit rows compete for the same budget. So **on the Free plan (`AB_PLAN=free`, the default) the cap is 60 an hour**:
 unset it is 60, and a larger value stops the Worker at its first request, like the call-budget and response-size ceilings
@@ -252,11 +252,51 @@ deployment-wide (L-081). Three Rate Limiting bindings add a **backstop** across 
 - A binding that **throws** lets the request through (the local buckets still apply) and logs
   `rate limit binding failed` at most once a minute; a **missing** binding means per-isolate limits only, with a
   warning when the Worker starts. Rate limits never decide authorization.
-- An exact deployment-wide limiter (a Durable Object) is planned as an option (P3-12).
+- An exact deployment-wide limiter (a Durable Object) is an option: [below](#exact-limits-on-a-durable-object-optional).
 - `RL_OAUTH` is optional and only matters with `AB_OAUTH=on`. Without it the OAuth routes keep the exact D1 counters
   ([above](#oauth-endpoints-and-the-d1-write-budget)) and the Worker logs one warning at start. It runs after the general
   per-address limit and before the counters, so a request it refuses reads and writes nothing in D1. It is a **backstop**,
   not a second authority (L-099): the D1 counters stay the exact, deployment-wide limit.
+
+### Exact limits on a Durable Object (optional)
+
+The bindings are per location and eventually consistent (L-099). A deployment that needs an exact, deployment-wide count can
+add a **Durable Object limiter** (P3-12). It is **off by default**: the bindings stay the default, and nothing changes until
+you declare an `RL_SHARED` Durable Object binding. Add this to the Worker's `wrangler.jsonc` (or your local
+`wrangler.<name>.local.jsonc`) and deploy:
+
+```jsonc
+"durable_objects": { "bindings": [{ "name": "RL_SHARED", "class_name": "SharedLimiter" }] },
+"migrations": [{ "tag": "shared-limiter-v1", "new_sqlite_classes": ["SharedLimiter"] }]
+```
+
+`new_sqlite_classes` matters: only SQLite-backed Durable Objects exist on the Workers Free plan. The class is exported by
+the Worker already; without the binding it is never created.
+
+What it decides, once bound:
+
+| Control | Keys | On Durable Object failure |
+|---|---|---|
+| Failed authentications (`RL_AUTH`'s limit, T1) | `authfail:<address>` | **fails open**: the binding and the per-isolate buckets decide, one `shared rate limiter failed` warning a minute |
+| Sign-in routes (`AB_RATE_LIMIT_*`) and the OAuth routes (`RL_OAUTH`'s limit, T20) | `signin:`, `oauth:` | **fails open**, as above |
+| Write counters (grant and deployment, `AB_WRITE_RATE_*`, T31) | `wl:*` | **fails closed**: the write is refused with `AB_WRITE_LIMIT_UNAVAILABLE`, nothing is changed in Agility |
+
+The per-address request limit before authentication (`RL_IP`, every request) and the per-token and per-grant limits stay on
+the per-isolate buckets and the binding: asking an object on every request would double the billed requests for little gain.
+The per-isolate buckets still run first, so the object is asked only for a request they allow, and an isolate that has
+seen a refusal remembers it until it ends, so a flood is turned away without more object calls.
+
+- **Cost:** each call is one billed Durable Object request (the Free plan includes 100,000 a day, Paid 1 million a month, and
+  duration charges, see the [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/)).
+  A failed authentication that the per-isolate buckets allow is two calls (the count and the check), each OAuth request
+  that reaches it one (a connect is about five), and a write three (read the deployment's count, then one increment per counter). Rows are swept by an alarm every 15
+  minutes; nothing is written for a refused call except the bucket's time.
+- **Sharding:** keys are spread over 16 objects by a hash, so one flooding address does not slow the others' decisions.
+  Objects are placed near their first caller; a distant isolate pays the round trip (a call times out after 1.5 s).
+- **Exactness:** the object serialises every decision of its shard and uses its own clock, so the limit holds across every
+  isolate and location (tested in workerd with two isolates). **Not covered:** a Durable Object is one location, so it is
+  not a defence against a distributed flood (use the WAF rule below), and the limits a settings change lowers apply to
+  the new bucket size at the next refill.
 
 ### Flood measurement for the OAuth routes (P5-19)
 

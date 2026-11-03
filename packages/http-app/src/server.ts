@@ -20,6 +20,7 @@ import {
 import {
   AbError,
   CORE_TOOLS,
+  type CounterStore,
   createOtlpExporter,
   createQuotaGate,
   createTelemetry,
@@ -515,6 +516,8 @@ export interface ServerParts {
   readonly logger: Logger;
   /** The counters behind the rate limits (in memory on Node; P3-04 adds the Workers binding). */
   readonly limiter: RateLimiter;
+  /** Where the write counters live instead of the `kv` table (the Workers Durable Object limiter, P3-12). */
+  readonly writeCounters?: CounterStore;
   readonly version: string;
   /** `process` on Node, `request` on Workers (L-096). */
   readonly isolation: 'process' | 'request';
@@ -684,6 +687,7 @@ export function assembleServer(parts: ServerParts): AssembledServer {
                   auditAdmin: (change: AdminChange) => audit.admin(change),
                 }),
             limits: { perGrant: settings.writeRates.perGrant, deployment: settings.writeRates.deployment },
+            ...(parts.writeCounters === undefined ? {} : { counters: parts.writeCounters }),
             logger,
           }),
         }

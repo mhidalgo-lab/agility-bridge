@@ -42,3 +42,23 @@
 - **Recommendation:** (a): Phase 4 (identity and the admin panel) does not depend on D-27, which only matters for a
   production deployment on the Free plan.
 - **Owner (2026-10-23):** Decided: (a), go for Phase 4 now.
+
+### D-339 — The Durable Object limiter decides the sensitive keys and the write counters, not every request *(P3-12)*
+- **Context:** an exact limiter is billed per call (a Durable Object request), and the Free plan has 100,000 of them a day, as many as
+  Worker requests. Asking it for the per-address limit on every request would double the billed requests of a busy deployment.
+- **Options:** (a) the object decides `authfail:`, `signin:` and `oauth:` request keys and the write counters; the per-address request
+  limit (`ip:`) and the per-token and per-grant limits keep the per-isolate buckets and the `RL_IP` binding; (b) every key goes to the
+  object when it is bound; (c) a setting lists the keys.
+- **Recommendation:** (a). These are the limits where "more than the limit across isolates" is a security failure (guessing, sign-in
+  and registration floods, write budgets); the per-request limits are throughput protection where an eventually consistent backstop is
+  enough. (c) is a small follow-up if an operator needs another set.
+
+### D-340 — A broken object falls back to the backstop for request limits and refuses writes *(P3-12)*
+- **Context:** the task fixes the policy (fail open for request limits, closed for writes). What "open" means when a binding is also
+  present is not stated: let everything through, or fall back to the weaker limit.
+- **Options:** (a) fall back to the Rate Limiting binding and the per-isolate buckets, and log once a minute; (b) let the request through
+  with no limit; (c) fail closed for authentication failures too.
+- **Recommendation:** (a): the weaker protection that was the default before is exactly what an operator keeps while the object is down,
+  nothing blocks a valid caller, and a flood during an outage is still slowed. Write counters throw, so the write limiter refuses the
+  write (`AB_WRITE_LIMIT_UNAVAILABLE`), as it does for a failing D1.
+

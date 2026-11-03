@@ -68,6 +68,8 @@ carry `requestId`.
 | error | `scheduled job failed` | `job`, `error` (class) | [scheduled.ts](../../apps/worker/src/scheduled.ts) |
 | info | `key rotation continues` | `rotated`, `remaining`, `failed` (counts) | [scheduled.ts](../../apps/worker/src/scheduled.ts) |
 | warn | `rate limit binding failed; using per-isolate limits` | `error` (class) (Worker, at most once a minute) | [rate-limit.ts](../../apps/worker/src/rate-limit.ts) |
+| warn | `shared rate limiter failed; using the backstop and per-isolate limits` | `error` (class) (Worker, Durable Object limiter bound, at most once a minute with the line above) | [rate-limit.ts](../../apps/worker/src/rate-limit.ts) |
+| info | `exact limiter on a Durable Object is on` | none (Worker start, `RL_SHARED` bound) | [boot.ts](../../apps/worker/src/boot.ts) |
 | warn | `Rate limit bindings RL_IP and RL_AUTH are missing: limits count per isolate only.` | — (Worker) | [boot.ts](../../apps/worker/src/boot.ts) |
 | warn | `Rate limit binding RL_OAUTH is missing: the OAuth routes are limited by the shared counters only (every request up to their limit costs D1 writes).` | — (Worker, OAuth on) | [boot.ts](../../apps/worker/src/boot.ts) |
 | warn | `identity hash failed` | `event` | [identity.ts](../../packages/http-app/src/identity.ts) |
