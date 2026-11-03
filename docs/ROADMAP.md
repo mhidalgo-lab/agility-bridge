@@ -380,7 +380,7 @@ Status lives in each task file.
 | P8-14 | [Per-grant and per-workspace quota overrides](tasks/phase-8-power-features/P8-14-quota-overrides.md) | low | P8-09 | review |
 | P8-15 | [Verify MCP Tasks with MCP Inspector and a real client](tasks/phase-8-power-features/P8-15-tasks-live-check.md) | low | P8-10 | todo |
 | P8-19 | [Verify MCP Apps views in real clients](tasks/phase-8-power-features/P8-19-verify-apps-in-real-clients.md) | low | P8-03 | todo |
-| P8-20 | [Self-monitoring for the stdio server](tasks/phase-8-power-features/P8-20-stdio-telemetry.md) | low | P8-07 | todo |
+| P8-20 | [Self-monitoring for the stdio server](tasks/phase-8-power-features/P8-20-stdio-telemetry.md) | low | P8-07 | review |
 | P8-21 | [Stop the OAuth abuse tests timing out on busy CI runners](tasks/phase-8-power-features/P8-21-oauth-abuse-test-timeout.md) | low | — | done |
 | P8-31 | [Bind a keychain token to the instance it was stored for](tasks/phase-8-power-features/P8-31-keychain-token-host-binding.md) | low | — | review |
 | P8-32 | [Verify the Windows keychain backend on a real machine](tasks/phase-8-power-features/P8-32-windows-keychain-real-run.md) | low | — | todo |
@@ -393,6 +393,7 @@ Status lives in each task file.
 | P8-41 | [Refuse an unbound keychain token](tasks/phase-8-power-features/P8-41-refuse-unbound-keychain-token.md) | low | P8-31 | review |
 | P8-42 | [Bind keychain tokens named in the YAML configuration](tasks/phase-8-power-features/P8-42-bind-yaml-keychain-tokens.md) | low | P8-31 | done |
 | P8-43 | [Batch OTLP spans per isolate on Workers](tasks/phase-8-power-features/P8-43-batch-otlp-spans-on-workers.md) | low | P8-35 | review |
+| P8-44 | [Agility request count on stdio spans](tasks/phase-8-power-features/P8-44-stdio-span-request-count.md) | low | P8-20 | todo |
 | P8-46 | [CLI workspace set merges limits instead of replacing them](tasks/phase-8-power-features/P8-46-cli-workspace-set-merges-limits.md) | low | P8-14 | todo |
 
 ### Phase 9

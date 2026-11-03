@@ -147,7 +147,10 @@ export function main(args: readonly string[], io: Io): number | 'serving' | Prom
     return 2;
   }
   try {
-    startStdio(loadConfig(io.env, { warn: (m) => io.err(`agility-bridge: ${m}`) }), { env: io.env });
+    startStdio(loadConfig(io.env, { warn: (m) => io.err(`agility-bridge: ${m}`) }), {
+      env: io.env,
+      version: VERSION,
+    });
     return 'serving';
   } catch (error) {
     if (error instanceof ConfigError) {

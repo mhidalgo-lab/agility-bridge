@@ -1,6 +1,6 @@
 # Observability: watching your own deployment
 
-`agility-bridge serve` and the Cloudflare Worker can send one [OpenTelemetry](https://opentelemetry.io) span for every MCP request
+`agility-bridge serve`, the Cloudflare Worker and the local stdio server can send one [OpenTelemetry](https://opentelemetry.io) span for every MCP request
 to a collector you run, so you can chart latency, error rate and Agility pressure. It is **off by default**, sends nothing
 until you set an endpoint, and sends **no content**: no Agility text, no token, no workspace or person, no query, no address.
 
@@ -34,8 +34,25 @@ carries only the attributes below); it is never forwarded to Agility.
 public-address rule other outgoing requests follow: an internal collector (a private address or an internal name) is a normal
 target. Set it only to a collector you trust; it receives the attributes below and the `AB_OTEL_HEADERS` credential.
 
-stdio is not instrumented: it is a local process for one person, and the client already shows what it does
-([P8-20](../tasks/phase-8-power-features/P8-20-stdio-telemetry.md)).
+## The local stdio server
+
+`agility-bridge` in stdio mode reads the same two settings from the environment your MCP client sets
+(`AB_OTEL_ENDPOINT`, and `AB_OTEL_HEADERS` for a hosted collector's key), with the same rules (HTTPS except loopback, headers need
+the endpoint, a bad value stops start-up and names the variable, never the value). It sends **one span per MCP request the client
+makes and one per notification**, with the same attribute names, the same fault classes and the same allowlist as above; what
+differs:
+
+- The span is taken from the frames on the pipe, not from an HTTP request. `http.response.status_code` is the HTTP-shaped
+  status of the JSON-RPC answer: 200 for a result (a failed tool call is a 200 with its `AB_*` code in `error.type`, as over
+  HTTP), 400 for a malformed or unknown request, 500 for our own failure, 202 for a notification.
+- There is no `agility_bridge.requests` (the count of Agility requests of the call) and no `traceparent`: the client's trace
+  context is not read. There are no workspace, token or person to leave out; the arguments and Agility text are as private as on a
+  server and are never read.
+- Spans are queued and sent every five seconds and once more when the client closes the pipe (a few seconds at most, 3 s per
+  attempt). A collector that is down, slow or refusing never delays or changes a tool call and never writes to stdout, which carries
+  MCP frames only; the failure is one warning on stderr at most a minute (the error class, never the endpoint or a header).
+- An unconfigured server (the setup guidance) sends nothing.
+- The start-up line is the same warning as `serve` (on stderr), without the Agility request count.
 
 ## What a span is
 

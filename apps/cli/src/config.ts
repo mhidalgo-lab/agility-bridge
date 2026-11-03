@@ -303,8 +303,6 @@ function instanceUrl(value: string, where: string): string {
 const SERVE_ONLY = [
   'AB_QUOTA_DAILY',
   'AB_QUOTA_MONTHLY',
-  'AB_OTEL_ENDPOINT',
-  'AB_OTEL_HEADERS',
   'AB_TASKS',
   'AB_QUERY_CACHE_EDGE',
   'AB_PUBLIC_TOOL_CATALOG',
@@ -318,7 +316,7 @@ function warnServeOnly(
   const set = SERVE_ONLY.filter((k) => env[k] !== undefined && env[k] !== '');
   if (set.length > 0 && warn !== undefined)
     warn(
-      `${set.join(', ')} ${set.length === 1 ? 'is' : 'are'} read by a remote host only; the stdio server ignores ${set.length === 1 ? 'it' : 'them'} (no quota, trace export or task support is applied here).`,
+      `${set.join(', ')} ${set.length === 1 ? 'is' : 'are'} read by a remote host only; the stdio server ignores ${set.length === 1 ? 'it' : 'them'} (no quota or task support is applied here).`,
     );
 }
 
