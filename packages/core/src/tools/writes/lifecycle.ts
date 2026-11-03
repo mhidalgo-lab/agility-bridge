@@ -45,7 +45,7 @@ const CHILD_LIMIT = 21;
 // Measured worst case on a cold cache (a Story, one request for the child counts): 11; an Epic has two more child types
 // to read metadata of. Reopening reads no children (measured 7). Both keep headroom (P7-09, D-199).
 const COST_CLOSE = 16;
-const COST_REOPEN = 10;
+const COST_REOPEN = 11;
 
 export const OPEN = 'Open';
 export const CLOSED = 'Closed';
@@ -132,8 +132,9 @@ function lifecycleTool(cfg: {
     description: `${cfg.description} Needs approval; preview with dry_run. Not paged. Cold call: up to ${cfg.cost} Agility requests.`,
     kind: 'destructive',
     // Resolution, the item read, the metadata of the type and of its child types, the child counts, the re-read with its
-    // counts, and the one operation.
+    // counts, the one operation and the read-back (P7-19).
     cost: cfg.cost,
+    readBack: 'reread',
     idempotent: true,
     inputSchema: z.object({ asset: assetArg }),
     allowedFields: ALLOWED,

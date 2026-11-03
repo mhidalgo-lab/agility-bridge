@@ -64,7 +64,10 @@ export class FakeItems {
 export const TEST_TOOL = 'update_test_item';
 
 /** `update_test_item { item, status }`: the whole pipeline on fakes. Only ever used in tests. */
-export function makeTestWriteTool(fake: FakeItems): ToolDefinition {
+export function makeTestWriteTool(
+  fake: FakeItems,
+  extra: { readBack?: Parameters<typeof defineWriteTool>[0]['readBack'] } = {},
+): ToolDefinition {
   return defineWriteTool({
     name: TEST_TOOL,
     title: 'Update test item',
@@ -72,6 +75,7 @@ export function makeTestWriteTool(fake: FakeItems): ToolDefinition {
     kind: 'write',
     cost: 3,
     idempotent: true,
+    ...(extra.readBack === undefined ? {} : { readBack: extra.readBack }),
     inputSchema: z.object({ item: z.string(), status: z.string() }),
     allowedFields: { Story: ['Status'] },
     async plan(input, ctx) {

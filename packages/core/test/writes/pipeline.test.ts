@@ -365,6 +365,70 @@ describe('apply once', () => {
   });
 });
 
+describe('the bounded read-back after a write (P7-19)', () => {
+  const rig = (readBack: NonNullable<Parameters<typeof makeTestWriteTool>[1]>['readBack']) => {
+    const fake = new FakeItems();
+    const tool = makeTestWriteTool(fake, { readBack });
+    const runtime = makeRuntime({ channel: answeringChannel(true) });
+    return { fake, tool, runtime, ctx: writeContext(runtime) };
+  };
+
+  it('is confirmed when Agility already shows the new value', async () => {
+    const { fake, tool, ctx } = rig('reread');
+    const out = await run(tool, CONFIRMED, ctx);
+    expect(out.structured).toMatchObject({ applied: true, readBack: 'confirmed' });
+    expect(out.text).toContain('Agility already shows the new values');
+    expect(fake.sends).toHaveLength(1);
+  });
+
+  it('is not yet visible when Agility still shows the old value, and the write is not repeated', async () => {
+    const { fake, tool, ctx, runtime } = rig(async () => ({ values: { Status: 'In Progress' } }));
+    const out = await run(tool, CONFIRMED, ctx);
+    expect(out.structured).toMatchObject({ applied: true, readBack: 'not_yet_visible' });
+    expect(out.text).toContain('does not show the new values yet');
+    expect(fake.sends).toHaveLength(1);
+    expect(runtime.audit.records.map((r) => r.phase)).toEqual(['intent', 'outcome']);
+  });
+
+  it('is unknown, never an error, when the read fails; the outcome row is already written and nothing is resent', async () => {
+    const { fake, tool, ctx, runtime } = rig(async () => {
+      throw new AbError(ErrorCode.AgilityUnavailable, 'down');
+    });
+    const out = await run(tool, CONFIRMED, ctx);
+    expect(out.structured).toMatchObject({ applied: true, readBack: 'unknown' });
+    expect(out.text).toContain('reading it back failed');
+    expect(fake.sends).toHaveLength(1);
+    expect(runtime.audit.records.at(-1)).toMatchObject({ phase: 'outcome', status: 'ok' });
+  });
+
+  it('is unknown when nothing it returned can be compared', async () => {
+    const { tool, ctx } = rig(async () => ({ values: {} }));
+    expect((await run(tool, CONFIRMED, ctx)).structured).toMatchObject({ readBack: 'unknown' });
+  });
+
+  it('reads once, after the send, and a tool without it keeps the plain lag note', async () => {
+    const withIt = rig('reread');
+    await run(withIt.tool, CONFIRMED, withIt.ctx);
+    // plan read, re-read, read-back
+    expect(withIt.fake.reads).toBe(3);
+    const without = setup();
+    const out = await run(without.tool, CONFIRMED, without.ctx);
+    expect(without.fake.reads).toBe(2);
+    expect(out.structured).not.toHaveProperty('readBack');
+    expect(out.text).toContain('Agility may take a moment');
+  });
+
+  it('is not run for a dry run, a no-op, a refusal or a failed send', async () => {
+    const dry = rig('reread');
+    await run(dry.tool, { ...CONFIRMED, confirm: undefined, dry_run: true }, dry.ctx);
+    expect(dry.fake.reads).toBe(1);
+    const failing = rig('reread');
+    failing.fake.failSendWith = new AbError(ErrorCode.AgilityTimeout, 'slow');
+    await refused(run(failing.tool, CONFIRMED, failing.ctx));
+    expect(failing.fake.reads).toBe(2);
+  });
+});
+
 describe('the out-of-band grant (seam for P7-02): bound to the change, the actor and the clock, single use', () => {
   async function grantFor(
     runtime: ReturnType<typeof makeRuntime>,

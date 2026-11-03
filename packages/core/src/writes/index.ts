@@ -38,6 +38,7 @@ export {
 export {
   approvalChannelOf,
   defineWriteTool,
+  type ReadBackStatus,
   type Reread,
   type SendResult,
   WRITE_GROUP,

@@ -28,7 +28,7 @@ import {
 const TYPES = ['Story', 'Defect'] as const;
 const FIELDS = ['Timebox', 'Timebox.Name'];
 
-const COST = 14;
+const COST = 15;
 
 export const moveToSprint: ToolDefinition = defineWriteTool({
   name: 'move_to_sprint',
@@ -36,8 +36,9 @@ export const moveToSprint: ToolDefinition = defineWriteTool({
   description: `Move one backlog item or defect into a sprint of its own Agility project, by sprint name, OID token or current, previous or next, or (to_backlog) out of its sprint. A closed sprint is refused. Give sprint or to_backlog, not both. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
   overwrites: true,
-  // Resolution, the item read, the sprint (a relative name takes two requests), its state, the re-read and the write.
+  // Resolution, the item read, the sprint (a relative name takes two requests), its state, the re-read, the write and the read-back (P7-19).
   cost: COST,
+  readBack: 'reread',
   idempotent: true,
   inputSchema: z.object({
     asset: assetArg,
