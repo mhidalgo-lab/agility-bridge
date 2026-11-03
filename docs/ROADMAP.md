@@ -408,9 +408,10 @@ Status lives in each task file.
 | P9-03 | [Performance and cost review](tasks/phase-9-hardening-launch/P9-03-performance-cost.md) | medium | P8-12 | todo |
 | P9-04 | [Documentation site](tasks/phase-9-hardening-launch/P9-04-docs-site.md) | medium | P8-12 | in-progress |
 | P9-05 | [Support, versioning and deprecation policy](tasks/phase-9-hardening-launch/P9-05-support-policy.md) | medium | P8-12 | in-progress |
-| P9-06 | [ASVS L2 mapping and OpenSSF Best Practices](tasks/phase-9-hardening-launch/P9-06-asvs-openssf.md) | medium | P9-01 | todo |
+| P9-06 | [ASVS L2 mapping and OpenSSF Best Practices](tasks/phase-9-hardening-launch/P9-06-asvs-openssf.md) | medium | P9-01 | in-progress |
 | P9-07 | [Release verification guide and backport path](tasks/phase-9-hardening-launch/P9-07-release-verification-backports.md) | medium | P8-12 | in-progress |
 | P9-08 | [Launch checklist and 1.0.0](tasks/phase-9-hardening-launch/P9-08-launch-1-0.md) | high | P9-02, P9-03, P9-04, P9-05, P9-06, P9-07 | todo |
+| P9-09 | [Close the partly met ASVS rows](tasks/phase-9-hardening-launch/P9-09-asvs-partial-rows.md) | medium | P9-06 | todo |
 | P9-19 | [Scheduled external link check for the documentation](tasks/phase-9-hardening-launch/P9-19-docs-external-links.md) | low | P9-04 | todo |
 | P9-20 | [Versioned documentation per release](tasks/phase-9-hardening-launch/P9-20-docs-versioned.md) | low | P9-04 | todo |
 | P9-21 | [Accessibility and performance checks for the documentation site](tasks/phase-9-hardening-launch/P9-21-docs-site-quality.md) | low | P9-04 | todo |

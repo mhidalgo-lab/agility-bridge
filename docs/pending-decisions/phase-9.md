@@ -71,3 +71,14 @@
 - **Context:** The workflow is path-filtered (`docs/**`, `site/**`) so it does not run on code-only pull requests. A required check that never reports blocks those pull requests. The `docs/` link check that matters for every change also runs in `pnpm lint`, which is already required.
 - **Options:** (a) keep "Build and link check" a non-required check, relying on `pnpm lint` for the docs links; (b) drop the path filter and make it required (about 40 s extra on every pull request); (c) require it with a ruleset that tolerates skipped checks.
 - **Recommendation:** (a), built. Choose (b) if you want a broken site build to block merging; it is a ruleset change that is yours to make.
+
+### D-348 — Scorecard Code-Review and Branch-Protection stay low until there is a second reviewer *(P9-06)*
+- **Context:** Scorecard scores `Code-Review` 0 (no approving review on any change) and `Branch-Protection` 4 (no required approvers, no code-owner review, no last-push approval). The cause is one maintainer merging after CI; a required approval would block every merge.
+- **Options:** (a) accept the two scores and say why in `docs/security/scorecard.md`; revisit when a second maintainer exists; (b) require one approval and add a second account or a bot as reviewer now; (c) require code-owner review of the security-relevant paths only.
+- **Recommendation:** (a), built as (a). A reviewer account that only clicks approve would raise the number and lower the meaning of review. The external review (P9-02) is the real second pair of eyes for 1.0.
+
+### D-349 — The ASVS mapping is published as a self-assessment *(P9-06)*
+- **Context:** `docs/security/asvs-l2.md` maps the 253 Level 1 and 2 requirements of ASVS 5.0.0 with evidence: 175 Met, 66 N/A with a reason, 5 Delegated to the platform or operator, 7 Partly (task P9-09), 0 Gap. No assessor has reviewed it.
+- **Options:** (a) publish it as a self-assessment and say so on the page and in the 1.0 notes; (b) hold it until the external reviewer has checked it; (c) do not publish a mapping.
+- **Recommendation:** (a), built as (a). The page states that it is not a certification, and the test that reads it keeps it from drifting. Ask the external reviewer to challenge it (it is in the call for reviewers).
+
