@@ -410,7 +410,7 @@ Status lives in each task file.
 | P9-05 | [Support, versioning and deprecation policy](tasks/phase-9-hardening-launch/P9-05-support-policy.md) | medium | P8-12 | in-progress |
 | P9-06 | [ASVS L2 mapping and OpenSSF Best Practices](tasks/phase-9-hardening-launch/P9-06-asvs-openssf.md) | medium | P9-01 | review |
 | P9-07 | [Release verification guide and backport path](tasks/phase-9-hardening-launch/P9-07-release-verification-backports.md) | medium | P8-12 | in-progress |
-| P9-08 | [Launch checklist and 1.0.0](tasks/phase-9-hardening-launch/P9-08-launch-1-0.md) | high | P9-02, P9-03, P9-04, P9-05, P9-06, P9-07 | todo |
+| P9-08 | [Launch checklist and 1.0.0](tasks/phase-9-hardening-launch/P9-08-launch-1-0.md) | high | P9-02, P9-03, P9-04, P9-05, P9-06, P9-07 | in-progress |
 | P9-09 | [Close the partly met ASVS rows](tasks/phase-9-hardening-launch/P9-09-asvs-partial-rows.md) | medium | P9-06 | todo |
 | P9-10 | [Admin API pre-review follow-ups (instance read scope, re-enable policy, A5 wording)](tasks/phase-9-hardening-launch/P9-10-admin-api-pre-review-follow-ups.md) | low | P9-02 | todo |
 | P9-11 | [OAuth pre-review follow-ups (code burn, refresh claim, revoke tombstone)](tasks/phase-9-hardening-launch/P9-11-oauth-pre-review-follow-ups.md) | low | P9-02 | todo |
