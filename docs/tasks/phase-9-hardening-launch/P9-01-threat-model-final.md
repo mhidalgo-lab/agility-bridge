@@ -2,7 +2,7 @@
 id: P9-01
 title: Threat model final review and evidence map
 phase: 9
-status: in-progress
+status: review
 priority: high
 depends_on: [P8-12]
 adr: []
@@ -28,18 +28,18 @@ Every threat-model claim is backed by code, a test or a named residual risk, and
 - A final-review section in `THREAT_MODEL.md` and the header status.
 
 ## Acceptance criteria
-- [ ] Every `T`/`A` row of `THREAT_MODEL.md` has exactly one row in the evidence map with code paths, test files and
+- [x] Every `T`/`A` row of `THREAT_MODEL.md` has exactly one row in the evidence map with code paths, test files and
       quoted test titles, and a test fails when a row, a path or a title is missing.
-- [ ] Parsers without fuzz coverage get properties stated on the output (not lists of bad inputs): rich text,
+- [x] Parsers without fuzz coverage get properties stated on the output (not lists of bad inputs): rich text,
       redaction, instance URLs and address classes, asset references, XML, CSV, cursors, token formats, bearer header,
       sealed values, JWT wrapper, instance metadata, OAuth client ids/redirects/registrations, MCP bodies, config bundle.
       Any counter-example found becomes a fix with a regression test (or a task).
-- [ ] Accepted residual risks are explicit (register with reason, rows, where documented) and the owner decision is
+- [x] Accepted residual risks are explicit (register with reason, rows, where documented) and the owner decision is
       recorded (D-346).
-- [ ] Rows whose evidence needs a live tenant or a real client are marked `A+L` and name what is unproven (register
+- [x] Rows whose evidence needs a live tenant or a real client are marked `A+L` and name what is unproven (register
       L-n); none is claimed as verified.
-- [ ] `THREAT_MODEL.md` has the final-review section and its status line; new lessons recorded.
-- [ ] `pnpm lint && pnpm typecheck && pnpm test` green.
+- [x] `THREAT_MODEL.md` has the final-review section and its status line; new lessons recorded.
+- [x] `pnpm lint && pnpm typecheck && pnpm test` green.
 
 ## Security notes
 No behaviour change is expected; a fuzz counter-example would be a security fix and follows AGENTS.md.

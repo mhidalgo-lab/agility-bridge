@@ -40,7 +40,7 @@ How to use it:
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412, L-481, L-482 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462, L-473, L-474, L-475 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453, L-467, L-468, L-469 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446, L-483, L-484 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157, L-499 – L-501 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241, L-402 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297, L-335 |
@@ -2110,6 +2110,22 @@ like a slow runner and rerunning "fixed" it. Measure where the time goes before 
 requests. Where the host shares the process, fake `Date` only (timers stay real, shouldAdvanceTime on) and jump past the boundary;
 where the host has a clock of its own (workerd), the wait is inherent and the project's timeout must exceed it.
 *Applied in:* P8-21, `packages/http-app/test/oauth/abuse-suite.ts`.
+
+**L-483 — An evidence map that no test reads goes stale; make the map executable.**
+The threat model's own status tables drift (a test renamed, a file moved) because nothing checks them. The P9-01 map is a
+table of code paths, test files and quoted test titles, and `scripts/test/threat-evidence.test.ts` fails when a threat row
+has no evidence row, a path is gone, a quoted title is no longer in the named test file, or a residual risk or live item is
+defined but cited by no row. A claim that needs a live tenant is marked `A+L` and must name the missing proof, so the gap
+is part of the table and cannot be forgotten or faked.
+*Applied in:* P9-01, `docs/security/threat-evidence.md`, `scripts/test/threat-evidence.test.ts` (L-010, L-133).
+
+**L-484 — A fuzz property states what must hold of the output, not which inputs are bad.**
+A list of hostile strings tests the attacks someone already thought of. The P9-01 properties say what any accepted value must
+look like (a client id that may be fetched is a canonical https URL on a dotted, non-IP host; an accepted instance URL has no
+user info, query or fragment; a planted secret is gone from any surrounding text; no CSV cell starts as a formula) and let
+fast-check search for a counter-example from structured pieces (tags, entities, scheme prefixes, dot segments). Seeded and
+replayable like the other property tests (L-123); each new parser gets one next to it.
+*Applied in:* P9-01, `core/test/fuzz-parsers.test.ts`, `auth/test/fuzz-tokens.test.ts`, `http-app/test/fuzz-parsers.test.ts`, `cli/test/fuzz-bundle.test.ts`.
 
 ## R. CI, release and supply chain
 

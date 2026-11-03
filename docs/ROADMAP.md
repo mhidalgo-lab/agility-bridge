@@ -403,7 +403,7 @@ Status lives in each task file.
 
 | ID | Task | Priority | Depends on | Status |
 |---|---|---|---|---|
-| P9-01 | [Threat model final review and evidence map](tasks/phase-9-hardening-launch/P9-01-threat-model-final.md) | high | P8-12 | todo |
+| P9-01 | [Threat model final review and evidence map](tasks/phase-9-hardening-launch/P9-01-threat-model-final.md) | high | P8-12 | review |
 | P9-02 | [External security review](tasks/phase-9-hardening-launch/P9-02-external-review.md) | high | P9-01 | todo |
 | P9-03 | [Performance and cost review](tasks/phase-9-hardening-launch/P9-03-performance-cost.md) | medium | P8-12 | todo |
 | P9-04 | [Documentation site](tasks/phase-9-hardening-launch/P9-04-docs-site.md) | medium | P8-12 | todo |
