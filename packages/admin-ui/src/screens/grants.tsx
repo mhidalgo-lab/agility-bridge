@@ -40,6 +40,7 @@ import {
   parseWorkspace,
   parseWriteBudget,
   rows,
+  type ServerLimits,
   type Tool,
   type User,
   usageText,
@@ -53,9 +54,11 @@ import {
   compositeNotes,
   confirmed,
   confirmPage,
+  effectiveBudget,
   FormError,
   field,
   formErrors,
+  groupsOff,
   hasWriteTools,
   isOk,
   isOwner,
@@ -74,6 +77,7 @@ import {
   RowAction,
   Screen,
   StatusBadge,
+  serverLimitsOf,
   ToolChecklist,
   toolsFrom,
   toolValues,
@@ -322,7 +326,12 @@ function formFieldOf(apiField: string | undefined): string | undefined {
 }
 
 /** What a saved grant does not do the way it reads (the API's warnings, recomputed from what is stored). */
-export function grantNotes(g: Grant, ws: Workspace, tools: readonly Tool[] = []): string[] {
+export function grantNotes(
+  g: Grant,
+  ws: Workspace,
+  tools: readonly Tool[] = [],
+  server: ServerLimits | null = null,
+): string[] {
   const notes: string[] = [];
   // What the grant can really call: its own list inside the workspace's (null = inherit / every read tool).
   const effective =
@@ -332,11 +341,17 @@ export function grantNotes(g: Grant, ws: Workspace, tools: readonly Tool[] = [])
         ? g.tools
         : g.tools.filter((t) => ws.enabledTools?.includes(t));
   notes.push(...compositeNotes(effective, tools));
-  // The tighter of the two budgets applies (a grant can only lower the workspace's, L-056).
-  const budgets = [g.limits['callBudget'], ws.limits['callBudget']].filter(
-    (n): n is number => typeof n === 'number',
-  );
-  notes.push(...budgetNotes(effective, budgets.length === 0 ? undefined : Math.min(...budgets), tools));
+  // The tighter budget applies (a grant can only lower the workspace's, L-056); a workspace that sets none inherits the
+  // server's (P6-58).
+  const own = (v: number | boolean | undefined) => (typeof v === 'number' ? v : undefined);
+  const applies = effectiveBudget(own(ws.limits['callBudget']), own(g.limits['callBudget']), server);
+  if (applies !== undefined)
+    notes.push(
+      ...budgetNotes(effective, applies.budget, tools, {
+        inherited: applies.inherited,
+        groupsOff: groupsOff(ws.limits, g.limits),
+      }),
+    );
   const outside = (g.tools ?? []).filter((t) =>
     ws.enabledTools === null ? false : !ws.enabledTools.includes(t),
   );
@@ -646,11 +661,12 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
       const g = await loadGrant(c, principal, id);
       if ('status' in g) return loadFailed(c, g, principal);
       const ws = await loadWorkspace(c, principal, g.workspaceId);
-      const [tokens, users, creds, tools, budget, usage] = await Promise.all([
+      const [tokens, users, creds, tools, server, budget, usage] = await Promise.all([
         load(kit, c, principal, adminPath`/grants/${id}/tokens`, (b) => rows(b, parseToken)),
         usersOf(c, principal),
         'status' in ws ? Promise.resolve([] as Credential[]) : credentialsOf(c, principal, ws.instanceId),
         catalogue(c, principal),
+        serverLimitsOf(kit, c, principal),
         // This grant's writes this hour (P7-16); a failed read is shown as unknown.
         kit.callAdmin(c, principal, { method: 'GET', path: adminPath`/grants/${id}/write-budget` }),
         // This grant's Agility requests today and this month against the server's quotas (P8-09).
@@ -737,7 +753,7 @@ export function registerGrants(ui: Hono, kit: UiKit): void {
                 ['Created', <When at={g.createdAt} />],
               ]}
             />
-            {'status' in ws ? null : <Notes title="Notes" items={grantNotes(g, ws, tools)} />}
+            {'status' in ws ? null : <Notes title="Notes" items={grantNotes(g, ws, tools, server)} />}
             <div class="actions">
               <LinkButton href={`${self}/edit`}>Edit</LinkButton>
             </div>

@@ -27,7 +27,7 @@ import {
   type VerifiedForm,
 } from '../kit.ts';
 import { errorPage, htmlResponse } from '../pages.tsx';
-import type { AssetTypes, Limits, Tool } from './data.ts';
+import { type AssetTypes, type Limits, parseServerLimits, type ServerLimits, type Tool } from './data.ts';
 
 /** Rows per list page (the admin API returns whole lists; the panel pages through them). */
 export const PAGE_SIZE = 25;
@@ -258,6 +258,16 @@ export function joined(items: readonly Child[], sep = ', '): Child[] {
 export const unavailable = (c: Context, page: PageContext): Response =>
   errorPage(503, requestIdOf(c), page.principal);
 
+/** The server's own per-call budget (P6-58); nothing known when the call fails (no note is shown then). */
+export async function serverLimitsOf(
+  kit: UiKit,
+  c: Context,
+  principal: UiPrincipal,
+): Promise<ServerLimits | null> {
+  const got = await load(kit, c, principal, '/limits', (b) => parseServerLimits(b));
+  return got.ok ? got.value : null;
+}
+
 /** Load a list or a row through the admin API: `GET path` and the parsed body, or the failed result. */
 export async function load<T>(
   kit: UiKit,
@@ -437,20 +447,61 @@ export function compositeNotes(list: readonly string[] | null, tools: readonly T
 }
 
 /**
+ * The per-call request budget that applies, and whether it is the server's own: a grant can only lower its workspace's
+ * (L-056), and a workspace that sets none inherits the server's default, which its runtime plan may cap (Workers Free:
+ * 45, P6-58). Undefined when nothing is known (the server did not say and neither the workspace nor the grant sets one).
+ */
+export function effectiveBudget(
+  workspace: number | undefined,
+  grant: number | undefined,
+  server: ServerLimits | null,
+): { readonly budget: number; readonly inherited: boolean } | undefined {
+  let base = workspace ?? server?.callBudget;
+  if (base === undefined) return grant === undefined ? undefined : { budget: grant, inherited: false };
+  const ceiling = server?.callBudgetCeiling;
+  if (ceiling !== undefined) base = Math.min(base, ceiling);
+  const budget = grant === undefined ? base : Math.min(base, grant);
+  // It is the server's when neither the workspace's nor the grant's own value is what applies.
+  return { budget, inherited: budget !== workspace && budget !== grant };
+}
+
+/**
+ * The groups the server leaves off unless the workspace turns them on (reports, attachment download), judged from the
+ * workspace's limits and, for a grant, its own (a grant can only turn one off).
+ */
+export function groupsOff(workspace: Limits, grant?: Limits): string[] {
+  const off: string[] = [];
+  if (workspace['reports'] !== true || grant?.['reports'] === false) off.push('reports');
+  if (workspace['attachmentDownload'] !== true || grant?.['attachmentDownload'] === false)
+    off.push('attachments');
+  return off;
+}
+
+/**
  * One fixed sentence naming the tools in `list` whose declared cost is above `budget` (the per-call request budget that
- * applies), which are therefore not listed to the caller (P6-36, L-115). Nothing when the list is "every tool" (null),
- * no budget is set here (the server's default applies, which the panel does not know) or nothing is hidden.
+ * applies), which are therefore not listed to the caller (P6-36, L-115). "Every read tool" (null) is judged by the read
+ * tools of the groups that are on: a group that is off by default is not reported as hidden (P6-58). Nothing when no
+ * budget is known or nothing is hidden. `inherited` says the budget is the server's, not set by the workspace or grant.
  */
 export function budgetNotes(
   list: readonly string[] | null,
   budget: number | undefined,
   tools: readonly Tool[],
+  options: { readonly inherited?: boolean; readonly groupsOff?: readonly string[] } = {},
 ): string[] {
-  if (list === null || budget === undefined) return [];
-  const hidden = tools.filter((t) => list.includes(t.name) && t.cost > budget);
+  if (budget === undefined) return [];
+  const off = options.groupsOff ?? [];
+  const hidden = tools.filter(
+    (t) =>
+      t.cost > budget &&
+      (list === null ? t.kind === 'read' && !off.includes(t.group) : list.includes(t.name)),
+  );
   if (hidden.length === 0) return [];
+  const names = hidden.map((t) => `${t.name} (needs ${t.cost})`).join(', ');
   return [
-    `Not listed because the per-call budget is ${budget} requests: ${hidden.map((t) => `${t.name} (needs ${t.cost})`).join(', ')}. Raise callBudget to list them.`,
+    options.inherited === true
+      ? `Not listed because the server's per-call budget is ${budget} requests: ${names}. Set callBudget on the workspace to list them, where the server allows it.`
+      : `Not listed because the per-call budget is ${budget} requests: ${names}. Raise callBudget to list them.`,
   ];
 }
 

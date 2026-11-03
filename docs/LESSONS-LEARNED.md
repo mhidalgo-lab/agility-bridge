@@ -38,7 +38,7 @@ How to use it:
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182, L-458, L-477 – L-479 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412, L-481, L-482 |
-| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462, L-473, L-474 |
+| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462, L-473, L-474, L-475 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453, L-467, L-468, L-469 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
@@ -1898,6 +1898,10 @@ The quota gate was built from the deployment settings and passed to every reques
 **L-469 — Observe a transport you do not own by wrapping its frames, and read nothing but the envelope.**
 The SDK's stdio entry has no per-request hook, and `onToolCall` sees only tool calls, resources and prompts, so `initialize`, `tools/list` and notifications would have had no span. A subclass of the real `StdioServerTransport` that sees each inbound frame and each outbound answer gives one span per method in both protocol eras, with the frames themselves unchanged and in order. The tracker reads only the method, the tool name, the id and the error code in the result's metadata (through the existing bounded classifier), keeps a capped table of requests waiting for an answer, and never throws; the allowlisted `Telemetry` sanitises the rest again. Prove it on a real pipe, with a dead collector, and check that stdout still holds only MCP frames (L-021).
 *Applied in:* P8-20, `apps/cli/src/stdio-telemetry.ts`, `test/stdio-telemetry.e2e.test.ts` (L-118, L-119).
+
+**L-475 — A note that depends on a default the panel cannot see must not guess; ask the server, and say nothing when it does not answer.**
+The budget-hidden-tools note only worked where the workspace or grant set `callBudget`, so on Workers Free (45) every workspace that enabled a report was silently hidden from it. The panel now reads the server's default and plan ceiling from a read-only admin answer, parses them as bounded whole numbers, and names the server as the source. "Every tool" is judged by the groups that are on, so a group that is off by default is never reported as hidden; a missing answer shows no note rather than an invented number.
+*Applied in:* P6-58, `admin-ui/src/screens/shared.tsx` (`effectiveBudget`, `budgetNotes`), `GET /limits` (L-115, L-314).
 
 ## P. Observability and logging
 

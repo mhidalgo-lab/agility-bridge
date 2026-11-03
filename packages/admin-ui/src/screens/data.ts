@@ -432,6 +432,25 @@ export function parseTool(r: Row): Tool | null {
   };
 }
 
+/** The server's per-call request budget: its default and the ceiling of its runtime plan (P6-58). */
+export interface ServerLimits {
+  readonly callBudget?: number;
+  readonly callBudgetCeiling?: number;
+}
+
+/** Whole numbers from 1 to 10,000 only (`callBudget`'s bounds); anything else the API says is dropped, never shown. */
+export function parseServerLimits(body: unknown): ServerLimits {
+  const o = obj(body);
+  const budget = (v: unknown): number | undefined =>
+    typeof v === 'number' && Number.isSafeInteger(v) && v >= 1 && v <= 10_000 ? v : undefined;
+  const callBudget = budget(o['callBudget']);
+  const callBudgetCeiling = budget(o['callBudgetCeiling']);
+  return {
+    ...(callBudget === undefined ? {} : { callBudget }),
+    ...(callBudgetCeiling === undefined ? {} : { callBudgetCeiling }),
+  };
+}
+
 /** A JSON array answer parsed row by row; null when the body is not an array. */
 export function rows<T>(body: unknown, parse: (r: Row) => T | null): T[] | null {
   if (!Array.isArray(body)) return null;

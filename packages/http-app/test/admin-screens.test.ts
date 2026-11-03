@@ -1685,6 +1685,51 @@ describe('composite grants (P6-11)', () => {
     expect((await submit(s, grantEdit, e.alice, ticked)).status).not.toBe(200);
   });
 
+  it("notes the tools the server's own call budget hides when the workspace sets none (P6-58)", async () => {
+    const free = await env({ callBudget: { default: 45, ceiling: 45 } });
+    const wsPath = (e: typeof free) => `/admin/workspaces/${e.ids.workspaceA}`;
+    const note = 'Not listed because the server&#39;s per-call budget is 45 requests: sprint_health (needs';
+    await free.s.api('PATCH', `/workspaces/${free.ids.workspaceA}`, free.owner, {
+      enabledTools: ['whoami', REPORT, 'get_sprint', 'search_work_items'],
+    });
+    for (const who of [free.admin, free.owner]) {
+      expect(await (await page(free.s, wsPath(free), who)).text()).toContain(note);
+    }
+    // The grant page says it too, without any callBudget on the grant.
+    expect(await (await page(free.s, `/admin/grants/${free.ids.aliceGrant}`, free.admin)).text()).toContain(
+      note,
+    );
+    // "Every read tool" does not report a report while reports are off.
+    await free.s.api('PATCH', `/workspaces/${free.ids.workspaceA}`, free.owner, { enabledTools: null });
+    expect(await (await page(free.s, wsPath(free), free.admin)).text()).not.toContain('Not listed because');
+    // The workspace's own budget is its own.
+    await free.s.api('PATCH', `/workspaces/${free.ids.workspaceA}`, free.owner, {
+      enabledTools: ['whoami', REPORT, 'get_sprint', 'search_work_items'],
+      limits: { callBudget: 20 },
+    });
+    const own = await (await page(free.s, wsPath(free), free.admin)).text();
+    expect(own).toContain('Not listed because the per-call budget is 20 requests');
+    // A default of 1000 adds no note.
+    const big = await env({ callBudget: { default: 1_000 } });
+    await big.s.api('PATCH', `/workspaces/${big.ids.workspaceA}`, big.owner, {
+      enabledTools: ['whoami', REPORT, 'get_sprint', 'search_work_items'],
+    });
+    expect(await (await page(big.s, wsPath(big), big.admin)).text()).not.toContain('Not listed because');
+  });
+
+  it('answers the server limits to owners and admins only (P6-58)', async () => {
+    const e = await env({ callBudget: { default: 45, ceiling: 45 } });
+    for (const who of [e.owner, e.admin]) {
+      const res = await e.s.api('GET', '/limits', who);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ callBudget: 45, callBudgetCeiling: 45 });
+    }
+    const denied = await e.s.api('GET', '/limits', e.alice);
+    expect(denied.status).toBe(403);
+    expect(await denied.text()).not.toContain('45');
+    expect((await e.s.send('GET', '/api/admin/v1/limits')).status).toBe(401);
+  });
+
   it('shows the warning to owners and admins only: members and strangers get no page', async () => {
     const e = await env();
     await e.s.api('PATCH', `/workspaces/${e.ids.workspaceA}`, e.owner, { enabledTools: ['whoami', REPORT] });

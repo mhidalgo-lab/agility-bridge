@@ -579,6 +579,10 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         }),
         ...(sessions === undefined ? {} : { revokeUserSessions: (id: string) => sessions.revokeUser(id) }),
         ...(options.writes?.budget === undefined ? {} : { writeBudget: options.writes.budget }),
+        deploymentLimits: {
+          callBudget: options.access.limits.defaults.callBudget,
+          callBudgetCeiling: options.access.limits.ceilings.callBudget ?? null,
+        },
         ...(services.quota === undefined
           ? {}
           : {
