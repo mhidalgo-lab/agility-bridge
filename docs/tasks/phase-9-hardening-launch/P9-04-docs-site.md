@@ -2,7 +2,7 @@
 id: P9-04
 title: Documentation site
 phase: 9
-status: in-progress
+status: review
 priority: medium
 depends_on: [P8-12]
 adr: []
@@ -38,7 +38,7 @@ A searchable site built from `docs/`, with every link checked.
 - [x] `docs/` relative links and anchors are checked in `pnpm lint`; the built site's links and anchors are checked in CI.
 - [x] Pull-request job builds and link-checks; deploy job runs only on `main` and does not fail `main` while Pages is off.
 - [x] README links to the site; `docs/dev` page explains how to build and preview it.
-- [ ] *owner:* enable Pages (Settings, Pages, Source: GitHub Actions); site live at https://mhidalgo-lab.github.io/agility-bridge/ (the first run on main after that deploys it).
+- [x] *owner:* enable Pages (Settings, Pages, Source: GitHub Actions); site live at https://mhidalgo-lab.github.io/agility-bridge/ (the first run on main after that deploys it). Done 2026-11-03: Pages enabled, the deploy job ran on main and the site is live.
 
 ## Security notes
 T18 (actions and artifacts): the deploy job holds only pages write and id-token write, runs no project code and gets an artifact built by a job without those scopes; actions pinned by SHA; pages joins the workflow write allowlist; the site is a separate workspace with the same release-age and build-script rules. Decisions D-361 to D-365.

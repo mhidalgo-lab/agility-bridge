@@ -2,7 +2,7 @@
 id: P9-05
 title: Support, versioning and deprecation policy
 phase: 9
-status: in-progress
+status: review
 priority: medium
 depends_on: [P8-12]
 adr: []
@@ -37,7 +37,7 @@ Users know what is supported, for how long, and how changes are announced.
 - [x] The minimum on-premises Agility version is marked *unverified* and recorded as a decision.
 - [x] Both pages are linked from SECURITY.md and the README; SECURITY.md's supported-versions table points to the policy.
 - [x] Contradictions found in existing docs (README status, deprecation examples) are fixed.
-- [ ] *owner:* the owner confirms the 1.x support window (decision) before 1.0 (P9-08).
+- [x] *owner:* the owner confirms the 1.x support window (decision) before 1.0 (P9-08). Confirmed 2026-11-03 (D-366 (a)).
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.
