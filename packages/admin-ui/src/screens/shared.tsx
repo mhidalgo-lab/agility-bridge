@@ -473,6 +473,15 @@ export const LIMIT_NUMBERS = [
   ['callBudget', 'Agility requests per tool call', 1, 10_000],
 ] as const;
 
+/**
+ * The Agility request quota of a workspace or grant (P8-14): a cap on the server's, so it can only lower it. Stored as
+ * `limits.quota.daily|monthly`; the panel names the fields `limit_quotaDaily` and `limit_quotaMonthly`.
+ */
+export const LIMIT_QUOTAS = [
+  ['quotaDaily', 'daily', 'Agility requests per UTC day', 1, 100_000_000],
+  ['quotaMonthly', 'monthly', 'Agility requests per UTC month', 1, 1_000_000_000],
+] as const;
+
 export const LIMIT_SWITCHES = [
   ['memberEmails', 'Member emails in output'],
   ['genericQuery', 'The generic query tools (query_assets, get_assets)'],
@@ -483,6 +492,10 @@ export const LIMIT_SWITCHES = [
 /** Form values for stored limits (`limit_<name>`). */
 export function limitValues(limits: Limits, into: URLSearchParams): void {
   for (const [name] of LIMIT_NUMBERS) {
+    const v = limits[name];
+    if (typeof v === 'number') into.set(`limit_${name}`, String(v));
+  }
+  for (const [name] of LIMIT_QUOTAS) {
     const v = limits[name];
     if (typeof v === 'number') into.set(`limit_${name}`, String(v));
   }
@@ -515,6 +528,19 @@ export function LimitsFields(props: {
           error={props.errors[`limit_${name}`]}
         />
       ))}
+      {LIMIT_QUOTAS.map(([name, , label, min, max]) => (
+        <TextField
+          name={`limit_${name}`}
+          label={label}
+          hint={`${min} to ${max}. Can only lower the server's quota; an owner loosens or removes one that is set.`}
+          type="number"
+          inputmode="numeric"
+          min={min}
+          max={max}
+          value={props.values.get(`limit_${name}`) ?? ''}
+          error={props.errors[`limit_${name}`]}
+        />
+      ))}
       {LIMIT_SWITCHES.map(([name, label]) => (
         <SelectField
           name={`limit_${name}`}
@@ -535,15 +561,25 @@ export function LimitsFields(props: {
 /** Limits from {@link LimitsFields}, or field errors. */
 export function limitsFrom(form: {
   readonly fields: URLSearchParams;
-}): { limits: Record<string, number | boolean> } | { errors: Record<string, string> } {
+}):
+  | { limits: Record<string, number | boolean | Record<string, number>> }
+  | { errors: Record<string, string> } {
   const errors: Record<string, string> = {};
-  const out: Record<string, number | boolean> = {};
+  const out: Record<string, number | boolean | Record<string, number>> = {};
   for (const [name, , min, max] of LIMIT_NUMBERS) {
     const n = wholeNumber(form, `limit_${name}`, min, max);
     if (n === null)
       errors[`limit_${name}`] = `Enter a whole number from ${min} to ${max}, or leave it blank.`;
     else if (n !== undefined) out[name] = n;
   }
+  const quota: Record<string, number> = {};
+  for (const [name, period, , min, max] of LIMIT_QUOTAS) {
+    const n = wholeNumber(form, `limit_${name}`, min, max);
+    if (n === null)
+      errors[`limit_${name}`] = `Enter a whole number from ${min} to ${max}, or leave it blank.`;
+    else if (n !== undefined) quota[period] = n;
+  }
+  if (Object.keys(quota).length > 0) out['quota'] = quota;
   for (const [name] of LIMIT_SWITCHES) {
     const v = form.fields.get(`limit_${name}`) ?? '';
     if (v === 'on') out[name] = true;
@@ -556,6 +592,8 @@ export function limitsFrom(form: {
 /** The form field an admin API `field` path (`limits.maxRows`) belongs to, when it names a limit. */
 export function limitFieldOf(apiField: string | undefined): string | undefined {
   if (apiField === undefined) return undefined;
+  const quota = /^(?:workspace\.)?limits\.quota\.(daily|monthly)/.exec(apiField);
+  if (quota?.[1] !== undefined) return quota[1] === 'daily' ? 'limit_quotaDaily' : 'limit_quotaMonthly';
   const m = /^(?:workspace\.)?limits\.([A-Za-z]+)/.exec(apiField);
   return m?.[1] === undefined ? undefined : `limit_${m[1]}`;
 }
@@ -566,6 +604,10 @@ export function limitsSummary(l: Limits): string[] {
   for (const [name, label] of LIMIT_NUMBERS) {
     const v = l[name];
     if (typeof v === 'number') out.push(`${label}: ${v}`);
+  }
+  for (const [name, , label] of LIMIT_QUOTAS) {
+    const v = l[name];
+    if (typeof v === 'number') out.push(`${label}: ${v.toLocaleString('en-US')}`);
   }
   for (const [name, label] of LIMIT_SWITCHES) {
     const v = l[name];

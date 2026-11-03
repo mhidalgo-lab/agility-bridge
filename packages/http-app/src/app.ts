@@ -8,10 +8,12 @@ import {
   bearerToken,
   type CredentialValidator,
   type EffectiveAccess,
+  effectiveQuota,
   hashDeviceToken,
   isWellFormedDeviceToken,
   KeyPurpose,
   type Keyring,
+  limitsPolicySchema,
   openCredentialToken,
   resolvePassthroughAccess,
   type TokenEnvironment,
@@ -212,7 +214,7 @@ export interface HttpAppOptions extends EdgeOptions {
     readonly audit?: (event: OAuthEvent) => unknown;
   };
   /** The admin API at `/api/admin/v1` (P2-09); absent = the whole API answers 404. */
-  readonly admin?: Pick<AdminApiOptions, 'services' | 'audit' | 'authenticate' | 'writeRateCap'>;
+  readonly admin?: Pick<AdminApiOptions, 'services' | 'audit' | 'authenticate' | 'writeRateCap' | 'quotaCap'>;
   /** Admin session timeouts, cap and logout behaviour (P4-02); used when sign-in (`identity`) is configured. */
   readonly session?: SessionOptions;
   /**
@@ -579,7 +581,22 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         ...(options.writes?.budget === undefined ? {} : { writeBudget: options.writes.budget }),
         ...(services.quota === undefined
           ? {}
-          : { grantUsage: (grantId: string) => (services.quota as QuotaGate).usageOf(grantId) }),
+          : {
+              // The grant's usage against what applies to it: the lowest of the server's, its workspace's and its own (P8-14).
+              grantUsage: async (grantId: string) => {
+                const gate = services.quota as QuotaGate;
+                const grant = await options.storage.grants.get(grantId);
+                const workspace =
+                  grant === null ? null : await options.storage.workspaces.get(grant.workspaceId);
+                const ws = limitsPolicySchema.safeParse(workspace?.limits ?? {});
+                const gr = limitsPolicySchema.safeParse(grant?.limits ?? {});
+                // An unreadable policy is shown as the server's quota; the resolver denies such a grant anyway.
+                return gate.usageOf(
+                  grantId,
+                  ws.success && gr.success ? effectiveQuota(gate.limits, ws.data, gr.data) : gate.limits,
+                );
+              },
+            }),
         storage: options.storage,
         tools: options.access.tools,
         onChange: () => cache.clear(),
@@ -1149,7 +1166,9 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
             },
           }),
       // This request's meter of the grant's quota: written once when each call ends (P8-09, T5).
-      ...(services.quota === undefined ? {} : { quota: services.quota.meterFor(resolved.grant.id) }),
+      ...(services.quota === undefined
+        ? {}
+        : { quota: services.quota.meterFor(resolved.grant.id, resolved.quota) }),
       // Workers: accounting work (quota counters, the cache's shared tier) finishes after the response (P-2).
       ...(options.background === undefined
         ? {}

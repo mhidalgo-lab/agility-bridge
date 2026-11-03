@@ -451,7 +451,7 @@ Local or remote.
 Create a workspace at /w/<slug>/mcp.
 
 ```text
-agility-bridge workspace add <slug> --name <value> --instance <value> --project <value> [--children] [--default-credential <value>] [--tools a,b] [--asset-types-allow a,b] [--asset-types-deny a,b] [--max-rows <n>] [--credential-source <value>]
+agility-bridge workspace add <slug> --name <value> --instance <value> --project <value> [--children] [--default-credential <value>] [--tools a,b] [--asset-types-allow a,b] [--asset-types-deny a,b] [--max-rows <n>] [--quota-daily <n>] [--quota-monthly <n>] [--credential-source <value>]
 ```
 
 | Name | Kind | Meaning |
@@ -466,6 +466,8 @@ agility-bridge workspace add <slug> --name <value> --instance <value> --project 
 | `--asset-types-allow` | list | Only these asset types |
 | `--asset-types-deny` | list | Never these asset types |
 | `--max-rows` | int | Most rows per call |
+| `--quota-daily` | int | Agility requests per UTC day for each grant (only lowers the server's AB_QUOTA_DAILY; replaces the limits set before) |
+| `--quota-monthly` | int | Agility requests per UTC month for each grant (only lowers the server's AB_QUOTA_MONTHLY; replaces the limits set before) |
 | `--credential-source` | string | `stored` (default) or `passthrough`: callers send their own Agility token (owner; needs AB_PASSTHROUGH=on) |
 
 Local or remote.
@@ -475,7 +477,7 @@ Local or remote.
 Change a workspace (only the options given).
 
 ```text
-agility-bridge workspace set <workspace-id> [--name <value>] [--project <value>] [--default-credential <value>] [--tools a,b] [--max-rows <n>] [--credential-source <value>]
+agility-bridge workspace set <workspace-id> [--name <value>] [--project <value>] [--default-credential <value>] [--tools a,b] [--max-rows <n>] [--quota-daily <n>] [--quota-monthly <n>] [--credential-source <value>]
 ```
 
 | Name | Kind | Meaning |
@@ -486,6 +488,8 @@ agility-bridge workspace set <workspace-id> [--name <value>] [--project <value>]
 | `--default-credential` | string | Shared default credential |
 | `--tools` | list | Enabled tools |
 | `--max-rows` | int | Most rows per call |
+| `--quota-daily` | int | Agility requests per UTC day for each grant (only lowers the server's AB_QUOTA_DAILY; replaces the limits set before) |
+| `--quota-monthly` | int | Agility requests per UTC month for each grant (only lowers the server's AB_QUOTA_MONTHLY; replaces the limits set before) |
 | `--credential-source` | string | `stored` (default) or `passthrough`: callers send their own Agility token (owner; needs AB_PASSTHROUGH=on) |
 
 Local or remote.
@@ -539,7 +543,7 @@ Local or remote.
 Grant a user (--user) or a labelled service (--service) access to a workspace.
 
 ```text
-agility-bridge grant add --workspace <value> [--user <value>] [--service <value>] [--credential <value>] [--tools a,b] [--project <value>] [--expires-days <value>]
+agility-bridge grant add --workspace <value> [--user <value>] [--service <value>] [--credential <value>] [--tools a,b] [--project <value>] [--quota-daily <n>] [--quota-monthly <n>] [--expires-days <value>]
 ```
 
 | Name | Kind | Meaning |
@@ -550,6 +554,8 @@ agility-bridge grant add --workspace <value> [--user <value>] [--service <value>
 | `--credential` | string | Credential (default: the workspace's shared default) |
 | `--tools` | list | Only these tools |
 | `--project` | string, repeatable | Only these of the workspace projects (repeat) |
+| `--quota-daily` | int | Agility requests per UTC day for each grant (only lowers the server's AB_QUOTA_DAILY) |
+| `--quota-monthly` | int | Agility requests per UTC month for each grant (only lowers the server's AB_QUOTA_MONTHLY) |
 | `--expires-days` | string | Days until it expires, or `never` |
 
 Local or remote.

@@ -46,6 +46,12 @@ anything else is looked at.
 - **Write tools** (Phase 7) additionally need the server switch, the workspace's write policy, and both the workspace
   and the grant naming each write tool explicitly: "all tools" never includes a write tool.
 
+## Request quota
+
+The Agility request quota per UTC day and month ([query limits](query-limits.md#quotas)) resolves like the numbers in
+`limits`: the lowest of the server's value, the workspace's `limits.quota` and the grant's. A workspace or grant can
+lower it, never raise it; raising or removing one that is set needs an owner with a recent sign-in.
+
 ## Warnings
 
 Saving a grant that asks for more than it can get is accepted with warnings, because the workspace may change later:

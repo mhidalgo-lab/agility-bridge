@@ -123,6 +123,15 @@ export function parseLimits(v: unknown): Limits {
       out[k] = value;
     }
   }
+  // The request quota (P8-14) is nested in the policy; the panel holds it as `quotaDaily` and `quotaMonthly`.
+  const quota = obj(obj(v)['quota']);
+  for (const [period, key] of [
+    ['daily', 'quotaDaily'],
+    ['monthly', 'quotaMonthly'],
+  ] as const) {
+    const n = quota[period];
+    if (typeof n === 'number' && Number.isSafeInteger(n)) out[key] = n;
+  }
   return out;
 }
 

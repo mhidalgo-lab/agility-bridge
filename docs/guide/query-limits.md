@@ -19,7 +19,18 @@
 Off unless you set a number. `AB_QUOTA_DAILY=2000` lets each grant cause at most 2,000 Agility requests a UTC day;
 `AB_QUOTA_MONTHLY=40000` caps the UTC month. Both can be set; either one ends the reads. The same numbers apply to every
 grant of the deployment, and each grant has its own counters (a pass-through workspace has one counter shared by its
-callers). A per-grant or per-workspace override is [P8-14](../tasks/phase-8-power-features/P8-14-quota-overrides.md).
+callers).
+
+**Lower it for one workspace or grant.** A workspace and a grant can carry their own `limits.quota` (`daily`,
+`monthly`; whole numbers). The quota that applies is the **lowest** of the server's, the workspace's and the grant's, per
+period, so an override can only lower: a value above the server's is refused (`422`, naming the server's value) and one
+that is stored anyway (a restored backup, or the server's value lowered later) still resolves to the lowest. A period the
+server leaves unlimited can be limited by an override. Anyone who may edit the workspace or grant can add or lower a
+quota; **raising or removing** one that is set needs an owner with a recent sign-in, so an administrator cannot undo what
+an owner decided. Set it in the panel (the Limits fields of the workspace and grant forms), in the admin API
+(`limits.quota` on `POST` and `PATCH` of `/workspaces` and `/grants`) or with `--quota-daily` and `--quota-monthly` of
+`agility-bridge workspace add|set` and `grant add`. `whoami` and the grant page show the limit that applies. The quota
+is not a scope dimension: the access cache and the query cache keys do not change.
 
 **What counts.** Each request the server sends to Agility counts once, at its first attempt: a retry is not a second
 one, and an answer from the [query cache](query-cache.md) is none (L-116). **Metadata requests do not count** (D-316):

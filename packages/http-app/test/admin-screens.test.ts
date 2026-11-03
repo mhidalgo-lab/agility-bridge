@@ -989,6 +989,54 @@ describe('grants', () => {
     expect((await s.w.storage.grants.get(grant?.id as string))?.limits).toEqual({ maxRows: 7 });
   });
 
+  it('sets, shows and protects a request quota on a workspace and a grant (P8-14)', async () => {
+    const e = await env({ quotaCap: { daily: 1_000, monthly: null } });
+    const { s, owner, admin } = e;
+    const wsPath = `/admin/workspaces/${e.ids.workspaceA}`;
+    const wsFields = { name: 'Team A', scopes: 'Scope:1001', tools_all: '1' };
+    // The form offers the fields; an admin may add a quota (a tightening).
+    const form = await (await page(s, `${wsPath}/edit`, admin)).text();
+    expect(form).toContain('name="limit_quotaDaily"');
+    expect(form).toContain('name="limit_quotaMonthly"');
+    const set = await submit(s, `${wsPath}/edit`, admin, { ...wsFields, limit_quotaDaily: '500' });
+    expect(set.status).toBe(303);
+    expect((await s.w.storage.workspaces.get(e.ids.workspaceA))?.limits).toEqual({ quota: { daily: 500 } });
+    expect(await (await page(s, wsPath, admin)).text()).toContain('Agility requests per UTC day: 500');
+    // Above the server's value: refused on the field, naming the cap, nothing stored.
+    const over = await submit(s, `${wsPath}/edit`, owner, { ...wsFields, limit_quotaDaily: '1001' });
+    expect(over.status).toBe(422);
+    expect(await over.text()).toContain('at most 1000');
+    // An admin cannot raise or remove what is set; the form keeps the stored value.
+    for (const fields of [{ limit_quotaDaily: '900' }, {}]) {
+      const res = await submit(s, `${wsPath}/edit`, admin, { ...wsFields, ...fields });
+      expect([303, 403, 422], JSON.stringify(fields)).toContain(res.status);
+      expect((await s.w.storage.workspaces.get(e.ids.workspaceA))?.limits).toEqual({
+        quota: { daily: 500 },
+      });
+    }
+    // The owner may loosen it, within the server's value.
+    expect((await submit(s, `${wsPath}/edit`, owner, { ...wsFields, limit_quotaDaily: '900' })).status).toBe(
+      303,
+    );
+    // A grant: the same rules, and its page lists it under Limits.
+    const g = `/admin/grants/${e.ids.aliceGrant}`;
+    const grantFields = {
+      credential: e.ids.aliceCredential,
+      tools_all: '1',
+      scopes_all: '1',
+      expiry: 'keep',
+    };
+    expect((await submit(s, `${g}/edit`, admin, { ...grantFields, limit_quotaDaily: '20' })).status).toBe(
+      303,
+    );
+    expect((await s.w.storage.grants.get(e.ids.aliceGrant))?.limits).toEqual({ quota: { daily: 20 } });
+    const shown = await (await page(s, g, admin)).text();
+    expect(shown).toContain('Agility requests per UTC day: 20');
+    const raise = await submit(s, `${g}/edit`, admin, { ...grantFields, limit_quotaDaily: '30' });
+    expect([303, 403, 422]).toContain(raise.status);
+    expect((await s.w.storage.grants.get(e.ids.aliceGrant))?.limits).toEqual({ quota: { daily: 20 } });
+  });
+
   it('revokes and deletes behind a confirmation page', async () => {
     const e = await env();
     const { s, admin } = e;

@@ -456,3 +456,23 @@
 - **Options:** (a) `redirect: 'manual'`, and a 3xx answer is a failed export like any non-2xx (it is never followed); (b) feature-detect per runtime.
 - **Recommendation:** (a), built; the guarantee (no redirect followed, T30) is the same, and the Worker test against a loopback collector now proves delivery in workerd.
 - **Owner (2026-10-31):** Decided: as recommended, (a).
+
+### D-333 — A quota override is `limits.quota` of the workspace and of the grant, in the existing limits JSON *(P8-14)*
+- **Context:** The grant's own write limit lives in `rateLimit` (D-225), but a workspace has no `rateLimit`, and the quota is one more per-period number that every layer (deployment, workspace, grant) caps.
+- **Options:** (a) `limits.quota` `{ daily, monthly }` on both the workspace and the grant, validated by `limitsPolicySchema`; (b) `rateLimit.quota` on the grant and a new column on the workspace; (c) a separate `quotas` table.
+- **Recommendation:** (a), built. No migration in the three storage adapters; the admin API, the access resolver and the panel already carry `limits` on both records; `workspace.limits` and `grant.limits` follow the same "lower only" rule they have for every other number. The effective value is the lowest of the deployment, workspace and grant per period (`effectiveQuota`) and is carried on `EffectiveAccess.quota`; the access cache key and the query cache key do not change, because the quota is not a scope dimension.
+
+### D-334 — An administrator may add or lower a quota; loosening or removing one needs an owner with a recent sign-in *(P8-14)*
+- **Context:** The brief says an administrator cannot loosen what an owner set, but a stored quota does not record who set it. P7-15 made the whole write limit owner-only.
+- **Options:** (a) any change that is not a new or lower value (raise one period, remove one, replace with an object that lacks it) needs an owner with a recent sign-in, adding or lowering is allowed to managers; (b) every change owner-only, as P7-15; (c) any manager.
+- **Recommendation:** (a), built. A quota only protects the customer's tenant, so tightening it is safe for an administrator to do; what must not happen is an administrator undoing the owner's cap. Not knowing who set a value is covered by treating every loosening alike. A value above the server's is refused (422) for everyone, naming the cap.
+
+### D-335 — A quota override may be set where the server has none, so the gate always exists *(P8-14)*
+- **Context:** `AB_QUOTA_DAILY` and `AB_QUOTA_MONTHLY` are off when unset. "Only lower, never raise" has no ceiling to compare with for a period the server leaves unlimited.
+- **Options:** (a) allow any in-range value for a period the server leaves open (it adds a limit, which is a lowering of "unlimited"), always create the gate, and let a request whose effective quota has no period touch nothing; (b) refuse overrides unless the server sets the same period; (c) require the server to set both.
+- **Recommendation:** (a), built. A grant that should be cheap on a deployment with no quota is a real case, and a gate with no period costs nothing (no counter is read or written). The admin API's `usage` answers `{ enabled: false }` for a grant to which no period applies, as before.
+
+### D-336 — The CLI sets quotas without knowing the server's cap *(P8-14)*
+- **Context:** `agility-bridge workspace add|set` and `grant add` run the admin API in process against the local store, which has no `AB_QUOTA_*` (the stdio server ignores them).
+- **Options:** (a) pass `--quota-daily` and `--quota-monthly` through without a cap check; (b) read `AB_QUOTA_*` in the CLI to check; (c) no CLI flags.
+- **Recommendation:** (a), built. The running server checks again on every request by taking the lowest value (L-473), so a number above the server's has no effect, and the server's admin API still refuses it when set through the panel or the API. `workspace set` replaces the workspace's whole `limits` object, as `--max-rows` already did (P8-46 merges them).

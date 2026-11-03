@@ -2,7 +2,7 @@
 id: P8-14
 title: Per-grant and per-workspace quota overrides
 phase: 8
-status: todo
+status: review
 priority: low
 depends_on: [P8-09]
 adr: ["0010"]
@@ -21,9 +21,12 @@ Let an owner give one grant or workspace a smaller (never larger) daily or month
 - Effective limits resolved in the access model and carried on `EffectiveAccess`; the meter of P8-09 reads them instead of the deployment values.
 
 ## Acceptance criteria
-- [ ] The effective quota is the lowest of the deployment, workspace and grant values; a higher value is refused with a message naming the cap.
-- [ ] Negative authorization tests: a member cannot set or read another grant's quota; an admin cannot raise an owner's value.
-- [ ] The admin API reference, CLI reference and panel show the new fields; the access cache key and the query cache key are unaffected (the quota is not a scope dimension).
+- [x] The effective quota is the lowest of the deployment, workspace and grant values; a higher value is refused with a message naming the cap.
+- [x] Negative authorization tests: a member cannot set or read another grant's quota; an admin cannot raise an owner's value.
+- [x] The admin API reference, CLI reference and panel show the new fields; the access cache key and the query cache key are unaffected (the quota is not a scope dimension).
+
+## Built (2026-11-03)
+Stored as `limits.quota` of the workspace and the grant (D-333); an administrator may add or lower, loosening needs an owner with a recent sign-in (D-334); allowed where the server has no quota (D-335); the CLI has no cap to check (D-336). `workspace set` replaces the whole `limits` object (P8-46). Lessons L-473, L-474.
 
 ## Security notes
 THREAT_MODEL T5, A10.

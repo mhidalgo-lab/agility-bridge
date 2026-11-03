@@ -194,6 +194,8 @@ export interface AdminApiOptions {
   readonly writeBudget?: (grantId: string, grantLimit?: number) => Promise<WriteBudget>;
   /** Reads a grant's request quota usage (P8-09); absent when no quota is configured. */
   readonly grantUsage?: (grantId: string) => Promise<QuotaUsage>;
+  /** `AB_QUOTA_DAILY` / `AB_QUOTA_MONTHLY`: the most a workspace's or a grant's own `limits.quota` may be (P8-14). */
+  readonly quotaCap?: { readonly daily: number | null; readonly monthly: number | null };
   /** `AB_WRITE_RATE_PER_GRANT_HOURLY`: the most a grant's own hourly write limit may be (P7-15). */
   readonly writeRateCap?: number;
   /** OAuth is on (P5-04): the signed-in person's connected apps. Absent = the `/me/oauth-devices` routes answer 404. */
@@ -754,6 +756,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
         now: () => options.clock.now(),
         ...(options.configuredIdps === undefined ? {} : { configuredIdps: options.configuredIdps }),
         ...(options.writeRateCap === undefined ? {} : { writeRateCap: options.writeRateCap }),
+        ...(options.quotaCap === undefined ? {} : { quotaCap: options.quotaCap }),
       },
       c.get('actor' as never) as Actor,
     );
@@ -1457,7 +1460,7 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       ...gr,
       params: true,
       summary:
-        'One grant\'s Agility requests used today and this month (UTC) against the server\'s quotas (AB_QUOTA_DAILY, AB_QUOTA_MONTHLY), read without taking anything. Owners and admins any grant, a member only their own (another is a 404). `{ enabled: false }` when no quota is configured; `unknown` when the counters cannot be read, never "unlimited".',
+        "One grant's Agility requests used today and this month (UTC) against the quota that applies to it (the lowest of the server's AB_QUOTA_DAILY and AB_QUOTA_MONTHLY, its workspace's `limits.quota` and its own), read without taking anything. Owners and admins any grant, a member only their own (another is a 404). `{ enabled: false }` when no quota is configured; `unknown` when the counters cannot be read, never \"unlimited\".",
       out: GrantUsageOut,
     },
     async (c, { id }) => {
@@ -1466,6 +1469,8 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
       const usage = await options.grantUsage?.(id);
       if (usage === undefined) return { enabled: false };
       if (usage.status !== 'ok') return { enabled: true, status: 'unknown' as const };
+      // No period applies to this grant (neither the server, its workspace nor the grant sets one): no quota.
+      if (usage.daily === undefined && usage.monthly === undefined) return { enabled: false };
       return {
         enabled: true,
         status: 'ok' as const,

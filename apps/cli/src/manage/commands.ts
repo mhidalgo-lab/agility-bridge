@@ -167,10 +167,31 @@ function expiresInDays(v: unknown): number | 'never' | undefined {
   return n;
 }
 
+const QUOTA_OPTIONS = [
+  {
+    name: 'quota-daily',
+    kind: 'int',
+    help: "Agility requests per UTC day for each grant (only lowers the server's AB_QUOTA_DAILY; replaces the limits set before)",
+  },
+  {
+    name: 'quota-monthly',
+    kind: 'int',
+    help: "Agility requests per UTC month for each grant (only lowers the server's AB_QUOTA_MONTHLY; replaces the limits set before)",
+  },
+] as const;
+
+/** `limits.quota` from `--quota-daily` and `--quota-monthly` (P8-14); undefined when neither is given. */
+function quotaOf(p: Parsed): { daily?: unknown; monthly?: unknown } | undefined {
+  const quota = defined({ daily: p.opts['quota-daily'], monthly: p.opts['quota-monthly'] });
+  return Object.keys(quota).length === 0 ? undefined : quota;
+}
+
 function workspaceBody(p: Parsed): Record<string, unknown> {
   const allow = list(p.opts['asset-types-allow']);
   const deny = list(p.opts['asset-types-deny']);
-  const limits = p.opts['max-rows'] === undefined ? undefined : { maxRows: p.opts['max-rows'] };
+  const quota = quotaOf(p);
+  const own = defined({ maxRows: p.opts['max-rows'], quota });
+  const limits = Object.keys(own).length === 0 ? undefined : own;
   return defined({
     name: p.opts['name'],
     allowedScopeIds: p.opts['project'],
@@ -816,6 +837,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       { name: 'asset-types-allow', kind: 'list', help: 'Only these asset types' },
       { name: 'asset-types-deny', kind: 'list', help: 'Never these asset types' },
       { name: 'max-rows', kind: 'int', help: 'Most rows per call' },
+      ...QUOTA_OPTIONS,
       {
         name: 'credential-source',
         kind: 'string',
@@ -838,6 +860,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       { name: 'default-credential', kind: 'string', help: 'Shared default credential' },
       { name: 'tools', kind: 'list', help: 'Enabled tools' },
       { name: 'max-rows', kind: 'int', help: 'Most rows per call' },
+      ...QUOTA_OPTIONS,
       {
         name: 'credential-source',
         kind: 'string',
@@ -886,6 +909,7 @@ export const COMMANDS: readonly CommandSpec[] = [
         repeat: true,
         help: 'Only these of the workspace projects (repeat)',
       },
+      ...QUOTA_OPTIONS.map((o) => ({ ...o, help: o.help.replace('; replaces the limits set before', '') })),
       EXPIRES,
     ],
     api: async (_r, p) => {
@@ -903,6 +927,7 @@ export const COMMANDS: readonly CommandSpec[] = [
           credentialId: p.opts['credential'],
           tools: list(p.opts['tools']),
           scopeIds: p.opts['project'],
+          limits: quotaOf(p) === undefined ? undefined : { quota: quotaOf(p) },
           expiresAt: days === undefined || days === 'never' ? undefined : Date.now() + days * 86_400_000,
         }),
       };
