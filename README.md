@@ -1,5 +1,7 @@
 # agility-bridge
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16294/badge)](https://www.bestpractices.dev/projects/16294)
+
 > **Status: pre-1.0 (0.x).** Published on npm and GHCR: the local stdio server, the team server (`agility-bridge serve`,
 > Docker or a Cloudflare Worker) with sign-in, an admin panel, workspaces, grants, per-device tokens and OAuth, typed
 > tools and reports, and opt-in writes. Minor releases may still contain breaking changes
