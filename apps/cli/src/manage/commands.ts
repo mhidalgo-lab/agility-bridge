@@ -244,6 +244,36 @@ async function grantRateLimit(
   return Object.keys(next).length === 0 ? null : next;
 }
 
+/**
+ * The workspace's `writePolicy` after `--writes` and `--write-approval` (P7-34). The API replaces the policy as a whole, so
+ * the current one is read first and the keys not named (the custom attributes of P7-20) stay as they are.
+ */
+async function workspaceWritePolicy(
+  r: Runtime,
+  workspaceId: string,
+  p: Parsed,
+): Promise<Record<string, unknown> | undefined> {
+  const writes = p.opts['writes'];
+  const approval = p.opts['write-approval'];
+  if (writes !== undefined && writes !== 'on' && writes !== 'off') {
+    throw new ConfigError('--writes must be "on" or "off".');
+  }
+  if (approval !== undefined && approval !== 'any' && approval !== 'page_only') {
+    throw new ConfigError('--write-approval must be "any" or "page_only".');
+  }
+  if (writes === undefined && approval === undefined) return undefined;
+  const got = await (await r.client()).request('GET', `/workspaces/${enc(workspaceId)}`);
+  // A refusal (not found, not allowed) is reported by the PATCH that follows.
+  const current =
+    got.status === 200 ? (got.body as { writePolicy?: unknown } | null)?.writePolicy : undefined;
+  const next: Record<string, unknown> =
+    current !== null && typeof current === 'object' ? { ...(current as Record<string, unknown>) } : {};
+  if (writes !== undefined) next['enabled'] = writes === 'on';
+  if (approval === 'page_only') next['approval'] = 'page_only';
+  else if (approval === 'any') delete next['approval'];
+  return next;
+}
+
 export const COMMANDS: readonly CommandSpec[] = [
   {
     words: ['init'],
@@ -906,12 +936,25 @@ export const COMMANDS: readonly CommandSpec[] = [
         kind: 'string',
         help: '`stored` (default) or `passthrough`: callers send their own Agility token (owner; needs AB_PASSTHROUGH=on)',
       },
+      {
+        name: 'writes',
+        kind: 'string',
+        help: '`on` or `off`: whether write tools may be used in this workspace (owner, recent sign-in; the server needs AB_WRITE_TOOLS=on)',
+      },
+      {
+        name: 'write-approval',
+        kind: 'string',
+        help: '`page_only`: every write needs the approval page, or `any` (owner, recent sign-in)',
+      },
     ],
-    api: async (_r, p) => ({
-      method: 'PATCH',
-      path: `/workspaces/${enc(p.args[0] as string)}`,
-      body: workspaceBody(p),
-    }),
+    api: async (r, p) => {
+      const writePolicy = await workspaceWritePolicy(r, p.args[0] as string, p);
+      return {
+        method: 'PATCH',
+        path: `/workspaces/${enc(p.args[0] as string)}`,
+        body: defined({ ...workspaceBody(p), writePolicy }),
+      };
+    },
   },
   {
     words: ['workspace', 'disable'],

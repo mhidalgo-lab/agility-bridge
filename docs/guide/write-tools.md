@@ -195,7 +195,9 @@ Per client (the full evidence, with versions and dates, is in the
 **Require the page (`page_only`).** Elicitation proves that the client answered, not that a person did: a client set to
 accept every question approves by itself. An owner can require the approval page for every write, per workspace
 (*How writes are approved* on the workspace form, or `writePolicy.approval` in the admin API) or per grant (the grant form,
-or `rateLimit.writeApproval: "page_only"`). The stricter of the two applies; a grant can only tighten. Under `page_only` the
+or `rateLimit.writeApproval: "page_only"`). On the command line: `agility-bridge workspace set <workspace-id> --writes on --write-approval page_only`
+(it reads the workspace's policy first and keeps the custom attributes) and `agility-bridge grant update <grant-id> --write-approval page_only`
+(`any` removes it). The stricter of the two applies; a grant can only tighten. Under `page_only` the
 client is **never asked**: a client that can elicit gets the same `AB_WRITE_APPROVAL_PENDING` link as one that cannot, and
 `whoami` and dry runs report `page`. Without a page (sign-in not configured, or a service grant) the answer is
 `AB_WRITE_APPROVAL_UNAVAILABLE`. Only an owner with a recent sign-in sets or removes it. The default is `any` (D-208, the
