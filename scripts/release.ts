@@ -46,6 +46,8 @@ export interface ReleaseState {
   released: boolean;
   tagCommit: string | undefined;
   headSha: string;
+  /** A stable version of the same `x.y` line that is already on npm and higher than this one (L-128), if any. */
+  newerInLine?: string | undefined;
 }
 
 /** Full 40-hex commit SHA (what GITHUB_SHA and the git refs API return). */
@@ -221,6 +223,11 @@ export function decidePlan(state: ReleaseState): ReleaseMode {
       `Tag already exists on commit ${state.tagCommit}, not on ${state.headSha}; refusing to release from another commit`,
     );
   }
+  if (!state.published && state.newerInLine !== undefined) {
+    throw new Error(
+      `${state.newerInLine} of the same minor line is already on npm; refusing to publish an older version (releases never move backwards)`,
+    );
+  }
   return state.published ? 'release' : 'publish';
 }
 
@@ -250,6 +257,17 @@ export function imageTags(version: string, released: readonly string[], backport
     tags.push(line);
   if (!backport && stable.every((v) => compareStable(v, version) <= 0)) tags.push('latest');
   return tags;
+}
+
+/** The highest stable version in `released` that has the same `major.minor` as `version` and is higher than it. */
+export function newerInLine(version: string, released: readonly string[]): string | undefined {
+  if (!SEMVER_RE.test(version) || version.includes('-')) return undefined;
+  const [major, minor] = version.split('.');
+  return released
+    .filter((v) => SEMVER_RE.test(v) && !v.includes('-') && v.startsWith(`${major}.${minor}.`))
+    .filter((v) => compareStable(v, version) > 0)
+    .sort(compareStable)
+    .pop();
 }
 
 /** Every version of a package on npm (empty when the package does not exist yet). */
@@ -446,6 +464,7 @@ function main(argv: readonly string[]): number {
             released: ghApi(`repos/${repo}/releases/tags/${tag}`) !== undefined,
             tagCommit: resolveTagCommit(repo, tag, ghApi),
             headSha,
+            newerInLine: newerInLine(version, npmVersions(PACKAGE_NAME)),
           });
         } catch (error) {
           console.error(`✗ release plan for ${tag}: ${(error as Error).message}`);
