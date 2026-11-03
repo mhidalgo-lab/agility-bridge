@@ -55,7 +55,7 @@
 ### D-362 — The site is its own pnpm workspace, built by its own workflow *(P9-04)*
 - **Context:** Starlight and Astro add about 280 packages. Putting `site/` in the root workspace would make every CI job install them and put them in the product lockfile.
 - **Options:** (a) `site/` with its own `pnpm-workspace.yaml` and lockfile (same supply-chain settings), installed only by the docs-site workflow; (b) a package under `packages/` in the root workspace; (c) npm in `site/`.
-- **Recommendation:** (a), built. The existing lint, typecheck, test and build jobs are unchanged; Renovate still sees `site/package.json`. The cost is one more lockfile to keep current.
+- **Recommendation:** (a), built. The existing lint, typecheck, test and build jobs are unchanged; Renovate still sees `site/package.json`. The cost is one more lockfile to keep current, and Astro's image library (sharp) brings LGPL libvips binaries: dependency review allows those packages by name because they only run where the site is built and ship in nothing.
 
 ### D-363 — Deploy is skipped, with a warning, until Pages is enabled *(P9-04)*
 - **Context:** The deploy action fails when Pages is not enabled with the GitHub Actions source, and that setting is the owner's to change. A red `main` would get in the way of other work.

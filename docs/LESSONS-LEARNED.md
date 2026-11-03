@@ -2189,7 +2189,8 @@ The Pages deploy job runs on `main`; until the owner enables Pages (Source: GitH
 
 **L-498 — A documentation toolchain is its own workspace, pinned like any dependency.**
 The Astro site lives in `site/` with its own `pnpm-workspace.yaml` (same release-age, trust and build rules) and lockfile, so the product workspace, its lockfile and its CI jobs never install or build it; one workflow does. The minimum release age applies to exact pins too: Astro's newest patch was one day old, so the site pins the previous stable release.
-*Applied in:* P9-04, `site/pnpm-workspace.yaml`, `site/package.json`.
+Astro's image library (sharp) pulls LGPL libvips binaries, so dependency review exempts those packages by name (never by licence): they run only where the site is built.
+*Applied in:* P9-04, `site/pnpm-workspace.yaml`, `site/package.json`, `.github/workflows/security.yml`.
 
 ## S. Documentation and configuration
 
