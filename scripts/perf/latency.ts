@@ -4,12 +4,12 @@
 // latency model), sequentially, N calls after a warm-up. Never a real tenant.
 //   node --conditions=source scripts/perf/latency.ts stdio  [--n 15] [--out file]   Node stdio, cold call per tool too
 //   node --conditions=source scripts/perf/latency.ts http   [--n 15] [--out file]   `agility-bridge serve` on loopback
-//   AB_PERF_URL=https://<worker> AB_PERF_WORKSPACE=<slug> AB_PERF_TOKEN_FILE=<file> AB_ADMIN_TOKEN_FILE=<file> \
+//   AB_PERF_URL=https://<worker> AB_PERF_WORKSPACE=<slug> AB_PERF_TOKEN=<device token> AB_PERF_ADMIN_TOKEN=<admin token> \
 //     node --conditions=source scripts/perf/latency.ts remote [--n 20] [--out file]   a deployed Worker
 // `remote` tags every request with `?perf=<tool>:<i>` so a `wrangler tail --format json` capture can be matched to the
 // calls (CPU time per request, `scripts/perf/tail-cpu.ts`).
 import { type ChildProcess, execFile, spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -279,8 +279,8 @@ async function remoteRun(n: number): Promise<PerfRun> {
   };
   const origin = env('AB_PERF_URL').replace(/\/$/, '');
   const base = `${origin}/w/${env('AB_PERF_WORKSPACE')}/mcp`;
-  const token = readFileSync(env('AB_PERF_TOKEN_FILE'), 'utf8').trim();
-  const adminToken = readFileSync(env('AB_ADMIN_TOKEN_FILE'), 'utf8').trim();
+  const token = env('AB_PERF_TOKEN');
+  const adminToken = env('AB_PERF_ADMIN_TOKEN');
   const offered = await names(base, token);
   const from = Date.now() - 1000;
   const tags: string[] = [];
@@ -330,7 +330,8 @@ async function httpRun(n: number): Promise<PerfRun> {
     ).stdout;
   const json = async (...args: string[]) => JSON.parse(await cli(...args)) as Record<string, any>;
   await cli('init', '--key-file', join(keys, 'master.key'));
-  writeFileSync(join(keys, 'admin.token'), (await cli('admin-token')).trim(), { mode: 0o600 });
+  const adminToken = (await cli('admin-token')).trim();
+  writeFileSync(join(keys, 'admin.token'), adminToken, { mode: 0o600 });
   writeFileSync(join(dir, 'service.token'), MOCK_CREDENTIAL, { mode: 0o600 });
   const instance = await json('instance', 'add', 'Mock', mock.url);
   const credential = await json(
@@ -384,7 +385,7 @@ async function httpRun(n: number): Promise<PerfRun> {
     const patched = await fetch(`http://127.0.0.1:${port}/api/admin/v1/workspaces/${workspace['id']}`, {
       method: 'PATCH',
       headers: {
-        authorization: `Bearer ${readFileSync(join(keys, 'admin.token'), 'utf8').trim()}`,
+        authorization: `Bearer ${adminToken}`,
         'content-type': 'application/json',
       },
       body: JSON.stringify({ limits: { reports: true, attachmentDownload: true } }),
