@@ -37,8 +37,9 @@ export const updateStatus: ToolDefinition = defineWriteTool({
   description: `Set the status of one backlog item, defect, task, test or epic to a status of its workflow (by name or OID token). Changes the status only: it does not close the item. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
   overwrites: true,
-  // Resolution, the item read, the status list (cold), the re-read and the one write.
+  // Resolution, the item read, the status list (cold), the re-read, the one write and the read-back (P7-19).
   cost: COST,
+  readBack: 'reread',
   idempotent: true,
   inputSchema: z.object({
     asset: assetArg,

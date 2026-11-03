@@ -22,7 +22,7 @@ import {
   withinWindow,
 } from './common.ts';
 
-const COST = 18;
+const COST = 20;
 
 export const MAX_COMMENT_CHARS = 4_000;
 const LINE_BREAKS = /\r\n?|[\u2028\u2029]/g;
@@ -78,8 +78,9 @@ export const addComment: ToolDefinition = defineWriteTool({
   title: 'Add comment',
   description: `Add a comment to one backlog item, defect, task, test or epic. The text is shown in full to the person who approves, at most 4,000 characters. A comment identical to your latest one from the last 10 minutes is treated as already added. Not paged. Cold call: up to ${COST} Agility requests.`,
   kind: 'write',
-  // Resolution, the item read, member, the latest comments, then the re-read (3) and the one write; metadata cold.
+  // Resolution, the item read, member, the latest comments, then the re-read (3), the one write and the read-back (3, P7-19); metadata cold.
   cost: COST,
+  readBack: 'reread',
   idempotent: false,
   inputSchema: z.object({
     asset: assetArg,

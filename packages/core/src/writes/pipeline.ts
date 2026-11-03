@@ -50,6 +50,9 @@ export interface Reread {
   readonly version?: string;
 }
 
+/** What a bounded read-back found (P7-19): never an error, because the write already happened. */
+export type ReadBackStatus = 'confirmed' | 'not_yet_visible' | 'unknown';
+
 export interface SendResult {
   /** The OID of what was created or changed, when the response says. */
   readonly oid?: string;
@@ -83,6 +86,13 @@ export interface WriteToolSpec<I extends InputSchema> {
   plan(input: z.infer<I>, ctx: ToolContext): Promise<WritePlan>;
   /** Reads the target again after approval. Omit for operations that create something new (nothing to compare). */
   reread?(plan: WritePlan, ctx: ToolContext): Promise<Reread>;
+  /**
+   * Optional (P7-19): `'reread'` reuses `reread`; or a function that reads the target once more after the send and
+   * returns its values for the fields it can compare
+   * (a field missing from `values` is not checked). One attempt, no waiting, no polling; it spends from the tool's
+   * declared `cost` like any read, so a tool that has it declares that read. A failure is reported as `unknown`.
+   */
+  readonly readBack?: 'reread' | ((plan: WritePlan, sent: SendResult, ctx: ToolContext) => Promise<Reread>);
   /** The one mutation. Called at most once per call, with the Agility request budget of the call. */
   send(plan: WritePlan, ctx: ToolContext): Promise<SendResult>;
 }
@@ -91,6 +101,11 @@ export const WRITE_GROUP: string = 'writes';
 const NOTICE = 'Changes Agility. Needs approval. Preview with dry_run.';
 const READ_LAG =
   'Agility may take a moment to show the change; read the item again later instead of repeating the write.';
+const CONFIRMED_NOTE = 'Read back after the change: Agility already shows the new values.';
+const NOT_VISIBLE_NOTE =
+  'Read back after the change: Agility does not show the new values yet. The write was sent once and is not repeated: read the item again later.';
+const UNKNOWN_NOTE =
+  'The change was sent, but reading it back failed, so it is not confirmed here: read the item again later instead of repeating the write.';
 const UNREADABLE_NOTE =
   'Agility accepted the change but its answer could not be read, so the new state is not confirmed here: read the item to check. Do not repeat the write.';
 const MAYBE_APPLIED_HINT =
@@ -300,6 +315,37 @@ async function obtainApproval(
         'The change needs approval on a page: open the link, review the exact change, approve it, then repeat this call.',
         { hint: `Approval link: ${reply.link}`, details: { expiresAt: reply.expiresAt }, localDetails: true },
       );
+  }
+}
+
+const failNoReread = async (): Promise<Reread> => {
+  throw new Error('readBack: reread needs a reread step');
+};
+
+/**
+ * One read after the send (P7-19). It never throws and never repeats the send: a failure, an exhausted budget or nothing
+ * comparable is `unknown`; a value that differs is `not_yet_visible` (Agility lags, or someone changed the item again).
+ */
+async function readBackOf(
+  spec: Pick<WriteToolSpec<InputSchema>, 'name' | 'readBack' | 'reread'>,
+  plan: WritePlan,
+  sent: SendResult,
+  ctx: ToolContext,
+): Promise<ReadBackStatus | undefined> {
+  if (spec.readBack === undefined) return undefined;
+  try {
+    const now =
+      spec.readBack === 'reread'
+        ? await (spec.reread ?? failNoReread)(plan, ctx)
+        : await spec.readBack(plan, sent, ctx);
+    const checked = plan.mutation.changes.filter((c) => now.values[c.field] !== undefined);
+    if (checked.length === 0) return 'unknown';
+    return checked.every((c) => valuesEqual(now.values[c.field] as WriteValue, c.new))
+      ? 'confirmed'
+      : 'not_yet_visible';
+  } catch (error) {
+    ctx.logger.warn('write read-back failed', { tool: spec.name, error });
+    return 'unknown';
   }
 }
 
@@ -564,7 +610,14 @@ export function defineWriteTool<I extends InputSchema>(spec: WriteToolSpec<I>): 
         ...(sent.unreadable === true ? { note: 'applied; the Agility response could not be read' } : {}),
       })
       .catch((e: unknown) => ctx.logger.error('write outcome audit failed', { tool: spec.name, error: e }));
-    ctx.logger.info('write applied', { tool: spec.name, change: shortId(hash), approval });
+    // After the outcome row, so a slow or failing read-back can never lose the evidence of the change (P7-19).
+    const readBack = await readBackOf(spec, plan, sent, ctx);
+    ctx.logger.info('write applied', {
+      tool: spec.name,
+      change: shortId(hash),
+      approval,
+      ...(readBack === undefined ? {} : { readBack }),
+    });
     return planOutput(
       ctx,
       `Applied: ${mutation.operation} on ${mutation.target.number ?? mutation.target.oid} changed ${mutation.changes.length} field(s).`,
@@ -575,8 +628,18 @@ export function defineWriteTool<I extends InputSchema>(spec: WriteToolSpec<I>): 
         approval,
         ...(sent.oid === undefined ? {} : { resultOid: sent.oid }),
         ...(sent.unreadable === true ? { responseReadable: false } : {}),
+        ...(readBack === undefined ? {} : { readBack }),
       },
-      sent.unreadable === true ? [UNREADABLE_NOTE, READ_LAG] : [READ_LAG],
+      [
+        ...(sent.unreadable === true ? [UNREADABLE_NOTE] : []),
+        readBack === 'confirmed'
+          ? CONFIRMED_NOTE
+          : readBack === 'not_yet_visible'
+            ? NOT_VISIBLE_NOTE
+            : readBack === 'unknown'
+              ? UNKNOWN_NOTE
+              : READ_LAG,
+      ],
     );
   };
 

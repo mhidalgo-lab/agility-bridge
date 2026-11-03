@@ -118,7 +118,8 @@ size, type). See [THREAT_MODEL](../THREAT_MODEL.md) A8 and D-86 … D-88.
 ## Write tools (Phase 7, opt-in)
 
 All write tools take `dry_run` and `confirm`, need approval by default, act on **one** asset, re-check the target before
-applying, are never retried, and note that Agility may take a moment to show the change
+applying, are never retried, and either read the item back once (`readBack`: `confirmed`, `not_yet_visible` or
+`unknown`, P7-19) or note that Agility may take a moment to show the change
 ([ADR-0013](../adr/0013-opt-in-writes-human-approval.md)).
 
 | Tool | Kind | What it changes |

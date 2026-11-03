@@ -152,7 +152,7 @@ describe('update_status', () => {
     expect(w.channel.asked[0]).toContain('"In progress [StoryStatus:2]"');
     expect(w.channel.asked[0]).toContain('"Done [StoryStatus:3]"');
     expect(w.audit.records.map((r) => r.phase)).toEqual(['intent', 'outcome']);
-    expect(out.text).toMatch(/Agility may take a moment/);
+    expect(out.structured).toMatchObject({ readBack: 'confirmed' });
   });
 
   it('a repeat is an idempotent no-op: no approval, no second request', async () => {

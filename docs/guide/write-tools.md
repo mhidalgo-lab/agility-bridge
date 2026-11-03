@@ -308,9 +308,16 @@ All of them are tool errors (`isError: true`), never a successful result with `a
   sent, and the answer says the change is already there. A repeated `add_comment` (same text as your latest comment on the
   item), `log_effort` (same item, you, date and hours) and `create_work_item` (same title and parent within 30 minutes, which
   is refused and names the existing item) are covered the same way.
-- **Read lag.** Agility may not show a change at once, and a list can disagree with a detail view for a while. Every applied
-  answer says so. Report the write result and read the item later; do not poll in a loop and do not repeat the write. How long
-  the lag is on a real instance is **unmeasured** (P7-07).
+- **Read lag and the read-back (P7-19).** Agility may not show a change at once, and a list can disagree with a detail view
+  for a while. After the one send, `update_status`, `assign_owners`, `move_to_sprint`, `update_fields`, `close_asset`,
+  `reopen_asset` and `add_comment` read the item **once** (no waiting, no polling) and report `readBack` in the structured
+  answer: `confirmed` (Agility already shows the new values), `not_yet_visible` (it still shows other values: lag, or someone
+  changed the item again) or `unknown` (the read failed, ran out of budget or had nothing to compare). It is never an error,
+  because the write already happened, and it never repeats the write. The read is after the outcome audit row, so it cannot
+  lose the evidence of the change, and it is part of each of these tools' declared cost. `create_work_item` and `log_effort`
+  have no read-back (a new item has nothing to compare, and a total of hours moves when others log): their answers keep the
+  plain lag note. On `not_yet_visible` or `unknown`, report the write result and read the item later; do not poll in a loop
+  and do not repeat the write. How long the lag is on a real instance is **unmeasured** (P7-07).
 - **A failed send is not retried**, not even after a timeout: the answer says the change may or may not have been applied.
   Look at the item, then decide.
 

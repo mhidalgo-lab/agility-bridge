@@ -53,7 +53,7 @@ import {
 } from './fields.ts';
 import { MOVABLE_TYPES, planMove, planParent, rereadRelations } from './relations.ts';
 
-const COST = 22;
+const COST = 23;
 
 /** Read for every type; attributes the type lacks are left out by the reader. */
 const READ_FIELDS = [
@@ -106,8 +106,9 @@ export const updateFields: ToolDefinition = defineWriteTool({
   kind: 'write',
   overwrites: true,
   // Resolution, the item read, metadata (cold), the priority (1 to 3), a new parent and a new project (each a lookup, a read and
-  // metadata), the re-read with the parent and the one write: 18 measured, 22 declared (D-199, P7-21).
+  // metadata), the re-read with the parent and the one write and the read-back: 20 measured, 23 declared (D-199, P7-21, P7-19).
   cost: COST,
+  readBack: 'reread',
   idempotent: true,
   inputSchema: z.object({
     asset: assetArg,

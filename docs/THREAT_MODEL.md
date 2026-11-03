@@ -393,6 +393,10 @@ Writable custom attributes (`create_work_item.custom`, `update_fields.custom`, [
 
 `create_work_item` takes `owners` (at most three), `team` and `sprint`; `update_fields` takes `parent` and `project` (D-240, D-241). A2/T3/T31: still one item and one request per call. Every new value is found by the resolvers inside the workspace's projects (an item, project, member or team outside answers like an unknown one), the asset types the workspace denies (`Member`, `Team`, `Timebox`, `Scope`) are refused before any request, and the target project of a move must be open and inside the workspace, so a move cannot widen the restriction; a task or test is never moved, only re-parented within its own project, and an item in a sprint is not moved. The write framework's allowlist names `Scope`, `Super` and `Parent` only for the types that may change them. The approval shows old and new for each relation and binds them; the re-read refuses a closed or moved new parent, an item that entered a sprint and a closed sprint (`AB_WRITE_CONFLICT`). The request shapes are *unverified* until the sandbox (P7-07).
 
+## 8g-5. Status after P7-19 (2026-11-03)
+
+Read-back after a write (D-343). A2/T31: it is one more read of the same target through the same scope-checked reads the re-read uses, after the send and after the outcome audit row, so it cannot widen what is read, skip an audit row or send anything; it never calls `send` again, and its failure (including an exhausted budget) becomes `readBack: unknown`, not an error. Values read back are compared, not echoed (the structured answer carries only the status), so no new Agility text reaches the agent outside the output shaper. Its requests are part of each tool's declared cost (D-199 margins kept). The lag itself stays *unmeasured* until the sandbox (P7-07).
+
 ## 8h. Status after P7-08 (2026-10-29)
 
 The write documentation ([guide](guide/write-tools.md), [client approval table](reference/client-compatibility.md#write-approval-channels-per-client))
