@@ -1899,6 +1899,10 @@ The quota gate was built from the deployment settings and passed to every reques
 The SDK's stdio entry has no per-request hook, and `onToolCall` sees only tool calls, resources and prompts, so `initialize`, `tools/list` and notifications would have had no span. A subclass of the real `StdioServerTransport` that sees each inbound frame and each outbound answer gives one span per method in both protocol eras, with the frames themselves unchanged and in order. The tracker reads only the method, the tool name, the id and the error code in the result's metadata (through the existing bounded classifier), keeps a capped table of requests waiting for an answer, and never throws; the allowlisted `Telemetry` sanitises the rest again. Prove it on a real pipe, with a dead collector, and check that stdout still holds only MCP frames (L-021).
 *Applied in:* P8-20, `apps/cli/src/stdio-telemetry.ts`, `test/stdio-telemetry.e2e.test.ts` (L-118, L-119).
 
+**L-475 — A note that depends on a default the panel cannot see must not guess; ask the server, and say nothing when it does not answer.**
+The budget-hidden-tools note only worked where the workspace or grant set `callBudget`, so on Workers Free (45) every workspace that enabled a report was silently hidden from it. The panel now reads the server's default and plan ceiling from a read-only admin answer, parses them as bounded whole numbers, and names the server as the source. "Every tool" is judged by the groups that are on, so a group that is off by default is never reported as hidden; a missing answer shows no note rather than an invented number.
+*Applied in:* P6-58, `admin-ui/src/screens/shared.tsx` (`effectiveBudget`, `budgetNotes`), `GET /limits` (L-115, L-314).
+
 ## P. Observability and logging
 
 **L-117 — Redaction is broad and tested.**
