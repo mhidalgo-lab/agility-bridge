@@ -52,6 +52,7 @@
 - **Recommendation:** (a). These are the limits where "more than the limit across isolates" is a security failure (guessing, sign-in
   and registration floods, write budgets); the per-request limits are throughput protection where an eventually consistent backstop is
   enough. (c) is a small follow-up if an operator needs another set.
+- **Owner (2026-11-03):** Decided: as recommended, (a).
 
 ### D-340 — A broken object falls back to the backstop for request limits and refuses writes *(P3-12)*
 - **Context:** the task fixes the policy (fail open for request limits, closed for writes). What "open" means when a binding is also
@@ -61,4 +62,5 @@
 - **Recommendation:** (a): the weaker protection that was the default before is exactly what an operator keeps while the object is down,
   nothing blocks a valid caller, and a flood during an outage is still slowed. Write counters throw, so the write limiter refuses the
   write (`AB_WRITE_LIMIT_UNAVAILABLE`), as it does for a failing D1.
+- **Owner (2026-11-03):** Decided: as recommended, (a).
 
