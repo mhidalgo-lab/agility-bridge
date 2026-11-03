@@ -1790,6 +1790,7 @@ refuse honest text and do not add a second, weaker envelope.
 **L-481 — A check after an irreversible step reports; it never fails the step.**
 The read-back after a write runs once the change was sent and its outcome stored, catches every failure (including an exhausted call budget) and turns it into `unknown`, so a lagging or broken read can neither hide an applied write behind an error nor tempt a retry. The same placement keeps the audit evidence ahead of any slow follow-up, and the extra read is declared in the tool's cost so the budget is not exhausted by surprise.
 *Applied in:* P7-19, `writes/pipeline.ts` (`readBackOf`), `test/writes/pipeline.test.ts` (L-047, L-108, L-114).
+
 **L-482 — A convenience in front of an out-of-band approval carries the link and nothing else.**
 Asking a client to open the approval page (URL mode) must stay a pointer: the request is a fixed text and the page's own http(s) link, it names nothing about the change, and its answer (accept, decline, error, timeout) is never read as approval, so the page's checks are the only way to approve. The link is returned in the plain answer whatever the client does, so a client that ignores or mishandles the request loses nothing.
 *Applied in:* P7-46, `writes/elicitation.ts` (`withUrlElicitation`), `http-app/test/write-url-elicitation.test.ts` (L-106, L-156).
