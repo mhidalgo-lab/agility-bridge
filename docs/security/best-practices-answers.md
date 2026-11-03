@@ -1,0 +1,130 @@
+# OpenSSF Best Practices (passing level): answers
+
+> P9-06, 2026-11-03. Criteria from the badge project's published list, `criteria/criteria.yml` and `config/locales/en.yml`
+> at commit `dfb72c1` (2026-11-01) of <https://github.com/coreinfrastructure/best-practices-badge>; the live form is at
+> <https://www.bestpractices.dev/en/criteria/0>. There are 67 criteria at the passing level.
+
+## What the owner does
+
+Registering the badge is an **owner step**: it needs a GitHub sign-in as the project owner at
+<https://www.bestpractices.dev/en/projects/new>. Nothing below has been submitted.
+
+1. Sign in with GitHub and add `https://github.com/mhidalgo-lab/agility-bridge` (homepage and repository URL are the same; the
+   project site arrives with P9-04).
+2. For each criterion paste the status and justification from the tables below. Rows marked *owner:* contain a claim only you
+   can make (your own knowledge, or the issue history): read it and confirm or change it.
+3. Save; when every MUST is Met or N/A the badge is awarded. Add the badge to README (the project id appears in the URL).
+4. Tick the P9-06 acceptance item "badge earned" and re-run the Scorecard (its CII-Best-Practices check then rises from 0).
+
+Answers: **64 Met, 3 N/A, 0 Unmet** of 67.
+
+## Project data
+
+| Field | Value |
+|---|---|
+| Name | agility-bridge |
+| Description | An unofficial MCP server that gives AI assistants safe, read-first access to Digital.ai Agility, with opt-in approved writes. |
+| Homepage and repository | https://github.com/mhidalgo-lab/agility-bridge |
+| License | Apache-2.0 |
+| Languages | TypeScript |
+
+## Basics
+
+| Criterion | Level | Status | Justification |
+|---|---|---|---|
+| `description_good`: The project website MUST succinctly describe what the software does (what problem does it solve?). | MUST | Met | The README opens with what the project does: an unofficial MCP server that lets AI assistants read Digital.ai Agility safely. https://github.com/mhidalgo-lab/agility-bridge/blob/main/README.md |
+| `interact`: The project website MUST provide information on how to: obtain, provide feedback (as bug reports or enhancements), and contribute to the software. | MUST | Met | The README and CONTRIBUTING say how to install (npm, Docker, Cloudflare), report bugs and request features (GitHub issues) and contribute (pull requests). https://github.com/mhidalgo-lab/agility-bridge/blob/main/README.md https://github.com/mhidalgo-lab/agility-bridge/blob/main/CONTRIBUTING.md |
+| `contribution`: The information on how to contribute MUST explain the contribution process (e.g., are pull requests used?) | MUST | Met | CONTRIBUTING.md explains the process: task files, one branch and pull request per task, review and CI. https://github.com/mhidalgo-lab/agility-bridge/blob/main/CONTRIBUTING.md |
+| `contribution_requirements`: The information on how to contribute SHOULD include the requirements for acceptable contributions (e.g., a reference to any required coding standard). | SHOULD | Met | CONTRIBUTING.md and AGENTS.md list the requirements: Conventional Commits, DCO sign-off, lint, typecheck and tests green, docs and threat model updated, a changeset when a published package changes. https://github.com/mhidalgo-lab/agility-bridge/blob/main/CONTRIBUTING.md https://github.com/mhidalgo-lab/agility-bridge/blob/main/AGENTS.md |
+| `floss_license`: The software produced by the project MUST be released as FLOSS. | MUST | Met | Apache License 2.0. https://github.com/mhidalgo-lab/agility-bridge/blob/main/LICENSE |
+| `floss_license_osi`: It is SUGGESTED that any required license(s) for the software produced by the project be approved by the Open Source Initiative (OSI). | SUGGESTED | Met | Apache-2.0 is OSI-approved. |
+| `license_location`: The project MUST post the license(s) of its results in a standard location in their source repository. | MUST | Met | LICENSE in the repository root (and in each published package). https://github.com/mhidalgo-lab/agility-bridge/blob/main/LICENSE |
+| `documentation_basics`: The project MUST provide basic documentation for the software produced by the project. | MUST | Met | User guides for install, configuration, access, OAuth, writes and operations. https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/guide/quickstart-local.md |
+| `documentation_interface`: The project MUST provide reference documentation that describes the external interface (both input and output) of the software produced by the project. | MUST | Met | Generated reference of every tool, resource, prompt, admin API route and CLI command. https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/reference |
+| `sites_https`: The project sites (website, repository, and download URLs) MUST support HTTPS using TLS. | MUST | Met | The repository, the npm registry and the container registry are served over HTTPS. https://github.com/mhidalgo-lab/agility-bridge |
+| `discussion`: The project MUST have one or more mechanisms for discussion (including proposed changes and issues) that are searchable, allow messages and topics to be addressed by URL, enable new people to participate in some of the discussions, and do not require client-side installation of proprietary software. | MUST | Met | GitHub issues are public, searchable, addressable by URL and need no proprietary client software beyond a browser. https://github.com/mhidalgo-lab/agility-bridge/issues |
+| `english`: The project SHOULD provide documentation in English and be able to accept bug reports and comments about code in English. | SHOULD | Met | All documentation, issues and code comments are in English. |
+| `maintained`: The project MUST be maintained. | MUST | Met | Actively developed: releases 0.6.0 to 0.8.0 within a week, a public roadmap and task list. https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/ROADMAP.md https://github.com/mhidalgo-lab/agility-bridge/releases |
+
+## Change Control
+
+| Criterion | Level | Status | Justification |
+|---|---|---|---|
+| `repo_public`: The project MUST have a version-controlled source repository that is publicly readable and has a URL. | MUST | Met | Public git repository. https://github.com/mhidalgo-lab/agility-bridge |
+| `repo_track`: The project's source repository MUST track what changes were made, who made the changes, and when the changes were made. | MUST | Met | Git records who changed what and when; every commit is signed off (DCO). |
+| `repo_interim`: To enable collaborative review, the project's source repository MUST include interim versions for review between releases; it MUST NOT include only final releases. | MUST | Met | Work happens on public task branches and pull requests before it reaches main. https://github.com/mhidalgo-lab/agility-bridge/pulls?q=is%3Apr |
+| `repo_distributed`: It is SUGGESTED that common distributed version control software be used (e.g., git) for the project's source repository. | SUGGESTED | Met | Git. |
+| `version_unique`: The project results MUST have a unique version identifier for each release intended to be used by users. | MUST | Met | Every release has a unique version (0.8.0, 0.7.0, ...) and git tag. https://github.com/mhidalgo-lab/agility-bridge/releases |
+| `version_semver`: It is SUGGESTED that the Semantic Versioning (SemVer) or Calendar Versioning (CalVer) version numbering format be used for releases. It is SUGGESTED that those who use CalVer include a micro level value. | SUGGESTED | Met | Semantic Versioning, stated in the versioning guide. https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/guide/versioning.md |
+| `version_tags`: It is SUGGESTED that projects identify each release within their version control system. For example, it is SUGGESTED that those using git identify each release using git tags. | SUGGESTED | Met | Each release is a `v<version>` git tag, enforced by the release workflow. https://github.com/mhidalgo-lab/agility-bridge/tags |
+| `release_notes`: The project MUST provide, in each release, release notes that are a human-readable summary of major changes in that release to help users determine if they should upgrade and what the upgrade impact will be. The release notes MUST NOT be the raw output of a version control log (e.g., the "git log" command results are not release notes). Projects whose results are not intended for reuse in multiple locations (such as the software for a single website or service) AND employ continuous delivery MAY select "N/A". | MUST | Met | Each release has human-readable notes generated from changesets and kept in CHANGELOG.md and the GitHub release. https://github.com/mhidalgo-lab/agility-bridge/blob/main/apps/cli/CHANGELOG.md |
+| `release_notes_vulns`: The release notes MUST identify every publicly known run-time vulnerability fixed in this release that already had a CVE assignment or similar when the release was created. This criterion may be marked as not applicable (N/A) if users typically cannot practically update the software themselves (e.g., as is often true for kernel updates). This criterion applies only to the project results, not to its dependencies. If there are no release notes or there have been no publicly known vulnerabilities, choose N/A. | MUST | N/A | No release so far fixed a publicly known run-time vulnerability that had a CVE. Security fixes will be named in the release notes and the advisory (SECURITY.md). |
+
+## Reporting
+
+| Criterion | Level | Status | Justification |
+|---|---|---|---|
+| `report_process`: The project MUST provide a process for users to submit bug reports (e.g., using an issue tracker or a mailing list). | MUST | Met | Bug reports go to GitHub issues with a template. https://github.com/mhidalgo-lab/agility-bridge/issues/new/choose |
+| `report_tracker`: The project SHOULD use an issue tracker for tracking individual issues. | SHOULD | Met | GitHub issues. |
+| `report_responses`: The project MUST acknowledge a majority of bug reports submitted in the last 2-12 months (inclusive); the response need not include a fix. | MUST | Met | The project has received few reports since it was created (2026-10-16); each is acknowledged. *owner:* confirm this is still true when you submit the form; if no report exists the criterion can be answered N/A. |
+| `enhancement_responses`: The project SHOULD respond to a majority (>50%) of enhancement requests in the last 2-12 months (inclusive). | SHOULD | Met | As above for feature requests. *owner:* confirm at submission. |
+| `report_archive`: The project MUST have a publicly available archive for reports and responses for later searching. | MUST | Met | GitHub issues are a public archive. https://github.com/mhidalgo-lab/agility-bridge/issues?q=is%3Aissue |
+| `vulnerability_report_process`: The project MUST publish the process for reporting vulnerabilities on the project site. | MUST | Met | SECURITY.md describes the process and the timelines. https://github.com/mhidalgo-lab/agility-bridge/blob/main/SECURITY.md |
+| `vulnerability_report_private`: If private vulnerability reports are supported, the project MUST include how to send the information in a way that is kept private. | MUST | Met | Private reports through GitHub private vulnerability reporting, linked from SECURITY.md. https://github.com/mhidalgo-lab/agility-bridge/security/advisories/new |
+| `vulnerability_report_response`: The project's initial response time for any vulnerability report received in the last 6 months MUST be less than or equal to 14 days. | MUST | Met | SECURITY.md promises an acknowledgement within 3 business days (the criterion needs 14 days or less). No report has been received yet. https://github.com/mhidalgo-lab/agility-bridge/blob/main/SECURITY.md |
+
+## Quality
+
+| Criterion | Level | Status | Justification |
+|---|---|---|---|
+| `build`: If the software produced by the project requires building for use, the project MUST provide a working build system that can automatically rebuild the software from source code. | MUST | Met | `pnpm install --frozen-lockfile && pnpm build` rebuilds everything from source; the release workflow does the same on a clean runner. https://github.com/mhidalgo-lab/agility-bridge/blob/main/CONTRIBUTING.md |
+| `build_common_tools`: It is SUGGESTED that common tools be used for building the software. | SUGGESTED | Met | pnpm, tsc and tsdown, the common tools of the TypeScript ecosystem. |
+| `build_floss_tools`: The project SHOULD be buildable using only FLOSS tools. | SHOULD | Met | Every build tool is FLOSS (Node.js, pnpm, TypeScript, tsdown, Biome). |
+| `test`: The project MUST use at least one automated test suite that is publicly released as FLOSS (this test suite may be maintained as a separate FLOSS project). The project MUST clearly show or document how to run the test suite(s) (e.g., via a continuous integration (CI) script or via documentation in files such as BUILD.md, README.md, or CONTRIBUTING.md). | MUST | Met | Vitest suite (about 4,500 tests), Playwright browser tests, all FLOSS and in the repository. https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/dev/testing.md |
+| `test_invocation`: A test suite SHOULD be invocable in a standard way for that language. | SHOULD | Met | `pnpm test` (standard for the language). |
+| `test_most`: It is SUGGESTED that the test suite cover most (or ideally all) the code branches, input fields, and functionality. | SUGGESTED | Met | Property tests, a negative authorization matrix over every route, principal and tool, workerd tests for the Worker and browser tests for the panel; the threat model maps every threat to tests. https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/security/threat-evidence.md |
+| `test_continuous_integration`: It is SUGGESTED that the project implement continuous integration (where new or changed code is frequently integrated into a central code repository and automated tests are run on the result). | SUGGESTED | Met | GitHub Actions runs lint, typecheck, test and build on every pull request, on two Node versions and on macOS and Windows. https://github.com/mhidalgo-lab/agility-bridge/blob/main/.github/workflows/ci.yml |
+| `test_policy`: The project MUST have a general policy (formal or not) that as major new functionality is added to the software produced by the project, tests of that functionality should be added to an automated test suite. | MUST | Met | AGENTS.md and the task rules make tests part of "definition of done" for every task. https://github.com/mhidalgo-lab/agility-bridge/blob/main/AGENTS.md |
+| `tests_are_added`: The project MUST have evidence that the test_policy for adding tests has been adhered to in the most recent major changes to the software produced by the project. | MUST | Met | Every merged task changed tests; see any recent pull request, for example the P9-01 fuzz tests. https://github.com/mhidalgo-lab/agility-bridge/pulls?q=is%3Apr+is%3Amerged |
+| `tests_documented_added`: It is SUGGESTED that this policy on adding tests (see test_policy) be documented in the instructions for change proposals. | SUGGESTED | Met | The policy is in AGENTS.md and the pull request template checklist. https://github.com/mhidalgo-lab/agility-bridge/blob/main/.github/PULL_REQUEST_TEMPLATE.md |
+| `warnings`: The project MUST enable one or more compiler warning flags, a "safe" language mode, or use a separate "linter" tool to look for code quality errors or common simple mistakes, if there is at least one FLOSS tool that can implement this criterion in the selected language. | MUST | Met | TypeScript strict mode and Biome (lint and format) run in CI and in the pre-commit hook. https://github.com/mhidalgo-lab/agility-bridge/blob/main/biome.json https://github.com/mhidalgo-lab/agility-bridge/blob/main/tsconfig.base.json |
+| `warnings_fixed`: The project MUST address warnings. | MUST | Met | CI fails on any error; warnings are reviewed with each change. |
+| `warnings_strict`: It is SUGGESTED that projects be maximally strict with warnings in the software produced by the project, where practical. | SUGGESTED | Met | TypeScript `strict` plus Biome rules. |
+
+## Security
+
+| Criterion | Level | Status | Justification |
+|---|---|---|---|
+| `know_secure_design`: The project MUST have at least one primary developer who knows how to design secure software. (See ‘details’ for the exact requirements.) | MUST | Met | *owner:* confirm. The maintainer has designed the security model of this project (threat model, ADRs, access model) and the project is reviewed against ASVS; see the evidence. https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/THREAT_MODEL.md |
+| `know_common_errors`: At least one of the project's primary developers MUST know of common kinds of errors that lead to vulnerabilities in this kind of software, as well as at least one method to counter or mitigate each of them. | MUST | Met | *owner:* confirm. The threat model, the lessons file and the fuzz and negative-authorization tests address the common errors for this kind of software (injection, SSRF, broken access control, token handling). https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/LESSONS-LEARNED.md |
+| `crypto_published`: The software produced by the project MUST use, by default, only cryptographic protocols and algorithms that are publicly published and reviewed by experts (if cryptographic protocols and algorithms are used). | MUST | Met | AES-256-GCM, HKDF, HMAC-SHA-256, SHA-256, PBKDF2, TLS, all published and standard. https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/security/cryptography.md |
+| `crypto_call`: If the software produced by the project is an application or library, and its primary purpose is not to implement cryptography, then it SHOULD only call on software specifically designed to implement cryptographic functions; it SHOULD NOT re-implement its own. | SHOULD | Met | The project calls the platform WebCrypto implementation and `jose`; it implements no primitive. |
+| `crypto_floss`: All functionality in the software produced by the project that depends on cryptography MUST be implementable using FLOSS. | MUST | Met | WebCrypto and `jose` are FLOSS (the platform runtimes are open source). |
+| `crypto_keylength`: The security mechanisms within the software produced by the project MUST use default keylengths that at least meet the NIST minimum requirements through the year 2030 (as stated in 2012). It MUST be possible to configure the software so that smaller keylengths are completely disabled. | MUST | Met | 256-bit keys and tokens (NIST minimums are 112 bits or more). |
+| `crypto_working`: The default security mechanisms within the software produced by the project MUST NOT depend on broken cryptographic algorithms (e.g., MD4, MD5, single DES, RC4, Dual_EC_DRBG), or use cipher modes that are inappropriate to the context, unless they are necessary to implement an interoperable protocol (where the protocol implemented is the most recent version of that standard broadly supported by the network ecosystem, that ecosystem requires the use of such an algorithm or mode, and that ecosystem does not offer any more secure alternative). The documentation MUST describe any relevant security risks and any known mitigations if these broken algorithms or modes are necessary for an interoperable protocol. | MUST | Met | No broken algorithm (no MD5, SHA-1, DES, RC4) is used. |
+| `crypto_weaknesses`: The default security mechanisms within the software produced by the project SHOULD NOT depend on cryptographic algorithms or modes with known serious weaknesses (e.g., the SHA-1 cryptographic hash algorithm or the CBC mode in SSH). | SHOULD | Met | No algorithm with known serious weaknesses is used by default. |
+| `crypto_pfs`: The security mechanisms within the software produced by the project SHOULD implement perfect forward secrecy for key agreement protocols so a session key derived from a set of long-term keys cannot be compromised if one of the long-term keys is compromised in the future. | SHOULD | Met | Key agreement is TLS 1.2/1.3 in the platform or proxy (ephemeral key exchange); the project does its own key agreement nowhere. |
+| `crypto_password_storage`: If the software produced by the project causes the storing of passwords for authentication of external users, the passwords MUST be stored as iterated hashes with a per-user salt by using a key stretching (iterated) algorithm (e.g., Argon2id, Bcrypt, Scrypt, or PBKDF2). See also OWASP Password Storage Cheat Sheet. | MUST | N/A | The project stores no passwords for external users: sign-in goes through identity providers and API access uses random tokens (only SHA-256 hashes are stored). |
+| `crypto_random`: The security mechanisms within the software produced by the project MUST generate all cryptographic keys and nonces using a cryptographically secure random number generator, and MUST NOT do so using generators that are cryptographically insecure. | MUST | Met | `crypto.getRandomValues` for every key, token, nonce and IV. https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/security/cryptography.md |
+| `delivery_mitm`: The project MUST use a delivery mechanism that counters MITM attacks. Using https or ssh+scp is acceptable. | MUST | Met | npm and GHCR over HTTPS with provenance attestations and an SBOM; the verification guide shows how to check them. https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/guide/verify-release.md |
+| `delivery_unsigned`: A cryptographic hash (e.g., a sha1sum) MUST NOT be retrieved over http and used without checking for a cryptographic signature. | MUST | Met | No hash is fetched over HTTP; checksums are published with the release over HTTPS and provenance is attested. |
+| `vulnerabilities_fixed_60_days`: There MUST be no unpatched vulnerabilities of medium or higher severity that have been publicly known for more than 60 days. | MUST | Met | No known unpatched medium or higher vulnerability: Scorecard reports 0 existing vulnerabilities and CI audits dependencies on every pull request. |
+| `vulnerabilities_critical_fixed`: Projects SHOULD fix all critical vulnerabilities rapidly after they are reported. | SHOULD | Met | Policy in SECURITY.md: fixes ship as soon as ready; none has been needed so far. |
+| `no_leaked_credentials`: The public repositories MUST NOT leak a valid private credential (e.g., a working password or private key) that is intended to limit public access. | MUST | Met | gitleaks runs as a pre-commit hook and in CI on every pull request; fixtures are synthetic. https://github.com/mhidalgo-lab/agility-bridge/blob/main/.github/workflows/security.yml |
+
+## Analysis
+
+| Criterion | Level | Status | Justification |
+|---|---|---|---|
+| `static_analysis`: At least one static code analysis tool (beyond compiler warnings and "safe" language modes) MUST be applied to any proposed major production release of the software before its release, if there is at least one FLOSS tool that implements this criterion in the selected language. | MUST | Met | CodeQL on every pull request and Biome, plus the project's own lints (runtime imports, UI escaping, workflow rules). https://github.com/mhidalgo-lab/agility-bridge/blob/main/.github/workflows/security.yml |
+| `static_analysis_common_vulnerabilities`: It is SUGGESTED that at least one of the static analysis tools used for the static_analysis criterion include rules or approaches to look for common vulnerabilities in the analyzed language or environment. | SUGGESTED | Met | CodeQL security queries cover common vulnerability classes. |
+| `static_analysis_fixed`: All medium and higher severity exploitable vulnerabilities discovered with static code analysis MUST be fixed in a timely way after they are confirmed. | MUST | Met | CodeQL alerts are triaged; there are no open code-scanning alerts about code (the four open ones are Scorecard process findings, triaged in docs/security/scorecard.md). |
+| `static_analysis_often`: It is SUGGESTED that static source code analysis occur on every commit or at least daily. | SUGGESTED | Met | On every pull request and weekly. |
+| `dynamic_analysis`: It is SUGGESTED that at least one dynamic analysis tool be applied to any proposed major production release of the software before its release. | SUGGESTED | Met | Seeded fuzz and property tests (fast-check) for every parser, an OWASP ZAP baseline scan of the panel, and browser tests. https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/security/threat-evidence.md |
+| `dynamic_analysis_unsafe`: It is SUGGESTED that if the software produced by the project includes software written using a memory-unsafe language (e.g., C or C++), then at least one dynamic tool (e.g., a fuzzer or web application scanner) be routinely used in combination with a mechanism to detect memory safety problems such as buffer overwrites. If the project does not produce software written in a memory-unsafe language, choose "not applicable" (N/A). | SUGGESTED | N/A | No memory-unsafe language is used. |
+| `dynamic_analysis_enable_assertions`: It is SUGGESTED that the project use a configuration for at least some dynamic analysis (such as testing or fuzzing) which enables many assertions. In many cases these assertions should not be enabled in production builds. | SUGGESTED | Met | Tests and fuzzing run with assertions on and strict TypeScript. |
+| `dynamic_analysis_fixed`: All medium and higher severity exploitable vulnerabilities discovered with dynamic code analysis MUST be fixed in a timely way after they are confirmed. | MUST | Met | No open medium or higher finding from the ZAP scan or fuzzing; the P9-01 fuzz pass found none. |
+
+## Scorecard
+
+The related OpenSSF Scorecard findings and what was done are in [scorecard.md](scorecard.md).

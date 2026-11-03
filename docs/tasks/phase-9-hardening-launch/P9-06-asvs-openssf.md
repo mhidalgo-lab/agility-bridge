@@ -30,14 +30,14 @@ Show the security posture with recognised checklists, with evidence that CI keep
 - A task for the ASVS rows that are only partly met.
 
 ## Acceptance criteria
-- [ ] Every ASVS 5.0.0 Level 1 and 2 requirement has exactly one row with a status and evidence or a reason; a test
+- [x] Every ASVS 5.0.0 Level 1 and 2 requirement has exactly one row with a status and evidence or a reason; a test
       checks the count, the statuses and that every linked file exists; no row is `Gap` without a task.
-- [ ] Quick wins found while mapping are fixed with a test (V13.4 exposure test).
-- [ ] The OpenSSF passing criteria each have an answer and a justification with a URL; claims only the owner can make
+- [x] Quick wins found while mapping are fixed with a test (V13.4 exposure test).
+- [x] The OpenSSF passing criteria each have an answer and a justification with a URL; claims only the owner can make
       are marked `*owner:*`.
-- [ ] Scorecard findings are triaged in `docs/security/scorecard.md` (cause, fix or decision, owner action).
-- [ ] RESEARCH.md records the ASVS and OpenSSF sources with URLs and dates; lessons and decisions recorded.
-- [ ] `pnpm lint && pnpm typecheck && pnpm test` green.
+- [x] Scorecard findings are triaged in `docs/security/scorecard.md` (cause, fix or decision, owner action).
+- [x] RESEARCH.md records the ASVS and OpenSSF sources with URLs and dates; lessons and decisions recorded.
+- [x] `pnpm lint && pnpm typecheck && pnpm test` green.
 - [ ] *owner:* The Best Practices badge is registered on bestpractices.dev with these answers and shown in the README.
 
 ## Security notes

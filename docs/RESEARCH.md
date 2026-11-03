@@ -746,3 +746,20 @@ Checked 2026-10-23.
   compiler bounds at 50 values for caller input, so on a tenant with more than 50 open defects the read failed and the report
   said "could not be read". The OIDs come from the call's own scope-checked search, so the filter is now a trusted list
   (bound 2,000), as the Scope lists of the search tools already are.
+
+## 10. Security checklists (P9-06, 2026-11-03)
+
+- **OWASP ASVS 5.0.0** (released 2025-05; the repository's latest release tag on 2026-11-03 is `latest`, the `v5.0.0` tag is
+  the numbered release). 345 requirements in 17 chapters: 70 at Level 1, 183 at Level 2, 92 at Level 3. Source used: the
+  official CSV, <https://raw.githubusercontent.com/OWASP/ASVS/v5.0.0/5.0/docs_en/OWASP_Application_Security_Verification_Standard_5.0.0_en.csv>
+  (fetched 2026-11-03); project page <https://owasp.org/www-project-application-security-verification-standard/>. Requirement ids
+  have the form `V<chapter>.<section>.<number>`; a requirement at Level 1 also applies at Level 2. Chapter V17 (WebRTC) and
+  most of V5 (files), V6.2 (passwords) and V4.3/V4.4 (GraphQL, WebSocket) do not apply to this product.
+- **OpenSSF Best Practices Badge, passing level**: 67 criteria (MUST, SHOULD, SUGGESTED), from `criteria/criteria.yml` and
+  `config/locales/en.yml` of <https://github.com/coreinfrastructure/best-practices-badge> at commit `dfb72c1` (2026-11-01);
+  the live form is <https://www.bestpractices.dev/en/criteria/0>. Registration needs a GitHub sign-in by the project owner.
+- **OpenSSF Scorecard** public API: <https://api.scorecard.dev/projects/github.com/mhidalgo-lab/agility-bridge> returns the
+  last run of the Scorecard action (v5.6.0 on 2026-11-03: 7.7). The `Maintained` check scores 0 for repositories younger than
+  90 days; `Code-Review` counts approving reviews, so a solo maintainer scores 0; `CII-Best-Practices` scores 0 until a badge
+  is registered. *verified 2026-11-03*
+
