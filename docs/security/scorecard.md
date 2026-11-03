@@ -18,7 +18,7 @@ License, Signed-Releases, Vulnerabilities, Packaging, SAST, Fuzzing, CI-Tests. N
 | Code-Review | 0 | 0 of 29 merged changesets had an approving review: a single maintainer merges his own pull requests after CI. | Not a quick win. A required approval needs a second person who can approve; with one maintainer it would block every merge. Decision D-348. | owner |
 | Branch-Protection | 4 | `main` forbids deletion and force pushes, applies to administrators, requires up-to-date branches and dismisses stale reviews, but does not require approvers, code-owner review or last-push approval. | Same cause as Code-Review: the three missing items need a second reviewer. Rulesets are the owner's to change ([repo settings](repo-settings.md)); D-348. | owner |
 | Maintained | 0 | The repository was created on 2026-10-16: Scorecard gives 0 to any project younger than 90 days. | Time only. It rises from 2027-01-14 as activity continues (hundreds of commits so far). | none |
-| CII-Best-Practices | 0 | No OpenSSF Best Practices badge. | The answers are ready in [best-practices-answers.md](best-practices-answers.md); registering is the owner step in P9-06. | owner |
+| CII-Best-Practices | 0 at triage | No OpenSSF Best Practices badge at triage time. | Passing badge earned 2026-11-03 (project 16294, [best-practices-answers.md](best-practices-answers.md)); the next Scorecard run picks it up. | done |
 | Contributors | 3 | Contributions come from one organisation. | Cannot be fixed by code; it moves as outside contributors arrive. Accepted. | none |
 
 ## Open code-scanning alerts

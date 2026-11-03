@@ -2,7 +2,7 @@
 id: P9-06
 title: ASVS L2 mapping and OpenSSF Best Practices
 phase: 9
-status: in-progress
+status: review
 priority: medium
 depends_on: [P9-01]
 adr: []
@@ -38,7 +38,8 @@ Show the security posture with recognised checklists, with evidence that CI keep
 - [x] Scorecard findings are triaged in `docs/security/scorecard.md` (cause, fix or decision, owner action).
 - [x] RESEARCH.md records the ASVS and OpenSSF sources with URLs and dates; lessons and decisions recorded.
 - [x] `pnpm lint && pnpm typecheck && pnpm test` green.
-- [ ] *owner:* The Best Practices badge is registered on bestpractices.dev with these answers and shown in the README.
+- [x] *owner:* The Best Practices badge is registered on bestpractices.dev with these answers and shown in the README
+      (passing level, project 16294, 2026-11-03).
 
 ## Security notes
 No behaviour change; the mapping states only what the repository can show.

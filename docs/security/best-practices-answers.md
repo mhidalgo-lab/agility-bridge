@@ -6,18 +6,12 @@
 
 ## What the owner does
 
-The project is registered as <https://www.bestpractices.dev/en/projects/16294> (2026-11-03). Filling in and saving the
-form is an **owner step** (GitHub sign-in as the project owner).
-
-1. Open the form for the passing level, or use the site's automation proposals
-   (<https://github.com/ossf/best-practices-badge/blob/main/docs/automation-proposals.md>): a URL of the form
-   `https://www.bestpractices.dev/en/projects/16294/passing/edit?<criterion>_status=Met&<criterion>_justification=...`
-   prefills a field whose value is still `?`. One such URL per section below, built from these tables, keeps each URL
-   short.
-2. Review every prefilled answer, in particular `know_secure_design` and `know_common_errors` (claims about the
-   maintainer) and the two reporting rows (true while no outside report exists), then save.
-3. When every MUST is Met or N/A the badge is awarded. Add the badge to README.
-4. Tick the P9-06 acceptance item "badge earned" and re-run the Scorecard (its CII-Best-Practices check then rises from 0).
+**Passing badge earned 2026-11-03**: <https://www.bestpractices.dev/projects/16294> (shown in the README). The owner
+filled in the form with the answers below, prefilled through the site's automation-proposal URLs
+(<https://github.com/ossf/best-practices-badge/blob/main/docs/automation-proposals.md>,
+`https://www.bestpractices.dev/en/projects/16294/passing/edit?<criterion>_status=Met&<criterion>_justification=...`). A
+proposal only fills a field that is still `?`; to replace a value the site already set (its automatic check had set
+`release_notes` to Unmet), add `overrides=<criterion>_status`. Keep this file in step when an answer changes on the site.
 
 Answers: **64 Met, 3 N/A, 0 Unmet** of 67.
 
@@ -60,7 +54,7 @@ Answers: **64 Met, 3 N/A, 0 Unmet** of 67.
 | `version_unique`: The project results MUST have a unique version identifier for each release intended to be used by users. | MUST | Met | Every release has a unique version (0.8.0, 0.7.0, ...) and git tag. https://github.com/mhidalgo-lab/agility-bridge/releases |
 | `version_semver`: It is SUGGESTED that the Semantic Versioning (SemVer) or Calendar Versioning (CalVer) version numbering format be used for releases. It is SUGGESTED that those who use CalVer include a micro level value. | SUGGESTED | Met | Semantic Versioning, stated in the versioning guide. https://github.com/mhidalgo-lab/agility-bridge/blob/main/docs/guide/versioning.md |
 | `version_tags`: It is SUGGESTED that projects identify each release within their version control system. For example, it is SUGGESTED that those using git identify each release using git tags. | SUGGESTED | Met | Each release is a `v<version>` git tag, enforced by the release workflow. https://github.com/mhidalgo-lab/agility-bridge/tags |
-| `release_notes`: The project MUST provide, in each release, release notes that are a human-readable summary of major changes in that release to help users determine if they should upgrade and what the upgrade impact will be. The release notes MUST NOT be the raw output of a version control log (e.g., the "git log" command results are not release notes). Projects whose results are not intended for reuse in multiple locations (such as the software for a single website or service) AND employ continuous delivery MAY select "N/A". | MUST | Met | Each release has human-readable notes generated from changesets and kept in CHANGELOG.md and the GitHub release. https://github.com/mhidalgo-lab/agility-bridge/blob/main/apps/cli/CHANGELOG.md |
+| `release_notes`: The project MUST provide, in each release, release notes that are a human-readable summary of major changes in that release to help users determine if they should upgrade and what the upgrade impact will be. The release notes MUST NOT be the raw output of a version control log (e.g., the "git log" command results are not release notes). Projects whose results are not intended for reuse in multiple locations (such as the software for a single website or service) AND employ continuous delivery MAY select "N/A". | MUST | Met | Every release has human-readable release notes written as changesets with each pull request (not a git log): they are collected per version in the CHANGELOG and published as the GitHub release body. Upgrade impact is in the versioning and upgrading guides. https://github.com/mhidalgo-lab/agility-bridge/blob/main/apps/cli/CHANGELOG.md https://github.com/mhidalgo-lab/agility-bridge/releases |
 | `release_notes_vulns`: The release notes MUST identify every publicly known run-time vulnerability fixed in this release that already had a CVE assignment or similar when the release was created. This criterion may be marked as not applicable (N/A) if users typically cannot practically update the software themselves (e.g., as is often true for kernel updates). This criterion applies only to the project results, not to its dependencies. If there are no release notes or there have been no publicly known vulnerabilities, choose N/A. | MUST | N/A | No release so far fixed a publicly known run-time vulnerability that had a CVE. Security fixes will be named in the release notes and the advisory (SECURITY.md). |
 
 ## Reporting
