@@ -397,7 +397,7 @@ Status lives in each task file.
 | P8-42 | [Bind keychain tokens named in the YAML configuration](tasks/phase-8-power-features/P8-42-bind-yaml-keychain-tokens.md) | low | P8-31 | done |
 | P8-43 | [Batch OTLP spans per isolate on Workers](tasks/phase-8-power-features/P8-43-batch-otlp-spans-on-workers.md) | low | P8-35 | review |
 | P8-44 | [Agility request count on stdio spans](tasks/phase-8-power-features/P8-44-stdio-span-request-count.md) | low | P8-20 | todo |
-| P8-46 | [CLI workspace set merges limits instead of replacing them](tasks/phase-8-power-features/P8-46-cli-workspace-set-merges-limits.md) | low | P8-14 | todo |
+| P8-46 | [CLI workspace set merges limits instead of replacing them](tasks/phase-8-power-features/P8-46-cli-workspace-set-merges-limits.md) | low | P8-14 | review |
 
 ### Phase 9
 

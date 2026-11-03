@@ -2,7 +2,7 @@
 id: P8-46
 title: "CLI workspace set merges limits instead of replacing them"
 phase: 8
-status: todo
+status: review
 priority: low
 depends_on: [P8-14]
 adr: []
@@ -18,12 +18,13 @@ owner: ""
 `agility-bridge workspace set <id> --max-rows 20` or `--quota-daily 500` changes only that limit and keeps the others, as the panel's form does.
 
 ## Scope
-- Read the workspace's current `limits`, merge the options given into them (`quota` per period), and send the whole object, so a limit set earlier is not dropped; `--quota-daily 0` style removal needs an explicit flag decided in refinement.
-- The same for a grant once the CLI has a `grant update` (P7-40).
+- Read the workspace's current `limits`, merge the options given into them (`quota` per period), and send the whole object, so a limit set earlier (including the switches and budgets set in the panel) is not dropped.
+- Removal (refined): `--max-rows none`, `--quota-daily none`, `--quota-monthly none`, as `grant update` already does for its rate options (P7-40); removing the last period removes `quota`. The API's owner rules decide whether a removal or raise is allowed.
+- The same for a grant: `grant update --quota-daily|--quota-monthly` (P7-40 exists).
 
 ## Acceptance criteria
-- [ ] A test shows `workspace set --quota-daily` keeps `maxRows` and the other limits, and the reverse.
-- [ ] CLI reference regenerated.
+- [x] A test shows `workspace set --quota-daily` keeps `maxRows` and the other limits, and the reverse (`apps/cli/test/merge-limits.test.ts`, also `none` and `grant update`).
+- [x] CLI reference regenerated.
 
 ## Security notes
 THREAT_MODEL T5: a limit must not disappear because an unrelated one was changed.

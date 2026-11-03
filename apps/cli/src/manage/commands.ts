@@ -171,14 +171,23 @@ const QUOTA_OPTIONS = [
   {
     name: 'quota-daily',
     kind: 'int',
-    help: "Agility requests per UTC day for each grant (only lowers the server's AB_QUOTA_DAILY; replaces the limits set before)",
+    help: "Agility requests per UTC day for each grant (only lowers the server's AB_QUOTA_DAILY)",
   },
   {
     name: 'quota-monthly',
     kind: 'int',
-    help: "Agility requests per UTC month for each grant (only lowers the server's AB_QUOTA_MONTHLY; replaces the limits set before)",
+    help: "Agility requests per UTC month for each grant (only lowers the server's AB_QUOTA_MONTHLY)",
   },
 ] as const;
+
+/** The quota options of `workspace set` and `grant update`: a number, or `none` to remove that period (P8-46). */
+const SET_QUOTA_OPTIONS = QUOTA_OPTIONS.map((o) => ({
+  ...o,
+  kind: 'string' as const,
+  help: `${o.help}, or \`none\` to remove it (removing or raising one needs an owner with a recent sign-in)`,
+}));
+
+const QUOTA_MAX = { daily: 100_000_000, monthly: 1_000_000_000 } as const;
 
 /** `limits.quota` from `--quota-daily` and `--quota-monthly` (P8-14); undefined when neither is given. */
 function quotaOf(p: Parsed): { daily?: unknown; monthly?: unknown } | undefined {
@@ -186,12 +195,10 @@ function quotaOf(p: Parsed): { daily?: unknown; monthly?: unknown } | undefined 
   return Object.keys(quota).length === 0 ? undefined : quota;
 }
 
-function workspaceBody(p: Parsed): Record<string, unknown> {
+/** The workspace fields of `workspace add` and `workspace set`; `limits` is the caller's (whole on add, merged on set). */
+function workspaceBody(p: Parsed, limits: Record<string, unknown> | undefined): Record<string, unknown> {
   const allow = list(p.opts['asset-types-allow']);
   const deny = list(p.opts['asset-types-deny']);
-  const quota = quotaOf(p);
-  const own = defined({ maxRows: p.opts['max-rows'], quota });
-  const limits = Object.keys(own).length === 0 ? undefined : own;
   return defined({
     name: p.opts['name'],
     allowedScopeIds: p.opts['project'],
@@ -213,6 +220,48 @@ function limitOption(v: unknown, name: string, max: number): number | 'none' | u
     throw new ConfigError(`--${name} must be a whole number from 1 to ${max}, or "none" to remove it.`);
   }
   return n;
+}
+
+/** `limits` of `workspace add`: only what the options give (a new workspace has nothing to keep). */
+function newWorkspaceLimits(p: Parsed): Record<string, unknown> | undefined {
+  const own = defined({ maxRows: p.opts['max-rows'], quota: quotaOf(p) });
+  return Object.keys(own).length === 0 ? undefined : own;
+}
+
+/**
+ * A workspace's or a grant's `limits` after `--max-rows`, `--quota-daily` and `--quota-monthly` (P8-46). The API replaces
+ * `limits` as a whole, so the current object is read first and every limit not named (the row and call budgets, the
+ * switches set in the panel, the other quota period) stays as it is (THREAT_MODEL T5). `none` removes one; the API's
+ * owner rules decide whether a removal or a raise is allowed. Undefined when no limit option is given.
+ */
+async function mergedLimits(
+  r: Runtime,
+  path: string,
+  p: Parsed,
+  withMaxRows: boolean,
+): Promise<Record<string, unknown> | undefined> {
+  const maxRows = withMaxRows ? limitOption(p.opts['max-rows'], 'max-rows', 1_000) : undefined;
+  const daily = limitOption(p.opts['quota-daily'], 'quota-daily', QUOTA_MAX.daily);
+  const monthly = limitOption(p.opts['quota-monthly'], 'quota-monthly', QUOTA_MAX.monthly);
+  if (maxRows === undefined && daily === undefined && monthly === undefined) return undefined;
+  const got = await (await r.client()).request('GET', path);
+  // A refusal (not found, not allowed) is reported by the PATCH that follows.
+  const current = got.status === 200 ? (got.body as { limits?: unknown } | null)?.limits : undefined;
+  const next: Record<string, unknown> =
+    current !== null && typeof current === 'object' ? { ...(current as Record<string, unknown>) } : {};
+  const oldQuota = next['quota'];
+  const quota: Record<string, unknown> =
+    oldQuota !== null && typeof oldQuota === 'object' ? { ...(oldQuota as Record<string, unknown>) } : {};
+  const set = (into: Record<string, unknown>, key: string, v: number | 'none' | undefined) => {
+    if (v === 'none') delete into[key];
+    else if (v !== undefined) into[key] = v;
+  };
+  set(next, 'maxRows', maxRows);
+  set(quota, 'daily', daily);
+  set(quota, 'monthly', monthly);
+  if (Object.keys(quota).length === 0) delete next['quota'];
+  else next['quota'] = quota;
+  return next;
 }
 
 /** The grant's `rateLimit` after the options given: keys not named stay as they are (the API replaces the whole value). */
@@ -917,7 +966,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     api: async (_r, p) => ({
       method: 'POST',
       path: '/workspaces',
-      body: { slug: p.args[0], instanceId: p.opts['instance'], ...workspaceBody(p) },
+      body: { slug: p.args[0], instanceId: p.opts['instance'], ...workspaceBody(p, newWorkspaceLimits(p)) },
     }),
   },
   {
@@ -929,8 +978,12 @@ export const COMMANDS: readonly CommandSpec[] = [
       { name: 'project', kind: 'string', repeat: true, help: 'Replace the allowed projects (repeat)' },
       { name: 'default-credential', kind: 'string', help: 'Shared default credential' },
       { name: 'tools', kind: 'list', help: 'Enabled tools' },
-      { name: 'max-rows', kind: 'int', help: 'Most rows per call' },
-      ...QUOTA_OPTIONS,
+      {
+        name: 'max-rows',
+        kind: 'string',
+        help: 'Most rows per call (1-1000), or `none`; the other limits stay as they are',
+      },
+      ...SET_QUOTA_OPTIONS,
       {
         name: 'credential-source',
         kind: 'string',
@@ -948,12 +1001,10 @@ export const COMMANDS: readonly CommandSpec[] = [
       },
     ],
     api: async (r, p) => {
+      const path = `/workspaces/${enc(p.args[0] as string)}`;
       const writePolicy = await workspaceWritePolicy(r, p.args[0] as string, p);
-      return {
-        method: 'PATCH',
-        path: `/workspaces/${enc(p.args[0] as string)}`,
-        body: defined({ ...workspaceBody(p), writePolicy }),
-      };
+      const limits = await mergedLimits(r, path, p, true);
+      return { method: 'PATCH', path, body: defined({ ...workspaceBody(p, limits), writePolicy }) };
     },
   },
   {
@@ -992,7 +1043,7 @@ export const COMMANDS: readonly CommandSpec[] = [
         repeat: true,
         help: 'Only these of the workspace projects (repeat)',
       },
-      ...QUOTA_OPTIONS.map((o) => ({ ...o, help: o.help.replace('; replaces the limits set before', '') })),
+      ...QUOTA_OPTIONS,
       EXPIRES,
     ],
     api: async (_r, p) => {
@@ -1019,7 +1070,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   {
     words: ['grant', 'update'],
     summary:
-      'Change a grant (only the options given): its rate and hourly write limit, write approval, tools, projects, end date (the API owner rules apply)',
+      'Change a grant (only the options given): its rate and hourly write limit, write approval, quota, tools, projects, end date (the API owner rules apply)',
     args: [id('grant-id', 'Grant id')],
     options: [
       {
@@ -1045,18 +1096,21 @@ export const COMMANDS: readonly CommandSpec[] = [
         repeat: true,
         help: 'Only these of the workspace projects (repeat)',
       },
+      ...SET_QUOTA_OPTIONS,
       EXPIRES,
     ],
     api: async (r, p) => {
       const grantId = p.args[0] as string;
       const days = expiresInDays(p.opts['expires-days']);
       const rateLimit = await grantRateLimit(r, grantId, p);
+      const limits = await mergedLimits(r, `/grants/${enc(grantId)}`, p, false);
       const body = defined({
         credentialId: p.opts['credential'],
         tools: list(p.opts['tools']),
         scopeIds: p.opts['project'],
         expiresAt: days === undefined ? undefined : days === 'never' ? null : Date.now() + days * 86_400_000,
         rateLimit,
+        limits,
       });
       if (Object.keys(body).length === 0) {
         throw new ConfigError('Give at least one option to change (see `agility-bridge help grant update`).');
