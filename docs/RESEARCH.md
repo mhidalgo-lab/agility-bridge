@@ -585,6 +585,36 @@ Checked 2026-10 in Cloudflare documentation; P0-09 measures with Agility-shaped 
 - **Browser Integrity Check / bot protection** on custom domains can answer non-browser MCP clients with error 1010 or
   403; a WAF exception for the MCP paths is needed.
 
+### Cloudflare limits fetched 2026-11-03 (P9-03)
+
+Fetched from the current documentation on 2026-11-03; the Paid columns of the P9-03 numbers are *derived* from these.
+
+| | Workers Free | Workers Paid |
+|---|---|---|
+| Requests | 100,000 a day | no limit; 10 million a month included, then $0.30 per million |
+| CPU time per HTTP request | 10 ms | 30 s default, up to 5 min; 30 million CPU ms a month included, then $0.02 per million ms |
+| Subrequests per invocation | 50 (1,000 to Cloudflare internal services) | 10,000 (up to 10 million) |
+| Simultaneous open connections | 6 | 6 |
+| Monthly minimum | none | $5 per account |
+| D1 queries per invocation | 50 | 1,000 (a `batch()` is one) |
+| D1 rows read | 5 million a day | 25 billion a month included, then $0.001 per million |
+| D1 rows written | 100,000 a day | 50 million a month included, then $1.00 per million |
+
+Sources: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/),
+[Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/),
+[D1 limits](https://developers.cloudflare.com/d1/platform/limits/),
+[D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/).
+
+Measured on the account's Free plan the same day (P9-03, *live*, synthetic upstream): **the 10 ms CPU limit is not
+enforced on warm calls.** Of 469 warm MCP calls, 155 reported `cpuTime` above 10 ms (p50 6 to 15 ms per tool, one report
+31 ms, maximum 42 ms) and every one ended `outcome: ok` (no error 1102), so the documented limit behaves as a tolerance
+here, as for the first request of an isolate (D-27); do not design to it (L-097). `wrangler tail --format json` carries
+`cpuTime` and `wallTime` per invocation (0 for a request that fails at boot). The D1 usage of the same 548 calls, read from the
+GraphQL analytics dataset `d1AnalyticsAdaptiveGroups` (`readQueries`, `writeQueries`, `rowsRead`, `rowsWritten`, summed
+by minute; it lags by a minute): 564 write queries and 2,221 rows written (about 4 per call), 430 read queries and 2,493
+rows read. A Worker on `workers.dev` fetched another Worker of the same account on `workers.dev` without error 1042 with
+`global_fetch_strictly_public` on (the mock upstream was reached this way).
+
 ## 6. Node.js, Docker, SQLite, npm and registries
 
 - **Node 24 LTS** ships `node:sqlite` (synchronous SQLite, D1-compatible SQL). Its stability index is below "Stable"

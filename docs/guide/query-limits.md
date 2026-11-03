@@ -80,8 +80,28 @@ refusal by the access model, `tools/list`). A request that made only metadata re
 One statement for both periods saves a D1 round trip (2 statements a request instead of 3), not rows: D1 counts the
 rows an upsert writes, so the rows below are the same as with one statement per period. What saves rows is that metadata is
 not counted. So a read tool call that reaches Agility costs about 2 more rows than without a quota (both periods set; 1 with one) on
-top of the 3 rows of its `tool_call` audit row, and the first call of each grant each day and month 4 more.
-At the Free plan's 100,000 rows that is about 20,000 read calls a day instead of 33,000; the Paid plan is not
-constrained. **The row accounting is computed from the schema, not read from a real D1 (`meta.rows_written`): unverified,**
-like the write numbers in [Cloudflare limits](cloudflare-limits.md). A quota is a cost control you opt into: set it where
+top of the about 4 rows a read call writes (its `tool_call` audit row and the token's last-used time, measured on a deployed
+Worker in P9-03), and the first call of each grant each day and month 4 more.
+At the Free plan's 100,000 rows that is about 16,000 read calls a day instead of 24,000; the Paid plan is not
+constrained. The 4 rows of a read call are **measured** (D1 analytics, 2026-11-03); the 2 rows of the counters are still
+computed from the schema, **unverified**, like the write numbers in [Cloudflare limits](cloudflare-limits.md). A quota is a cost control you opt into: set it where
 the Agility tenant needs protecting, and leave it off on a small Free deployment.
+
+## Declared cost against the measured worst case (P9-03)
+
+Every tool declares the most Agility requests one call can make, and the call budget (45 on Workers Free, otherwise 1,000)
+hides a tool whose declared cost does not fit (L-114, L-115). The cost test (`packages/core/test/tools/cost.test.ts`) forces
+each tool's worst-case fixture on a cold metadata cache and asserts requests <= declared; `pnpm bench:worker` records the
+same counts, cold and warm, in `scripts/bench/worker-baseline.json`, and a test pins them (any change is deliberate). The
+table of all 28 read tools, with the measured latency per mode, is the [performance reference](../reference/performance.md).
+
+What the 2026-11-03 measurements say about budgets and caps (decisions D-356 and D-357 in
+[pending decisions](../pending-decisions/phase-9.md)):
+
+- **No tool exceeds its declared cost**, and a warm call is 0 to 5 requests, so the budget of 45 is generous for everything
+  that fits; nothing was lowered. A tool that sends one more request than before fails the baseline test.
+- **`sprint_health` (54) and `standup_summary` (48) are declared well above their measured 23 and 21** and are hidden on
+  Free by the budget of 45. They stay as declared: the fixture is not a worst case (no paging), and a lower declared cost
+  that is later wrong would break the budget guarantee on Free. P9-16 builds the worst case that proves the real bound.
+- **Quota and rate defaults are not changed**: a quota counts requests (1 to 5 per call warm), not tools, and the
+  measured requests per call agree with how the defaults were reasoned in ADR-0010.
