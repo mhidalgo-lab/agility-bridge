@@ -12,16 +12,34 @@ owner: ""
 
 # P9-03 — Performance and cost review
 
-> Later-phase task: **refine scope and acceptance criteria before starting** (tasks/README rule 7).
+> Refined 2026-11-03 (tasks/README rule 7). Depends on P8-12, waived by the owner on 2026-11-03 (live pass pending).
 
 ## Goal
-Publish realistic latency, request and cost numbers per tool and deployment mode.
+Publish realistic latency, request and cost numbers per tool and deployment mode, and keep them from regressing.
 
 ## Scope
-- Benchmarks with Agility-shaped data on Node and Workers (Free and Paid); budgets and caps re-tuned; numbers documented.
+- Start from `pnpm bench:worker` and its baseline (`scripts/bench/worker-baseline.json`): extend it from a handful of
+  tools to every read tool (warm CPU, cold and warm Agility requests, declared cost against measured worst case, L-114).
+- Latency p50/p95 per tool on **Node stdio**, **Node HTTP** (`agility-bridge serve`) and a **Worker** (staging, Free plan),
+  against a mock Agility with Agility-shaped data and a documented latency model (P0-06 measurements). Never a real tenant.
+- Workers numbers: CPU ms per request (`wrangler tail`), D1 operations; derive the Paid column from Cloudflare's
+  documented limits (cited with URL and date in RESEARCH) and mark derived numbers as derived.
+- Re-tune budgets and caps where the numbers say so (a decision if a default changes).
+- A regression mechanism: the CI bench job also flags request-count growth; a deterministic test pins per-tool requests.
 
 ## Acceptance criteria
-- [ ] Per-tool budget table published; regressions tracked.
+- [ ] The bench covers every read tool; a deterministic test pins the measured requests per tool to the baseline and to
+  the declared cost.
+- [ ] A per-tool budget table is published (`docs/reference/performance.md`, generated from committed results): latency
+  p50/p95 per mode, Agility requests (cold, warm), Workers CPU ms, D1 operations, declared cost against measured worst case.
+- [ ] Latency measured on Node stdio, Node HTTP and the Free-plan Worker with the mock upstream; the raw results are
+  committed (`scripts/bench/perf-results.json`) with the date and the method.
+- [ ] Cloudflare limits for Free and Paid cited from the current docs in `docs/RESEARCH.md` (URL, date); Paid numbers marked derived.
+- [ ] Budgets and caps reviewed against the numbers; any default change recorded as a decision (or "no change" recorded).
+- [ ] Regression tracking: the CI bench job flags request growth as well as CPU growth; documented.
+- [ ] `docs/guide/cloudflare-limits.md` and `docs/guide/query-limits.md` updated.
+- [ ] Every spike Worker created is deleted and the deletion recorded.
+- [ ] *owner:* a run against a live Agility tenant (real latency) and on a Paid account (measured Paid numbers).
 
 ## Security notes
 None beyond the shared rules in AGENTS.md.
