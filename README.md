@@ -1,9 +1,10 @@
 # agility-bridge
 
-> **Status: pre-release.** The local stdio server works (read-only tools for every asset type, with bound queries,
-> workspace scope and untrusted-data handling), and so do the team server (`agility-bridge serve`, Docker or a Cloudflare
-> Worker) with sign-in, an admin panel, workspaces, grants and per-device tokens. OAuth for claude.ai and mobile, writes
-> and reports follow in later phases ([roadmap](docs/ROADMAP.md)). Start with the
+> **Status: pre-1.0 (0.x).** Published on npm and GHCR: the local stdio server, the team server (`agility-bridge serve`,
+> Docker or a Cloudflare Worker) with sign-in, an admin panel, workspaces, grants, per-device tokens and OAuth, typed
+> tools and reports, and opt-in writes. Minor releases may still contain breaking changes
+> ([support and versioning policy](docs/guide/versioning.md)); 1.0 follows the hardening phase
+> ([roadmap](docs/ROADMAP.md)). Start with the
 > [local quickstart](docs/guide/quickstart-local.md) for one person, or the
 > [remote quickstart](docs/guide/quickstart-remote.md) for a team.
 
@@ -82,6 +83,8 @@ The tools are listed in the [tool reference](docs/reference/tools.md).
 - **Lessons learned:** [engineering rules and known failure modes](docs/LESSONS-LEARNED.md)
 - **Contributors and AI agents:** [contributing](CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) ·
   [code of conduct](CODE_OF_CONDUCT.md)
+- **Releases:** [support, versioning and deprecation policy](docs/guide/versioning.md) ·
+  [upgrading](docs/guide/upgrading.md) · [verify a release](docs/guide/verify-release.md)
 - **Security policy:** [SECURITY.md](SECURITY.md) (report vulnerabilities privately) ·
   [repository settings](docs/security/repo-settings.md)
 

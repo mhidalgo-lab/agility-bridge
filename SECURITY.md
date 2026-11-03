@@ -7,7 +7,10 @@ agility-bridge handles Digital.ai Agility access tokens and Agility data, so we 
 | Version | Security fixes |
 |---|---|
 | pre-1.0 (`0.x`) | Latest minor release only, as a patch release. No backports: upgrade to the latest minor. |
-| 1.x (future) | Defined by the support policy (P9-05) before 1.0. |
+| 1.x (future) | The latest minor and, for 90 days, the previous one (recommended in [D-366](docs/pending-decisions/phase-9.md); confirmed before 1.0). |
+
+The full policy (semantic versioning, supported Node, Agility and clients, deprecation) is in
+[versioning](docs/guide/versioning.md); upgrade steps are in [upgrading](docs/guide/upgrading.md).
 
 A fix lands on `main` first and ships as a patch of the latest minor. A security fix may tighten a default or refuse
 input that used to be accepted, without the usual deprecation period; the advisory and the release notes say so.
