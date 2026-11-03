@@ -64,6 +64,8 @@ export interface BenchResult {
   readonly requests: Record<string, number>;
   /** Storage statements per call (the write paths' approval ledger, the quota counters). */
   readonly storage?: Record<string, number>;
+  /** Declared cost of every read tool (P9-03): the ceiling of its `tool cold:` requests (L-114). */
+  readonly declared?: Record<string, number>;
 }
 
 /** Paths whose relative cost grew past THRESHOLD × the baseline (new paths are not flagged). */
@@ -77,6 +79,13 @@ export function regressions(current: BenchResult, baseline: BenchResult, thresho
       ([path, v]) =>
         `${path}: ${v.toFixed(2)}× calibration, baseline ${baseline.relative[path]?.toFixed(2)}×`,
     );
+}
+
+/** Paths that make more Agility requests than the baseline (P9-03): deterministic, so any growth is flagged. */
+export function requestRegressions(current: BenchResult, baseline: BenchResult): string[] {
+  return Object.entries(current.requests)
+    .filter(([path, n]) => baseline.requests[path] !== undefined && n > (baseline.requests[path] as number))
+    .map(([path, n]) => `${path}: ${n} requests, baseline ${baseline.requests[path]}`);
 }
 
 /** One cold boot in this (fresh) process: what the Worker does before its first answer. */
@@ -293,6 +302,65 @@ async function metadataPaths(): Promise<{ ms: Record<string, number>; requests: 
     }
   }
   return { ms, requests };
+}
+
+/**
+ * Every read tool at its worst-case fixture (P9-03, L-114): Agility requests on a cold metadata cache and on a warm one,
+ * beside the declared cost; with `timing`, the median CPU of a warm call. Requests are deterministic, so a test pins
+ * them (`scripts/test/perf-baseline.test.ts`); CPU is compared as a ratio to the calibration like the other paths.
+ */
+export async function catalogPaths(timing = true): Promise<{
+  ms: Record<string, number>;
+  requests: Record<string, number>;
+  declared: Record<string, number>;
+}> {
+  const core = await import('../packages/core/src/index.ts');
+  const { costFakeOptions } = await import('../packages/core/test/tools/cost-world.ts');
+  const { NOW, toolByName } = await import('../packages/core/test/tools/reports-world.ts');
+  const { WORST_CASES } = await import('../packages/core/test/tools/worst-case.ts');
+  const { makeContext, FakeAgility } = await import('../packages/core/test/harness/index.ts');
+  const { rpc } = await import('../packages/core/test/helpers/mcp.ts');
+  const ms: Record<string, number> = {};
+  const requests: Record<string, number> = {};
+  const declared: Record<string, number> = {};
+  const clock = { now: () => NOW };
+  for (const name of Object.keys(WORST_CASES)) {
+    const tool = toolByName(name);
+    const siblings = (core.COMPOSITE_SIBLINGS[name] ?? []).map(toolByName);
+    const fake = new FakeAgility(costFakeOptions());
+    const call = async (service: InstanceType<typeof core.MetadataService>) => {
+      const ctx = makeContext({
+        fetch: fake.fetch,
+        metadata: service,
+        clock,
+        budget: core.createBudget(1_000),
+        projects: { allowed: ['Scope:1001'], includeChildren: true },
+        limits: { ...core.DEFAULT_LIMITS, reports: true, attachmentDownload: true },
+      });
+      const before = fake.requests;
+      const t = cpu();
+      const out = await rpc(() => core.buildMcpServer({ tools: [tool, ...siblings], ctx }), 'tools/call', {
+        name,
+        arguments: WORST_CASES[name]?.args ?? {},
+      });
+      const spent = cpu() - t;
+      if ((out as { isError?: boolean }).isError === true) throw new Error(`${name} failed in the bench`);
+      return { spent, requests: fake.requests - before };
+    };
+    declared[name] = tool.cost;
+    const primed = new core.MetadataService({ shareInflight: false });
+    requests[`tool cold: ${name}`] = (
+      await call(new core.MetadataService({ shareInflight: false }))
+    ).requests;
+    await call(primed);
+    requests[`tool warm: ${name}`] = (await call(primed)).requests;
+    if (!timing) continue;
+    for (let i = 0; i < 3; i++) await call(primed);
+    const samples: number[] = [];
+    for (let i = 0; i < 9; i++) samples.push((await call(primed)).spent);
+    ms[`tool warm: ${name}`] = median(samples);
+  }
+  return { ms, requests, declared };
 }
 
 /** Write paths (P7-09): one write tool on the fakes, warm metadata, the item's status toggled between samples. */
@@ -956,6 +1024,7 @@ async function main(argv: readonly string[]): Promise<number> {
   const panel = await warmPanel();
   const phase6 = await metadataPaths();
   const writes = await writePaths();
+  const catalog = await catalogPaths();
   const approvals = await warmApprovals();
   const queryCache = await cachePaths();
   const phase8 = await phase8Paths();
@@ -967,6 +1036,7 @@ async function main(argv: readonly string[]): Promise<number> {
     ...Object.fromEntries(Object.entries(panel.ms).map(([k, v]) => [`warm: ${k}`, v])),
     ...phase6.ms,
     ...writes.ms,
+    ...catalog.ms,
     ...queryCache.ms,
     ...phase8.ms,
     ...Object.fromEntries(Object.entries(approvals).map(([k, v]) => [`warm: ${k}`, v])),
@@ -983,10 +1053,12 @@ async function main(argv: readonly string[]): Promise<number> {
       ...panel.requests,
       ...phase6.requests,
       ...writes.requests,
+      ...catalog.requests,
       ...queryCache.requests,
       ...phase8.requests,
     },
     storage: { ...writes.storage, ...phase8.storage },
+    declared: catalog.declared,
   };
   console.log(JSON.stringify(result, null, 2));
   if (argv.includes('--update')) {
@@ -997,7 +1069,9 @@ async function main(argv: readonly string[]): Promise<number> {
   const baseline = JSON.parse(readFileSync(BASELINE, 'utf8')) as BenchResult;
   const flagged = regressions(result, baseline);
   for (const f of flagged) console.error(`::warning::CPU regression ${f}`);
-  return flagged.length === 0 ? 0 : 1;
+  const grown = requestRegressions(result, baseline);
+  for (const f of grown) console.error(`::warning::Agility request regression ${f}`);
+  return flagged.length + grown.length === 0 ? 0 : 1;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

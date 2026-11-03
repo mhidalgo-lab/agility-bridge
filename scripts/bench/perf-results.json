@@ -1,0 +1,1187 @@
+{
+  "date": "2026-11-03",
+  "plan": "free",
+  "latencyModel": {
+    "query": 250,
+    "sortedByChangeDate": 1100,
+    "meta": 150,
+    "history": 400,
+    "other": 150
+  },
+  "stdio": {
+    "mode": "node-stdio",
+    "date": "2026-11-03",
+    "node": "v24.16.0",
+    "n": 20,
+    "warm": {
+      "whoami": {
+        "p50": 291,
+        "p95": 588,
+        "min": 265,
+        "max": 1110,
+        "samples": 20,
+        "requests": 1,
+        "errors": 0
+      },
+      "list_projects": {
+        "p50": 341,
+        "p95": 658,
+        "min": 269,
+        "max": 780,
+        "samples": 20,
+        "requests": 1,
+        "errors": 0
+      },
+      "list_asset_types": {
+        "p50": 30,
+        "p95": 95,
+        "min": 2,
+        "max": 321,
+        "samples": 20,
+        "requests": 0,
+        "errors": 0
+      },
+      "describe_asset_type": {
+        "p50": 32,
+        "p95": 85,
+        "min": 4,
+        "max": 105,
+        "samples": 20,
+        "requests": 0,
+        "errors": 0
+      },
+      "query_assets": {
+        "p50": 371,
+        "p95": 556,
+        "min": 307,
+        "max": 580,
+        "samples": 20,
+        "requests": 1,
+        "errors": 0
+      },
+      "get_assets": {
+        "p50": 710,
+        "p95": 1135,
+        "min": 593,
+        "max": 1139,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "search_work_items": {
+        "p50": 2081,
+        "p95": 3481,
+        "min": 1976,
+        "max": 14137,
+        "samples": 20,
+        "requests": 4,
+        "errors": 0
+      },
+      "get_work_item": {
+        "p50": 1398,
+        "p95": 1538,
+        "min": 1375,
+        "max": 1681,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "list_my_work": {
+        "p50": 1407,
+        "p95": 1672,
+        "min": 1369,
+        "max": 1862,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "list_teams": {
+        "p50": 258,
+        "p95": 267,
+        "min": 255,
+        "max": 268,
+        "samples": 20,
+        "requests": 1,
+        "errors": 0
+      },
+      "get_team": {
+        "p50": 775,
+        "p95": 794,
+        "min": 763,
+        "max": 833,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "list_sprints": {
+        "p50": 517,
+        "p95": 544,
+        "min": 507,
+        "max": 706,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "get_sprint": {
+        "p50": 1292,
+        "p95": 1323,
+        "min": 1270,
+        "max": 1619,
+        "samples": 20,
+        "requests": 5,
+        "errors": 0
+      },
+      "get_velocity": {
+        "p50": 769,
+        "p95": 780,
+        "min": 760,
+        "max": 815,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "list_members": {
+        "p50": 255,
+        "p95": 270,
+        "min": 253,
+        "max": 280,
+        "samples": 20,
+        "requests": 1,
+        "errors": 0
+      },
+      "get_asset_history": {
+        "p50": 663,
+        "p95": 673,
+        "min": 655,
+        "max": 677,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "list_recent_changes": {
+        "p50": 1616,
+        "p95": 1627,
+        "min": 1608,
+        "max": 1639,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "get_conversations": {
+        "p50": 509,
+        "p95": 517,
+        "min": 505,
+        "max": 523,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "list_attachments": {
+        "p50": 781,
+        "p95": 803,
+        "min": 759,
+        "max": 818,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "get_attachment": {
+        "p50": 683,
+        "p95": 700,
+        "min": 664,
+        "max": 715,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "list_portfolio_items": {
+        "p50": 1631,
+        "p95": 1659,
+        "min": 1622,
+        "max": 1678,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "get_portfolio_tree": {
+        "p50": 2734,
+        "p95": 2761,
+        "min": 2716,
+        "max": 2764,
+        "samples": 20,
+        "requests": 4,
+        "errors": 0
+      },
+      "sprint_health": {
+        "p50": 1362,
+        "p95": 1375,
+        "min": 1358,
+        "max": 1381,
+        "samples": 20,
+        "requests": 5,
+        "errors": 0
+      },
+      "standup_summary": {
+        "p50": 1372,
+        "p95": 1470,
+        "min": 1364,
+        "max": 1562,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "release_readiness": {
+        "p50": 2717,
+        "p95": 2761,
+        "min": 2709,
+        "max": 2842,
+        "samples": 20,
+        "requests": 4,
+        "errors": 0
+      },
+      "defect_triage": {
+        "p50": 1365,
+        "p95": 1431,
+        "min": 1359,
+        "max": 1537,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "quality_scan": {
+        "p50": 511,
+        "p95": 542,
+        "min": 505,
+        "max": 650,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "work_item_quality": {
+        "p50": 1612,
+        "p95": 1618,
+        "min": 1608,
+        "max": 1621,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      }
+    },
+    "cold": {
+      "whoami": {
+        "ms": 2276,
+        "requests": 2
+      },
+      "list_projects": {
+        "ms": 1470,
+        "requests": 4
+      },
+      "list_asset_types": {
+        "ms": 5208,
+        "requests": 21
+      },
+      "describe_asset_type": {
+        "ms": 1261,
+        "requests": 3
+      },
+      "query_assets": {
+        "ms": 1545,
+        "requests": 9
+      },
+      "get_assets": {
+        "ms": 1740,
+        "requests": 9
+      },
+      "search_work_items": {
+        "ms": 4337,
+        "requests": 19
+      },
+      "get_work_item": {
+        "ms": 4614,
+        "requests": 22
+      },
+      "list_my_work": {
+        "ms": 3577,
+        "requests": 16
+      },
+      "list_teams": {
+        "ms": 453,
+        "requests": 2
+      },
+      "get_team": {
+        "ms": 2736,
+        "requests": 14
+      },
+      "list_sprints": {
+        "ms": 1361,
+        "requests": 7
+      },
+      "get_sprint": {
+        "ms": 2970,
+        "requests": 16
+      },
+      "get_velocity": {
+        "ms": 2283,
+        "requests": 13
+      },
+      "list_members": {
+        "ms": 459,
+        "requests": 2
+      },
+      "get_asset_history": {
+        "ms": 2360,
+        "requests": 12
+      },
+      "list_recent_changes": {
+        "ms": 4105,
+        "requests": 21
+      },
+      "get_conversations": {
+        "ms": 1423,
+        "requests": 7
+      },
+      "list_attachments": {
+        "ms": 1835,
+        "requests": 9
+      },
+      "get_attachment": {
+        "ms": 1725,
+        "requests": 8
+      },
+      "list_portfolio_items": {
+        "ms": 3277,
+        "requests": 12
+      },
+      "get_portfolio_tree": {
+        "ms": 4499,
+        "requests": 15
+      },
+      "sprint_health": {
+        "ms": 3715,
+        "requests": 22
+      },
+      "standup_summary": {
+        "ms": 3592,
+        "requests": 20
+      },
+      "release_readiness": {
+        "ms": 6109,
+        "requests": 15
+      },
+      "defect_triage": {
+        "ms": 4283,
+        "requests": 12
+      },
+      "quality_scan": {
+        "ms": 3980,
+        "requests": 9
+      },
+      "work_item_quality": {
+        "ms": 3924,
+        "requests": 16
+      }
+    }
+  },
+  "http": {
+    "mode": "node-http",
+    "date": "2026-11-03",
+    "node": "v24.16.0",
+    "n": 20,
+    "warm": {
+      "whoami": {
+        "p50": 273,
+        "p95": 287,
+        "min": 265,
+        "max": 287,
+        "samples": 20,
+        "requests": 1,
+        "errors": 0
+      },
+      "list_projects": {
+        "p50": 269,
+        "p95": 280,
+        "min": 259,
+        "max": 282,
+        "samples": 20,
+        "requests": 1,
+        "errors": 0
+      },
+      "list_asset_types": {
+        "p50": 10,
+        "p95": 46,
+        "min": 7,
+        "max": 46,
+        "samples": 20,
+        "requests": 0,
+        "errors": 0
+      },
+      "describe_asset_type": {
+        "p50": 14,
+        "p95": 20,
+        "min": 5,
+        "max": 26,
+        "samples": 20,
+        "requests": 0,
+        "errors": 0
+      },
+      "query_assets": {
+        "p50": 273,
+        "p95": 316,
+        "min": 261,
+        "max": 332,
+        "samples": 20,
+        "requests": 1,
+        "errors": 0
+      },
+      "get_assets": {
+        "p50": 522,
+        "p95": 544,
+        "min": 512,
+        "max": 556,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "search_work_items": {
+        "p50": 1901,
+        "p95": 1949,
+        "min": 1871,
+        "max": 1974,
+        "samples": 20,
+        "requests": 4,
+        "errors": 0
+      },
+      "get_work_item": {
+        "p50": 1391,
+        "p95": 1429,
+        "min": 1368,
+        "max": 1441,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "list_my_work": {
+        "p50": 1386,
+        "p95": 1434,
+        "min": 1366,
+        "max": 1441,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "list_teams": {
+        "p50": 284,
+        "p95": 415,
+        "min": 271,
+        "max": 428,
+        "samples": 20,
+        "requests": 1,
+        "errors": 0
+      },
+      "get_team": {
+        "p50": 821,
+        "p95": 930,
+        "min": 781,
+        "max": 931,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "list_sprints": {
+        "p50": 557,
+        "p95": 714,
+        "min": 514,
+        "max": 781,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "get_sprint": {
+        "p50": 1315,
+        "p95": 1408,
+        "min": 1286,
+        "max": 1536,
+        "samples": 20,
+        "requests": 5,
+        "errors": 0
+      },
+      "get_velocity": {
+        "p50": 792,
+        "p95": 845,
+        "min": 775,
+        "max": 846,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "list_members": {
+        "p50": 285,
+        "p95": 371,
+        "min": 264,
+        "max": 378,
+        "samples": 20,
+        "requests": 1,
+        "errors": 0
+      },
+      "get_asset_history": {
+        "p50": 704,
+        "p95": 753,
+        "min": 679,
+        "max": 771,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "list_recent_changes": {
+        "p50": 1655,
+        "p95": 1704,
+        "min": 1631,
+        "max": 1918,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "get_conversations": {
+        "p50": 537,
+        "p95": 559,
+        "min": 522,
+        "max": 609,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "list_attachments": {
+        "p50": 792,
+        "p95": 806,
+        "min": 776,
+        "max": 809,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "get_attachment": {
+        "p50": 682,
+        "p95": 698,
+        "min": 667,
+        "max": 714,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "list_portfolio_items": {
+        "p50": 1630,
+        "p95": 1644,
+        "min": 1617,
+        "max": 1661,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "get_portfolio_tree": {
+        "p50": 2757,
+        "p95": 2783,
+        "min": 2737,
+        "max": 2793,
+        "samples": 20,
+        "requests": 4,
+        "errors": 0
+      },
+      "sprint_health": {
+        "p50": 1381,
+        "p95": 1410,
+        "min": 1367,
+        "max": 1411,
+        "samples": 20,
+        "requests": 5,
+        "errors": 0
+      },
+      "standup_summary": {
+        "p50": 1439,
+        "p95": 1592,
+        "min": 1376,
+        "max": 1651,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "release_readiness": {
+        "p50": 2734,
+        "p95": 2764,
+        "min": 2716,
+        "max": 2786,
+        "samples": 20,
+        "requests": 4,
+        "errors": 0
+      },
+      "defect_triage": {
+        "p50": 1365,
+        "p95": 1400,
+        "min": 1356,
+        "max": 1409,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "work_item_quality": {
+        "p50": 1616,
+        "p95": 1644,
+        "min": 1614,
+        "max": 1666,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "quality_scan": {
+        "p50": 511,
+        "p95": 519,
+        "min": 508,
+        "max": 766,
+        "samples": 20,
+        "requests": 2.05,
+        "errors": 0
+      }
+    }
+  },
+  "workers": {
+    "mode": "workers",
+    "date": "2026-11-03",
+    "node": "v24.16.0",
+    "n": 20,
+    "warm": {
+      "whoami": {
+        "p50": 311,
+        "p95": 330,
+        "min": 295,
+        "max": 336,
+        "samples": 20,
+        "requests": 1,
+        "errors": 0
+      },
+      "list_projects": {
+        "p50": 300,
+        "p95": 323,
+        "min": 292,
+        "max": 325,
+        "samples": 20,
+        "requests": 1.14,
+        "errors": 0
+      },
+      "list_asset_types": {
+        "p50": 74,
+        "p95": 4508,
+        "min": 46,
+        "max": 4751,
+        "samples": 20,
+        "requests": 1,
+        "errors": 0
+      },
+      "describe_asset_type": {
+        "p50": 88,
+        "p95": 435,
+        "min": 31,
+        "max": 451,
+        "samples": 20,
+        "requests": 0.19,
+        "errors": 0
+      },
+      "query_assets": {
+        "p50": 304,
+        "p95": 320,
+        "min": 294,
+        "max": 975,
+        "samples": 20,
+        "requests": 1.14,
+        "errors": 0
+      },
+      "get_assets": {
+        "p50": 548,
+        "p95": 599,
+        "min": 537,
+        "max": 822,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "search_work_items": {
+        "p50": 1878,
+        "p95": 2165,
+        "min": 1862,
+        "max": 2252,
+        "samples": 20,
+        "requests": 4.1,
+        "errors": 0
+      },
+      "get_work_item": {
+        "p50": 1375,
+        "p95": 1674,
+        "min": 1362,
+        "max": 2719,
+        "samples": 20,
+        "requests": 2.1,
+        "errors": 0
+      },
+      "list_my_work": {
+        "p50": 1382,
+        "p95": 1664,
+        "min": 1369,
+        "max": 1723,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "list_teams": {
+        "p50": 295,
+        "p95": 306,
+        "min": 288,
+        "max": 575,
+        "samples": 20,
+        "requests": 1,
+        "errors": 0
+      },
+      "get_team": {
+        "p50": 797,
+        "p95": 1039,
+        "min": 784,
+        "max": 1068,
+        "samples": 20,
+        "requests": 3.1,
+        "errors": 0
+      },
+      "list_sprints": {
+        "p50": 543,
+        "p95": 556,
+        "min": 528,
+        "max": 840,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "get_sprint": {
+        "p50": 1302,
+        "p95": 1609,
+        "min": 1274,
+        "max": 1716,
+        "samples": 20,
+        "requests": 5,
+        "errors": 0
+      },
+      "get_velocity": {
+        "p50": 788,
+        "p95": 799,
+        "min": 773,
+        "max": 1063,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "list_members": {
+        "p50": 295,
+        "p95": 300,
+        "min": 282,
+        "max": 582,
+        "samples": 20,
+        "requests": 1,
+        "errors": 0
+      },
+      "get_asset_history": {
+        "p50": 696,
+        "p95": 844,
+        "min": 678,
+        "max": 975,
+        "samples": 20,
+        "requests": 2.05,
+        "errors": 0
+      },
+      "list_recent_changes": {
+        "p50": 1625,
+        "p95": 1924,
+        "min": 1604,
+        "max": 2176,
+        "samples": 20,
+        "requests": 3.1,
+        "errors": 0
+      },
+      "get_conversations": {
+        "p50": 541,
+        "p95": 612,
+        "min": 525,
+        "max": 840,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "list_attachments": {
+        "p50": 791,
+        "p95": 798,
+        "min": 782,
+        "max": 1076,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "get_attachment": {
+        "p50": 699,
+        "p95": 966,
+        "min": 688,
+        "max": 1026,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "list_portfolio_items": {
+        "p50": 1617,
+        "p95": 1892,
+        "min": 1577,
+        "max": 1941,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "get_portfolio_tree": {
+        "p50": 2703,
+        "p95": 3001,
+        "min": 2673,
+        "max": 3005,
+        "samples": 20,
+        "requests": 4,
+        "errors": 0
+      },
+      "release_readiness": {
+        "p50": 2700,
+        "p95": 2983,
+        "min": 2651,
+        "max": 3009,
+        "samples": 20,
+        "requests": 4,
+        "errors": 0
+      },
+      "defect_triage": {
+        "p50": 1373,
+        "p95": 1693,
+        "min": 1356,
+        "max": 2294,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "work_item_quality": {
+        "p50": 1637,
+        "p95": 1910,
+        "min": 1605,
+        "max": 1973,
+        "samples": 20,
+        "requests": 3,
+        "errors": 0
+      },
+      "quality_scan": {
+        "p50": 542,
+        "p95": 563,
+        "min": 523,
+        "max": 574,
+        "samples": 20,
+        "requests": 2,
+        "errors": 0
+      },
+      "sprint_health": {
+        "p50": 1406,
+        "p95": 1855,
+        "min": 1369,
+        "max": 1855,
+        "samples": 10,
+        "requests": 5,
+        "errors": 0
+      },
+      "standup_summary": {
+        "p50": 1447,
+        "p95": 1754,
+        "min": 1407,
+        "max": 1754,
+        "samples": 10,
+        "requests": 3.09,
+        "errors": 0
+      }
+    }
+  },
+  "workersCpu": {
+    "whoami": {
+      "cpuP50": 9,
+      "cpuP95": 13,
+      "cpuMax": 13,
+      "wallP50": 441,
+      "samples": 9,
+      "over10": 3,
+      "notOk": 0,
+      "warmupCpu": 30
+    },
+    "list_projects": {
+      "cpuP50": 7,
+      "cpuP95": 8,
+      "cpuMax": 8,
+      "wallP50": 441,
+      "samples": 7,
+      "over10": 0,
+      "notOk": 0,
+      "warmupCpu": 27
+    },
+    "list_asset_types": {
+      "cpuP50": 7,
+      "cpuP95": 68,
+      "cpuMax": 85,
+      "wallP50": 180,
+      "samples": 20,
+      "over10": 6,
+      "notOk": 0,
+      "warmupCpu": 61
+    },
+    "describe_asset_type": {
+      "cpuP50": 9,
+      "cpuP95": 13,
+      "cpuMax": 13,
+      "wallP50": 186,
+      "samples": 5,
+      "over10": 1,
+      "notOk": 0,
+      "warmupCpu": 13
+    },
+    "query_assets": {
+      "cpuP50": 10,
+      "cpuP95": 15,
+      "cpuMax": 15,
+      "wallP50": 445,
+      "samples": 15,
+      "over10": 7,
+      "notOk": 0,
+      "warmupCpu": 24
+    },
+    "get_assets": {
+      "cpuP50": 7,
+      "cpuP95": 10,
+      "cpuMax": 10,
+      "wallP50": 694,
+      "samples": 20,
+      "over10": 0,
+      "notOk": 0,
+      "warmupCpu": 8
+    },
+    "search_work_items": {
+      "cpuP50": 11,
+      "cpuP95": 19,
+      "cpuMax": 19,
+      "wallP50": 2067,
+      "samples": 20,
+      "over10": 13,
+      "notOk": 0,
+      "warmupCpu": 24
+    },
+    "get_work_item": {
+      "cpuP50": 10,
+      "cpuP95": 24,
+      "cpuMax": 29,
+      "wallP50": 1556,
+      "samples": 20,
+      "over10": 8,
+      "notOk": 0,
+      "warmupCpu": 12
+    },
+    "list_my_work": {
+      "cpuP50": 12,
+      "cpuP95": 16,
+      "cpuMax": 21,
+      "wallP50": 1554,
+      "samples": 20,
+      "over10": 12,
+      "notOk": 0,
+      "warmupCpu": 18
+    },
+    "list_teams": {
+      "cpuP50": 6,
+      "cpuP95": 12,
+      "cpuMax": 12,
+      "wallP50": 436,
+      "samples": 18,
+      "over10": 2,
+      "notOk": 0,
+      "warmupCpu": 5
+    },
+    "get_team": {
+      "cpuP50": 9,
+      "cpuP95": 13,
+      "cpuMax": 14,
+      "wallP50": 957,
+      "samples": 20,
+      "over10": 6,
+      "notOk": 0,
+      "warmupCpu": 12
+    },
+    "list_sprints": {
+      "cpuP50": 7,
+      "cpuP95": 9,
+      "cpuMax": 18,
+      "wallP50": 689,
+      "samples": 20,
+      "over10": 1,
+      "notOk": 0,
+      "warmupCpu": 6
+    },
+    "get_sprint": {
+      "cpuP50": 13,
+      "cpuP95": 22,
+      "cpuMax": 27,
+      "wallP50": 1472,
+      "samples": 20,
+      "over10": 13,
+      "notOk": 0,
+      "warmupCpu": 21
+    },
+    "get_velocity": {
+      "cpuP50": 8,
+      "cpuP95": 12,
+      "cpuMax": 12,
+      "wallP50": 952,
+      "samples": 20,
+      "over10": 6,
+      "notOk": 0,
+      "warmupCpu": 9
+    },
+    "list_members": {
+      "cpuP50": 6,
+      "cpuP95": 16,
+      "cpuMax": 16,
+      "wallP50": 435,
+      "samples": 15,
+      "over10": 1,
+      "notOk": 0,
+      "warmupCpu": 8
+    },
+    "get_asset_history": {
+      "cpuP50": 8,
+      "cpuP95": 15,
+      "cpuMax": 18,
+      "wallP50": 846,
+      "samples": 20,
+      "over10": 2,
+      "notOk": 0,
+      "warmupCpu": 9
+    },
+    "list_recent_changes": {
+      "cpuP50": 11,
+      "cpuP95": 20,
+      "cpuMax": 26,
+      "wallP50": 1816,
+      "samples": 20,
+      "over10": 12,
+      "notOk": 0,
+      "warmupCpu": 24
+    },
+    "get_conversations": {
+      "cpuP50": 6,
+      "cpuP95": 11,
+      "cpuMax": 19,
+      "wallP50": 691,
+      "samples": 20,
+      "over10": 3,
+      "notOk": 0,
+      "warmupCpu": 7
+    },
+    "list_attachments": {
+      "cpuP50": 8,
+      "cpuP95": 10,
+      "cpuMax": 12,
+      "wallP50": 954,
+      "samples": 20,
+      "over10": 1,
+      "notOk": 0,
+      "warmupCpu": 10
+    },
+    "get_attachment": {
+      "cpuP50": 8,
+      "cpuP95": 14,
+      "cpuMax": 19,
+      "wallP50": 851,
+      "samples": 20,
+      "over10": 4,
+      "notOk": 0,
+      "warmupCpu": 7
+    },
+    "list_portfolio_items": {
+      "cpuP50": 9,
+      "cpuP95": 16,
+      "cpuMax": 24,
+      "wallP50": 1805,
+      "samples": 20,
+      "over10": 6,
+      "notOk": 0,
+      "warmupCpu": 15
+    },
+    "get_portfolio_tree": {
+      "cpuP50": 12,
+      "cpuP95": 21,
+      "cpuMax": 24,
+      "wallP50": 2919,
+      "samples": 20,
+      "over10": 12,
+      "notOk": 0,
+      "warmupCpu": 14
+    },
+    "release_readiness": {
+      "cpuP50": 14,
+      "cpuP95": 20,
+      "cpuMax": 28,
+      "wallP50": 2918,
+      "samples": 20,
+      "over10": 13,
+      "notOk": 0,
+      "warmupCpu": 20
+    },
+    "defect_triage": {
+      "cpuP50": 10,
+      "cpuP95": 20,
+      "cpuMax": 26,
+      "wallP50": 1547,
+      "samples": 20,
+      "over10": 10,
+      "notOk": 0,
+      "warmupCpu": 8
+    },
+    "work_item_quality": {
+      "cpuP50": 11,
+      "cpuP95": 18,
+      "cpuMax": 19,
+      "wallP50": 1811,
+      "samples": 20,
+      "over10": 11,
+      "notOk": 0,
+      "warmupCpu": 17
+    },
+    "quality_scan": {
+      "cpuP50": 7,
+      "cpuP95": 11,
+      "cpuMax": 11,
+      "wallP50": 692,
+      "samples": 20,
+      "over10": 2,
+      "notOk": 0,
+      "warmupCpu": 7
+    },
+    "sprint_health": {
+      "cpuP50": 15,
+      "cpuP95": 17,
+      "cpuMax": 17,
+      "wallP50": 1548,
+      "samples": 10,
+      "over10": 10,
+      "notOk": 0,
+      "warmupCpu": 21
+    },
+    "standup_summary": {
+      "cpuP50": 31,
+      "cpuP95": 42,
+      "cpuMax": 42,
+      "wallP50": 1575,
+      "samples": 10,
+      "over10": 10,
+      "notOk": 0,
+      "warmupCpu": 34
+    }
+  }
+}

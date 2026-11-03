@@ -84,7 +84,7 @@ would write about 4,800 x 31 = 149,000 rows a day, **above the Free plan's 100,0
 read-tool audit rows compete for the same budget. So **on the Free plan (`AB_PLAN=free`, the default) the cap is 60 an hour**:
 unset it is 60, and a larger value stops the Worker at its first request, like the call-budget and response-size ceilings
 (P7-30, D-211). 60 an hour is at most 1,440 writes and about 45,000 rows a day, under half the budget. One grant at its
-default 20 an hour is about 15,000 rows a day. The Paid plan (50 million rows a day included) keeps the default of 200. The `tool_call` audit rows of reads are in the same budget (three rows each).
+default 20 an hour is about 15,000 rows a day. The Paid plan (50 million rows a day included) keeps the default of 200. The `tool_call` audit rows of reads are in the same budget (measured in P9-03: about four rows written per read call, see [per-tool numbers](#per-tool-numbers-on-a-deployed-worker-p9-03)).
 
 ## Quotas and the D1 row budget
 
@@ -233,6 +233,70 @@ A non-required CI job runs the benchmark on every pull request, keeps the number
 whose cost, relative to a calibration workload in the same run, more than doubles against
 `scripts/bench/worker-baseline.json`. After an intended change, refresh the baseline with
 `pnpm bench:worker --update`.
+
+## Per-tool numbers on a deployed Worker (P9-03)
+
+Measured 2026-11-03 on a Worker deployed on this account's **Free plan** (`agility-bridge-staging`), its D1, and a mock
+Agility Worker with synthetic, Agility-shaped data and a modelled delay per upstream request (never a real tenant). The
+whole per-tool table (latency p50/p95 on Node stdio, Node HTTP and the Worker, Agility requests cold and warm, Workers
+CPU, declared cost against measured worst case) is generated in the [performance reference](../reference/performance.md);
+the method is in [Repeat the measurements](#repeat-the-measurements). What the numbers say:
+
+- **Agility requests are the latency.** A warm call is 0 to 5 Agility requests, mostly in sequence, so a tool takes about
+  *the longest chain of requests times the upstream's latency* plus 5 to 60 ms of our own work: `whoami` 0.3 s,
+  `get_sprint` 1.3 s, `search_work_items` 1.9 s (it sorts by `ChangeDate`, about 1.1 s in P0-06, which the mock models),
+  `get_portfolio_tree` and `release_readiness` 2.7 s. Node stdio, Node HTTP and the Worker differ by less than 10% in the
+  median; the Worker's p95 is 10 to 30% above its p50. The mock's delays are a model of P0-06's live figures, so **scale
+  the latency column to your tenant; the request counts and the CPU are firm.**
+- **Warm CPU is above the Free plan's 10 ms for a third of the calls, and Cloudflare did not stop one.** Over 469 warm calls
+  of 26 tools, p50 was 6 to 15 ms per tool (`standup_summary`, a report that reads three sections, 31 ms), p95 8 to 24 ms
+  (68 ms for one `list_asset_types` call that landed on a new isolate), 155 calls (33%) took more than 10 ms and **none
+  ended in an `exceededCpu` error** (`wrangler tail`, `outcome` and `cpuTime`). That is the tolerance of D-27 reaching warm
+  calls, not a guarantee (L-097): the Worker's own fixed cost (auth, the audit row, JSON-RPC, shaping) is already 6 to 9 ms in
+  `list_teams` and `whoami`, about two to three times the Node figure of `pnpm bench:worker` for the same path. The 512 KiB
+  response cap and the call budgets are not what drives this, so they stay (D-356); cutting the fixed cost is P9-15. A
+  deployment that cannot accept an occasional error 1102 runs on Paid.
+- **D1: about 4 rows written and 1 write query per tool call, 4.5 rows read and 0.8 read queries**, read from the account's
+  GraphQL analytics (`d1AnalyticsAdaptiveGroups`, which reports `rowsWritten` and `rowsRead`) for 548 calls: 2,221 rows
+  written, 564 write queries, 2,493 rows read, 430 read queries. The audit row of every call is three of the four (the
+  table and its two indexes); the rest is the token's last-used time. **On the Free plan a deployment that only reads is
+  bounded by D1, not by Worker requests: 100,000 rows a day is about 24,000 tool calls a day, a quarter of the 100,000
+  requests** (D-359). This replaces the "about three rows" of the write section; the write flows keep their computed
+  figures, which this run did not check.
+- **Declared cost covers the measured worst case for every tool** (cold, all 28), with margins of 0 to 15 (most under 6;
+  `get_work_item` 23 of 24). The two reports above the Free budget, `sprint_health` (declared 54) and `standup_summary`
+  (48), measured 23 and 21 on a cold cache in the cost world, so the budget of 45 hides them behind headroom that may not be
+  needed; the declared figures stay until worst-case fixtures with paging prove a lower bound (D-357, P9-16). On a Worker,
+  metadata kept in D1 makes a cold isolate cost 5 to 8 requests for the Phase 6 tools instead (table above).
+- **Free versus Paid, derived.** Measured: Free. Derived from Cloudflare's current documented limits (fetched 2026-11-03,
+  [RESEARCH](../RESEARCH.md#cloudflare-limits-fetched-2026-11-03-p9-03)): on Paid the 10 ms CPU limit becomes 30 s by
+  default and the 50 subrequests become 10,000, so no tool here can fail on CPU or subrequests, and the cost becomes money,
+  not errors. At the measured p50 of about 10 ms and 4 D1 rows a call, one million tool calls a month use 1 million of the 10
+  million requests, about 10 million of the 30 million CPU ms and 4 million of the 50 million D1 rows written that Paid
+  includes: the $5 minimum is the bill, and overage prices ($0.30 per million requests, $0.02 per million CPU ms, $1.00 per
+  million rows) only matter beyond about 3 million calls a month. These are *derived*; the CPU of the two reports above the Free budget was measured on the same Free account with
+  `AB_PLAN=paid` (budget only), so it is a Free-hardware figure.
+
+### Repeat the measurements
+
+Everything is committed. `pnpm bench:worker` measures CPU and requests of every read tool in Node (CI keeps it).
+`pnpm bench:latency stdio` and `pnpm bench:latency http` measure latency against the local mock
+(`scripts/perf/mock-agility.ts`, `node scripts/perf/mock-agility.ts [port]`). For a Worker, deploy the mock as a Worker
+(`spikes/perf-mock`, named `agility-bridge-spike-*`, delete it afterwards), add it as an instance of a staging workspace with
+reports and attachment download on (`limits.reports`, `limits.attachmentDownload`), run `bench:latency remote` (it tags each
+request `?perf=<tool>:<n>`) while `wrangler tail <name> --format json` writes a capture, and parse the capture with
+`node scripts/perf/tail-cpu.ts`; rows come from the D1 analytics for the window. `scripts/perf/collect.ts` writes
+`scripts/bench/perf-results.json`, and `pnpm docs:perf` regenerates the reference.
+
+### Regressions
+
+The CI **Worker CPU benchmark** job (not required) flags two things against `scripts/bench/worker-baseline.json`: a path
+whose CPU, relative to the run's calibration, is more than twice its baseline, and **any growth in Agility requests** of any
+path, since requests are exact. The deterministic part is also a required unit test (`scripts/test/worker-bench.test.ts`):
+every read tool's cold and warm request counts must equal the baseline and its cold count must not exceed its declared
+cost, so a change that makes a tool send one more request fails the build until the baseline (and the declared cost, if
+needed) is updated on purpose (D-360). Introducing the check found that the write paths had grown from 4 to 5 requests
+since the baseline (the read-back of P7-19).
 
 ## Rate limits
 

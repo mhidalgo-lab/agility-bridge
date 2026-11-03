@@ -1,0 +1,8 @@
+// P9-03 mock Agility upstream (worker.ts). Deploy for the measurement, then `wrangler delete` it. No ids committed.
+{
+  "name": "agility-bridge-spike-perf-mock",
+  "main": "worker.ts",
+  "compatibility_date": "2026-09-26",
+  "workers_dev": true,
+  "send_metrics": false
+}

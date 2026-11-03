@@ -92,3 +92,27 @@
 - **Options:** (a) 90 days from the report, or until a fixed release is out, whichever is first, and another time by agreement; (b) 45 days; (c) no fixed term.
 - **Recommendation:** (a), built as (a): the common industry default, and long enough for a volunteer-maintained project to fix, release and let users upgrade. SECURITY.md already commits to 30 days for a fix of high and critical issues.
 
+### D-356 — The budget and cap presets stay as they are after the P9-03 measurements *(P9-03)*
+- **Context:** P9-03 measured every read tool on Node stdio, Node HTTP and a Free-plan Worker (mock upstream): no tool exceeds its declared cost, warm calls are 0 to 5 Agility requests, and the Worker's CPU is driven by a fixed per-request cost of 6 to 9 ms, not by response size.
+- **Options:** (a) keep Free 45 requests / 512 KiB and Paid 1,000 / 8 MiB; (b) lower the Free response cap to cut CPU; (c) raise the Free budget now that warm calls are small.
+- **Recommendation:** (a), built (no change). A lower cap would not move the fixed cost; a higher budget would not unhide the two reports (their declared cost is 54 and 48), and the headroom under 50 subrequests is what the Free plan allows.
+
+### D-357 — Declared costs of `sprint_health` (54) and `standup_summary` (48) stay until a paging worst case proves a bound *(P9-03)*
+- **Context:** Measured cold on the cost world they use 23 and 21 requests, so the Free budget of 45 hides them behind headroom that may be unnecessary. The cost fixture has no paging, so it is not a proof of the worst case (L-114).
+- **Options:** (a) keep the declared costs and file the proof as P9-16; (b) lower them to the measured values plus a margin now; (c) make the reports degrade (fewer sections) on a small budget instead of hiding them.
+- **Recommendation:** (a), built (no change). A declared cost that is too low breaks the guarantee that a call never needs a request the budget does not have; (c) is a product change that needs its own decision.
+
+### D-358 — Warm CPU above 10 ms on Workers Free stays a documented tolerance, with a task to cut the fixed cost *(P9-03)*
+- **Context:** 33% of 469 warm calls reported more than 10 ms of CPU on the Free plan and none failed (RESEARCH, 2026-11-03). This extends D-27 from the first request of an isolate to warm calls. Cloudflare may start enforcing the limit.
+- **Options:** (a) keep Free supported as a tolerance, say so in the guide, and file P9-15 to profile and cut the fixed per-request cost; (b) declare Free "light use" and require Paid for teams; (c) make the Free plan refuse tools whose measured p50 is above 10 ms.
+- **Recommendation:** (a), built. (c) would hide most tools on a plan that serves them today; (b) can follow if enforcement starts or P9-15 finds nothing to cut.
+
+### D-359 — D1 rows for reads are documented as the Free plan's real ceiling; no default changes *(P9-03)*
+- **Context:** A read tool call writes about 4 D1 rows (measured), so a read-only deployment on Free is bounded at about 24,000 tool calls a day by the 100,000 row limit, below the Worker request limit. The read audit row is the main part.
+- **Options:** (a) document the ceiling and file P9-17 (attribute and reduce rows per read call, for example sampling or batching read audit rows); (b) stop auditing reads on Free; (c) leave it undocumented.
+- **Recommendation:** (a), built. The audit log of reads is a feature owners rely on (usage statistics), so it is not turned off to save rows without a design.
+
+### D-360 — Request regressions are pinned by a required unit test, CPU stays in the non-required bench job *(P9-03)*
+- **Context:** Requests per tool are exact; CPU is noisy on shared runners (the baseline compares ratios and flags at 2x). The bench job is not a required check.
+- **Options:** (a) a unit test (required, in `pnpm test`) pins every read tool's cold and warm requests to the baseline and its cold count under the declared cost, and the bench job also flags request growth; CPU stays a 2x ratio warning; (b) make the bench job itself required; (c) pin only declared costs (already in the cost test).
+- **Recommendation:** (a), built. (b) would make an unreliable timing job block merges; (c) misses a tool that gets more expensive but stays under its declaration.

@@ -2,7 +2,7 @@
 // The CPU regression check of scripts/worker-bench.ts (P3-10).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { type BenchResult, median, regressions } from '../worker-bench.ts';
+import { type BenchResult, catalogPaths, median, regressions, requestRegressions } from '../worker-bench.ts';
 
 const baseline = JSON.parse(
   readFileSync(new URL('../bench/worker-baseline.json', import.meta.url), 'utf8'),
@@ -63,5 +63,29 @@ describe('worker-bench regressions', () => {
       },
     };
     expect(regressions(slowed, baseline)).toHaveLength(1);
+  });
+});
+
+describe('per-tool request pins (P9-03, L-114)', () => {
+  it('flags request growth, however small, and ignores new paths', () => {
+    const grown: BenchResult = {
+      ...baseline,
+      requests: { ...baseline.requests, 'tool cold: get_work_item': 99, 'tool cold: new_tool': 5 },
+    };
+    expect(requestRegressions(baseline, baseline)).toEqual([]);
+    expect(requestRegressions(grown, baseline)).toEqual([expect.stringMatching(/^tool cold: get_work_item/)]);
+  });
+
+  it('every read tool makes exactly the baseline requests, cold and warm, within its declared cost', async () => {
+    const now = await catalogPaths(false);
+    expect(Object.keys(baseline.declared ?? {}).sort()).toEqual(Object.keys(now.declared).sort());
+    for (const [path, n] of Object.entries(now.requests))
+      expect(n, `${path}: run pnpm bench:worker --update if this change is intended`).toBe(
+        baseline.requests[path],
+      );
+    for (const [tool, cost] of Object.entries(now.declared)) {
+      expect(baseline.declared?.[tool], `${tool}: declared cost changed, refresh the baseline`).toBe(cost);
+      expect(now.requests[`tool cold: ${tool}`] ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(cost);
+    }
   });
 });
