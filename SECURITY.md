@@ -85,13 +85,27 @@ scanners without a demonstrated impact.
 
 ## Safe harbour
 
-We will not pursue legal action for good-faith research that respects this policy: test only against your own
-deployments and Agility instances you are authorised to use, avoid accessing other people's data, and give us
-reasonable time to fix before disclosure.
+We will not pursue or support legal action against good-faith research that follows this policy, and we consider such
+research authorised. The rules:
+
+- test only your own deployments and Agility instances you are authorised to use; never someone else's agility-bridge
+  deployment, Cloudflare account or identity provider
+- do not access, keep or share other people's data; if you reach some, stop and tell us
+- no denial of service of shared infrastructure (GitHub, npm, Cloudflare, identity providers, Digital.ai), no social
+  engineering of maintainers or users, no physical attacks
+- give us reasonable time to fix before disclosure: we ask for **90 days from the report** or until a fixed release is out,
+  whichever is first, and will agree another time if the issue calls for it
+
+## External review
+
+We are inviting an independent security review before 1.0. The scope, the code map and the rules for reviewers are in the
+[call for reviewers](docs/security/call-for-reviewers.md). The review summary will be linked here once it is published.
 
 ## Our practices
 
-See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) (threats, mitigations and the tasks that implement them) and
+See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) (threats, mitigations and the tasks that implement them),
+[`docs/security/threat-evidence.md`](docs/security/threat-evidence.md) (every threat mapped to code and tests, with the
+accepted residual risks), the [ASVS 5.0 mapping](docs/security/asvs-l2.md) and
 [`docs/security/repo-settings.md`](docs/security/repo-settings.md) (repository protections).
 
 ## Security acknowledgements

@@ -32,7 +32,7 @@ How to use it:
 | [F. Query safety and limits](#f-query-safety-and-limits) | L-057 – L-062, L-168 – L-170, L-172, L-273, L-282, L-323 |
 | [G. Access model, tokens and isolation](#g-access-model-tokens-and-isolation) | L-063 – L-070, L-424, L-177, L-183, L-239, L-280, L-304, L-316 |
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-434, L-443, L-444, L-161, L-173 |
-| [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271, L-426, L-427 |
+| [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271, L-426, L-427, L-486 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267, L-345, L-409, L-410 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182, L-458, L-477 – L-479 |
@@ -950,6 +950,13 @@ Error-rate alerts only work if a bad asset number and a database outage are diff
 and a test fails when a code is added without a class. `upstream` (Agility down, slow or throttling) is kept apart from `server` so an
 Agility outage and a bug page different people; both mark the span `ERROR`, caller faults never do.
 *Applied in:* P8-07, `telemetry/attributes.ts`, `core/test/telemetry/attributes.test.ts`.
+
+**L-486 — A cap's cleanup runs after the cost check, never before it.**
+The metadata-document cap made room by evicting a stored document before the per-address fetch budget was checked, so a caller with
+no budget left could still empty the cache one request at a time. The rule is the one for every bounded cache fed by anonymous
+callers: refuse first (budget, shape), do the work (fetch, validate), and only then make room right before the store. A test fills
+the cap, spends the budget, sends many unseen ids and expects the stored set unchanged.
+*Applied in:* P9-02, `http-app/src/oauth/server.ts` (`makeRoom`), `http-app/test/oauth/clients-memory.test.ts` (L-121, L-080).
 
 ## J. OAuth and identity
 
