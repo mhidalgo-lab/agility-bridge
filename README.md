@@ -4,7 +4,7 @@
 > Docker or a Cloudflare Worker) with sign-in, an admin panel, workspaces, grants, per-device tokens and OAuth, typed
 > tools and reports, and opt-in writes. Minor releases may still contain breaking changes
 > ([support and versioning policy](docs/guide/versioning.md)); 1.0 follows the hardening phase
-> ([roadmap](docs/ROADMAP.md)). Start with the
+> ([roadmap](docs/ROADMAP.md), [launch checklist](docs/dev/launch-checklist.md)). Start with the
 > [local quickstart](docs/guide/quickstart-local.md) for one person, or the
 > [remote quickstart](docs/guide/quickstart-remote.md) for a team.
 
