@@ -6,14 +6,17 @@
 
 ## What the owner does
 
-Registering the badge is an **owner step**: it needs a GitHub sign-in as the project owner at
-<https://www.bestpractices.dev/en/projects/new>. Nothing below has been submitted.
+The project is registered as <https://www.bestpractices.dev/en/projects/16294> (2026-11-03). Filling in and saving the
+form is an **owner step** (GitHub sign-in as the project owner).
 
-1. Sign in with GitHub and add `https://github.com/mhidalgo-lab/agility-bridge` (homepage and repository URL are the same; the
-   project site arrives with P9-04).
-2. For each criterion paste the status and justification from the tables below. Rows marked *owner:* contain a claim only you
-   can make (your own knowledge, or the issue history): read it and confirm or change it.
-3. Save; when every MUST is Met or N/A the badge is awarded. Add the badge to README (the project id appears in the URL).
+1. Open the form for the passing level, or use the site's automation proposals
+   (<https://github.com/ossf/best-practices-badge/blob/main/docs/automation-proposals.md>): a URL of the form
+   `https://www.bestpractices.dev/en/projects/16294/passing/edit?<criterion>_status=Met&<criterion>_justification=...`
+   prefills a field whose value is still `?`. One such URL per section below, built from these tables, keeps each URL
+   short.
+2. Review every prefilled answer, in particular `know_secure_design` and `know_common_errors` (claims about the
+   maintainer) and the two reporting rows (true while no outside report exists), then save.
+3. When every MUST is Met or N/A the badge is awarded. Add the badge to README.
 4. Tick the P9-06 acceptance item "badge earned" and re-run the Scorecard (its CII-Best-Practices check then rises from 0).
 
 Answers: **64 Met, 3 N/A, 0 Unmet** of 67.
@@ -66,8 +69,8 @@ Answers: **64 Met, 3 N/A, 0 Unmet** of 67.
 |---|---|---|---|
 | `report_process`: The project MUST provide a process for users to submit bug reports (e.g., using an issue tracker or a mailing list). | MUST | Met | Bug reports go to GitHub issues with a template. https://github.com/mhidalgo-lab/agility-bridge/issues/new/choose |
 | `report_tracker`: The project SHOULD use an issue tracker for tracking individual issues. | SHOULD | Met | GitHub issues. |
-| `report_responses`: The project MUST acknowledge a majority of bug reports submitted in the last 2-12 months (inclusive); the response need not include a fix. | MUST | Met | The project has received few reports since it was created (2026-10-16); each is acknowledged. *owner:* confirm this is still true when you submit the form; if no report exists the criterion can be answered N/A. |
-| `enhancement_responses`: The project SHOULD respond to a majority (>50%) of enhancement requests in the last 2-12 months (inclusive). | SHOULD | Met | As above for feature requests. *owner:* confirm at submission. |
+| `report_responses`: The project MUST acknowledge a majority of bug reports submitted in the last 2-12 months (inclusive); the response need not include a fix. | MUST | Met | No bug reports have been received yet: the only issue is the Renovate dependency dashboard. New reports are triaged in GitHub issues. https://github.com/mhidalgo-lab/agility-bridge/issues?q=is%3Aissue |
+| `enhancement_responses`: The project SHOULD respond to a majority (>50%) of enhancement requests in the last 2-12 months (inclusive). | SHOULD | Met | No enhancement requests have been received yet; requests are triaged in GitHub issues. https://github.com/mhidalgo-lab/agility-bridge/issues?q=is%3Aissue |
 | `report_archive`: The project MUST have a publicly available archive for reports and responses for later searching. | MUST | Met | GitHub issues are a public archive. https://github.com/mhidalgo-lab/agility-bridge/issues?q=is%3Aissue |
 | `vulnerability_report_process`: The project MUST publish the process for reporting vulnerabilities on the project site. | MUST | Met | SECURITY.md describes the process and the timelines. https://github.com/mhidalgo-lab/agility-bridge/blob/main/SECURITY.md |
 | `vulnerability_report_private`: If private vulnerability reports are supported, the project MUST include how to send the information in a way that is kept private. | MUST | Met | Private reports through GitHub private vulnerability reporting, linked from SECURITY.md. https://github.com/mhidalgo-lab/agility-bridge/security/advisories/new |
