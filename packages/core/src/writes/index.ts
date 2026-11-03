@@ -2,7 +2,15 @@
 // The write framework (P7-01): public surface for hosts and write tools.
 export { APPROVAL_SCHEMA, displayLabel, renderApproval, shortId } from './approval.ts';
 export { type CallerWriteBudget, callerView, callerWriteBudget } from './budget.ts';
-export { APPROVAL_INPUT_KEY, elicitationChannel, supportsFormElicitation } from './elicitation.ts';
+export {
+  APPROVAL_INPUT_KEY,
+  elicitationChannel,
+  supportsFormElicitation,
+  supportsUrlElicitation,
+  URL_ELICITATION_MESSAGE,
+  URL_ELICITATION_TIMEOUT_MS,
+  withUrlElicitation,
+} from './elicitation.ts';
 export { ApprovalLedger, type LedgerEntry, type LedgerStore, memoryLedgerStore } from './ledger.ts';
 export {
   type CounterStore,

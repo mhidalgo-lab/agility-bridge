@@ -397,6 +397,10 @@ Writable custom attributes (`create_work_item.custom`, `update_fields.custom`, [
 
 Read-back after a write (D-343). A2/T31: it is one more read of the same target through the same scope-checked reads the re-read uses, after the send and after the outcome audit row, so it cannot widen what is read, skip an audit row or send anything; it never calls `send` again, and its failure (including an exhausted budget) becomes `readBack: unknown`, not an error. Values read back are compared, not echoed (the structured answer carries only the status), so no new Agility text reaches the agent outside the output shaper. Its requests are part of each tool's declared cost (D-199 margins kept). The lag itself stays *unmeasured* until the sandbox (P7-07).
 
+## 8g-6. Status after P7-46 (2026-11-03)
+
+URL-mode elicitation for the approval page (D-344). A13/T31: the request carries the page's own link (http or https, no credentials, otherwise nothing is sent) and a fixed text that names no change, target or value; the pending answer, the link, the page and every check of the page (signed-in owner of the request, recent sign-in, one use, exact change, ten minutes) are unchanged, so URL mode cannot make an approval possible without that page: an `accept` only means the client will open the link, and no code path reads it as an approval. It is sent only where the server can push (2025-era connection with the client's capabilities), best effort with a 30 second bound, and a refusal, error or timeout changes nothing. Allowed under `page_only` (P7-26): the client still cannot approve. Which clients declare `elicitation.url` is documented only (P7-12 is open).
+
 ## 8h. Status after P7-08 (2026-10-29)
 
 The write documentation ([guide](guide/write-tools.md), [client approval table](reference/client-compatibility.md#write-approval-channels-per-client))

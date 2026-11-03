@@ -356,8 +356,9 @@ Status lives in each task file.
 | P7-33 | [Step-up consent for mcp:write instead of reconnecting](tasks/phase-7-writes/P7-33-oauth-write-step-up.md) | low | P7-24, P7-10 | todo |
 | P7-34 | [CLI flags for write settings and a default approval policy](tasks/phase-7-writes/P7-34-cli-write-settings.md) | low | P7-26, P7-40 | todo |
 | P7-40 | [CLI command to change a grant](tasks/phase-7-writes/P7-40-cli-grant-update.md) | low | P7-15 | review |
-| P7-46 | [URL-mode elicitation for the approval page](tasks/phase-7-writes/P7-46-url-mode-elicitation.md) | low | P7-13, P7-12 | todo |
+| P7-46 | [URL-mode elicitation for the approval page](tasks/phase-7-writes/P7-46-url-mode-elicitation.md) | low | P7-13, P7-12 | review |
 | P7-50 | [Read-back after create_work_item](tasks/phase-7-writes/P7-50-read-back-after-create.md) | low | P7-19 | todo |
+| P7-51 | [URL-mode elicitation on 2026-07-28 requests](tasks/phase-7-writes/P7-51-url-mode-on-2026-requests.md) | low | P7-46, P7-12 | todo |
 
 ### Phase 8
 

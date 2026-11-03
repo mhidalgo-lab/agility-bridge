@@ -226,6 +226,13 @@ the whole change (workspace, item, every field with the value now and the value 
   requests: when asked, the change and tool, the item, the workspace, the **names** of the fields, the change id and the expiry,
   with a button to open each. It never shows a value, the item's title or anyone else's request, and a request you answered or
   that expired is not listed. Opening one is the same page as above.
+- **A client that declares `elicitation.url`** (MCP 2025-11) is also asked to open this same link itself (URL mode, P7-46), on
+  a connection the server can push a request to (stdio and other 2025-era connections that keep their capabilities; 2026-07-28
+  requests keep the plain link for now, D-345). The request is a fixed text and the link: it names no change and approves
+  nothing, accepting it only opens the page, and the answer still carries the link whatever the client does. With the
+  `page_only` policy this is allowed, because the client still cannot approve. Which clients declare it is in the
+  [client compatibility reference](../reference/client-compatibility.md#url-mode-elicitation-elicitationurl-p7-46) (documented
+  only).
 - Approving needs a recent sign-in (the page sends you to sign in again, then back to it); declining does not.
 - An approval is for **one** repeat of **exactly** this change, in **this** workspace, for ten minutes. A different value, item,
   tool or workspace asks again; so does a second repeat. A decline makes the next call fail as `AB_WRITE_APPROVAL_DECLINED`.
