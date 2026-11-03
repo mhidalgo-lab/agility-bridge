@@ -176,7 +176,7 @@ the image) and has a built-in healthcheck (`GET /health`). CI builds it, runs a 
 and scans it on every change (`scripts/docker-smoke.ts`).
 
 Releases from v0.2 publish it as `ghcr.io/mhidalgo-lab/agility-bridge:<version>` (also `:<major.minor>` and
-`:latest`), with provenance and SBOM attestations; [verify it](verify-release.md#the-docker-image) and pin its digest.
+`:latest`), with provenance and SBOM attestations; [verify it](verify-release.md#5-the-docker-image) and pin its digest.
 To build it from a checkout instead:
 
 ```sh

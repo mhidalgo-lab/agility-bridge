@@ -46,3 +46,28 @@
 - **Context:** Fuzz tests live next to the parser they test (`packages/http-app`, `apps/cli` as well as `core` and `auth`), and pnpm's strict layout needs the dependency declared where it is imported.
 - **Options:** (a) declare `fast-check` (same pinned version) in each package that uses it; (b) move all fuzz tests to `packages/core/test` and import other packages' sources across the boundary; (c) a shared `test-utils` workspace package.
 - **Recommendation:** (a), built as (a): no new package, no cross-package source imports, and Renovate updates all of them in one PR. It adds nothing to a published runtime dependency list (dev only).
+
+### D-361 — The documentation site publishes `docs/` except the planning records *(P9-04)*
+- **Context:** `docs/tasks/` (about 250 task files) and `docs/pending-decisions/` are working records for the maintainers and agents, not documentation for users; they would swamp the sidebar and the search results. Pages that link to them still need a working link.
+- **Options:** (a) leave both out; links from site pages to them point at the file in the repository; (b) publish them in an "Internal" sidebar group; (c) publish everything.
+- **Recommendation:** (a), built. Guides, reference, developer pages, security, the threat model, ADRs, research, phase reviews, the roadmap and the lessons are on the site; `tasks/` and `pending-decisions/` stay in the repository (`EXCLUDED_DIRS` in `scripts/docs-site.ts`). Revisit at 1.0, when the roadmap page may be the public face of planning.
+
+### D-362 — The site is its own pnpm workspace, built by its own workflow *(P9-04)*
+- **Context:** Starlight and Astro add about 280 packages. Putting `site/` in the root workspace would make every CI job install them and put them in the product lockfile.
+- **Options:** (a) `site/` with its own `pnpm-workspace.yaml` and lockfile (same supply-chain settings), installed only by the docs-site workflow; (b) a package under `packages/` in the root workspace; (c) npm in `site/`.
+- **Recommendation:** (a), built. The existing lint, typecheck, test and build jobs are unchanged; Renovate still sees `site/package.json`. The cost is one more lockfile to keep current.
+
+### D-363 — Deploy is skipped, with a warning, until Pages is enabled *(P9-04)*
+- **Context:** The deploy action fails when Pages is not enabled with the GitHub Actions source, and that setting is the owner's to change. A red `main` would get in the way of other work.
+- **Options:** (a) the build job asks the Pages API and the deploy job runs only when it is enabled; (b) `continue-on-error` on the deploy job (hides real deploy failures once Pages is on); (c) leave the workflow out until Pages is on.
+- **Recommendation:** (a), built. The site is still built and link-checked on every change; deployment starts by itself after Settings, Pages, Source: GitHub Actions.
+
+### D-364 — CI checks internal links and anchors; external links are not checked there *(P9-04)*
+- **Context:** The task asks for broken internal links and anchors to fail CI. An external link check on every pull request would fail unrelated changes whenever a third-party site is down or rate-limits the runner.
+- **Options:** (a) internal only on pull requests, plus a scheduled external check as a follow-up task (P9-19); (b) external links in the required path; (c) no external check.
+- **Recommendation:** (a), built. `docs/` relative links and anchors run in `pnpm lint`; the built site's links and anchors fail the docs-site build.
+
+### D-365 — The docs-site job is not a required check *(P9-04)*
+- **Context:** The workflow is path-filtered (`docs/**`, `site/**`) so it does not run on code-only pull requests. A required check that never reports blocks those pull requests. The `docs/` link check that matters for every change also runs in `pnpm lint`, which is already required.
+- **Options:** (a) keep "Build and link check" a non-required check, relying on `pnpm lint` for the docs links; (b) drop the path filter and make it required (about 40 s extra on every pull request); (c) require it with a ruleset that tolerates skipped checks.
+- **Recommendation:** (a), built. Choose (b) if you want a broken site build to block merging; it is a ruleset change that is yours to make.

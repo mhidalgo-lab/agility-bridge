@@ -13,7 +13,8 @@
       "!**/.wrangler",
       "!**/test/fixtures/**/*.json",
       "!**/*.generated.ts",
-      "!packages/storage/migrations/meta"
+      "!packages/storage/migrations/meta",
+      "!site/**/*.astro"
     ]
   },
   "formatter": {

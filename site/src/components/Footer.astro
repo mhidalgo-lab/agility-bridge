@@ -1,0 +1,21 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+// The project disclaimer (same wording as the README) on every page, above Starlight's own footer.
+import Default from '@astrojs/starlight/components/Footer.astro';
+---
+
+<p class="disclaimer">
+  agility-bridge is an unofficial, community project. It is not affiliated with, endorsed by, or supported by
+  Digital.ai. Digital.ai, Agility and VersionOne are trademarks of their respective owners.
+</p>
+<Default {...Astro.props}><slot /></Default>
+
+<style>
+  .disclaimer {
+    margin: 2rem 0 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--sl-color-hairline);
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+  }
+</style>

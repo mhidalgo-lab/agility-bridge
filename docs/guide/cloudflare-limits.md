@@ -48,7 +48,7 @@ every authorization request, consent post and failed token request is one extra 
 address and the deployment); a request refused by a limit writes nothing, and each isolate remembers a refused counter
 until its window ends, so a flood costs about the limit's worth of writes per counter and window, not one per request.
 Normal use is a handful of writes per connected app. The Free plan allows 100,000 D1 rows written a day
-([RESEARCH](../RESEARCH.md#cloudflare-workers)); the default limits keep one flooding address to about 160 writes per ten
+([RESEARCH](../RESEARCH.md#5-cloudflare-workers-platform)); the default limits keep one flooding address to about 160 writes per ten
 minutes (authorize 30, token failures 20 and consent 30, each on two counters) and the deployment-wide caps bound the sum. The cron
 sweeps 20 unused registrations per run (one read each, at most 50 D1 queries per run together with the purge).
 

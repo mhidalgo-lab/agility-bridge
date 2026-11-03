@@ -1,3 +1,5 @@
+# Phase 8 review
+
 - **Scope:** the power features of Phase 8 (P8-01 … P8-11): the query cache, deep links, MCP Apps views, `doctor`, configuration
   export and import, client integrations and the Claude Code plugin, self-monitoring, the OS keychain, per-grant quotas, MCP Tasks and
   the public tool catalogue, as merged on `main` at `ae19fbd` (range `eed67c4..ae19fbd`). The live checks (P8-13, P8-15, P8-19) are
