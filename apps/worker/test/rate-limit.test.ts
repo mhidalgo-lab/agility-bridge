@@ -79,3 +79,19 @@ describe('BackstopRateLimiter', () => {
     expect((await none.take('ip:1.1.1.1', rate, 0)).ok).toBe(true);
   });
 });
+
+describe('the OAuth backstop (P5-19)', () => {
+  it('asks RL_OAUTH only for oauth: keys, refuses what it refuses, and fails open with one log a minute', async () => {
+    const oauth = binding(() => false);
+    const l = limiter({ oauth });
+    expect((await l.take('oauth:1.2.3.4', rate, 0)).ok).toBe(false);
+    expect((await l.take('ip:1.2.3.4', rate, 0)).ok).toBe(true);
+    expect(oauth.keys).toEqual(['oauth:1.2.3.4']);
+    const logs: string[] = [];
+    const broken = limiter({ oauth: binding(() => new Error('down')) }, logs);
+    for (let i = 0; i < 3; i++) expect((await broken.take('oauth:5.5.5.5', rate, i)).ok).toBe(true);
+    expect(logs.filter((x) => x.includes('rate limit binding failed'))).toHaveLength(1);
+    // No binding: the local buckets only, as before.
+    expect((await limiter({}).take('oauth:1.2.3.4', rate, 0)).ok).toBe(true);
+  });
+});

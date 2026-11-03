@@ -277,3 +277,14 @@ Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.m
 - **Recommendation:** (a): the list is a security control, and a suffix or wildcard match widens it to hosts nobody reviewed (anyone can
   publish under a shared domain). List each host; add a wildcard only if a real client needs one.
 - **Owner (2026-10-29):** Decided: as recommended, (a).
+
+### D-338 — `RL_OAUTH` is an optional third binding at 60 per minute per address, behind a new `beforeOAuth` hook *(P5-19)*
+- **Context:** the OAuth routes already count in D1 (P5-09) and sit behind the general per-address limit. The task asks for a Rate
+  Limiting binding in front of the counters. Cloudflare's binding has a fixed limit per namespace, no peek, and is per location.
+- **Options:** (a) a separate `RL_OAUTH` namespace (60 per 60 s per address) reached through a new optional `beforeOAuth` request hook that
+  the Worker backs with the binding and every other host answers with the same per-address rate as `beforeAuth` (so nothing changes
+  without the binding); (b) reuse `RL_IP` for the OAuth routes (OAuth floods would eat the MCP address budget and the reverse); (c) key the
+  existing hook by route and add the binding inside it (the hook signature changes for every caller).
+- **Recommendation:** (a). A flood of OAuth requests must not use up the address's MCP budget, a normal connect is about five requests so 60
+  a minute never refuses a person, and the stricter option is one number in `wrangler.jsonc`. Consent is wired the same way but its
+  workerd test is part of the http-app package (the stand-in host has no consent screen).

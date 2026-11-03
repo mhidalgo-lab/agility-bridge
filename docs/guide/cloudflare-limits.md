@@ -238,13 +238,14 @@ whose cost, relative to a calibration workload in the same run, more than double
 
 The limits of `agility-bridge serve` (`AB_RATE_LIMIT_*`, [configuration](configuration.md#rate-limits)) apply on
 Workers too, counted exactly **per isolate**. Cloudflare runs many isolates, so on their own they are not
-deployment-wide (L-081). Two Rate Limiting bindings add a **backstop** across isolates (L-099), declared in
+deployment-wide (L-081). Three Rate Limiting bindings add a **backstop** across isolates (L-099), declared in
 `wrangler.jsonc`:
 
 | Binding | Counts | Default | When it refuses |
 |---|---|---|---|
 | `RL_IP` | requests per client address (`CF-Connecting-IP`) before authentication | 600 per 60 s | `429` for that address for 60 s in that isolate |
 | `RL_AUTH` | failed authentications per address | 20 per 60 s | that address is out of failed attempts for 60 s: more failures get `429` without contacting Agility; valid tokens keep working |
+| `RL_OAUTH` | requests per address to `/oauth/authorize`, `/oauth/token`, `/oauth/register` and the consent post (P5-19) | 60 per 60 s | `429` for that address for 60 s in that isolate, before any D1 query of the OAuth abuse counters |
 
 - The local buckets decide first; the binding is asked only when they allow. Bindings count per Cloudflare location
   and are eventually consistent, so they slow an attack down rather than stop it at an exact number.
@@ -252,6 +253,43 @@ deployment-wide (L-081). Two Rate Limiting bindings add a **backstop** across is
   `rate limit binding failed` at most once a minute; a **missing** binding means per-isolate limits only, with a
   warning when the Worker starts. Rate limits never decide authorization.
 - An exact deployment-wide limiter (a Durable Object) is planned as an option (P3-12).
+- `RL_OAUTH` is optional and only matters with `AB_OAUTH=on`. Without it the OAuth routes keep the exact D1 counters
+  ([above](#oauth-endpoints-and-the-d1-write-budget)) and the Worker logs one warning at start. It runs after the general
+  per-address limit and before the counters, so a request it refuses reads and writes nothing in D1. It is a **backstop**,
+  not a second authority (L-099): the D1 counters stay the exact, deployment-wide limit.
+
+### Flood measurement for the OAuth routes (P5-19)
+
+Local, in workerd with a synthetic flood (`apps/worker/test/oauth-edge-limit.test.ts`, 2026-11-03): 150 requests to
+`/oauth/authorize` from one address. Each unit the abuse counters take is one D1 row write.
+
+| Setup | Requests answered `429` | Counter writes in D1 |
+|---|---|---|
+| No `RL_OAUTH` (the counters alone: 30 per address and 600 in all per ten minutes) | 120 | 60 (30 on the address counter, 30 on the deployment's) |
+| `RL_OAUTH` at 5 per 60 s (test value) | 145 | 10; after the binding refuses, none |
+
+The shipped limit (60 per 60 s) is deliberately **looser** than the address counter (30 per ten minutes): one address that
+floods is already bounded by the counters at about 60 writes per ten minutes, so a binding at 60 a minute saves no writes
+for it. What the binding saves is the *queries*: each isolate that has not yet seen a refusal asks D1 once more before it
+remembers it, and a flood spread over many isolates repeats that. Lower `limit` in `wrangler.jsonc` (or use the WAF rule
+below) to cut writes harder; a normal connect is about five requests. The figures are a model of a flood, not a Cloudflare
+measurement (no deploy, L-182); no real service was probed.
+
+### A WAF rate limiting rule for the OAuth routes
+
+A deployment that owns the zone can stop a flood before the Worker runs at all, which also saves the Worker request
+(100,000 a day on Free): in the zone's **Security > WAF > Rate limiting rules** add a rule
+
+- *When incoming requests match*: `starts_with(http.request.uri.path, "/oauth/")` (this also covers
+  `/.well-known/oauth-*` if you extend it with an `or`), method `GET` or `POST`;
+- *With the same*: IP address; *Requests*: 30; *Period*: 10 seconds (the periods your plan offers; Free zones have one rule
+  and a fixed 10 second period);
+- *Then*: Block, for 10 seconds to 1 minute.
+
+Keep the rule per address, never one counter for the whole zone (that would let anyone lock every client out, T20), and keep
+the `/w/*/mcp` paths out of it. The Worker's own limits still apply after it. Rules and plan limits change: check the
+[Cloudflare rate limiting rules](https://developers.cloudflare.com/waf/rate-limiting-rules/) page; this recipe is
+*unverified* on a real zone.
 
 Deep links after P8-40 (local and indicative, 2026-10-30, a machine with a high load average, calibration 3.3 ms): the
 25-row and 200-row searches took 4.0 ms (1.35×) and 11.3 ms (3.80×), so a row of the whole pipeline costs about 40 µs, most

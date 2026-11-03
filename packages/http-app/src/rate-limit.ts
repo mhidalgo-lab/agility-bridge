@@ -172,6 +172,14 @@ export function createRequestLimits(
       if (!config.enabled) return { ok: true };
       return safely('sign_in', () => limiter.take(`signin:${addressKey(ip)}`, signIn, now));
     },
+    beforeOAuth(ip, now) {
+      // Never stricter than `beforeAuth` (the same rate, and every such request also took a unit from `ip:`): without an
+      // edge limiter behind it this changes nothing; the Workers host gives the `oauth:` keys their own backstop (P5-19).
+      if (!config.enabled) return { ok: true };
+      return safely('oauth', () =>
+        limiter.take(`oauth:${addressKey(ip)}`, { limit: config.ipPerMinute, windowMs: MINUTE }, now),
+      );
+    },
     beforeValidation(instanceId, now) {
       // Fail closed here: an unbounded stream of new tokens would spend the instance's Agility quota (A10).
       if (!config.enabled) return { ok: true };

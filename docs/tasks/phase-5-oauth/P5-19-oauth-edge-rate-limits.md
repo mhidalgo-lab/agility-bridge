@@ -2,7 +2,7 @@
 id: P5-19
 title: Edge rate limits for the OAuth routes on Workers
 phase: 5
-status: todo
+status: review
 priority: low
 depends_on: [P5-09]
 adr: ["0010"]
@@ -12,7 +12,8 @@ owner: ""
 
 # P5-19 — Edge rate limits for the OAuth routes on Workers
 
-> Later-phase task: **refine scope and acceptance criteria before starting** (tasks/README rule 7). Created by P5-09.
+> Created by P5-09. Refined 2026-11-03: the binding is reached through a new `beforeOAuth` request hook (D-338); the metadata routes
+> stay on the general limit only; the flood measurement counts D1 counter writes in workerd (no real service).
 
 ## Goal
 A flood of OAuth requests is stopped before it costs a D1 query, on Workers deployments that can add Cloudflare's own rate
@@ -25,10 +26,11 @@ limiting in front of the Worker.
 - Measure: D1 rows written per day under a synthetic flood, with and without the backstop (local, no real service probing).
 
 ## Acceptance criteria
-- [ ] With the binding present, a flood causes no D1 write after the binding refuses; without it the P5-09 behaviour is
-  unchanged.
-- [ ] The binding failing never blocks a request (fail-open, logged once a minute).
-- [ ] `docs/guide/cloudflare-limits.md` and the deployment guide show both options.
+- [x] With the binding present, a flood causes no D1 write after the binding refuses; without it the P5-09 behaviour is
+  unchanged (`apps/worker/test/oauth-edge-limit.test.ts`).
+- [x] The binding failing never blocks a request (fail-open, logged once a minute) (`apps/worker/test/rate-limit.test.ts`).
+- [x] `docs/guide/cloudflare-limits.md` and the deployment guide show both options.
+- [ ] *owner / live:* the WAF recipe checked on a real zone and `RL_OAUTH` created by a real deploy (no Cloudflare account here).
 
 ## Security notes
 THREAT_MODEL T20.

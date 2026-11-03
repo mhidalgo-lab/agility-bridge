@@ -167,6 +167,12 @@ pass them. Add a WAF custom rule *Skip* for `http.request.uri.path wildcard "/w/
 use the admin API remotely) that skips Browser Integrity Check and the managed bot rules, or turn Bot Fight Mode off
 for the zone. Leave the Worker's own limits in place: they apply after the skip.
 
+## Rate limits for the OAuth routes
+
+`wrangler.jsonc` declares three Rate Limiting bindings (`RL_IP`, `RL_AUTH`, and `RL_OAUTH` for `/oauth/*`); with `AB_OAUTH=on`
+the Worker warns at start when `RL_OAUTH` is missing. A zone you own can also block floods before the Worker with a WAF rate
+limiting rule. Both options, the limits and what they save are in [Cloudflare limits](cloudflare-limits.md#rate-limits).
+
 ## Costs
 
 | | Free | Workers Paid (from 5 USD a month) |

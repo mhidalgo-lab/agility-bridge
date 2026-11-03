@@ -163,3 +163,84 @@ describe('addressKey (P2-17 review L4)', () => {
     expect((await post(w, 'team-a', w.tokens.alice, LIST, from('2001:db8:0:1::1'))).status).toBe(200);
   });
 });
+
+describe('the OAuth edge hook (P5-19)', () => {
+  const URL_ = 'http://127.0.0.1:8787';
+  type Decision = { ok: false; retryAfterSeconds: number } | { ok: true };
+  const server = (beforeOAuth: () => Decision, general = true) =>
+    world({
+      oauth: { consent: async () => new Response(null) },
+      publicUrl: URL_,
+      limits: {
+        beforeAuth: () => (general ? { ok: true } : { ok: false, retryAfterSeconds: 3 }),
+        beforeOAuth,
+      },
+    });
+
+  it('turns authorize, token and registration away before any work, and leaves the metadata alone', async () => {
+    let calls = 0;
+    const w = await server(() => {
+      calls += 1;
+      return { ok: false, retryAfterSeconds: 11 };
+    });
+    const form = { 'content-type': 'application/x-www-form-urlencoded' };
+    for (const req of [
+      new Request(`${URL_}/oauth/authorize?client_id=x`),
+      new Request(`${URL_}/oauth/token`, { method: 'POST', headers: form, body: 'grant_type=x' }),
+      new Request(`${URL_}/oauth/register`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      }),
+    ]) {
+      const res = await w.app.fetch(req);
+      expect([res.status, res.headers.get('retry-after')]).toEqual([429, '11']);
+      expect(await res.json()).toMatchObject({ error: 'temporarily_unavailable' });
+    }
+    expect(calls).toBe(3);
+    expect((await w.app.fetch(new Request(`${URL_}/.well-known/oauth-authorization-server`))).status).toBe(
+      200,
+    );
+    expect(calls).toBe(3);
+    // Nothing reached the abuse counters or the provider.
+    expect(await w.storage.kv.list('oauth-abuse:', { limit: 10 })).toEqual([]);
+  });
+
+  it('is not asked when the general per-IP limit already refused', async () => {
+    let calls = 0;
+    const w = await server(() => {
+      calls += 1;
+      return { ok: true };
+    }, false);
+    expect((await w.app.fetch(new Request(`${URL_}/oauth/authorize?client_id=x`))).status).toBe(429);
+    expect(calls).toBe(0);
+  });
+
+  it('createRequestLimits: its own key, and a failing or disabled limiter lets it through', async () => {
+    const keys: string[] = [];
+    const recording: RateLimiter = {
+      take: (key) => {
+        keys.push(key);
+        return { ok: true };
+      },
+      peek: () => true,
+    };
+    const limits = createRequestLimits(recording, DEFAULT_RATE_LIMITS, silentLogger);
+    expect(await limits.beforeOAuth?.('2001:db8::5', 0)).toEqual({ ok: true });
+    expect(keys).toEqual(['oauth:2001:db8:0:0::/64']);
+    const broken = createRequestLimits(
+      {
+        take: () => {
+          throw new Error('down');
+        },
+        peek: () => true,
+      },
+      DEFAULT_RATE_LIMITS,
+      silentLogger,
+    );
+    expect(await broken.beforeOAuth?.('1.2.3.4', 0)).toEqual({ ok: true });
+    const off = createRequestLimits(recording, { ...DEFAULT_RATE_LIMITS, enabled: false }, silentLogger);
+    expect(await off.beforeOAuth?.('1.2.3.4', 0)).toEqual({ ok: true });
+    expect(keys).toHaveLength(1);
+  });
+});

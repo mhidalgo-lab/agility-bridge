@@ -44,6 +44,7 @@ export interface WorkerEnv {
   readonly DB?: D1Database;
   readonly RL_IP?: RateLimitBinding;
   readonly RL_AUTH?: RateLimitBinding;
+  readonly RL_OAUTH?: RateLimitBinding;
   readonly [name: string]: unknown;
 }
 
@@ -157,6 +158,11 @@ export async function boot(
   if (settings.rateLimits.enabled && (env.RL_IP === undefined || env.RL_AUTH === undefined)) {
     logger.warn('Rate limit bindings RL_IP and RL_AUTH are missing: limits count per isolate only.');
   }
+  if (settings.rateLimits.enabled && settings.oauth !== undefined && env.RL_OAUTH === undefined) {
+    logger.warn(
+      'Rate limit binding RL_OAUTH is missing: the OAuth routes are limited by the shared counters only (every request up to their limit costs D1 writes).',
+    );
+  }
   const current = settingsEnv['AB_MASTER_KEY'];
   if (current === undefined || current === '') throw new BootError('The secret AB_MASTER_KEY is missing.');
   const previous = settingsEnv['AB_MASTER_KEY_PREVIOUS'];
@@ -229,6 +235,7 @@ export async function boot(
       {
         ...(env.RL_IP === undefined ? {} : { ip: env.RL_IP }),
         ...(env.RL_AUTH === undefined ? {} : { authFailures: env.RL_AUTH }),
+        ...(env.RL_OAUTH === undefined ? {} : { oauth: env.RL_OAUTH }),
       },
       logger,
     ),
