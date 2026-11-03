@@ -476,3 +476,15 @@
 - **Context:** `agility-bridge workspace add|set` and `grant add` run the admin API in process against the local store, which has no `AB_QUOTA_*` (the stdio server ignores them).
 - **Options:** (a) pass `--quota-daily` and `--quota-monthly` through without a cap check; (b) read `AB_QUOTA_*` in the CLI to check; (c) no CLI flags.
 - **Recommendation:** (a), built. The running server checks again on every request by taking the lowest value (L-473), so a number above the server's has no effect, and the server's admin API still refuses it when set through the panel or the API. `workspace set` replaces the workspace's whole `limits` object, as `--max-rows` already did (P8-46 merges them).
+
+### D-328 — stdio spans come from a transport wrapper, one per request and notification *(P8-20)*
+- **Context:** The task asks for one span for every stdio method with the HTTP attribute list. `onToolCall` covers tool calls, resources and prompts only; the SDK's `serveStdio` has no per-request hook, but accepts a transport.
+- **Options:** (a) a subclass of `StdioServerTransport` that pairs each client request with the server's answer and records one span per exchange (and one per notification); (b) `onToolCall` only (tool calls, no `initialize` or `tools/list`); (c) wrap the SDK server's request handlers.
+- **Recommendation:** (a), built. It covers every method in both protocol eras without touching the SDK's internals, and the frames stay unchanged. Collector: any OTLP/HTTP collector (the task names none; the request that triggered the work did not say which).
+- **Owner (2026-11-03):** pending the owner.
+
+### D-329 — stdio spans carry no Agility request count and no trace context *(P8-20)*
+- **Context:** `agility_bridge.requests` on HTTP comes from the tool call's own budget, handed to the span by the request. On stdio the count is known inside the tool call, but a frame-level tracker cannot tell which of several concurrent calls an event belongs to (the event has no request id), and a local client has no trace context to join.
+- **Options:** (a) leave the count and `traceparent` out on stdio, documented, and file the count as a follow-up (P8-44); (b) correlate by tool name and order (wrong with concurrent calls of one tool); (c) put the id in the tool event now (touches the shared server code for a local-only attribute).
+- **Recommendation:** (a), built; P8-44 holds (c).
+- **Owner (2026-11-03):** pending the owner.

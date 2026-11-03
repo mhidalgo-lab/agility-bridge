@@ -39,7 +39,7 @@ How to use it:
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412, L-481, L-482 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462, L-473, L-474 |
-| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453, L-467, L-468 |
+| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453, L-467, L-468, L-469 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241, L-402 |
@@ -1886,6 +1886,10 @@ A grant's or workspace's quota is stored next to a deployment value that an oper
 **L-474 — A deployment-wide control that gains overrides takes its value from the resolver, and test helpers must mirror that wiring.**
 The quota gate was built from the deployment settings and passed to every request; with per-grant values each request has to hand its effective value to the meter, and the gate has to exist even where the deployment sets nothing. A test world that built the gate but left the deployment value out of the access settings silently turned the quota off for every existing test. Give the helper the same source as `assembleServer` (here the gate's own limits), and keep one test where the deployment has no quota and only a grant does.
 *Applied in:* P8-14, `http-app/src/app.ts`, `server.ts`, `test/helpers/world.ts` (L-063).
+
+**L-469 — Observe a transport you do not own by wrapping its frames, and read nothing but the envelope.**
+The SDK's stdio entry has no per-request hook, and `onToolCall` sees only tool calls, resources and prompts, so `initialize`, `tools/list` and notifications would have had no span. A subclass of the real `StdioServerTransport` that sees each inbound frame and each outbound answer gives one span per method in both protocol eras, with the frames themselves unchanged and in order. The tracker reads only the method, the tool name, the id and the error code in the result's metadata (through the existing bounded classifier), keeps a capped table of requests waiting for an answer, and never throws; the allowlisted `Telemetry` sanitises the rest again. Prove it on a real pipe, with a dead collector, and check that stdout still holds only MCP frames (L-021).
+*Applied in:* P8-20, `apps/cli/src/stdio-telemetry.ts`, `test/stdio-telemetry.e2e.test.ts` (L-118, L-119).
 
 ## P. Observability and logging
 

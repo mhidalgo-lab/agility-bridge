@@ -2,12 +2,12 @@
 id: P8-20
 title: "Self-monitoring for the stdio server"
 phase: 8
-status: todo
+status: review
 priority: low
 depends_on: [P8-07]
 adr: []
 lessons: [L-118, L-119]
-owner: ""
+owner: "claude"
 ---
 
 # P8-20 — Self-monitoring for the stdio server
@@ -22,9 +22,9 @@ HTTP hosts, if anyone asks for it. P8-07 covers `serve` and the Worker only (D-2
 - stdout stays MCP frames only (L-021); a failed export logs to stderr like everything else.
 
 ## Acceptance criteria
-- [ ] Someone asked for it, and the request says which collector they use.
-- [ ] Every stdio method produces one span with the HTTP list of attributes and nothing else; the allowlist test covers it.
-- [ ] A collector that is down never blocks a tool call or writes to stdout.
+- [ ] Someone asked for it, and the request says which collector they use. *owner:* the owner asked for this task on 2026-11-03 but did not name a collector; it is built for any OTLP/HTTP collector (HTTPS, or loopback HTTP), so name yours if it needs more (D-328).
+- [x] Every stdio method produces one span with the HTTP list of attributes and nothing else; the allowlist test covers it. (`agility_bridge.requests` and trace context are left out, D-329, P8-44.)
+- [x] A collector that is down never blocks a tool call or writes to stdout.
 
 ## Security notes
 THREAT_MODEL T30: the same allowlist; stdio has no workspace or token to leak, but the arguments and Agility text are as private as on a server.

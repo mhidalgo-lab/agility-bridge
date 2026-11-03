@@ -219,12 +219,14 @@ workspaces:
         AB_AGILITY_URL: URL,
         AB_AGILITY_TOKEN: '1.x',
         AB_QUOTA_DAILY: '200',
+        AB_TASKS: 'on',
+        // Read by stdio since P8-20: no warning for it.
         AB_OTEL_ENDPOINT: 'https://o.example/v1',
       },
       { warn: (m) => warnings.push(m) },
     );
     expect(warnings).toEqual([
-      expect.stringMatching(/AB_QUOTA_DAILY, AB_OTEL_ENDPOINT are read by a remote host only/),
+      expect.stringMatching(/AB_QUOTA_DAILY, AB_TASKS are read by a remote host only/),
     ]);
     const none: string[] = [];
     loadConfig({ AB_AGILITY_URL: URL, AB_AGILITY_TOKEN: '1.x' }, { warn: (m) => none.push(m) });

@@ -37,6 +37,7 @@ import {
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { createNodeFetch } from './agility-fetch.ts';
 import { ConfigError, type LoadedConfig, type StdioConfig } from './config.ts';
+import { ObservedStdioTransport, StdioSpanTracker, stdioTelemetry } from './stdio-telemetry.ts';
 
 /** Groups the stdio server can serve (docs/reference/tool-catalogue.md); `query` follows AB_GENERIC_QUERY. */
 export const STDIO_GROUPS = [
@@ -263,6 +264,10 @@ export interface StartOptions {
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly fetch?: FetchLike;
   readonly sink?: (line: string) => void;
+  /** The version in the resource of exported spans (P8-20). */
+  readonly version?: string;
+  /** Sends the spans (tests); default is the global `fetch`. */
+  readonly telemetryFetch?: (request: Request) => Promise<Response>;
 }
 
 /** Starts serving MCP on stdin/stdout. Throws ConfigError before anything is served. */
@@ -304,5 +309,29 @@ export function startStdio(config: LoadedConfig, options: StartOptions): { close
     workspace: config.workspace.id,
     projects: config.projects.length,
   });
-  return serveStdio(() => buildMcpServer({ tools, ctx, apps: config.mcpApps ? 'detect' : 'off' }));
+  const factory = () => buildMcpServer({ tools, ctx, apps: config.mcpApps ? 'detect' : 'off' });
+  // Self-monitoring (P8-20): only with AB_OTEL_ENDPOINT. A bad value stops start-up here, before anything is served.
+  const monitoring = stdioTelemetry(options.env, {
+    version: options.version ?? '0.0.0',
+    logger,
+    clock: systemClock,
+    random: webCryptoRandom,
+    ...(options.telemetryFetch === undefined ? {} : { fetch: options.telemetryFetch }),
+  });
+  if (monitoring === undefined) return serveStdio(factory);
+  logger.warn(
+    `AB_OTEL_ENDPOINT is set: allowlisted request metadata (MCP method, tool name, status, error code, duration) is sent to ${monitoring.host}; never Agility content, credentials or request values.`,
+  );
+  const transport = new ObservedStdioTransport(
+    new StdioSpanTracker(monitoring.telemetry, systemClock, webCryptoRandom),
+    // The client closed its end: send what is queued before the process ends (best effort, a few seconds at most).
+    () => void monitoring.stop(),
+  );
+  const handle = serveStdio(factory, { transport });
+  return {
+    async close() {
+      await handle.close();
+      await monitoring.stop();
+    },
+  };
 }
