@@ -30,3 +30,8 @@ test-results/
 zap-reports/
 eval-report*.md
 eval-smoke*.md
+
+# Documentation site (P9-04): generated content, build output and caches.
+site/src/content/docs/
+site/.astro/
+site/dist/

@@ -55,7 +55,7 @@ Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.m
   refresh token (relic-bridge's P5-05 design, pulled forward).
 - **Recommendation:** (a): P5-05 is next, `AB_OAUTH` cannot be on before P5-04, and the window it builds replaces this rule.
 - **Owner (2026-10-26):** Closed. **Superseded by P5-05 (2026-10-24):** every refresh now goes through the refresh
-  family ([D-70](#d-70--refresh-successors-are-sealed-under-a-key-derived-from-the-spent-token-p5-05)): a spent token is
+  family ([D-70](#d-70--refresh-successors-are-sealed-under-a-key-derived-from-the-spent-token-not-under-the-master-key-p5-05)): a spent token is
   answered with the same successor for the reuse window (default 30 s) and revokes the device after it; the provider's
   "previous token" rule is never reached for a token we have seen spent.
 

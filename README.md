@@ -67,6 +67,9 @@ The tools are listed in the [tool reference](docs/reference/tools.md).
 
 ## Documentation
 
+The documentation is also a searchable site: <https://mhidalgo-lab.github.io/agility-bridge/> (built from `docs/` on every change to
+`main`; it goes live once GitHub Pages is enabled for the repository, see [the docs site](docs/dev/docs-site.md)).
+
 - **Plan:** [roadmap and task index](docs/ROADMAP.md) · [how tasks work](docs/tasks/README.md) ·
   [pending decisions](docs/pending-decisions/phase-0.md)
 - **Design:** [architecture](docs/ARCHITECTURE.md) · [decisions (ADRs)](docs/adr/README.md) ·

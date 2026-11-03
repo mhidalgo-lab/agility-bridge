@@ -1,0 +1,22 @@
+{
+  "name": "agility-bridge-docs-site",
+  "private": true,
+  "description": "Documentation site (Astro Starlight) built from ../docs; standalone, not part of the root workspace (P9-04)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "sync": "node ../scripts/docs-site.ts sync",
+    "dev": "pnpm sync && astro dev",
+    "build": "pnpm sync && astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.42.8",
+    "astro": "7.4.4",
+    "starlight-links-validator": "0.27.0"
+  }
+}

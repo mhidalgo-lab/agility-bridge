@@ -29,7 +29,10 @@ interface Workflow {
 
 /** Scopes a job may request with `write` (each needs a reason in the workflow). */
 // `attestations` and `artifact-metadata`: the release publish job attests provenance and the SBOM (P1-15).
+// `pages`: the documentation site's deploy job publishes to GitHub Pages (P9-04); with `id-token` it is the whole of
+// the official actions/deploy-pages contract.
 const JOB_WRITE_ALLOWLIST = new Set([
+  'pages',
   'id-token',
   'contents',
   'pull-requests',

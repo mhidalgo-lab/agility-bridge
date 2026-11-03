@@ -1,0 +1,97 @@
+# Documentation site (P9-04): Astro Starlight in site/, built from docs/ and deployed to GitHub Pages.
+# Pull requests build the site and fail on a broken internal link or anchor; only main deploys, and only once the
+# owner has enabled Pages (Settings, Pages, Source: GitHub Actions), so main never fails for a missing setting.
+name: Docs site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'site/**'
+      - 'scripts/docs-site.ts'
+      - '.github/workflows/docs-site.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'site/**'
+      - 'scripts/docs-site.ts'
+      - '.github/workflows/docs-site.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-site-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build and link check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # `pages: read` only to ask whether Pages is enabled; nothing here can publish.
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      deploy: ${{ steps.pages.outputs.enabled }}
+    steps:
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      # docs/ relative links and anchors (also part of `pnpm lint`).
+      - run: node scripts/docs-site.ts check
+      # Only on main: is Pages enabled with the GitHub Actions source? A 404 means the owner has not enabled it yet.
+      - id: pages
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type' | grep -qx workflow; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::GitHub Pages is not enabled with the GitHub Actions source; the site is built and checked but not deployed."
+          fi
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        id: configure
+        if: steps.pages.outputs.enabled == 'true'
+      - run: pnpm --dir site install --frozen-lockfile
+      # The build fails on an invalid internal link or anchor (starlight-links-validator).
+      - run: pnpm --dir site build
+        env:
+          DOCS_SITE: ${{ steps.configure.outputs.origin }}
+          DOCS_BASE: ${{ steps.configure.outputs.base_path }}
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: steps.pages.outputs.enabled == 'true'
+        with:
+          path: site/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.event_name != 'pull_request' && needs.build.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The deploy job runs no project code: it only hands the built artifact to GitHub Pages (THREAT_MODEL T18).
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
