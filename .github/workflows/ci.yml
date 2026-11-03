@@ -106,7 +106,8 @@ jobs:
         run: docker buildx build --platform linux/amd64,linux/arm64 -f docker/Dockerfile .
 
   # CPU of the Worker's code paths (P3-10): not required; a path more than 2× its baseline is flagged as a warning
-  # annotation, and the numbers are kept as an artifact (history).
+  # annotation, as is any growth in Agility requests (P9-03; the request counts are also pinned by a unit test), and the
+  # numbers are kept as an artifact (history).
   bench:
     name: Worker CPU benchmark (not required)
     runs-on: ubuntu-latest

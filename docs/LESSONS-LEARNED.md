@@ -35,12 +35,12 @@ How to use it:
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271, L-426, L-427, L-486 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267, L-345, L-409, L-410 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
-| [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182, L-458, L-477 – L-479 |
+| [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182, L-458, L-477 – L-479, L-491, L-494 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412, L-481, L-482 |
-| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462, L-473, L-474, L-475 |
+| [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462, L-473, L-474, L-475, L-492 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453, L-467, L-468, L-469 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446, L-483, L-484, L-485 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446, L-483, L-484, L-485, L-493 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157, L-497, L-498, L-499 – L-501 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241, L-402, L-495, L-496 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297, L-335 |
@@ -1577,6 +1577,14 @@ The limiter object is a class with `fetch(request)` over a small storage interfa
 Two requests to one Miniflare worker usually reach the same isolate and the same module state, so a limit that is only per isolate passes the test. Declare a host worker that owns the object classes and two workers whose `durableObjects` binding names the host (`scriptName`), send alternating requests, and check that the control (no object) lets through what the object refuses. Give both workers the same master key, or the second fails its key check and the test measures a boot failure.
 *Applied in:* P3-12, `apps/worker/test/shared-limiter-workerd.test.ts` (L-081, L-099).
 
+**L-491 — Measure Workers CPU on a deployed Worker, per tool, and count the calls over the limit.**
+Node's figure is a third to half of the Worker's for the same path (the fixed cost of auth, the audit row, JSON-RPC and shaping is 6 to 9 ms on a Free Worker; `pnpm bench:worker` says 2 to 4). In P9-03, 155 of 469 warm calls reported more than the Free plan's 10 ms of `cpuTime` in `wrangler tail --format json` and none ended in error 1102: the documented limit is a tolerance that a design must not lean on (L-097). Tag every request (`?perf=<tool>:<n>`) so the capture can be matched to the calls, report p50, p95, the maximum and the share over the limit, and keep the first call after a deploy apart from the warm ones.
+*Applied in:* P9-03, `scripts/perf/latency.ts`, `scripts/perf/tail-cpu.ts`, `docs/guide/cloudflare-limits.md` (L-020, L-097).
+
+**L-494 — `keep_vars` keeps a dashboard variable that the config no longer names.**
+A deploy with a setting a Worker rejects at boot (`AB_REPORTS` is a single-server setting; Workers turn reports on per workspace with `limits.reports`) left the Worker answering `{"error":"temporarily unavailable"}` on every route, and removing the line from the local config and redeploying did not clear it, because `keep_vars: true` (what `cf:setup` writes) keeps variables set outside the file. The boot error is in `wrangler tail` (`Unknown or unsupported setting ...`). Recover with one deploy that has `keep_vars` false, then restore it; and before adding a variable to a deployed Worker, check that the Worker accepts it.
+*Applied in:* P9-03, `apps/worker/src/boot.ts` (the settings allowlist), `docs/guide/cloudflare-deploy.md` (L-180).
+
 ## M. Node, Docker and self-hosting
 
 **L-102 — Keep the Node footprint portable.**
@@ -1910,6 +1918,10 @@ The SDK's stdio entry has no per-request hook, and `onToolCall` sees only tool c
 The budget-hidden-tools note only worked where the workspace or grant set `callBudget`, so on Workers Free (45) every workspace that enabled a report was silently hidden from it. The panel now reads the server's default and plan ceiling from a read-only admin answer, parses them as bounded whole numbers, and names the server as the source. "Every tool" is judged by the groups that are on, so a group that is off by default is never reported as hidden; a missing answer shows no note rather than an invented number.
 *Applied in:* P6-58, `admin-ui/src/screens/shared.tsx` (`effectiveBudget`, `budgetNotes`), `GET /limits` (L-115, L-314).
 
+**L-492 — On Workers Free, reads spend the D1 write budget: measure rows per call from the account's analytics.**
+A read tool call writes about four D1 rows (the `tool_call` audit row is three with its two indexes, plus the token's last-used time), measured in P9-03 from the GraphQL dataset `d1AnalyticsAdaptiveGroups` (`rowsWritten`, `rowsRead`, `writeQueries`, `readQueries`; by minute, a minute late) over 548 calls: 100,000 rows a day is about 24,000 calls, a quarter of the Free plan's request limit. The number was computed from the schema until then and was one row short. Any "rows per flow" figure in the guides is worth one such measurement before it sets a default.
+*Applied in:* P9-03, `docs/guide/cloudflare-limits.md`, `docs/guide/query-limits.md` (L-097, L-114).
+
 ## P. Observability and logging
 
 **L-117 — Redaction is broad and tested.**
@@ -2140,6 +2152,9 @@ Level 1 and 2 row present exactly once) and a test checks the count, the status 
 requirement for a feature the product does not have (passwords, WebRTC, GraphQL) is `N/A` with the reason, never left out, and
 anything the platform or operator owns is `Delegated` with the guide that tells them; only `Partly` and `Gap` produce work.
 *Applied in:* P9-06, `docs/security/asvs-l2.md`, `scripts/test/asvs-l2.test.ts` (L-010, L-483).
+**L-493 — A mock upstream in the harness process must not share its event loop with a blocking child call.**
+The latency harness serves the mock Agility from the same Node process that runs the CLI to create the instance, credential and workspace. `execFileSync` blocked the loop, so the CLI's probe of the mock timed out with "The instance did not answer the probe" and the cause looked like the product. Use the asynchronous `execFile` for every child call in a process that also serves, or serve from a child. The same run found a stale baseline: the request counts of the write paths had grown from 4 to 5 and no check compared requests, only CPU (see the baseline test).
+*Applied in:* P9-03, `scripts/perf/latency.ts`, `scripts/test/worker-bench.test.ts` (L-114, L-121).
 
 ## R. CI, release and supply chain
 
