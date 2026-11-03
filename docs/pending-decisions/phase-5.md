@@ -288,3 +288,4 @@ Left for the owner after the Phase 5 review ([P5-10](../reviews/phase-5-review.m
 - **Recommendation:** (a). A flood of OAuth requests must not use up the address's MCP budget, a normal connect is about five requests so 60
   a minute never refuses a person, and the stricter option is one number in `wrangler.jsonc`. Consent is wired the same way but its
   workerd test is part of the http-app package (the stand-in host has no consent screen).
+- **Owner (2026-11-03):** Decided: as recommended, (a).
