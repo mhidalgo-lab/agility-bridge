@@ -198,9 +198,11 @@ Status lives in each task file.
 | P3-09 | [Self-hosted to Worker migration](tasks/phase-3-cloudflare/P3-09-migrate-to-worker.md) | low | P3-02 | done |
 | P3-10 | [CPU benchmark and cost check](tasks/phase-3-cloudflare/P3-10-cpu-benchmark.md) | low | P3-03 | done |
 | P3-11 | [Phase 3 review and staging verification](tasks/phase-3-cloudflare/P3-11-phase-3-review.md) | high | P3-04, P3-06, P3-07, P3-08, P3-09, P3-10 | done |
-| P3-12 | [Optional exact rate limiter on a Durable Object](tasks/phase-3-cloudflare/P3-12-durable-object-limiter.md) | low | P3-04 | todo |
+| P3-12 | [Optional exact rate limiter on a Durable Object](tasks/phase-3-cloudflare/P3-12-durable-object-limiter.md) | low | P3-04 | review |
 | P3-13 | [Master-key status and retirement through the admin API; init --version](tasks/phase-3-cloudflare/P3-13-remote-key-admin.md) | medium | P3-08 | done |
 | P3-14 | [Cut the Worker's cold-start CPU under the Free plan's budget](tasks/phase-3-cloudflare/P3-14-cold-start-cpu.md) | high | P3-10 | done |
+| P3-15 | [A cf:setup flag for the Durable Object limiter](tasks/phase-3-cloudflare/P3-15-setup-shared-limiter-flag.md) | low | P3-12, P3-05 | todo |
+| P3-16 | [Measure the Durable Object limiter on the staging Worker](tasks/phase-3-cloudflare/P3-16-shared-limiter-live.md) | low | P3-12 | todo |
 
 ### Phase 4
 

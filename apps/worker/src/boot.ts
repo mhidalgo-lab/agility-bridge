@@ -38,6 +38,11 @@ import {
 import { createD1Driver, type D1Database, openSqlStorage, type Storage } from '@agility-bridge/storage';
 import { strictlyPublicClientMetadataFetch } from './cimd-fetch.ts';
 import { BackstopRateLimiter, type RateLimitBinding } from './rate-limit.ts';
+import {
+  SHARED_REQUEST_PREFIXES,
+  SharedLimiterClient,
+  type SharedLimiterNamespace,
+} from './shared-limiter.ts';
 
 /** The Worker's bindings: `DB` (D1), the rate-limit backstops, the secrets and the `AB_*` variables. */
 export interface WorkerEnv {
@@ -45,6 +50,8 @@ export interface WorkerEnv {
   readonly RL_IP?: RateLimitBinding;
   readonly RL_AUTH?: RateLimitBinding;
   readonly RL_OAUTH?: RateLimitBinding;
+  /** Optional Durable Object namespace of the exact limiter (P3-12). */
+  readonly RL_SHARED?: SharedLimiterNamespace;
   readonly [name: string]: unknown;
 }
 
@@ -223,6 +230,10 @@ export async function boot(
     settings.queryCache.edge && settings.queryCache.ttlSeconds > 0 && edgeCache !== undefined
       ? new EdgeQueryTier({ cache: edgeCache, keyring, clock: systemClock })
       : undefined;
+  // The exact limiter on a Durable Object, only when the operator bound it (P3-12): request limits for the keys it decides
+  // fail open, write counters fail closed.
+  const sharedLimiter = env.RL_SHARED === undefined ? undefined : new SharedLimiterClient(env.RL_SHARED);
+  if (sharedLimiter !== undefined) logger.info('exact limiter on a Durable Object is on');
   const { app, services } = assembleServer({
     settings,
     storage,
@@ -236,9 +247,13 @@ export async function boot(
         ...(env.RL_IP === undefined ? {} : { ip: env.RL_IP }),
         ...(env.RL_AUTH === undefined ? {} : { authFailures: env.RL_AUTH }),
         ...(env.RL_OAUTH === undefined ? {} : { oauth: env.RL_OAUTH }),
+        ...(sharedLimiter === undefined
+          ? {}
+          : { shared: sharedLimiter, sharedPrefixes: SHARED_REQUEST_PREFIXES }),
       },
       logger,
     ),
+    ...(sharedLimiter === undefined ? {} : { writeCounters: sharedLimiter }),
     version,
     isolation: 'request',
     registry: REGISTRY,

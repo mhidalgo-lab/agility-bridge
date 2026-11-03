@@ -35,7 +35,7 @@ How to use it:
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271, L-426, L-427 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267, L-345, L-409, L-410 |
 | [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
-| [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182, L-458, L-477 |
+| [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182, L-458, L-477 – L-479 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412, L-481, L-482 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462, L-473, L-474 |
@@ -1561,6 +1561,14 @@ Inside a Workers isolate the clock does not advance while code computes, so `per
 **L-477 — A backstop looser than the exact limit behind it saves queries, not writes: measure which one you are buying.**
 `RL_OAUTH` sits in front of D1 counters that already cap one address at 30 units per ten minutes. A flood test (150 requests, one address) showed the same 60 counter writes with a binding at the shipped 60 a minute, and 10 with a test value of 5: the binding only cuts writes when it is stricter than the counters. What a looser one still saves is the refused-increment query that each isolate makes before it remembers a refusal, and the Worker run itself when the same rule is a WAF rule. Say so in the guide, count the thing the plan bills, and give the operator the knob (`limit` in `wrangler.jsonc`) instead of implying a saving.
 *Applied in:* P5-19, `apps/worker/test/oauth-edge-limit.test.ts`, `docs/guide/cloudflare-limits.md` (L-081, L-097, L-099).
+
+**L-478 — Give a Durable Object a plain `fetch` interface when only the Worker calls it, so the whole class runs without workerd.**
+The limiter object is a class with `fetch(request)` over a small storage interface, not a subclass of the runtime's `DurableObject` with RPC methods. That keeps `cloudflare:workers` out of the module graph (the Worker packages stay web-standard and Node-importable), lets unit tests drive the class over a fake storage and clock, and leaves workerd tests for what only workerd shows: two isolates sharing one object, parallel calls serialised by the input gate, and an object that throws or never answers. Validate every field the Worker sends (key length, rate bounds, window end) as if it came from outside, since the object is a trust boundary for its counters.
+*Applied in:* P3-12, `apps/worker/src/shared-limiter.ts`, `test/shared-limiter.test.ts` (L-013, ADR-0004).
+
+**L-479 — Test "two isolates" with two Miniflare workers bound to one object class, not with two requests to one worker.**
+Two requests to one Miniflare worker usually reach the same isolate and the same module state, so a limit that is only per isolate passes the test. Declare a host worker that owns the object classes and two workers whose `durableObjects` binding names the host (`scriptName`), send alternating requests, and check that the control (no object) lets through what the object refuses. Give both workers the same master key, or the second fails its key check and the test measures a boot failure.
+*Applied in:* P3-12, `apps/worker/test/shared-limiter-workerd.test.ts` (L-081, L-099).
 
 ## M. Node, Docker and self-hosting
 

@@ -17,6 +17,12 @@ export interface BackstopBindings {
   readonly authFailures?: RateLimitBinding;
   /** Requests per address to the OAuth routes that reach D1 (T20, P5-19). */
   readonly oauth?: RateLimitBinding;
+  /**
+   * The exact Durable Object limiter (P3-12, opt-in through `RL_SHARED`): decides `sharedPrefixes` keys instead of the
+   * bindings. Its failure is logged and the bindings and local buckets decide, like a failing binding (L-080).
+   */
+  readonly shared?: RateLimiter;
+  readonly sharedPrefixes?: readonly string[];
 }
 
 /** The binding's period; a refused key stays refused here for that long. */
@@ -45,6 +51,18 @@ export class BackstopRateLimiter implements RateLimiter {
     return undefined;
   }
 
+  #sharedFor(key: string): RateLimiter | undefined {
+    const { shared, sharedPrefixes } = this.#bindings;
+    return shared !== undefined && (sharedPrefixes ?? []).some((p) => key.startsWith(p)) ? shared : undefined;
+  }
+
+  /** Logs a limiter failure at most once a minute (shared by the binding and the Durable Object). */
+  #logFailure(message: string, error: unknown, now: number): void {
+    if (now - this.#lastFailureLog < LOG_EVERY_MS) return;
+    this.#lastFailureLog = now;
+    this.#logger.warn(message, { error: (error as Error).name });
+  }
+
   #isBlocked(key: string, now: number): boolean {
     const until = this.#blocked.get(key);
     if (until === undefined) return false;
@@ -53,7 +71,7 @@ export class BackstopRateLimiter implements RateLimiter {
     return false;
   }
 
-  #block(key: string, now: number): void {
+  #block(key: string, now: number, forMs: number = PERIOD_MS): void {
     if (this.#blocked.size >= MAX_BLOCKED) {
       for (const [k, until] of this.#blocked) if (until <= now) this.#blocked.delete(k);
       while (this.#blocked.size >= MAX_BLOCKED) {
@@ -62,7 +80,7 @@ export class BackstopRateLimiter implements RateLimiter {
         this.#blocked.delete(oldest.value);
       }
     }
-    this.#blocked.set(key, now + PERIOD_MS);
+    this.#blocked.set(key, now + forMs);
   }
 
   async take(key: string, rate: Rate, now: number): Promise<LimitDecision> {
@@ -74,18 +92,25 @@ export class BackstopRateLimiter implements RateLimiter {
     }
     const local = await this.#local.take(key, rate, now);
     if (!local.ok) return local;
+    const shared = this.#sharedFor(key);
+    if (shared !== undefined) {
+      try {
+        const exact = await shared.take(key, rate, now);
+        if (exact.ok) return local;
+        // Exact and deployment-wide: remember the refusal here for as long as it lasts, so a flood costs no more calls.
+        this.#block(key, now, exact.retryAfterSeconds * 1000);
+        return exact;
+      } catch (error) {
+        this.#logFailure('shared rate limiter failed; using the backstop and per-isolate limits', error, now);
+      }
+    }
     const binding = this.#bindingFor(key);
     if (binding === undefined) return local;
     try {
       if ((await binding.limit({ key })).success) return local;
     } catch (error) {
       // Fail open (L-080): the local buckets still apply, and authorization never depends on rate limits.
-      if (now - this.#lastFailureLog >= LOG_EVERY_MS) {
-        this.#lastFailureLog = now;
-        this.#logger.warn('rate limit binding failed; using per-isolate limits', {
-          error: (error as Error).name,
-        });
-      }
+      this.#logFailure('rate limit binding failed; using per-isolate limits', error, now);
       return local;
     }
     this.#block(key, now);
@@ -94,6 +119,14 @@ export class BackstopRateLimiter implements RateLimiter {
 
   async peek(key: string, rate: Rate, now: number): Promise<boolean> {
     if (this.#isBlocked(key, now)) return false;
-    return this.#local.peek(key, rate, now);
+    if (!(await this.#local.peek(key, rate, now))) return false;
+    const shared = this.#sharedFor(key);
+    if (shared === undefined) return true;
+    try {
+      return await shared.peek(key, rate, now);
+    } catch (error) {
+      this.#logFailure('shared rate limiter failed; using the backstop and per-isolate limits', error, now);
+      return true;
+    }
   }
 }

@@ -77,4 +77,7 @@ export function createWorker(bootWorker: (env: WorkerEnv) => Promise<Booted>) {
   };
 }
 
+/** The Durable Object class of the optional exact limiter (P3-12); bound as `RL_SHARED` only when an operator opts in. */
+export { SharedLimiter } from './shared-limiter.ts';
+
 export default createWorker((env) => boot(env, VERSION));

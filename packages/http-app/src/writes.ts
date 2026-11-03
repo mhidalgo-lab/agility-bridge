@@ -10,6 +10,7 @@ import { KeyPurpose } from '@agility-bridge/auth';
 import {
   ApprovalLedger,
   type Clock,
+  type CounterStore,
   createWriteLimiter,
   type Logger,
   type WriteActor,
@@ -51,6 +52,11 @@ export interface HttpWritesOptions {
   readonly auditAdmin?: (change: AdminChange) => Promise<void> | undefined;
   /** Writes an hour per grant and deployment-wide (P7-03). */
   readonly limits?: WriteRateLimits;
+  /**
+   * Where the write counters live (default: the storage `kv` table). A host may give an exact store of its own (the
+   * Workers Durable Object limiter, P3-12); the write limiter fails closed on whatever it throws (L-080).
+   */
+  readonly counters?: CounterStore;
   readonly logger?: Logger;
 }
 
@@ -99,7 +105,7 @@ export function createHttpWrites(options: HttpWritesOptions): HttpWrites {
         });
   // The limiter counts in the shared `kv` table (every isolate sees one count) and fails closed (L-080, L-111).
   const limiter: WriteLimiter = createWriteLimiter({
-    counters: options.storage.kv,
+    counters: options.counters ?? options.storage.kv,
     clock: options.clock,
     ...(options.limits === undefined ? {} : { limits: options.limits }),
     onError: (error) =>
