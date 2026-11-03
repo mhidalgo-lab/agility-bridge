@@ -62,6 +62,7 @@ only they can store it (in the admin panel under *My access*, [admin panel](admi
 | Remove a workspace | `agility-bridge workspace disable <workspace-id>` or `agility-bridge workspace delete <workspace-id>` |
 | Remove an instance | `agility-bridge instance delete <instance-id>` (only when unused) |
 | Move an instance to a new address | `agility-bridge instance retarget <instance-id> https://new.example.com/Instance` (owners; revokes its credentials and grants) |
+| Change a grant (rate, hourly write limit, write approval, tools, projects, end date) | `agility-bridge grant update <grant-id> --writes-per-hour 5` (a limit you do not name stays; `none` removes one; the API's owner rules apply) |
 | Remove a grant | `agility-bridge grant delete <grant-id>` |
 | Read the audit log | `agility-bridge audit tail --limit 50 --kind auth` |
 | Create the first owner (a single-use sign-in link; needs [sign-in providers](identity-providers.md)) | `agility-bridge setup-link --ttl-minutes 30` |

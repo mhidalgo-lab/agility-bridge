@@ -355,7 +355,7 @@ Status lives in each task file.
 | P7-32 | [Show the OAuth write scope on My access and the administrators' device list](tasks/phase-7-writes/P7-32-oauth-write-scope-on-my-access.md) | low | P7-24 | done |
 | P7-33 | [Step-up consent for mcp:write instead of reconnecting](tasks/phase-7-writes/P7-33-oauth-write-step-up.md) | low | P7-24, P7-10 | todo |
 | P7-34 | [CLI flags for write settings and a default approval policy](tasks/phase-7-writes/P7-34-cli-write-settings.md) | low | P7-26, P7-40 | todo |
-| P7-40 | [CLI command to change a grant](tasks/phase-7-writes/P7-40-cli-grant-update.md) | low | P7-15 | todo |
+| P7-40 | [CLI command to change a grant](tasks/phase-7-writes/P7-40-cli-grant-update.md) | low | P7-15 | review |
 | P7-46 | [URL-mode elicitation for the approval page](tasks/phase-7-writes/P7-46-url-mode-elicitation.md) | low | P7-13, P7-12 | todo |
 
 ### Phase 8

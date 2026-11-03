@@ -2,12 +2,12 @@
 id: P7-40
 title: CLI command to change a grant
 phase: 7
-status: todo
+status: review
 priority: low
 depends_on: [P7-15]
 adr: ["0013"]
 lessons: [L-081]
-owner: ""
+owner: "claude"
 ---
 
 # P7-40 — CLI command to change a grant
@@ -22,7 +22,7 @@ An owner who works on the command line can set a grant's per-minute rate and its
 - The same owner-only and recent-sign-in rules as the API (the CLI client acts as the break-glass actor, which the guards already treat as an owner).
 
 ## Acceptance criteria
-- [ ] Command tests, generated CLI reference refreshed.
+- [x] Command tests, generated CLI reference refreshed.
 
 ## Security notes
 THREAT_MODEL T31.

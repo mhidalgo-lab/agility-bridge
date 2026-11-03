@@ -256,7 +256,7 @@ The counters are fixed hourly windows in the shared `kv` table, so they hold acr
 closed**: if the counters cannot be reached the write is refused (`AB_WRITE_LIMIT_UNAVAILABLE`), never allowed.
 
 - **A lower limit for one grant.** An owner can give a grant its own **writes per hour** (1 to 1,000) on the grant's form in
-  the panel (*Writes per hour*) or as `rateLimit.writesPerHour` in `PATCH /api/admin/v1/grants/<id>`. The write limiter uses
+  the panel (*Writes per hour*), with `agility-bridge grant update <grant-id> --writes-per-hour <n>` (`none` removes it) or as `rateLimit.writesPerHour` in `PATCH /api/admin/v1/grants/<id>`. The write limiter uses
   the **lower** of that and `AB_WRITE_RATE_PER_GRANT_HOURLY`, so it can only tighten: a value above the server's is refused
   when you set it, and one that became higher because the server's limit was lowered later simply has no effect. Setting,
   changing or removing it needs an **owner** with a recent sign-in (an administrator cannot loosen what an owner set, and the
