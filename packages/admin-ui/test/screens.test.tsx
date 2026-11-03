@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { TextField } from '../src/components.tsx';
 import { createUiKit, ONCE_FIELD, ONCE_MAX_OUTSTANDING } from '../src/kit.ts';
 import { renderDocument } from '../src/pages.tsx';
-import { parseTokenPage, parseTool, parseUser, type User } from '../src/screens/data.ts';
+import { parseServerLimits, parseTokenPage, parseTool, parseUser, type User } from '../src/screens/data.ts';
 import { grantNotes } from '../src/screens/grants.tsx';
 import { parsePrefixText, prefixText } from '../src/screens/instances.tsx';
 import {
@@ -26,6 +26,7 @@ import {
   words,
 } from '../src/screens/shared.tsx';
 import { canEnable } from '../src/screens/users.tsx';
+import { budgetNotesOf } from '../src/screens/workspaces.tsx';
 import { CSRF, type Fake, fakeDeps, get, post, principal } from './helpers/fake-deps.ts';
 
 const asAdmin = { 'x-test-session': 'admin' };
@@ -668,9 +669,65 @@ describe('composite grant notes (P6-11)', () => {
     expect(budgetNotes(['whoami', 'sprint_health'], 54, t)).toEqual([]);
     expect(budgetNotes(['whoami'], 2, t)).toEqual([]);
     expect(budgetNotes(['whoami', 'sprint_health'], undefined, t)).toEqual([]);
-    expect(budgetNotes(null, 1, t)).toEqual([]);
+    // "Every read tool" is judged by the groups that are on; reports are off by default (P6-58).
+    expect(budgetNotes(null, 10, t, { groupsOff: ['reports'] })).toEqual([]);
+    expect(budgetNotes(null, 10, t, { groupsOff: [] })).toEqual([
+      'Not listed because the per-call budget is 10 requests: sprint_health (needs 54). Raise callBudget to list them.',
+    ]);
     expect(parseTool({ name: 'whoami', kind: 'read', group: 'core', cost: '<b>' })?.cost).toBe(0);
     expect(parseTool({ name: 'whoami', kind: 'read', group: 'core', cost: 54 })?.cost).toBe(54);
+  });
+
+  it("uses the server default when the workspace sets no budget, and says it is the server's (P6-58)", () => {
+    const t = [...tools];
+    const ws = (limits: Record<string, number | boolean>, enabledTools: string[] | null) =>
+      ({ enabledTools, limits }) as never;
+    // Workers Free: 45 hides the report a workspace enables, with no callBudget set anywhere.
+    const free = { callBudget: 45, callBudgetCeiling: 45 };
+    expect(budgetNotesOf(ws({}, ['whoami', 'sprint_health']), t, free)).toEqual([
+      "Not listed because the server's per-call budget is 45 requests: sprint_health (needs 54). Set callBudget on the workspace to list them, where the server allows it.",
+    ]);
+    // A default of 1000, or an unknown default, adds no note.
+    expect(budgetNotesOf(ws({}, ['whoami', 'sprint_health']), t, { callBudget: 1000 })).toEqual([]);
+    expect(budgetNotesOf(ws({}, ['whoami', 'sprint_health']), t, null)).toEqual([]);
+    // The ceiling caps a workspace's own larger value; the workspace's own lower value is its own.
+    expect(budgetNotesOf(ws({ callBudget: 500 }, ['sprint_health']), t, free)).toHaveLength(1);
+    expect(budgetNotesOf(ws({ callBudget: 10 }, ['sprint_health']), t, { callBudget: 1000 })[0]).toContain(
+      'the per-call budget is 10 requests',
+    );
+    // "Every read tool" does not count reports unless the workspace turns them on.
+    expect(budgetNotesOf(ws({}, null), t, free)).toEqual([]);
+    expect(budgetNotesOf(ws({ reports: true }, null), t, free)).toHaveLength(1);
+    // A grant is judged against the tighter of the three.
+    const g = (limits: Record<string, number | boolean>) => ({ tools: null, limits }) as never;
+    const w = ws({ reports: true }, ['whoami', 'sprint_health']);
+    const notes = (grant: Record<string, number | boolean>, server: Record<string, number> | null) =>
+      grantNotes(g(grant), w, t, server).filter((n) => n.startsWith('Not listed'));
+    expect(notes({}, free)).toHaveLength(1);
+    expect(notes({}, { callBudget: 1000 })).toEqual([]);
+    expect(notes({ callBudget: 20 }, { callBudget: 1000 })[0]).toContain('per-call budget is 20 requests');
+    // A grant that turns reports off hides nothing from "every tool".
+    expect(
+      grantNotes(
+        { tools: null, limits: { reports: false } } as never,
+        ws({ reports: true }, null),
+        t,
+        free,
+      ).filter((n) => n.startsWith('Not listed')),
+    ).toEqual([]);
+  });
+
+  it('shows only well-formed numbers of the server limits answer, whatever else it sends (P6-58)', () => {
+    const evil = '<img src=x onerror=alert(1)>';
+    expect(parseServerLimits({ callBudget: 45, callBudgetCeiling: null })).toEqual({ callBudget: 45 });
+    expect(parseServerLimits({ callBudget: evil, callBudgetCeiling: 1.5 })).toEqual({});
+    expect(parseServerLimits({ callBudget: 0 })).toEqual({});
+    expect(parseServerLimits({ callBudget: 10_001 })).toEqual({});
+    expect(parseServerLimits(evil)).toEqual({});
+    expect(parseServerLimits(null)).toEqual({});
+    const t = [...tools];
+    const hostile = parseServerLimits({ callBudget: evil });
+    expect(budgetNotesOf({ enabledTools: ['sprint_health'], limits: {} } as never, t, hostile)).toEqual([]);
   });
 
   it('a grant is judged against the tighter of its own and the workspace budget (P6-36)', () => {

@@ -110,6 +110,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 | Method | Path | What | Body | Response |
 |---|---|---|---|---|
 | `GET` | `/tools` | The tool catalogue: name, kind, group and (for a composite) the sibling tools it reads, of every tool (owner, admin); what workspaces and grants choose from | — | 200 Tool[] |
+| `GET` | `/limits` | The server's own per-call request budget (`callBudget`, the default of a workspace that sets none) and the ceiling its runtime plan puts on every workspace (`callBudgetCeiling`, null without one), so the panel can say which tools the inherited budget hides (owner, admin). Empty when the host does not say | — | 200 ServerLimits |
 
 ## users
 
@@ -150,6 +151,7 @@ settings and write tools. Personal Agility tokens are stored only by their own u
 - **OAuthAdminDevice**: `id`: string, `userId`: string, `userEmail`: string \| null, `userName`: string \| null, `userRole`: "owner" \| "admin" \| "member" \| null, `clientName`: string \| null, `redirectHost`: string, `workspaceId`: string \| null, `workspaceName`: string \| null, `workspaceSlug`: string \| null, `label`: string \| null, `createdAt`: number, `expiresAt`: number \| null, `canWrite`: boolean
 - **OAuthClient**: `clientId`: string, `kind`: "dynamic" \| "metadata_document", `name`: string \| null, `redirectHosts`: string[], `createdAt`: number \| null, `lastApprovedAt`: number \| null, `devices`: number \| null
 - **OAuthDevice**: `id`: string, `clientName`: string \| null, `redirectHost`: string, `workspaceId`: string \| null, `workspaceName`: string \| null, `workspaceSlug`: string \| null, `label`: string \| null, `createdAt`: number, `expiresAt`: number \| null, `lastUsedAt`: number \| null, `canWrite`: boolean
+- **ServerLimits**: `callBudget`?: integer, `callBudgetCeiling`?: integer \| null
 - **Session**: `actor`: "session" \| "break_glass" \| "user", `user`: object \| null, `recentAuth`: boolean, `signedInAt`: number \| null, `idleExpiresAt`: number \| null, `expiresAt`: number \| null, `csrfToken`: string \| null
 - **SetupLink**: `id`: string, `url`: string, `expiresAt`: number
 - **Tool**: `name`: string, `kind`: "read" \| "write" \| "destructive", `group`: string, `cost`?: integer, `siblings`?: string[]

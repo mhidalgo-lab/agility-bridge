@@ -196,6 +196,11 @@ export interface AdminApiOptions {
   readonly grantUsage?: (grantId: string) => Promise<QuotaUsage>;
   /** `AB_QUOTA_DAILY` / `AB_QUOTA_MONTHLY`: the most a workspace's or a grant's own `limits.quota` may be (P8-14). */
   readonly quotaCap?: { readonly daily: number | null; readonly monthly: number | null };
+  /**
+   * The server's per-call request budget: its default for a workspace that sets none (`AB_CALL_BUDGET`) and the ceiling
+   * the runtime plan puts on every workspace (Workers Free: 45), `null` without one (P6-58). Read-only, our own numbers.
+   */
+  readonly deploymentLimits?: { readonly callBudget: number; readonly callBudgetCeiling: number | null };
   /** `AB_WRITE_RATE_PER_GRANT_HOURLY`: the most a grant's own hourly write limit may be (P7-15). */
   readonly writeRateCap?: number;
   /** OAuth is on (P5-04): the signed-in person's connected apps. Absent = the `/me/oauth-devices` routes answer 404. */
@@ -2158,6 +2163,29 @@ export function createAdminApi(options: AdminApiOptions): OpenAPIHono {
           cost: DECLARED_COST.get(name) ?? 0,
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
+    },
+  );
+
+  const ServerLimitsOut = z
+    .object({
+      callBudget: z.number().int().min(1).optional(),
+      callBudgetCeiling: z.number().int().min(1).nullable().optional(),
+    })
+    .openapi('ServerLimits');
+  add(
+    {
+      method: 'get',
+      path: '/limits',
+      tag: 'tools',
+      summary:
+        "The server's own per-call request budget (`callBudget`, the default of a workspace that sets none) and the ceiling its runtime plan puts on every workspace (`callBudgetCeiling`, null without one), so the panel can say which tools the inherited budget hides (owner, admin). Empty when the host does not say",
+      out: ServerLimitsOut,
+    },
+    async (c) => {
+      const actor = c.get('actor' as never) as Actor;
+      if (actor.kind === 'user' && actor.role === 'member')
+        throw new AdminError('forbidden', 'This needs an owner or an admin.');
+      return options.deploymentLimits ?? {};
     },
   );
 

@@ -257,3 +257,15 @@ under the checklist. It needs no script, saves nothing, and is behind the same C
 sentences come from the catalogue the admin API serves (L-314, L-316) and are escaped text. A list that is "every read
 tool" or has every sibling shows nothing. The detail pages show the same notes for what is stored (P6-11).
 
+
+## The inherited call budget (P6-58)
+
+The note for tools a per-call budget hides (`budgetNotes`, P6-36) also covers a workspace or grant that sets no
+`callBudget`. The panel asks `GET /api/admin/v1/limits` (owner and admin; a member is 403) for the server's own
+`callBudget` (the default of a workspace that sets none) and `callBudgetCeiling` (the cap of the runtime plan, 45 on
+Workers Free), both whole numbers from 1 to 10,000 and parsed as such (`parseServerLimits`; anything else is dropped,
+never shown). `effectiveBudget` takes the workspace's value, or the server's default, capped by the ceiling, then lowered
+by the grant's; when the server's number applies the sentence says "the server's per-call budget". A list that is "every
+read tool" (`null`) is judged by the read tools of the groups that are on: reports and the attachment download are off
+unless the workspace turns them on (`groupsOff`), so they are not reported as hidden. A failed or empty answer shows no
+note (L-475).

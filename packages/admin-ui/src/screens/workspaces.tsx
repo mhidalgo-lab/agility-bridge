@@ -38,6 +38,7 @@ import {
   parseUser,
   parseWorkspace,
   rows,
+  type ServerLimits,
   type Tool,
   type User,
   type Workspace,
@@ -50,10 +51,12 @@ import {
   compositeNotes,
   confirmed,
   confirmPage,
+  effectiveBudget,
   enabledState,
   FormError,
   field,
   formErrors,
+  groupsOff,
   hasWriteTools,
   isOk,
   isOwner,
@@ -70,6 +73,7 @@ import {
   RowAction,
   Screen,
   StatusBadge,
+  serverLimitsOf,
   ToolChecklist,
   toolsFrom,
   toolValues,
@@ -86,6 +90,20 @@ const SCOPE = /^Scope:\d{1,12}$/;
 const MAX_NAME = 200;
 
 /** The values a workspace form posts, for a stored workspace (the same shape a posted form has). */
+/**
+ * The note for the tools a workspace's per-call budget hides: its own `callBudget`, or the server's default when it sets
+ * none (P6-58). Reports and the attachment download are not reported while their switches are off.
+ */
+export function budgetNotesOf(ws: Workspace, tools: readonly Tool[], server: ServerLimits | null): string[] {
+  const own = ws.limits['callBudget'];
+  const applies = effectiveBudget(typeof own === 'number' ? own : undefined, undefined, server);
+  if (applies === undefined) return [];
+  return budgetNotes(ws.enabledTools, applies.budget, tools, {
+    inherited: applies.inherited,
+    groupsOff: groupsOff(ws.limits),
+  });
+}
+
 function workspaceValues(ws: Workspace): URLSearchParams {
   const v = new URLSearchParams();
   v.set('slug', ws.slug);
@@ -556,12 +574,13 @@ export function registerWorkspaces(ui: Hono, kit: UiKit): void {
       if (!isId(id)) return errorPage(404, undefined, principal);
       const ws = await loadWorkspace(c, principal, id);
       if ('status' in ws) return loadFailed(c, ws, principal);
-      const [instance, grants, users, creds, tools] = await Promise.all([
+      const [instance, grants, users, creds, tools, server] = await Promise.all([
         load(kit, c, principal, adminPath`/instances/${ws.instanceId}`, (b) => one(b, parseInstance)),
         load(kit, c, principal, '/grants', (b) => rows(b, parseGrant), { workspaceId: id }),
         load(kit, c, principal, '/users', (b) => rows(b, parseUser)),
         credentialsOf(c, principal, ws.instanceId),
         load(kit, c, principal, '/tools', (b) => rows(b, parseTool)),
+        serverLimitsOf(kit, c, principal),
       ]);
       const emails = new Map<string, User>((users.ok ? users.value : []).map((u) => [u.id, u]));
       const t = now();
@@ -638,11 +657,7 @@ export function registerWorkspaces(ui: Hono, kit: UiKit): void {
               title="Notes"
               items={[
                 ...compositeNotes(ws.enabledTools, tools.ok ? tools.value : []),
-                ...budgetNotes(
-                  ws.enabledTools,
-                  typeof ws.limits['callBudget'] === 'number' ? ws.limits['callBudget'] : undefined,
-                  tools.ok ? tools.value : [],
-                ),
+                ...budgetNotesOf(ws, tools.ok ? tools.value : [], server),
               ]}
             />
             <div class="actions">

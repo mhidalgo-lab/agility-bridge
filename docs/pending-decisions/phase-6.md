@@ -560,3 +560,8 @@ Left for the owner after the Phase 6 review ([P6-13](../reviews/phase-6-review.m
 - **Options:** (a) a new report `quality_scan` (input `sprint` or `epic`, never both) with one batched read of the text fields of open stories and defects, scored by the same `assess` and `summarise`; at most 50 items per type per call, more is partial and says so; for an epic the items whose `Super` is that epic (items below sub-epics are named as not read); gated by the `get_work_item` grant, declared cost 30; (b) add `sprint` and `epic` inputs to `work_item_quality` (one tool with three modes and a mixed output); (c) walk the whole epic tree (up to four levels, several requests more).
 - **Recommendation:** (a), built.
 - **Owner (2026-10-29):** Decided: as recommended, (a).
+
+### D-337 — The server's call budget reaches the panel through a new read-only `GET /limits` *(P6-58)*
+- **Context:** The task asks for a read-only field of "an existing settings or tools answer". `GET /tools` is a bare array, so a field there would be per tool row or a breaking change of its shape, and there is no settings answer.
+- **Options:** (a) a new `GET /limits` (owner and admin, a member is 403) returning `{ callBudget, callBudgetCeiling }`; (b) repeat the numbers on every row of `/tools`; (c) change `/tools` to an object.
+- **Recommendation:** (a), built. Additive, no client of `/tools` changes, and it carries only the server's own two numbers (T13); the ceiling is there because a workspace's own larger value is capped by the plan, so the panel judges the same number the runtime uses. "Every read tool" is judged by the groups that are on (reports and the attachment download are off by default) so they are not reported as hidden.

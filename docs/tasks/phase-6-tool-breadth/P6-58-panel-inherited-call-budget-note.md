@@ -2,7 +2,7 @@
 id: P6-58
 title: Show the budget-hidden tools note for an inherited call budget in the panel
 phase: 6
-status: todo
+status: review
 priority: low
 depends_on: [P6-36]
 adr: ["0010"]
@@ -24,11 +24,14 @@ hidden), and the panel does not know that default, so it says nothing there.
   be reported as hidden.
 
 ## Acceptance criteria
-- [ ] A workspace on a 45-request host that enables a report shows the note without setting `callBudget`.
-- [ ] A negative test: a default of 1000 adds no note; hostile values in the API answer are not shown.
+- [x] A workspace on a 45-request host that enables a report shows the note without setting `callBudget`.
+- [x] A negative test: a default of 1000 adds no note; hostile values in the API answer are not shown.
+
+## Built (2026-11-03)
+New read-only `GET /limits` (owner and admin): D-337. "Every read tool" is judged by the groups that are on (reports and the attachment download are off by default). Lesson L-475. Follow-up P6-61 (show the server's budget in the form hint).
 
 ## Security notes
-Our own tool names and numbers only (THREAT_MODEL T13).
+Our own tool names and numbers only (THREAT_MODEL T13); `GET /limits` is owner and admin only.
 
 ## Lessons applied
 - L-115 — Hide what cannot fit, and say so.

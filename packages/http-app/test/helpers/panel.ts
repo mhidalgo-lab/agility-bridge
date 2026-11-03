@@ -40,6 +40,8 @@ export interface Opts {
   writeRateCap?: number;
   /** The deployment's request quota per grant, which a workspace's or grant's own may not exceed (P8-14). */
   quotaCap?: { daily: number | null; monthly: number | null };
+  /** The server's per-call budget and the ceiling of its plan (Workers Free: 45 and 45), for the inherited-budget note (P6-58). */
+  callBudget?: { default: number; ceiling?: number };
 }
 
 export async function setup(options: Opts = {}) {
@@ -91,20 +93,21 @@ export async function setup(options: Opts = {}) {
       ...(options.isolation === undefined ? {} : { isolation: options.isolation }),
       ...(options.oauth === undefined ? {} : { oauth: options.oauth }),
       ...(options.writes === undefined ? {} : { writes: options.writes }),
-      ...(options.writeSwitch === true
+      ...(options.writeSwitch === true || options.callBudget !== undefined
         ? {
             access: {
               tools: options.tools ?? TOOL_INFO,
-              writesEnabled: true,
+              writesEnabled: options.writeSwitch === true,
               environment: 'live' as const,
               limits: {
                 defaults: {
                   ...DEFAULT_LIMITS,
                   maxResponseBytes: 8 * 1024 * 1024,
-                  callBudget: 1_000,
+                  callBudget: options.callBudget?.default ?? 1_000,
                   genericQuery: true,
                 },
-                ceilings: {},
+                ceilings:
+                  options.callBudget?.ceiling === undefined ? {} : { callBudget: options.callBudget.ceiling },
               },
             },
           }
