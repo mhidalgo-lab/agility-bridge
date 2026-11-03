@@ -2,12 +2,12 @@
 id: P9-07
 title: Release verification guide and backport path
 phase: 9
-status: todo
+status: in-progress
 priority: medium
 depends_on: [P8-12]
 adr: []
 lessons: [L-128, L-131]
-owner: ""
+owner: "claude (lane D)"
 ---
 
 # P9-07 — Release verification guide and backport path
@@ -28,14 +28,14 @@ Anyone can verify a release, and security fixes can ship to older minors.
 - The exact GitHub settings for the `release/*` branches and the `v*` tags, written down for the owner.
 
 ## Acceptance criteria
-- [ ] `docs/guide/verify-release.md` was executed command by command against the latest published release (0.8.0) and
+- [x] `docs/guide/verify-release.md` was executed command by command against the latest published release (0.8.0) and
       every command works; non-obvious behaviour (silent success, exit codes) is documented.
-- [ ] `docs/dev/releasing.md` documents the `release/x.y` path: when and how to cut it, the guards (`plan`, `publish`,
+- [x] `docs/dev/releasing.md` documents the `release/x.y` path: when and how to cut it, the guards (`plan`, `publish`,
       `image`), the dist-tag and image-tag rules, the egress policy, and a repeatable dry run.
-- [ ] A release never publishes a version lower than one already on npm in the same `x.y` line (tested).
-- [ ] A backport dry run was executed locally (plan, version, build, package check, image tags) and its result is
+- [x] A release never publishes a version lower than one already on npm in the same `x.y` line (tested).
+- [x] A backport dry run was executed locally (plan, version, build, package check, image tags) and its result is
       recorded; nothing was pushed or published.
-- [ ] `docs/security/repo-settings.md` lists the exact `release/*` and `v*` settings; THREAT_MODEL T18 is updated.
+- [x] `docs/security/repo-settings.md` lists the exact `release/*` and `v*` settings; THREAT_MODEL T18 is updated.
 - [ ] *owner:* create or confirm the settings above on GitHub (the `v*` tag ruleset was not found on 2026-11-03).
 - [ ] *owner:* the verification guide executed by someone other than the author.
 

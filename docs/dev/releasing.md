@@ -48,7 +48,7 @@ release that did not touch the tools can reuse the last report if the `tools/lis
 | Repository variable `AB_RELEASE_ENABLED` | `true` when the first release is intended | Every build and publish job is skipped without it. |
 | npm trusted publisher | `npm trust github agility-bridge --repo mhidalgo-lab/agility-bridge --file release.yml --env release --allow-stage-publish` (no `--allow-publish`) | Only this workflow, in this environment, can stage; nothing can publish directly. |
 | npm package publishing access | "Require 2FA and disallow tokens" | No token can publish. |
-| Tag ruleset `v*` | Only maintainers create; no update or deletion | `plan` trusts that `v<version>` points at the released commit. |
+| Tag ruleset `v*` | Only maintainers create; no update or deletion (not found on 2026-11-03: owner item in [repo settings](../security/repo-settings.md#release-branches-and-tags)) | `plan` trusts that `v<version>` points at the released commit. |
 | Actions | Default `GITHUB_TOKEN` read-only; allow Actions to create pull requests (the version PR) | Each job declares its own permissions. |
 | GHCR package `agility-bridge` | After the first push: visibility **public**, linked to this repository (the image's `org.opencontainers.image.source` label links it), Actions access only from this repository | A new container package starts private; `image` pushes with the workflow's `GITHUB_TOKEN`. |
 
@@ -58,8 +58,73 @@ release that did not touch the tools can reuse the last report if the `tools/lis
 pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test && pnpm build
 node scripts/check-package.ts --out release      # packs, checks and installs the tarball, runs it
 node scripts/release.ts notes "$(node -p 'require("./apps/cli/package.json").version')"
-cd release && npm publish --dry-run --ignore-scripts "$PWD/agility-bridge-<version>.tgz"
+cd release && npm publish --dry-run --ignore-scripts "$PWD/agility-bridge-<version>.tgz" # a backport adds --tag release-x.y
 ```
+
+## Backports (`release/x.y`)
+
+A security fix (or a severe bug fix) for an older minor ships as a patch from a `release/x.y` branch, so users of that
+line do not have to take the features of `main` ([support policy](../guide/versioning.md#security-fixes)). The pipeline
+is the same `release.yml`: the same jobs, the same two approvals, the same artifacts and the same checks.
+
+### The guards a backport has
+
+| Guard | Where | Effect on `release/x.y` |
+|---|---|---|
+| Ref allowlist | `release.ts releaseRef`, every job's `if` | Only `main` and `release/<major>.<minor>` release; any other ref or tag fails `plan`. |
+| Line check | `releaseRef` | `release/0.8` can only release `0.8.x`; any other version fails `plan`. |
+| npm dist-tag | `plan` output `npm-tag`, `publish` input check | `release-0.8`, never `latest` (an approval on npmjs.com would otherwise move `latest` back). |
+| Never backwards | `decidePlan`, `release.ts image-tags` | A version lower than one already on npm in the same minor line is refused (P9-07); image tags `X.Y` and `latest` only move forward, `latest` only from `main`; a backport is not GitHub's "Latest" release. |
+| Tag on another commit | `plan`, `publish` | A `v<version>` tag on a different commit stops the release. |
+| Changesets | `release.ts check-changesets` in `pnpm lint`, `plan` | A pending changeset makes the run open a Version Packages PR (against the release branch) instead of publishing. |
+| Provenance, SBOM, checksums | `build` and `publish` | Identical to `main`; the attestation records `refs/heads/release/x.y` as the source ref. |
+| Egress | `publish` and `image` | `egress-policy: block` with the same exact allowlist; the other jobs run `audit`. The jobs are shared, so the policy cannot differ between `main` and a backport (`release.test.ts` asserts the allowlist). |
+| Approvals | Environment `release` (deployment branches `main` and `release/*`), then 2FA on npmjs.com | Same two approvals. |
+| Branch protection | Ruleset `Protect release/*` ([repo settings](../security/repo-settings.md#release-branches-and-tags)) | Same rules as `main`: pull requests, the required checks, no force push, no deletion. |
+
+### Cut the branch and release a fix
+
+The branch is created from the **release tag** of the line, by the owner, never from `main`:
+
+1. Create `release/0.8` from the latest `v0.8.x` tag (`git switch -c release/0.8 v0.8.0` after fetching tags). Push it
+   only when you mean to release.
+2. **Carry the pipeline forward** (L-499): the branch runs *its own* `release.yml`, `scripts/release.ts` and Dockerfile.
+   Compare them with `main` (`git diff main -- .github/workflows/release.yml scripts/release.ts docker/Dockerfile`) and
+   cherry-pick the pipeline's guards before the first release from the branch.
+3. Open a pull request **to `release/0.8`** with the cherry-picked fix (`git cherry-pick -x <commit>`) and a changeset
+   for `agility-bridge` (`patch`). CI runs on it like on any pull request.
+4. After the merge, `plan` sees the changeset and opens the **Version Packages** PR against `release/0.8`. Merge it.
+5. The next run is mode `publish`: the same flow as in [Flow](#flow) steps 3 to 7, with the dist-tag `release-0.8`
+   and, for the image, the tags `0.8.1` and `0.8`.
+6. Announce the fix (advisory and release notes). The fix must exist on `main` first ([SECURITY.md](../../SECURITY.md)).
+
+### Backport dry run (publishes nothing)
+
+Run it to check a branch before the real release, or after changing the pipeline. It is local: **never push a
+`release/*` branch or a tag for a dry run, and never run `npm publish` without `--dry-run`**.
+
+```sh
+git switch -c release/0.8 v0.8.0                      # local only
+printf -- "---\n'agility-bridge': patch\n---\n\nDry run.\n" > .changeset/dry-run.md
+pnpm install --frozen-lockfile
+GITHUB_REF=refs/heads/release/0.8 node scripts/release.ts plan     # mode=version version=0.8.0 npm-tag=release-0.8
+pnpm version-packages && git add -A && git commit -s -m 'chore(release): version packages'
+export GITHUB_REPOSITORY=mhidalgo-lab/agility-bridge GITHUB_SHA="$(git rev-parse HEAD)" GH_TOKEN="$(gh auth token)"
+GITHUB_REF=refs/heads/release/0.8 node scripts/release.ts plan     # mode=publish version=0.8.1 npm-tag=release-0.8
+GITHUB_REF=refs/heads/release/0.9 node scripts/release.ts plan     # refused: release/0.9 can only release 0.9.x
+GITHUB_REF=refs/heads/release/0.8 node scripts/release.ts image-tags 0.8.1   # 0.8.1 and 0.8, never latest
+pnpm lint && pnpm typecheck && pnpm test && pnpm build
+node scripts/check-package.ts --out ../release-dry-run              # packs, checks, installs and runs the tarball
+(cd ../release-dry-run && npm publish --dry-run --ignore-scripts --tag release-0.8 "$PWD/agility-bridge-0.8.1.tgz")
+git switch - && git branch -D release/0.8                           # clean up
+```
+
+Executed on 2026-11-03 from `v0.8.0` (P9-07): `plan` returned `mode=version` and then `mode=publish` with
+`npm-tag=release-0.8`; a wrong ref and a wrong line failed with the messages above; `image-tags` returned `0.8.1` and
+`0.8` without `latest`; lint, build and the package check passed; `npm publish --dry-run` named agility-bridge@0.8.1
+(without `--tag` it reports `latest`: the workflow always passes the planned tag). Not exercised locally: the OIDC,
+attestation, registry and GHCR steps, which run only in the workflow on a pushed branch, so the first real backport is
+the first full run of those steps (watch the harden-runner log, [egress](#egress-of-the-publish-and-image-jobs)).
 
 ## Reruns
 

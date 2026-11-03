@@ -41,7 +41,7 @@ How to use it:
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462, L-473, L-474, L-475 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453, L-467, L-468, L-469 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446 |
-| [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157 |
+| [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157, L-499 – L-501 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241, L-402 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297, L-335 |
 | [Top 20](#top-20) | the lessons that save the most time |
@@ -2148,6 +2148,24 @@ A local npm wrapper that enforces a minimum release age (here Safe-chain) hides 
 `https://registry.npmjs.org/<name>` directly and compare the shasum. A first staged publish also creates a public
 `0.0.0-stage` stub, and the 2FA approval needs an interactive terminal.
 *Applied in:* P1-15.
+
+**L-499 — A release branch runs its own copy of the pipeline.**
+`release/x.y` is built from a tag, so its `release.yml`, `scripts/release.ts` and Dockerfile are the ones of that tag, not
+`main`'s. A guard added to `main` protects a backport only after it is cherry-picked, so cutting a backport branch
+includes diffing those files against `main` and carrying the guards over, and a version never goes below one already on
+npm in the same minor line.
+*Applied in:* P9-07, `docs/dev/releasing.md`.
+
+**L-500 — A verification command that prints nothing has not told you anything: read the exit code.**
+`gh attestation verify` writes its checkmarks only to a terminal; piped or in CI it is silent and exits 0 on success.
+Tell readers to check the exit status (or add `--format json`), and run every documented command in a non-interactive
+shell before publishing the guide.
+*Applied in:* P9-07, `docs/guide/verify-release.md`.
+
+**L-501 — A settings page that says "applied" must be checked against the API.**
+`docs/dev/releasing.md` listed a `v*` tag ruleset that did not exist (the rulesets API showed only the two branch
+rulesets), although `plan` relies on it. Re-read such settings with `gh api` at every release review.
+*Applied in:* P9-07, `docs/security/repo-settings.md`.
 
 ## S. Documentation and configuration
 

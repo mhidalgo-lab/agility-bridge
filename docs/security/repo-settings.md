@@ -71,6 +71,38 @@ required, as in relic-bridge.
   grouped, releases at least 3 days old, majors behind dependency-dashboard approval, actions pinned by digest, CI tool
   binaries pinned by tag and sha256.
 
+## Release branches and tags
+
+> Read from the rulesets API on 2026-11-03 (P9-07, L-501). The backport path is in
+> [releasing](../dev/releasing.md#backports-releasexy).
+
+`Protect release/*` exists and is active (id 25445940, include `refs/heads/release/*`, no bypass actors): deletion and
+force push blocked, pull request with squash only and 0 approvals, review threads resolved, the ten required checks
+above (not required to be up to date). The `release` environment has the owner as required reviewer and the deployment
+branches `main`, `release/*` and the tag pattern `v*`. The repository variable `AB_RELEASE_ENABLED` is `true`.
+
+**Not found:** the `v*` **tag ruleset** that `plan` relies on (a tag on another commit stops a release, but nothing stops
+someone with write access from creating or moving a `v*` tag first).
+
+### Settings to apply (owner)
+
+Settings → Rules → Rulesets → *New tag ruleset*:
+
+| Field | Value |
+|---|---|
+| Name / enforcement | `Protect release tags` / Active |
+| Target / pattern | Tags, include `refs/tags/v*` |
+| Bypass list | empty (the release workflow creates tags through `gh release create` with `GITHUB_TOKEN`; if a release run fails with a ruleset rejection, add the repository's GitHub Actions app as bypass for *creation* only, never for update or deletion) |
+| Rules | Restrict updates, restrict deletions, block force pushes (`non_fast_forward`); optionally restrict creations once the bypass above is confirmed |
+
+Optional hardening of `Protect release/*`: add **Restrict creations** with the owner (repository admin role) as the only
+bypass actor, so only the owner can create `release/x.y` branches; the release branches are created rarely and always
+from a release tag. Keep every other setting as it is. Add the `Authorization suite` and any new required job to both
+branch rulesets together.
+
+- [ ] *owner:* create the `Protect release tags` ruleset above and confirm a release run can still create its tag.
+- [ ] *owner:* decide on and apply "Restrict creations" for `release/*` (D-368).
+
 ## Owner checklist (P0-04)
 
 - [x] Rulesets, required checks from CI, secret scanning and push protection, private vulnerability reporting,
