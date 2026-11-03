@@ -466,8 +466,8 @@ agility-bridge workspace add <slug> --name <value> --instance <value> --project 
 | `--asset-types-allow` | list | Only these asset types |
 | `--asset-types-deny` | list | Never these asset types |
 | `--max-rows` | int | Most rows per call |
-| `--quota-daily` | int | Agility requests per UTC day for each grant (only lowers the server's AB_QUOTA_DAILY; replaces the limits set before) |
-| `--quota-monthly` | int | Agility requests per UTC month for each grant (only lowers the server's AB_QUOTA_MONTHLY; replaces the limits set before) |
+| `--quota-daily` | int | Agility requests per UTC day for each grant (only lowers the server's AB_QUOTA_DAILY) |
+| `--quota-monthly` | int | Agility requests per UTC month for each grant (only lowers the server's AB_QUOTA_MONTHLY) |
 | `--credential-source` | string | `stored` (default) or `passthrough`: callers send their own Agility token (owner; needs AB_PASSTHROUGH=on) |
 
 Local or remote.
@@ -477,7 +477,7 @@ Local or remote.
 Change a workspace (only the options given).
 
 ```text
-agility-bridge workspace set <workspace-id> [--name <value>] [--project <value>] [--default-credential <value>] [--tools a,b] [--max-rows <n>] [--quota-daily <n>] [--quota-monthly <n>] [--credential-source <value>] [--writes <value>] [--write-approval <value>]
+agility-bridge workspace set <workspace-id> [--name <value>] [--project <value>] [--default-credential <value>] [--tools a,b] [--max-rows <value>] [--quota-daily <value>] [--quota-monthly <value>] [--credential-source <value>] [--writes <value>] [--write-approval <value>]
 ```
 
 | Name | Kind | Meaning |
@@ -487,9 +487,9 @@ agility-bridge workspace set <workspace-id> [--name <value>] [--project <value>]
 | `--project` | string, repeatable | Replace the allowed projects (repeat) |
 | `--default-credential` | string | Shared default credential |
 | `--tools` | list | Enabled tools |
-| `--max-rows` | int | Most rows per call |
-| `--quota-daily` | int | Agility requests per UTC day for each grant (only lowers the server's AB_QUOTA_DAILY; replaces the limits set before) |
-| `--quota-monthly` | int | Agility requests per UTC month for each grant (only lowers the server's AB_QUOTA_MONTHLY; replaces the limits set before) |
+| `--max-rows` | string | Most rows per call (1-1000), or `none`; the other limits stay as they are |
+| `--quota-daily` | string | Agility requests per UTC day for each grant (only lowers the server's AB_QUOTA_DAILY), or `none` to remove it (removing or raising one needs an owner with a recent sign-in) |
+| `--quota-monthly` | string | Agility requests per UTC month for each grant (only lowers the server's AB_QUOTA_MONTHLY), or `none` to remove it (removing or raising one needs an owner with a recent sign-in) |
 | `--credential-source` | string | `stored` (default) or `passthrough`: callers send their own Agility token (owner; needs AB_PASSTHROUGH=on) |
 | `--writes` | string | `on` or `off`: whether write tools may be used in this workspace (owner, recent sign-in; the server needs AB_WRITE_TOOLS=on) |
 | `--write-approval` | string | `page_only`: every write needs the approval page, or `any` (owner, recent sign-in) |
@@ -564,10 +564,10 @@ Local or remote.
 
 ### `grant update`
 
-Change a grant (only the options given): its rate and hourly write limit, write approval, tools, projects, end date (the API owner rules apply).
+Change a grant (only the options given): its rate and hourly write limit, write approval, quota, tools, projects, end date (the API owner rules apply).
 
 ```text
-agility-bridge grant update <grant-id> [--rate-per-minute <value>] [--writes-per-hour <value>] [--write-approval <value>] [--credential <value>] [--tools a,b] [--project <value>] [--expires-days <value>]
+agility-bridge grant update <grant-id> [--rate-per-minute <value>] [--writes-per-hour <value>] [--write-approval <value>] [--credential <value>] [--tools a,b] [--project <value>] [--quota-daily <value>] [--quota-monthly <value>] [--expires-days <value>]
 ```
 
 | Name | Kind | Meaning |
@@ -579,6 +579,8 @@ agility-bridge grant update <grant-id> [--rate-per-minute <value>] [--writes-per
 | `--credential` | string | Credential |
 | `--tools` | list | Only these tools |
 | `--project` | string, repeatable | Only these of the workspace projects (repeat) |
+| `--quota-daily` | string | Agility requests per UTC day for each grant (only lowers the server's AB_QUOTA_DAILY), or `none` to remove it (removing or raising one needs an owner with a recent sign-in) |
+| `--quota-monthly` | string | Agility requests per UTC month for each grant (only lowers the server's AB_QUOTA_MONTHLY), or `none` to remove it (removing or raising one needs an owner with a recent sign-in) |
 | `--expires-days` | string | Days until it expires, or `never` |
 
 Local or remote.
