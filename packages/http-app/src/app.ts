@@ -130,6 +130,12 @@ export interface RequestLimits {
   onAuthFailure?(ip: string, now: number): void | Promise<void>;
   /** Per client IP on the sign-in routes (P4-01): each start writes a row and may call the identity provider. */
   beforeSignIn?(ip: string, now: number): LimitDecision | Promise<LimitDecision>;
+  /**
+   * Per client IP on the OAuth routes that reach storage (authorize, token, register, consent), after the general
+   * per-IP limit and before the abuse counters (P5-19): a host may back it with an edge limiter so a flood costs no
+   * storage query.
+   */
+  beforeOAuth?(ip: string, now: number): LimitDecision | Promise<LimitDecision>;
   /** Before an upstream validation of a new pass-through token (P2-14), per instance. */
   beforeValidation?(instanceId: string, now: number): LimitDecision | Promise<LimitDecision>;
   /** True when the IP has no failures left: a failed attempt then answers 429 instead of 401. */
@@ -763,9 +769,12 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
   // the consent screen are built above (the admin API's connected-apps routes need them).
   if (oauth !== undefined) {
     const runtime = oauth;
-    const limited = async (c: Context, run: () => Promise<Response>): Promise<Response> => {
+    const limited = async (c: Context, run: () => Promise<Response>, edge = false): Promise<Response> => {
       const now = services.clock.now();
-      const decision = await options.limits?.beforeAuth?.(clientIp(c), now);
+      const ip = clientIp(c);
+      let decision = await options.limits?.beforeAuth?.(ip, now);
+      if (edge && (decision === undefined || decision.ok))
+        decision = await options.limits?.beforeOAuth?.(ip, now);
       if (decision !== undefined && !decision.ok) {
         return c.json(
           { error: 'temporarily_unavailable', error_description: 'Too many requests; retry later.' },
@@ -783,17 +792,17 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     );
     // The OAuth abuse controls (P5-09) sit behind the general per-IP limit and in front of the endpoint's own work.
     app.get(OAUTH_AUTHORIZE_PATH, (c) =>
-      limited(c, () => runtime.guard('authorize', c, () => runtime.authorize(c))),
+      limited(c, () => runtime.guard('authorize', c, () => runtime.authorize(c)), true),
     );
     app.post(OAUTH_TOKEN_PATH, (c) =>
-      limited(c, () => runtime.guard('token', c, () => runtime.token(c, () => cache.clear()))),
+      limited(c, () => runtime.guard('token', c, () => runtime.token(c, () => cache.clear())), true),
     );
-    app.post(OAUTH_REGISTER_PATH, (c) => limited(c, () => runtime.register(c)));
+    app.post(OAUTH_REGISTER_PATH, (c) => limited(c, () => runtime.register(c), true));
     const screen = consentScreen;
     // The built-in consent screen's form post (P5-04); a stand-in handler has no such route.
     if (screen !== undefined)
       app.post(OAUTH_CONSENT_PATH, (c) =>
-        limited(c, () => runtime.guard('consent', c, () => screen.decide(c, runtime))),
+        limited(c, () => runtime.guard('consent', c, () => screen.decide(c, runtime)), true),
       );
   }
 

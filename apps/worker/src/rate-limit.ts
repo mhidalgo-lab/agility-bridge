@@ -15,6 +15,8 @@ export interface BackstopBindings {
   readonly ip?: RateLimitBinding;
   /** Failed authentications per address (T1). */
   readonly authFailures?: RateLimitBinding;
+  /** Requests per address to the OAuth routes that reach D1 (T20, P5-19). */
+  readonly oauth?: RateLimitBinding;
 }
 
 /** The binding's period; a refused key stays refused here for that long. */
@@ -39,6 +41,7 @@ export class BackstopRateLimiter implements RateLimiter {
   #bindingFor(key: string): RateLimitBinding | undefined {
     if (key.startsWith('ip:')) return this.#bindings.ip;
     if (key.startsWith('authfail:')) return this.#bindings.authFailures;
+    if (key.startsWith('oauth:')) return this.#bindings.oauth;
     return undefined;
   }
 
