@@ -1,5 +1,9 @@
 ---
 title: agility-bridge
+# Starlight titles a page "<page> | <site>", which reads "agility-bridge | agility-bridge" here.
+head:
+  - tag: title
+    content: agility-bridge documentation
 description: An open-source MCP server that lets AI agents work with Digital.ai Agility through its public APIs.
 ---
 
