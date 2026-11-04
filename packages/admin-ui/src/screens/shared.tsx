@@ -186,7 +186,7 @@ export function RowAction(props: {
   readonly action: string;
   readonly csrf: string;
   readonly label: string;
-  /** Accessible name: says which row (`Revoke laptop`). */
+  /** Accessible name: starts with the visible label and says which row (`Revoke laptop`), WCAG 2.5.3 (L-504). */
   readonly name: string;
   readonly confirm?: boolean;
 }): JSX.Element {

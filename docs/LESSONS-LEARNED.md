@@ -34,7 +34,7 @@ How to use it:
 | [H. Storage, migrations and secrets](#h-storage-migrations-and-secrets) | L-071 – L-078, L-434, L-443, L-444, L-161, L-173 |
 | [I. HTTP, rate limiting and abuse](#i-http-rate-limiting-and-abuse) | L-079 – L-085, L-151, L-175, L-176, L-187, L-189, L-219, L-266, L-268, L-271, L-426, L-427, L-486 |
 | [J. OAuth and identity](#j-oauth-and-identity) | L-086 – L-094, L-164, L-184 – L-186, L-188, L-190 – L-193, L-220 – L-222, L-236, L-242 – L-265, L-267, L-345, L-409, L-410 |
-| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270 |
+| [K. Admin UI](#k-admin-ui) | L-095, L-194 – L-200, L-205 – L-208, L-210 – L-214, L-218, L-223, L-229 – L-232, L-235, L-270, L-504 |
 | [L. Cloudflare Workers](#l-cloudflare-workers) | L-096 – L-101, L-179 – L-182, L-458, L-477 – L-479, L-491, L-494 |
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412, L-481, L-482 |
@@ -1499,6 +1499,13 @@ The Connect page said OAuth clients are "a later release" and "have no snippet y
 sent a person with a working server to a device token. At the end of each phase, search the pages and guides for "later release",
 "not yet" and "yet" and the names of the phase's tasks, and have a test pin the new wording where it is rendered.
 *Applied in:* P5-10, `packages/admin-ui/src/screens/connect.tsx`.
+
+**L-504 — A button's accessible name starts with its visible text (WCAG 2.5.3, label in name).**
+`RowAction` sets `aria-label` to say which row; "End their sessions…" was named "End the sessions of <email>", so a voice
+user saying the visible words could not activate it. axe-core 4.14 added `label-content-name-mismatch` and the admin E2E
+failed on `main` after a grouped dev-dependency update: that job is path-filtered and not required, so a dependency
+update that only bumps axe needs its run checked before merging (2026-11-04).
+*Applied in:* `packages/admin-ui/src/screens/users.tsx`, `shared.tsx` (`RowAction` doc comment).
 
 ## L. Cloudflare Workers
 
