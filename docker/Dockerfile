@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+# syntax=docker/dockerfile:1.28@sha256:bb22d9815c728170f72750f4e5b0d672e06176142e1d602c7e66c050100b7e5b
 # SPDX-License-Identifier: Apache-2.0
 # agility-bridge server image (P2-11, L-102): built on the build platform (pure-JavaScript dependencies, so every target
 # architecture needs only a copy, no emulation), run as a non-root user on distroless Node 24 with a read-only root
