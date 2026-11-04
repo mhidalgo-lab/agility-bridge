@@ -370,7 +370,7 @@ export function registerUsers(ui: Hono, kit: UiKit): void {
                     action={`${self}/sessions`}
                     csrf={principal.csrf}
                     label="End their sessions…"
-                    name={`End the sessions of ${u.email}`}
+                    name={`End their sessions (${u.email})`}
                   />
                 ) : null}
                 {canUnbind(principal, u) ? (
