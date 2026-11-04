@@ -25,7 +25,7 @@
     "runtime": "web"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "2.3.1",
+    "@modelcontextprotocol/server": "2.4.0",
     "saxes": "6.0.0",
     "zod": "4.6.7"
   },
