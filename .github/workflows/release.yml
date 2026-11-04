@@ -50,7 +50,7 @@ jobs:
       version: ${{ steps.plan.outputs.version }}
       npm-tag: ${{ steps.plan.outputs.npm-tag }}
     steps:
-      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -79,7 +79,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
       # Full history: `changeset version` otherwise deepens the shallow clone with `git fetch`, which has no
@@ -123,7 +123,7 @@ jobs:
     env:
       VERSION: ${{ needs.plan.outputs.version }}
     steps:
-      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -201,7 +201,7 @@ jobs:
       # `npm view`); Sigstore (fulcio, rekor: attestations and npm provenance). A blocked call fails the job and shows in
       # the harden-runner log: add that exact host in a pull request, or set `audit` as the documented fallback
       # (docs/dev/releasing.md). Never a wildcard (scripts/test/release.test.ts).
-      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: block
           allowed-endpoints: >
@@ -382,7 +382,7 @@ jobs:
       # sha256 of the Linux-64bit tarball, pinned here so a tampered release cannot also replace its checksums file.
       TRIVY_SHA256: c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f
     steps:
-      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -466,7 +466,7 @@ jobs:
       # Egress blocked like `publish`. Classes: GitHub API (api); GHCR and its blob storage (ghcr.io,
       # pkg-containers.githubusercontent.com); OIDC token (token.actions); npm (registry, `npm view`); Sigstore (fulcio,
       # rekor). A blocked call fails the job and shows in the harden-runner log (docs/dev/releasing.md).
-      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: block
           allowed-endpoints: >
