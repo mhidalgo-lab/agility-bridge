@@ -1,5 +1,26 @@
 # agility-bridge
 
+## 0.9.0
+
+### Minor Changes
+
+- f924993: `agility-bridge workspace set` takes `--writes on|off` and `--write-approval any|page_only` (P7-34). It reads the workspace's write policy first and sends it merged, so the custom attributes stay. `grant update --write-approval` (from P7-40) does the same for a grant. There is no deployment-wide default for the approval policy (D-208).
+- e1f6e41: New `agility-bridge grant update <grant-id>` changes a grant from the command line: `--rate-per-minute`, `--writes-per-hour`, `--write-approval page_only|any`, `--tools`, `--project`, `--credential` and `--expires-days` (P7-40). It reads the grant first so a limit you do not name stays as it is, and `none` removes one.
+- 680ab94: A workspace and a grant can carry their own Agility request quota (`limits.quota`, `daily` and `monthly`, P8-14). The quota that applies is the lowest of the server's `AB_QUOTA_DAILY` / `AB_QUOTA_MONTHLY`, the workspace's and the grant's, so an override only lowers; a value above the server's is refused, and raising or removing one that is set needs an owner with a recent sign-in. Set it in the admin panel, the admin API, or with `--quota-daily` and `--quota-monthly` of `workspace add|set` and `grant add`.
+- a3ea087: Breaking for unbound keychain entries (P8-41): a keychain token that was stored without a host is no longer accepted. `AB_AGILITY_TOKEN=keychain:<name>` or `${keychain:...}` in the YAML `instance.token` now stops startup, and `agility-bridge doctor` reports a failure, until you run `agility-bridge keychain bind <name> --for-url <address>` once. Tokens stored with `keychain set --for-url`, or bound since v0.8.0, are not affected. v0.8.0 warned about these entries.
+- 2f9f59e: The stdio server now exports the same self-monitoring spans as `serve` when `AB_OTEL_ENDPOINT` (and optionally `AB_OTEL_HEADERS`) are set: one allowlisted span per MCP request and notification, sent to your OTLP/HTTP collector without ever delaying a call or writing to stdout (P8-20). It is off by default.
+
+### Patch Changes
+
+- ca18051: Admin panel: the "End their sessions…" button on a person's page now has an accessible name that starts with its visible text, so voice control users can activate it by saying what they see (WCAG 2.5.3).
+- 74f01e4: OAuth client metadata documents (P9-02): a stored client document is now evicted at the cap only after the per-address and per-deployment fetch budgets have passed and a valid document was fetched, so a caller with no budget left can no longer empty the cache of other clients' documents one request at a time. No setting or API changes.
+- 87023a2: `agility-bridge workspace set --max-rows/--quota-daily/--quota-monthly` now changes only the limit named and keeps the others (row and call budgets, the switches set in the panel, the other quota period); before, it replaced the workspace's whole `limits` and dropped them (P8-46). `none` removes one. `grant update` takes `--quota-daily` and `--quota-monthly` the same way.
+- 796210a: The admin panel now says which tools the server's own per-call request budget hides (for example every report on Workers Free, 45 requests) on a workspace or grant that sets no `callBudget` (P6-58). The admin API gains a read-only `GET /limits` with the server's default and ceiling.
+- 438ad14: OAuth edge rate limit on Workers (P5-19): an optional `RL_OAUTH` Rate Limiting binding (60 per minute per address) turns a flood of `/oauth/authorize`, `/oauth/token`, `/oauth/register` and consent requests away before any D1 query of the OAuth abuse counters; it fails open and is only a backstop. Other hosts behave as before. The Worker warns at start when OAuth is on and the binding is missing. A WAF rate limiting rule recipe is in the Cloudflare limits guide.
+- 42353f3: Bounded read-back after a write (P7-19): `update_status`, `assign_owners`, `move_to_sprint`, `update_fields`, `close_asset`, `reopen_asset` and `add_comment` read the item once after the change was sent and answer `readBack: confirmed`, `not_yet_visible` or `unknown`. It is never an error and never repeats the write. Declared costs of `add_comment`, `update_fields`, `move_to_sprint` and `reopen_asset` rose by 1 to 2 requests for that read.
+- e48519f: Write counters can live outside the storage `kv` table (P3-12): the HTTP app's write wiring takes an optional counter store, used by the Cloudflare Worker's optional Durable Object limiter. Nothing changes for `serve` or stdio.
+- 8af02a4: URL-mode elicitation for the approval page (P7-46): a client that declares `elicitation.url`, on a connection the server can push a request to (stdio and other 2025-era connections), is asked to open the approval page's link itself. The request is a fixed text and the page's own link; the answer still carries the link, the page and its checks are unchanged, and accepting the request approves nothing. 2026-07-28 requests keep the plain link for now.
+
 ## 0.8.0
 
 ### Minor Changes
