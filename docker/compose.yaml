@@ -10,7 +10,7 @@
 #   build: { context: .., dockerfile: docker/Dockerfile }
 services:
   agility-bridge:
-    image: ghcr.io/mhidalgo-lab/agility-bridge:0.2.0@sha256:38dca26cb4e4216c8a0288c4818bb2b94bad39352032eda978e1563f191d85b6
+    image: ghcr.io/mhidalgo-lab/agility-bridge:0.8.0@sha256:6ecf6d95adf6277f3471d71036d60c440ea4ca9ca637ad250d4a8c7a980d09fd
     restart: unless-stopped
     read_only: true
     tmpfs:
