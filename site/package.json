@@ -4,7 +4,7 @@
   "description": "Documentation site (Astro Starlight) built from ../docs; standalone, not part of the root workspace (P9-04)",
   "license": "Apache-2.0",
   "type": "module",
-  "packageManager": "pnpm@12.11.2",
+  "packageManager": "pnpm@12.16.1",
   "engines": {
     "node": ">=24"
   },
