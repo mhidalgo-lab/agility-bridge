@@ -27,6 +27,6 @@
     "hono": "4.13.16"
   },
   "devDependencies": {
-    "tsdown": "0.23.1"
+    "tsdown": "0.23.4"
   }
 }

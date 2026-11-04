@@ -41,7 +41,7 @@ How to use it:
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462, L-473, L-474, L-475, L-492 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453, L-467, L-468, L-469 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446, L-483, L-484, L-485, L-493 |
-| [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157, L-497, L-498, L-499 – L-501 |
+| [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157, L-497, L-498, L-499 – L-503 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241, L-402, L-495, L-496 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297, L-335 |
 | [Top 20](#top-20) | the lessons that save the most time |
@@ -2211,6 +2211,20 @@ shell before publishing the guide.
 `docs/dev/releasing.md` listed a `v*` tag ruleset that did not exist (the rulesets API showed only the two branch
 rulesets), although `plan` relies on it. Re-read such settings with `gh api` at every release review.
 *Applied in:* P9-07, `docs/security/repo-settings.md`.
+
+**L-502 — A Renovate "artifact update failure" can be the trust policy doing its job: read why before forcing it.**
+The grouped dev-dependency PR failed every install with `ERR_PNPM_OUTDATED_LOCKFILE` because Renovate could not write
+the lockfile: `trustPolicy: no-downgrade` refused `lefthook@2.2.2`, published by hand from a maintainer account after
+2.2.0 and 2.2.1 came from GitHub Actions with provenance (registry `_npmUser.trustedPublisher` and
+`dist.attestations`). Keep the trusted version and exclude the downgraded one in Renovate (`allowedVersions`), never
+relax the policy to make a group pass (2026-11-04).
+*Applied in:* `renovate.json`, PR #272.
+
+**L-503 — A linter minor release can start checking new languages: pin its scope in the config.**
+Biome 2.6 formats Markdown and YAML by default, so a "non-major" bump failed `pnpm lint` on changesets and workflows it
+had never read. `biome.json` now excludes `*.md`, `*.yml` and `*.yaml` explicitly (the previous behaviour); adopting a
+new language is its own change, not part of a dependency update (2026-11-04).
+*Applied in:* `biome.json`, PR #272.
 
 **L-497 — A deploy to an optional platform feature checks the switch and skips, it does not fail the branch.**
 The Pages deploy job runs on `main`; until the owner enables Pages (Source: GitHub Actions) the official deploy action fails with a 404. The build job asks the Pages API once (`build_type` is `workflow`), emits a warning and leaves the artifact upload and the deploy job to run only when it is on, so the build and the link check still run on every change and `main` stays green. Pull requests never reach the deploy, and the job that publishes carries only `pages: write` and `id-token: write` and runs no project code.

@@ -33,6 +33,11 @@
     {
       "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true
+    },
+    {
+      "description": "L-502: lefthook 2.2.2 was published by hand, without the provenance of 2.2.0 and 2.2.1, so pnpm's trustPolicy no-downgrade refuses it. Drop this rule once a release with provenance follows.",
+      "matchPackageNames": ["lefthook"],
+      "allowedVersions": "!/^2\\.2\\.2$/"
     }
   ],
   "vulnerabilityAlerts": {

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -14,7 +14,10 @@
       "!**/test/fixtures/**/*.json",
       "!**/*.generated.ts",
       "!packages/storage/migrations/meta",
-      "!site/**/*.astro"
+      "!site/**/*.astro",
+      "!**/*.md",
+      "!**/*.yml",
+      "!**/*.yaml"
     ]
   },
   "formatter": {
