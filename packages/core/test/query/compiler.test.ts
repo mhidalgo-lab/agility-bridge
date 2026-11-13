@@ -342,6 +342,33 @@ describe('scope strategy classes', () => {
     expect((q.body['filter'] as string[])[0]).toBe(token);
   });
 
+  it('rechecks every scope path of a derived type, and ORs the alternatives of a hop in a filter (P9-25)', async () => {
+    const q = await compile(
+      {
+        assetType: 'Expression',
+        fields: ['Content', 'InReplyTo.Content'],
+        filters: [{ field: 'InReplyTo.Author', op: 'eq', value: 'Member:20' }],
+      },
+      ctx({ projects: { allowed: ['Scope:1001'], includeChildren: true } }),
+    );
+    const select = q.body['select'] as string[];
+    expect(select).toEqual(
+      expect.arrayContaining(['Mentions:Workitem.Scope', 'InReplyTo.Mentions:Workitem.Scope']),
+    );
+    // The related comment's value is kept only when every path it has is in the workspace.
+    expect(q.guards.find((g) => g.key === 'InReplyTo.Content')?.guards).toEqual([
+      'InReplyTo.Mentions:Workitem.Scope',
+      'InReplyTo.InReplyTo.Mentions:Workitem.Scope',
+    ]);
+    const filters = q.body['filter'] as string[];
+    expect(filters).toContain(
+      '(Mentions:Workitem.Scope=$ab_scope|InReplyTo.Mentions:Workitem.Scope=$ab_scope)',
+    );
+    expect(filters).toContain(
+      '(InReplyTo.Author=$v1;(InReplyTo.Mentions:Workitem.Scope=$ab_scope|InReplyTo.InReplyTo.Mentions:Workitem.Scope=$ab_scope))',
+    );
+  });
+
   it('needs an explicit allowance for global types', async () => {
     expect((await failure(compile({ assetType: 'Member', fields: ['Name'] }))).code).toBe(
       'AB_AUTH_FORBIDDEN',

@@ -40,7 +40,7 @@ How to use it:
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412, L-481, L-482 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462, L-473, L-474, L-475, L-492 |
 | [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453, L-467, L-468, L-469 |
-| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446, L-483, L-484, L-485, L-493 |
+| [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446, L-483, L-484, L-485, L-493, L-505 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157, L-497, L-498, L-499 – L-503 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241, L-402, L-495, L-496 |
 | [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297, L-335 |
@@ -2162,6 +2162,13 @@ anything the platform or operator owns is `Delegated` with the guide that tells 
 **L-493 — A mock upstream in the harness process must not share its event loop with a blocking child call.**
 The latency harness serves the mock Agility from the same Node process that runs the CLI to create the instance, credential and workspace. `execFileSync` blocked the loop, so the CLI's probe of the mock timed out with "The instance did not answer the probe" and the cause looked like the product. Use the asynchronous `execFile` for every child call in a process that also serves, or serve from a child. The same run found a stale baseline: the request counts of the write paths had grown from 4 to 5 and no check compared requests, only CPU (see the baseline test).
 *Applied in:* P9-03, `scripts/perf/latency.ts`, `scripts/test/worker-bench.test.ts` (L-114, L-121).
+
+**L-505 — A live check that asserts only shapes misses optional relations: assert on one that must be there.**
+`get_conversations` passed its live check (P6-04) on counts and shapes, yet never returned a reply: replies carry
+`InReplyTo` and no `Mentions`, so the derived scope path dropped them everywhere, and the tenant's report came from a
+user (2026-11-13). A live check for a read tool now also finds a row that uses the optional relation (a reply, a child,
+a link) and asserts that the tool returns it in a restricted workspace, by id only.
+*Applied in:* P9-25, `live/collaboration.live.test.ts`.
 
 ## R. CI, release and supply chain
 

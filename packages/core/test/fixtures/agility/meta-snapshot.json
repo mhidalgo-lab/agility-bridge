@@ -6408,6 +6408,38 @@
     "IsMultivalue": false,
     "IsCanned": true,
     "IsCustom": false
+   },
+   "Expression.InReplyTo": {
+    "_type": "AttributeDefinition",
+    "Name": "InReplyTo",
+    "Token": "Expression.InReplyTo",
+    "DisplayName": "InReplyTo",
+    "AttributeType": "Relation",
+    "IsReadOnly": false,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": true,
+    "IsCustom": false,
+    "RelatedAsset": {
+     "nameref": "Expression",
+     "href": "/SyntheticInstance/meta.v1/Expression"
+    }
+   },
+   "Expression.Replies": {
+    "_type": "AttributeDefinition",
+    "Name": "Replies",
+    "Token": "Expression.Replies",
+    "DisplayName": "Replies",
+    "AttributeType": "Relation",
+    "IsReadOnly": true,
+    "IsRequired": false,
+    "IsMultivalue": true,
+    "IsCanned": true,
+    "IsCustom": false,
+    "RelatedAsset": {
+     "nameref": "Expression",
+     "href": "/SyntheticInstance/meta.v1/Expression"
+    }
    }
   },
   "Operations": {}

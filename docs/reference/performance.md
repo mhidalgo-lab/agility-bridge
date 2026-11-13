@@ -38,7 +38,7 @@ in that mode (a report above the Free budget of 45, or a tool a mode does not ru
 | `list_members` | 6 | 2 | 1 | 255 / 270 | 285 / 371 | 295 / 300 | 6 / 16 | 0.3 |
 | `get_asset_history` | 14 | 13 | 2 | 663 / 673 | 704 / 753 | 696 / 844 | 8 / 15 | 0.5 |
 | `list_recent_changes` | 24 | 21 | 3 | 1616 / 1627 | 1655 / 1704 | 1625 / 1924 | 11 / 20 | 1.6 |
-| `get_conversations` | 10 | 8 | 2 | 509 / 517 | 537 / 559 | 541 / 612 | 6 / 11 | 0.7 |
+| `get_conversations` | 11 | 9 | 3 | 509 / 517 | 537 / 559 | 541 / 612 | 6 / 11 | 0.7 |
 | `list_attachments` | 12 | 10 | 3 | 781 / 803 | 792 / 806 | 791 / 798 | 8 / 10 | 1.2 |
 | `get_attachment` | 12 | 9 | 3 | 683 / 700 | 682 / 698 | 699 / 966 | 8 / 14 | 0.7 |
 | `list_portfolio_items` | 12 | 12 | 3 | 1631 / 1659 | 1630 / 1644 | 1617 / 1892 | 9 / 16 | 0.8 |

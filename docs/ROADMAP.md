@@ -425,4 +425,5 @@ Status lives in each task file.
 | P9-22 | [Per-tool and per-command pages on the documentation site](tasks/phase-9-hardening-launch/P9-22-docs-reference-pages.md) | low | P9-04 | todo |
 | P9-23 | [Backport ancestry guard and a dispatch dry-run mode](tasks/phase-9-hardening-launch/P9-23-backport-ancestry-guard.md) | low | P9-07 | todo |
 | P9-24 | [Opt-in images embedded in descriptions and comments](tasks/phase-9-hardening-launch/P9-24-description-images.md) | medium | — | todo |
+| P9-25 | [Replies to comments in get_conversations](tasks/phase-9-hardening-launch/P9-25-conversation-replies.md) | high | — | review |
 <!-- tasks:end -->

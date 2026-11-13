@@ -7,7 +7,7 @@
 import type { ToolContext } from '../context.ts';
 import { AbError, ErrorCode } from '../errors.ts';
 import type { AttributeKind } from '../metadata/model.ts';
-import { metadataFor, type ResolvedPath, type ScopeStrategy } from '../metadata/service.ts';
+import { metadataFor, type ResolvedPath, type ScopeStrategy, scopePaths } from '../metadata/service.ts';
 import { invalid, limitError } from './limits.ts';
 import { parseInstant } from './time.ts';
 
@@ -202,15 +202,16 @@ function scalarValue(field: string, kind: AttributeKind, value: unknown, op: Fil
   }
 }
 
-function guardFor(prefix: string, strategy: ScopeStrategy): string | undefined {
+/** The guard selections of one hop: alternatives, any of which places the related asset in the workspace (P9-25). */
+function guardFor(prefix: string, strategy: ScopeStrategy): string[] {
   switch (strategy.kind) {
     case 'direct':
     case 'derived':
-      return `${prefix}.${strategy.path}`;
+      return scopePaths(strategy).map((p) => `${prefix}.${p}`);
     case 'workspace_bounded':
-      return strategy.via === 'self' ? prefix : `${prefix}.Schedule.ScheduledScopes`;
+      return [strategy.via === 'self' ? prefix : `${prefix}.Schedule.ScheduledScopes`];
     default:
-      return undefined;
+      return [];
   }
 }
 
@@ -227,9 +228,10 @@ async function pathGuards(
   resolved: ResolvedPath,
   trusted: boolean,
   restricted: boolean,
-): Promise<string[]> {
+): Promise<string[][]> {
   const md = metadataFor(ctx);
-  const guards: string[] = [];
+  // One entry per guarded hop; each entry lists the hop's alternatives.
+  const guards: string[][] = [];
   const rootPath = root.kind === 'direct' || root.kind === 'derived' ? root.path : undefined;
   for (const [i, hop] of resolved.hops.entries()) {
     const last = i === resolved.hops.length - 1;
@@ -278,7 +280,7 @@ async function pathGuards(
     }
     if (i === 0 && hop.prefix === rootPath) continue;
     const guard = guardFor(hop.prefix, strategy);
-    if (guard !== undefined) guards.push(guard);
+    if (guard.length > 0) guards.push(guard);
   }
   return guards;
 }
@@ -299,7 +301,7 @@ async function compileFilter(
   const token =
     guards.length === 0
       ? compiled.token
-      : `(${[compiled.token, ...guards.map((g) => `${g}=${SCOPE_VAR}`)].join(';')})`;
+      : `(${[compiled.token, ...guards.map((alts) => orTokens(alts.map((g) => `${g}=${SCOPE_VAR}`)))].join(';')})`;
   return { token, normalized: compiled.normalized };
 }
 
@@ -394,12 +396,17 @@ async function sentPath(ctx: ToolContext, type: string, resolved: ResolvedPath):
   return [`${relation}${live}`, ...rest].join('.');
 }
 
+/** Tokens ORed in one parenthesised term (a single token stays as it is). */
+function orTokens(tokens: readonly string[]): string {
+  return tokens.length === 1 ? (tokens[0] as string) : `(${tokens.join('|')})`;
+}
+
 /** The Agility-project restriction for one strategy, over `$ab_scope`: the allowed projects and their descendants. */
 function scopeToken(strategy: ScopeStrategy): string | undefined {
   switch (strategy.kind) {
     case 'direct':
     case 'derived':
-      return `${strategy.path}=${SCOPE_VAR}`;
+      return orTokens(scopePaths(strategy).map((p) => `${p}=${SCOPE_VAR}`));
     case 'workspace_bounded':
       return strategy.via === 'self' ? `ID=${SCOPE_VAR}` : `Schedule.ScheduledScopes=${SCOPE_VAR}`;
     default:
@@ -412,7 +419,7 @@ export function recheckFields(strategy: ScopeStrategy): string[] {
   switch (strategy.kind) {
     case 'direct':
     case 'derived':
-      return [strategy.path];
+      return scopePaths(strategy);
     case 'workspace_bounded':
       return strategy.via === 'self' ? [] : ['Schedule.ScheduledScopes'];
     default:
@@ -499,7 +506,8 @@ export async function compileQuery(
     if (!select.includes(sent)) select.push(sent);
     keys[field] = sent;
     const g = await pathGuards(ctx, strategy, resolved, false, restricted);
-    if (g.length > 0) guards.push({ key: sent, guards: g });
+    // A value is kept only when every OID on every alternative is in the workspace (stricter than the filter's OR).
+    if (g.length > 0) guards.push({ key: sent, guards: g.flat() });
   }
   const filters = input.filters ?? [];
   const groups = input.anyOf ?? [];

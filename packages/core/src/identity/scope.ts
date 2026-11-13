@@ -3,6 +3,7 @@
 // that comes back is checked again from the scope fields the compiler selected, so a row the upstream should not have
 // returned (or one from a single-asset URL, which ignores filters) never reaches the caller.
 import type { ToolContext } from '../context.ts';
+import { scopePaths } from '../metadata/service.ts';
 import type { CompiledQuery } from '../query/compiler.ts';
 
 /** OID tokens in a relation value: `"Scope:5"`, `{ _oid }`, or arrays of them. */
@@ -50,7 +51,7 @@ export function inScope(
   switch (strategy.kind) {
     case 'direct':
     case 'derived':
-      return hit(strategy.path);
+      return scopePaths(strategy).some(hit);
     case 'workspace_bounded':
       return strategy.via === 'self' ? hit('_oid') : hit('Schedule.ScheduledScopes');
     case 'global':

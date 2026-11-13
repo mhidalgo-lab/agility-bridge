@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import type { ToolContext } from '../../context.ts';
 import { AbError, ErrorCode } from '../../errors.ts';
-import { metadataFor } from '../../metadata/service.ts';
+import { metadataFor, scopePaths } from '../../metadata/service.ts';
 import { shapeList, shapeOutput } from '../../output/result.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import { assetTypeArg, boundedListOutput, containsArg, formatArg } from '../common.ts';
@@ -71,7 +71,7 @@ export const listAssetTypes: ToolDefinition = defineTool({
         ...(meta.base === undefined ? {} : { base: meta.base }),
         ...(prefixes.get(meta.name) === undefined ? {} : { prefix: `${prefixes.get(meta.name)}-` }),
         scopeStrategy: strategy.kind,
-        ...(strategy.kind === 'derived' ? { scopePath: strategy.path } : {}),
+        ...(strategy.kind === 'derived' ? { scopePath: scopePaths(strategy).join(' | ') } : {}),
       });
     }
     return shapeList(ctx, {

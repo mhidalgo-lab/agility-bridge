@@ -184,7 +184,10 @@ except `group`, and adds `op` (POST only). *docs*
   `ContentType`, `Asset` (→ `BaseAsset`), `Description` (long text), `CreateDate`, `CreateDateUTC` and `CreatedBy` (→
   `Member`) and **no `ContentLength`**, so the size is unknown until the content is read; `ID` cannot be sorted on
   (a relation), so newest-first uses `CreateDateUTC`. `Expression` has `Author`, `AuthoredAt`, `Content`, `BelongsTo`
-  and `Mentions`; comments of a work item are the `Expression` rows that mention it. The content endpoint
+  and `Mentions`; comments of a work item are the `Expression` rows that mention it. *live (2026-11-13, P9-25):* a
+  reply is an `Expression` with `InReplyTo` (→ its comment) and usually **no `Mentions`**; the comment lists them in
+  `Replies` (multi-value). `query.v1` accepts the filter `InReplyTo.Mentions:Workitem.Scope=$x` and ORed terms
+  `(a=$x|b=$x)`; replies of replies were not seen (threads are one level). The content endpoint
   (`attachments.img/<id>`, as in the developer library's utility endpoints page; `attachment.img` appears in SDK
   examples) and its `Content-Type` behaviour are **unverified**: the read-only tenant's guard allows no such request
   (P6-19).

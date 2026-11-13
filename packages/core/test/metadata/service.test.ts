@@ -490,7 +490,10 @@ describe('scope strategy (ARCHITECTURE §6.3)', () => {
     ['Actual', { kind: 'direct', path: 'Scope' }],
     ['Attachment', { kind: 'derived', path: 'Asset:Workitem.Scope' }],
     ['Link', { kind: 'derived', path: 'Asset:Workitem.Scope' }],
-    ['Expression', { kind: 'derived', path: 'Mentions:Workitem.Scope' }],
+    [
+      'Expression',
+      { kind: 'derived', path: 'Mentions:Workitem.Scope', also: ['InReplyTo.Mentions:Workitem.Scope'] },
+    ],
     ['Scope', { kind: 'workspace_bounded', via: 'self' }],
     ['Timebox', { kind: 'workspace_bounded', via: 'schedule' }],
     ['Member', { kind: 'global' }],
@@ -504,6 +507,16 @@ describe('scope strategy (ARCHITECTURE §6.3)', () => {
   ])('%s → %o', async (type, strategy) => {
     const { ctx } = setup();
     expect(await metadataFor(ctx()).scopeStrategy(type)).toEqual(strategy);
+  });
+
+  it('keeps the main path alone when an alternative does not resolve on the instance (P9-25)', async () => {
+    const meta = structuredClone(SNAPSHOT) as Record<string, { Attributes: Record<string, unknown> }>;
+    delete meta['Expression']?.Attributes['Expression.InReplyTo'];
+    const { ctx } = setup({ fake: { meta } });
+    expect(await metadataFor(ctx()).scopeStrategy('Expression')).toEqual({
+      kind: 'derived',
+      path: 'Mentions:Workitem.Scope',
+    });
   });
 });
 
