@@ -187,7 +187,13 @@ except `group`, and adds `op` (POST only). *docs*
   and `Mentions`; comments of a work item are the `Expression` rows that mention it. *live (2026-11-13, P9-25):* a
   reply is an `Expression` with `InReplyTo` (→ its comment) and usually **no `Mentions`**; the comment lists them in
   `Replies` (multi-value). `query.v1` accepts the filter `InReplyTo.Mentions:Workitem.Scope=$x` and ORed terms
-  `(a=$x|b=$x)`; replies of replies were not seen (threads are one level). The content endpoint
+  `(a=$x|b=$x)`; replies of replies were not seen (threads are one level). *live (2026-11-14, P9-24):* an image pasted
+  into rich text is `<img src="<instance>/embedded.img/<id>" data-oid="undefined" data-mce-src=… width height alt="">`
+  (an absolute same-host URL; `data-oid` is the literal `undefined`); 212 of the latest 300 defects held images, yet only
+  107 had a non-empty `EmbeddedImages` relation, and `EmbeddedImage` by the `src` id returned nothing, so neither says
+  which asset an image belongs to. Rarer forms: `downloadblob.img/<40 alphanumerics>` (same host, `image/png`), `data:`
+  URIs, and outside addresses. `GET embedded.img/<id>` with the bearer token: `200 image/png`, valid PNG magic,
+  `Cache-Control: private`; without it `401`. None of the latest 300 comments held an image. The content endpoint
   (`attachments.img/<id>`, as in the developer library's utility endpoints page; `attachment.img` appears in SDK
   examples) and its `Content-Type` behaviour are **unverified**: the read-only tenant's guard allows no such request
   (P6-19).

@@ -35,6 +35,8 @@ describe('readOnlyFetch', () => {
     ['GET', 'rest-1.v1/Hist/Story/1001'],
     ['POST', 'query.v1'],
     ['POST', 'query.legacy.v1'],
+    ['GET', 'embedded.img/28116000'],
+    ['GET', 'downloadblob.img/ABC123'],
   ] as const)('allows %s %s and sends the bearer token', async (method, path) => {
     const { live, fetchImpl } = guarded();
     await live(path, { method, body: { from: 'Story' } });
@@ -54,6 +56,10 @@ describe('readOnlyFetch', () => {
     ['GET', 'query.v1', 'a GET to query.v1'],
     ['GET', 'rest-1.v1/New/Story', 'the New template'],
     ['GET', 'attachment.img/1', 'attachment content'],
+    ['POST', 'embedded.img/1', 'a POST to the image endpoint (an upload)'],
+    ['GET', 'embedded.img/1/../../rest-1.v1/Data/Story/1?op=Delete', 'a path that leaves the image endpoint'],
+    ['GET', 'embedded.img/abc', 'an image id that is not a number'],
+    ['GET', 'downloadblob.img/a-b', 'a token with other characters'],
     ['GET', 'https://evil.example.com/Inst/meta.v1', 'another host'],
     ['GET', 'https://agility.example.com/Other/meta.v1', 'another instance'],
   ] as const)('refuses %s %s (%s) without sending anything', async (method, path, _why) => {

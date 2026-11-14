@@ -252,6 +252,16 @@ describe('tools/list contract', () => {
             "idempotentHint": true,
             "openWorldHint": true,
             "readOnlyHint": true,
+            "title": "Get an image from a work item",
+          },
+          "name": "get_embedded_image",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
             "title": "List portfolio items",
           },
           "name": "list_portfolio_items",

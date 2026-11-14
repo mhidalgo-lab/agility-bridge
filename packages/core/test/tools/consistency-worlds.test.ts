@@ -25,7 +25,7 @@ const outputProps = (name: string): Record<string, { type?: string }> =>
   (advertisedSchemas(toolByName(name)).output?.['properties'] ?? {}) as Record<string, { type?: string }>;
 
 const ALL = READ_TOOLS.map((t) => t.name);
-const limits = { ...DEFAULT_LIMITS, attachmentDownload: true, reports: true };
+const limits = { ...DEFAULT_LIMITS, attachmentDownload: true, imageDownload: true, reports: true };
 
 /** The tools some report reads through; the reports alone are granted in the last world. */
 const SIBLING_NAMES = new Set(Object.values(SIBLINGS).flat());

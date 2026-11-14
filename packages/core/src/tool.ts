@@ -21,6 +21,11 @@ export interface ToolOutput<O = unknown> {
   readonly structured?: O;
   /** `_meta["agility-bridge/result"]` and friends (ADR-0015). */
   readonly meta?: Record<string, unknown>;
+  /**
+   * Images returned as MCP `image` content blocks after the text (ADR-0019): base64 data and an allowlisted image type,
+   * never a URL. Only `get_embedded_image` sets it.
+   */
+  readonly images?: ReadonlyArray<{ readonly data: string; readonly mimeType: string }>;
 }
 
 export interface ToolDefinition<I extends InputSchema = InputSchema, O = unknown> {

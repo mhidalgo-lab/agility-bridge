@@ -472,6 +472,7 @@ in stdio), grant first; a store that fails or answers anything but a count refus
 | `AB_MEMBER_EMAILS` | `off` | include member emails in output |
 | `AB_ATTACHMENT_DOWNLOAD` | `off` | enable `get_attachment` (D-08) |
 | `AB_ATTACHMENT_MAX_BYTES` / `AB_ATTACHMENT_TYPES` | `1048576` / text types | attachment content size cap and content-type allowlist |
+| `AB_IMAGE_DOWNLOAD` / `AB_IMAGE_MAX_BYTES` | `off` / `1048576` | enable `get_embedded_image` (P9-24, ADR-0019) and its size cap |
 | `AB_LIMITS_MAX_LIMIT` | `100` | maximum rows per call (hard 1,000) |
 | `AB_LIMITS_MAX_RESPONSE_BYTES` | `8388608` (Workers Free 524288) | upstream response cap |
 | `AB_CALL_BUDGET` | per runtime | Agility requests per tool call |

@@ -335,7 +335,7 @@ export async function catalogPaths(timing = true): Promise<{
         clock,
         budget: core.createBudget(1_000),
         projects: { allowed: ['Scope:1001'], includeChildren: true },
-        limits: { ...core.DEFAULT_LIMITS, reports: true, attachmentDownload: true },
+        limits: { ...core.DEFAULT_LIMITS, reports: true, attachmentDownload: true, imageDownload: true },
       });
       const before = fake.requests;
       const t = cpu();

@@ -4,7 +4,7 @@
 import { CORE_TOOLS, type ToolDefinition, withCachedJsonSchema } from '../../packages/core/src/index.ts';
 
 /** Groups a workspace must switch on; mirrors `OPT_IN_GROUPS` in the core test harness (a test keeps them equal). */
-export const OPT_IN_GROUPS: readonly string[] = ['attachments', 'reports', 'writes'];
+export const OPT_IN_GROUPS: readonly string[] = ['attachments', 'images', 'reports', 'writes'];
 
 export interface ListedTool {
   readonly name: string;

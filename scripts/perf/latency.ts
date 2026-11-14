@@ -388,7 +388,7 @@ async function httpRun(n: number): Promise<PerfRun> {
         authorization: `Bearer ${adminToken}`,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ limits: { reports: true, attachmentDownload: true } }),
+      body: JSON.stringify({ limits: { reports: true, attachmentDownload: true, imageDownload: true } }),
     });
     if (!patched.ok) throw new Error(`workspace limits: ${patched.status}`);
     const base = `http://127.0.0.1:${port}/w/perf/mcp`;

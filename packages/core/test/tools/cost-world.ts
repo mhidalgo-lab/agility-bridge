@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // The shared world plus comments, attachments, links, a version history and the content endpoint: what the worst-case
 // fixtures (worst-case.ts) need to run every tool, used by the cost test and the consistency test.
-import { FakeAgility, type FakeAgilityOptions } from '../harness/index.ts';
+import { FAKE_BASE_URL, FakeAgility, type FakeAgilityOptions } from '../harness/index.ts';
 import { history, SNAPSHOT, world } from './reports-world.ts';
 
 const version = (oid: string, moment: number, at: string, attrs: Record<string, unknown>) => ({
@@ -16,13 +16,27 @@ const version = (oid: string, moment: number, at: string, attrs: Record<string, 
   ),
 });
 
+/** A PNG signature and a few bytes: enough for the type check of `get_embedded_image` (P9-24). */
+export const TINY_PNG: Uint8Array<ArrayBuffer> = new Uint8Array([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48,
+]);
+
 /** The shared world plus comments, attachments and a version history, with the content endpoint served. */
 export function costFakeOptions(): FakeAgilityOptions {
   const base = world();
+  // B-01001's description holds one pasted image (P9-24).
+  const withImage = (rows: readonly Readonly<Record<string, unknown>>[]) =>
+    rows.map((r) =>
+      r['_oid'] === 'Story:1001'
+        ? { ...r, Description: `<p>See</p><img src="${FAKE_BASE_URL}/embedded.img/42" alt="">` }
+        : r,
+    );
   return {
     meta: SNAPSHOT,
     assets: {
       ...base,
+      ...(base['Story'] === undefined ? {} : { Story: withImage(base['Story']) }),
+      ...(base['Workitem'] === undefined ? {} : { Workitem: withImage(base['Workitem']) }),
       Expression: [
         {
           _oid: 'Expression:1',
@@ -64,6 +78,8 @@ export function costFakeOptions(): FakeAgilityOptions {
     },
     history: history() as NonNullable<FakeAgilityOptions['history']>,
     override: (_req, call) => {
+      if (call.path === 'embedded.img/42')
+        return new Response(TINY_PNG, { status: 200, headers: { 'content-type': 'image/png' } });
       if (call.path.startsWith('attachments.img/'))
         return new Response('Hello', {
           status: 200,

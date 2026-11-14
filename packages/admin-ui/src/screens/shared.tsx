@@ -466,7 +466,7 @@ export function effectiveBudget(
 }
 
 /**
- * The groups the server leaves off unless the workspace turns them on (reports, attachment download), judged from the
+ * The groups the server leaves off unless the workspace turns them on (reports, attachment and image download), judged from the
  * workspace's limits and, for a grant, its own (a grant can only turn one off).
  */
 export function groupsOff(workspace: Limits, grant?: Limits): string[] {
@@ -474,6 +474,7 @@ export function groupsOff(workspace: Limits, grant?: Limits): string[] {
   if (workspace['reports'] !== true || grant?.['reports'] === false) off.push('reports');
   if (workspace['attachmentDownload'] !== true || grant?.['attachmentDownload'] === false)
     off.push('attachments');
+  if (workspace['imageDownload'] !== true || grant?.['imageDownload'] === false) off.push('images');
   return off;
 }
 
@@ -521,6 +522,7 @@ export const LIMIT_NUMBERS = [
   ['maxAsOfAgeDays', 'Furthest AsOf into the past (days)', 0, 3_650],
   ['maxTimeRangeDays', 'Longest time range (days)', 1, 3_660],
   ['attachmentMaxBytes', 'Largest attachment text returned (bytes)', 1_024, 8_388_608],
+  ['imageMaxBytes', 'Largest pasted image returned (bytes)', 1_024, 8_388_608],
   ['callBudget', 'Agility requests per tool call', 1, 10_000],
 ] as const;
 
@@ -537,6 +539,7 @@ export const LIMIT_SWITCHES = [
   ['memberEmails', 'Member emails in output'],
   ['genericQuery', 'The generic query tools (query_assets, get_assets)'],
   ['attachmentDownload', 'Attachment text download (get_attachment; off by default)'],
+  ['imageDownload', 'Images pasted into descriptions (get_embedded_image; off by default)'],
   ['reports', 'Composite reports (sprint_health, standup_summary, …; off by default)'],
 ] as const;
 

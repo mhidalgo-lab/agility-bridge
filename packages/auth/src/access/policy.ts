@@ -63,6 +63,15 @@ export const limitsPolicySchema = z.strictObject({
     .min(1_024)
     .max(8 * 1024 * 1024)
     .optional(),
+  /** `get_embedded_image`, an image pasted into a work item's rich text (P9-24): off unless the workspace turns it on. */
+  imageDownload: z.boolean().optional(),
+  /** Largest image `get_embedded_image` reads, in bytes (the response cap bounds it too). */
+  imageMaxBytes: z
+    .number()
+    .int()
+    .min(1_024)
+    .max(8 * 1024 * 1024)
+    .optional(),
 });
 export type LimitsPolicy = z.infer<typeof limitsPolicySchema>;
 
@@ -154,9 +163,10 @@ const NUMBER_LIMITS = [
   'maxAsOfAgeDays',
   'maxTimeRangeDays',
   'attachmentMaxBytes',
+  'imageMaxBytes',
   'callBudget',
 ] as const;
-const SWITCHES = ['memberEmails', 'genericQuery', 'attachmentDownload', 'reports'] as const;
+const SWITCHES = ['memberEmails', 'genericQuery', 'attachmentDownload', 'imageDownload', 'reports'] as const;
 
 /** What a deployment allows at most and uses by default (runtime presets, ADR-0010). */
 export interface DeploymentLimits {

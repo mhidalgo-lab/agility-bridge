@@ -183,7 +183,8 @@ interface List {
 
 /**
  * Rich text to plain text with light Markdown: paragraphs, line breaks, headings, `-`/`1.` lists (nested), bold,
- * italics, code, `[text](url)` for http(s) and mailto links only, `[image: alt]`. Scripts, styles, embedded objects,
+ * italics, code, `[text](url)` for http(s) and mailto links only, `[image N]` / `[image N: alt]` (numbered in reading
+ * order, as `imageSources` lists them). Scripts, styles, embedded objects,
  * comments, event attributes and every other attribute are dropped. Linear in the input.
  */
 /** Longest rich text converted; the shaper cuts values far below this anyway (Phase 1 review H1). */
@@ -192,7 +193,20 @@ export const MAX_HTML_CHARS = 65_536;
 const MAX_LIST_INDENT = 8;
 
 export function htmlToText(input: string): string {
+  return convert(input).text;
+}
+
+/**
+ * The `src` of every image of a rich text, in the order `htmlToText` numbers them (`[image 1]`, `[image 2]`, …), so a
+ * tool can fetch "image N" from what the caller saw (P9-25). Entities are decoded; nothing is validated here.
+ */
+export function imageSources(input: string): string[] {
+  return convert(input).images;
+}
+
+function convert(input: string): { text: string; images: string[] } {
   const html = input.length > MAX_HTML_CHARS ? input.slice(0, MAX_HTML_CHARS) : input;
+  const images: string[] = [];
   const lower = html.toLowerCase();
   const out: string[] = [];
   const lists: List[] = [];
@@ -225,7 +239,9 @@ export function htmlToText(input: string): string {
     }
     if (gt !== -2 && gt < lt) gt = html.indexOf('>', lt);
     if (gt === -1) gt = -2;
-    const tag = gt >= 0 && gt - lt <= MAX_TAG_CHARS ? readTag(html, lt, gt) : undefined;
+    // An image may carry a `data:` URI far longer than any other tag: it is read whole (the input is capped already).
+    const isImg = lower.startsWith('<img', lt) && !/[a-z0-9]/.test(lower[lt + 4] ?? '');
+    const tag = gt >= 0 && (gt - lt <= MAX_TAG_CHARS || isImg) ? readTag(html, lt, gt) : undefined;
     if (tag === undefined) {
       text('<');
       i = lt + 1;
@@ -300,7 +316,9 @@ export function htmlToText(input: string): string {
         const alt = cleanText(decodeEntities(tag.attrs.get('alt') ?? ''))
           .replace(/\s+/g, ' ')
           .trim();
-        out.push(alt === '' ? '[image]' : `[image: ${alt.replace(/[[\]]/g, '')}]`);
+        images.push(decodeEntities(tag.attrs.get('src') ?? '').trim());
+        const n = images.length;
+        out.push(alt === '' ? `[image ${n}]` : `[image ${n}: ${alt.replace(/[[\]]/g, '')}]`);
         break;
       }
       case 'a': {
@@ -323,11 +341,12 @@ export function htmlToText(input: string): string {
         break;
     }
   }
-  return cleanText(out.join(''))
+  const result = cleanText(out.join(''))
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n[ \t]+(?=\n)/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+  return { text: result, images };
 }
 
 const HTML_HINT_RE = /<\/?[A-Za-z][A-Za-z0-9]*(?:\s[^<>]*)?\/?>|&(?:#[0-9]+|#x[0-9a-f]+|[a-z]+);/i;

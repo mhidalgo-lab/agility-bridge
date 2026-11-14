@@ -53,6 +53,10 @@ export const WORST_CASES: Readonly<Record<string, WorstCase>> = {
     args: { asset: 'B-01001', attachment: 'Attachment:1' },
     why: 'lookup, metadata read and the content download',
   },
+  get_embedded_image: {
+    args: { asset: 'B-01001', image: 1 },
+    why: 'number lookup, metadata, the description and the image download',
+  },
   list_portfolio_items: {
     args: {
       project: 'Mobile App',

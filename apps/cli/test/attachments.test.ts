@@ -97,3 +97,30 @@ describe('stdio attachment download', () => {
     }
   });
 });
+
+describe('stdio pasted images (P9-24, THREAT_MODEL A8)', () => {
+  it('offers get_embedded_image only with AB_IMAGE_DOWNLOAD=on, independently of attachments', () => {
+    expect(names(config())).not.toContain('get_embedded_image');
+    expect(names(config({ AB_ATTACHMENT_DOWNLOAD: 'on' }))).not.toContain('get_embedded_image');
+    expect(names(config({ AB_IMAGE_DOWNLOAD: 'on' }))).toContain('get_embedded_image');
+    expect(names(config({ AB_IMAGE_DOWNLOAD: 'on' }))).not.toContain('get_attachment');
+    expect(names(config({ AB_TOOLS: 'whoami,get_embedded_image' }))).toEqual(['whoami']);
+  });
+
+  it('puts the switch and the size into every call context', () => {
+    for (const on of [false, true]) {
+      const c = config(on ? { AB_IMAGE_DOWNLOAD: 'on', AB_IMAGE_MAX_BYTES: '2048' } : {});
+      const ctx = contextFactory(
+        c,
+        { fetch: () => Promise.reject(new Error('no')), logger: undefined as never },
+        selectTools(c),
+      )();
+      expect(ctx.limits.imageDownload).toBe(on);
+      expect(ctx.limits.imageMaxBytes).toBe(on ? 2048 : 1_048_576);
+    }
+  });
+
+  it('refuses an out-of-range size at start', () => {
+    expect(() => config({ AB_IMAGE_MAX_BYTES: '10' })).toThrow(/AB_IMAGE_MAX_BYTES/);
+  });
+});

@@ -156,6 +156,46 @@ describe('resolveAccess: what a valid grant gets', () => {
     ).toBe(4_096);
   });
 
+  it('offers the image download only where the workspace turns it on and the grant keeps it on (P9-24, A8)', () => {
+    expect(allowed(records()).tools).not.toContain('get_embedded_image');
+    expect(allowed(records()).limits.imageDownload).toBe(false);
+    const named = records({
+      workspace: workspace({ enabledTools: ['whoami', 'get_embedded_image'] }),
+      grant: grant({ tools: ['whoami', 'get_embedded_image'] }),
+    });
+    expect(allowed(named).tools).toEqual(['whoami']);
+    const on = allowed(
+      records({ workspace: workspace({ limits: { imageDownload: true, imageMaxBytes: 4_096 } }) }),
+    );
+    expect(on.tools).toContain('get_embedded_image');
+    expect(on.limits).toMatchObject({ imageDownload: true, imageMaxBytes: 4_096 });
+    // Independent of the attachment download.
+    expect(on.tools).not.toContain('get_attachment');
+    expect(
+      allowed(records({ workspace: workspace({ limits: { attachmentDownload: true } }) })).tools,
+    ).not.toContain('get_embedded_image');
+    // A grant can only turn it off, never on; and it can only lower the size.
+    expect(
+      allowed(
+        records({
+          workspace: workspace({ limits: { imageDownload: true } }),
+          grant: grant({ limits: { imageDownload: false } }),
+        }),
+      ).tools,
+    ).not.toContain('get_embedded_image');
+    const grantOn = allowed(records({ grant: grant({ limits: { imageDownload: true } }) }));
+    expect(grantOn.tools).not.toContain('get_embedded_image');
+    expect(grantOn.warnings.join(' ')).toContain('imageDownload on, but the workspace has it off');
+    expect(
+      allowed(
+        records({
+          workspace: workspace({ limits: { imageDownload: true, imageMaxBytes: 4_096 } }),
+          grant: grant({ limits: { imageMaxBytes: 8_192 } }),
+        }),
+      ).limits.imageMaxBytes,
+    ).toBe(4_096);
+  });
+
   it('offers the composite reports only where the workspace turns them on and the grant keeps them on (D-101)', () => {
     expect(allowed(records()).tools).not.toContain('sprint_health');
     expect(allowed(records()).limits.reports).toBe(false);
