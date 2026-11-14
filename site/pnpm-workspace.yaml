@@ -8,3 +8,6 @@ strictDepBuilds: true
 allowBuilds:
   esbuild: true
   sharp: true
+minimumReleaseAgeExclude:
+  # Renovate security update: astro@7.4.7
+  - astro@7.4.7
