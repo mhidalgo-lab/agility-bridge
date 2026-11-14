@@ -33,6 +33,7 @@
 | `collaboration` | on | `get_conversations`, `list_attachments` |
 | `history` | on | `get_asset_history`, `list_recent_changes` |
 | `attachments` | **off** (workspace limit `attachmentDownload`, which a grant can only turn off; `AB_ATTACHMENT_DOWNLOAD` in stdio) | `get_attachment` |
+| `images` | **off** (workspace limit `imageDownload`, which a grant can only turn off; `AB_IMAGE_DOWNLOAD` in stdio) | `get_embedded_image` |
 | `reports` | **off** (workspace limit `reports`, which a grant can only turn off; `AB_REPORTS` in stdio) | `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage`, `work_item_quality`, `quality_scan` |
 | `writes` | **off** | `add_comment`, `update_status`, `log_effort`, `assign_owners`, `move_to_sprint`, `create_work_item`, `update_fields`, `close_asset`, `reopen_asset` |
 
@@ -103,6 +104,15 @@ unless the workspace limit `reports` is on and the grant keeps it on (stdio: `AB
 workspace). A report's declared cost is the sum of its sections' costs (L-302); a section that is skipped, failed, out of
 budget or cut is named in `sections` and in the notes, and what it would have contributed is absent, never zero (L-033).
 Calls to the siblings use the same context, scope and budget: a composite never widens what the caller may read.
+
+### Pasted images (opt-in)
+
+`get_embedded_image` returns one image pasted into a work item's description or acceptance criteria, by its number in the
+text (`[image N]`), as an MCP image block ([ADR-0019](../adr/0019-images-from-rich-text.md)). It is absent and refused unless
+the workspace limit `imageDownload` is on and the grant keeps it on (`imageMaxBytes` can only be lowered; stdio:
+`AB_IMAGE_DOWNLOAD`, `AB_IMAGE_MAX_BYTES`). The caller never passes a URL: the server reads the field of the asset in
+scope, takes the Nth image and fetches it only from `embedded.img/<id>` or `downloadblob.img/<token>` on the instance (a
+`data:` image is decoded locally); type checked on header and bytes, size on the stream, audited.
 
 ### Attachments (opt-in)
 

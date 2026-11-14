@@ -4,6 +4,7 @@
 import type { ToolDefinition } from '../tool.ts';
 import { getAttachment, listAttachments } from './collaboration/attachments.ts';
 import { getConversations } from './collaboration/conversations.ts';
+import { getEmbeddedImage } from './collaboration/images.ts';
 import { describeAssetType, listAssetTypes } from './core/asset-types.ts';
 import { listProjects } from './core/list-projects.ts';
 import { whoami } from './core/whoami.ts';
@@ -50,6 +51,7 @@ export const CORE_TOOLS: readonly ToolDefinition[] = Object.freeze([
   getConversations,
   listAttachments,
   getAttachment,
+  getEmbeddedImage,
 
   listPortfolioItems,
   getPortfolioTree,

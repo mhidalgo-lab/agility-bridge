@@ -48,6 +48,7 @@ export const STDIO_GROUPS = [
   'people',
   'collaboration',
   'attachments',
+  'images',
   'portfolio',
   'history',
   'reports',
@@ -98,6 +99,7 @@ function selection(
     (g) =>
       (g !== 'query' || config.genericQuery) &&
       (g !== 'attachments' || config.attachmentDownload) &&
+      (g !== 'images' || config.imageDownload) &&
       (g !== 'reports' || config.reports) &&
       (g !== 'writes' || config.writeTools),
   );
@@ -207,6 +209,8 @@ export function contextFactory(
       reports: config.reports,
       attachmentMaxBytes: config.attachmentMaxBytes,
       attachmentTypes: config.attachmentTypes,
+      imageDownload: config.imageDownload,
+      imageMaxBytes: config.imageMaxBytes,
     },
     budget: createBudget(config.callBudget),
     limiter: limiters.for(instanceId, 'stdio'),

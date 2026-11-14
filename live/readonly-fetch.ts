@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // P0-12 (D-01, THREAT_MODEL A15): every request the live harness sends to the third-party tenant goes through this
-// guard. Only reads reach Agility: GET on meta.v1 and rest-1.v1 Data/Hist, POST on query.v1 and query.legacy.v1
-// (read-only by design).
+// guard. Only reads reach Agility: GET on meta.v1 and rest-1.v1 Data/Hist, GET of one pasted image (embedded.img/<id>,
+// downloadblob.img/<token>: P9-24), POST on query.v1 and query.legacy.v1 (read-only by design).
 // Anything else (another endpoint, method, host, an `op=` operation, a redirect) is refused before or instead of sending.
 
 export class ReadOnlyViolation extends Error {
@@ -23,7 +23,8 @@ export interface LiveRequest {
 
 export type LiveFetch = (path: string, request?: LiveRequest) => Promise<Response>;
 
-const READ_GET = /^(?:meta\.v1(?:\/|$)|rest-1\.v1\/(?:Data|Hist)\/[A-Za-z]+)/;
+const READ_GET =
+  /^(?:meta\.v1(?:\/|$)|rest-1\.v1\/(?:Data|Hist)\/[A-Za-z]+|embedded\.img\/[1-9][0-9]{0,11}$|downloadblob\.img\/[A-Za-z0-9]{1,64}$)/;
 
 /** Throws ReadOnlyViolation unless (method, path) is a read the harness may send. Exported for tests. */
 export function assertReadOnly(base: URL, url: URL, method: string): void {

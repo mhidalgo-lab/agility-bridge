@@ -41,6 +41,7 @@ in that mode (a report above the Free budget of 45, or a tool a mode does not ru
 | `get_conversations` | 11 | 9 | 3 | 509 / 517 | 537 / 559 | 541 / 612 | 6 / 11 | 0.7 |
 | `list_attachments` | 12 | 10 | 3 | 781 / 803 | 792 / 806 | 791 / 798 | 8 / 10 | 1.2 |
 | `get_attachment` | 12 | 9 | 3 | 683 / 700 | 682 / 698 | 699 / 966 | 8 / 14 | 0.7 |
+| `get_embedded_image` | 12 | 6 | 3 | — | — | — | — | — |
 | `list_portfolio_items` | 12 | 12 | 3 | 1631 / 1659 | 1630 / 1644 | 1617 / 1892 | 9 / 16 | 0.8 |
 | `get_portfolio_tree` | 20 | 16 | 4 | 2734 / 2761 | 2757 / 2783 | 2703 / 3001 | 12 / 21 | 1.1 |
 | `sprint_health` | 54 | 23 | 5 | 1362 / 1375 | 1381 / 1410 | 1406 / 1855 | 15 / 17 | 2.3 |

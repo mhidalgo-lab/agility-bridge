@@ -43,6 +43,7 @@ carry `requestId`.
 | warn | `tool error` | `tool`, `ms`, `code`, `error` (class, redacted message) | [server.ts](../../packages/core/src/server.ts) |
 | warn | `deprecated argument used` | `tool`, `argument` (fixed names, once per process) | [server.ts](../../packages/core/src/server.ts) |
 | info | `attachment downloaded` | `asset` (number), `attachment` (id), `bytes`, `contentType`; never the content | [attachments.ts](../../packages/core/src/tools/collaboration/attachments.ts) |
+| info | `image downloaded` | `asset` (number), `attachment` (image endpoint and id, or `data:<type>`), `bytes`, `contentType`; never the bytes | [images.ts](../../packages/core/src/tools/collaboration/images.ts) |
 | debug | `resource ok` | `resource`, `ms`, `requests` | [server.ts](../../packages/core/src/server.ts) |
 | warn | `resource error` | `resource`, `ms`, `error` (class, redacted message) | [server.ts](../../packages/core/src/server.ts) |
 | debug | `agility request` | `endpoint`, `method`, `attempt`, `status`, `ms`, `bytes` (no body, no token) | [client.ts](../../packages/core/src/agility/client.ts) |

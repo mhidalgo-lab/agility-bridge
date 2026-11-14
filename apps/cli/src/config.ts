@@ -45,6 +45,8 @@ export interface StdioConfig {
   readonly memberEmails: boolean;
   /** `get_attachment` (D-08): off by default. */
   readonly attachmentDownload: boolean;
+  /** `get_embedded_image` (P9-24): off by default. */
+  readonly imageDownload: boolean;
   /** The composite reports group (P6-07, D-101): off by default. */
   readonly reports: boolean;
   /** MCP Apps views (P8-03): on by default, offered only to a client that declared Apps; `AB_MCP_APPS=off` is the kill switch. */
@@ -62,6 +64,7 @@ export interface StdioConfig {
   readonly writeRatePerHour: number;
   readonly attachmentMaxBytes: number;
   readonly attachmentTypes: readonly string[];
+  readonly imageMaxBytes: number;
   readonly maxRows: number;
   readonly maxResponseBytes: number;
   readonly callBudget: number;
@@ -96,6 +99,8 @@ const KNOWN_ENV = new Set([
   'AB_MCP_APPS',
   'AB_ATTACHMENT_MAX_BYTES',
   'AB_ATTACHMENT_TYPES',
+  'AB_IMAGE_DOWNLOAD',
+  'AB_IMAGE_MAX_BYTES',
   'AB_LIMITS_MAX_LIMIT',
   'AB_LIMITS_MAX_RESPONSE_BYTES',
   'AB_CALL_BUDGET',
@@ -194,6 +199,8 @@ const ENV_MODE_ONLY = [
   'AB_REPORTS',
   'AB_ATTACHMENT_MAX_BYTES',
   'AB_ATTACHMENT_TYPES',
+  'AB_IMAGE_DOWNLOAD',
+  'AB_IMAGE_MAX_BYTES',
   'AB_LIMITS_MAX_LIMIT',
   'AB_LIMITS_MAX_RESPONSE_BYTES',
   'AB_CALL_BUDGET',
@@ -201,6 +208,7 @@ const ENV_MODE_ONLY = [
 
 export const DEFAULTS = Object.freeze({
   attachmentMaxBytes: 1_048_576,
+  imageMaxBytes: 1_048_576,
   maxRows: 100,
   /** Node default (ADR-0010); Workers Free uses 512 KiB. */
   maxResponseBytes: 8 * 1024 * 1024,
@@ -507,6 +515,17 @@ const workspaceSchema = z.strictObject({
       types: z.array(z.string().min(3).max(130)).max(20).optional(),
     })
     .optional(),
+  images: z
+    .strictObject({
+      download: z.boolean().optional(),
+      max_bytes: z
+        .number()
+        .int()
+        .min(1_024)
+        .max(8 * 1024 * 1024)
+        .optional(),
+    })
+    .optional(),
   limits: z
     .strictObject({
       max_limit: z.number().int().min(1).max(1_000).optional(),
@@ -662,6 +681,8 @@ function fromYaml(env: Readonly<Record<string, string | undefined>>, options: Lo
     attachmentDownload: resolved.attachments?.download ?? false,
     attachmentMaxBytes: resolved.attachments?.max_bytes ?? DEFAULTS.attachmentMaxBytes,
     attachmentTypes: attachmentTypes(`workspaces.${id}.attachments.types`, resolved.attachments?.types),
+    imageDownload: resolved.images?.download ?? false,
+    imageMaxBytes: resolved.images?.max_bytes ?? DEFAULTS.imageMaxBytes,
     maxRows: resolved.limits?.max_limit ?? DEFAULTS.maxRows,
     maxResponseBytes: resolved.limits?.max_response_bytes ?? DEFAULTS.maxResponseBytes,
     callBudget: resolved.limits?.call_budget ?? DEFAULTS.callBudget,
@@ -769,6 +790,14 @@ export function loadConfig(
     attachmentTypes: attachmentTypes(
       'AB_ATTACHMENT_TYPES',
       list('AB_ATTACHMENT_TYPES', env['AB_ATTACHMENT_TYPES'], MEDIA_TYPE_LOOSE, 'content type'),
+    ),
+    imageDownload: bool('AB_IMAGE_DOWNLOAD', env['AB_IMAGE_DOWNLOAD'], false),
+    imageMaxBytes: int(
+      'AB_IMAGE_MAX_BYTES',
+      env['AB_IMAGE_MAX_BYTES'],
+      DEFAULTS.imageMaxBytes,
+      1_024,
+      8 * 1024 * 1024,
     ),
     maxRows: int('AB_LIMITS_MAX_LIMIT', env['AB_LIMITS_MAX_LIMIT'], DEFAULTS.maxRows, 1, 1_000),
     maxResponseBytes: int(

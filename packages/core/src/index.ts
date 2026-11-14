@@ -64,9 +64,11 @@ export {
   closedBreaker,
   createBudget,
   DEFAULT_ATTACHMENT_TYPES,
+  DEFAULT_IMAGE_MAX_BYTES,
   DEFAULT_LIMITS,
   type FetchLike,
   freezeContext,
+  IMAGE_TYPES,
   type InstanceRef,
   type Limiter,
   type Limits,
@@ -199,7 +201,7 @@ export {
   type Untrusted,
   untrusted,
 } from './output/result.ts';
-export { cleanText, decodeEntities, htmlToText, richText, utcIso } from './output/text.ts';
+export { cleanText, decodeEntities, htmlToText, imageSources, richText, utcIso } from './output/text.ts';
 export { PROMPT_MANIFEST, PROMPT_RULES, type PromptDefinition } from './prompts.ts';
 export {
   isPublicCatalogMethod,

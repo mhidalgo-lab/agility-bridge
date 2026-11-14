@@ -255,6 +255,7 @@ export function resolveAccess(
     if (gp.tools !== null && !gp.tools.includes(name)) continue;
     if (!limits.genericQuery && info.group === 'query') continue;
     if (!limits.attachmentDownload && info.group === 'attachments') continue;
+    if (!limits.imageDownload && info.group === 'images') continue;
     if (!limits.reports && info.group === 'reports') continue;
     if (info.kind !== 'read') {
       // Both lists must name a write tool explicitly: "all tools" never includes one.
@@ -351,6 +352,7 @@ export function resolvePassthroughAccess(
       info.kind === 'read' &&
       (limits.genericQuery || info.group !== 'query') &&
       (limits.attachmentDownload || info.group !== 'attachments') &&
+      (limits.imageDownload || info.group !== 'images') &&
       (limits.reports || info.group !== 'reports')
     );
   });

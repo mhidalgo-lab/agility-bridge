@@ -37,6 +37,7 @@ The smallest working configuration:
 | `AB_GENERIC_QUERY` | `on` | `off` removes `query_assets` and `get_assets`. |
 | `AB_MEMBER_EMAILS` | `off` | `on` includes member emails in results. |
 | `AB_ATTACHMENT_DOWNLOAD` | `off` | `on` offers `get_attachment`: the text of one attachment of an asset in scope (own group, [THREAT_MODEL](../THREAT_MODEL.md) A8). Each download is logged to stderr (asset number, attachment id, size, type). |
+| `AB_IMAGE_DOWNLOAD` / `AB_IMAGE_MAX_BYTES` | `off` / `1048576` | `on` offers `get_embedded_image`: an image pasted into the description or acceptance criteria of a work item in scope, by its number in the text (`[image 2]`), returned as an image block (own group `images`, [ADR-0019](../adr/0019-images-from-rich-text.md), [THREAT_MODEL](../THREAT_MODEL.md) A8). Fetched only from the instance's own image endpoints; PNG, JPEG, GIF and WebP only; each download is logged to stderr. In the workspace YAML: `images: { download: true, max_bytes: 1048576 }`. |
 | `AB_REPORTS` | `off` | `on` offers the composite reports `sprint_health`, `standup_summary`, `release_readiness`, `defect_triage`, `work_item_quality` and `quality_scan` (own group; each runs several reads, so keep `AB_CALL_BUDGET` at 54 or more). In the workspace YAML: `reports: true`. |
 | `AB_MCP_APPS` | `on` | `off` is the kill switch for [chart views](charts.md) (MCP Apps): no `ui://` resource and no tool metadata, whatever the client declares. They are offered only to a client that declared the extension. In the workspace YAML: `mcp_apps: false`. Also a server setting for `serve` and the Worker |
 | `AB_WRITE_TOOLS` / `AB_WRITE_APPROVAL` | `off` / `required` | Write tools ([guide](write-tools.md)): `AB_WRITE_TOOLS=on` allows them, and `AB_TOOLS` must name each one. `AB_WRITE_APPROVAL=off` (stdio only) skips the approval question and logs a warning at start. In the workspace YAML: `writes: { enabled: true, approval: required }`. `AB_WRITE_CUSTOM_FIELDS=Custom_Risk,Custom_Note` (YAML `writes.custom_fields`) names the custom attributes `create_work_item` and `update_fields` may write (none by default, at most 20; P7-20). Nine write tools are built (P7-04 to P7-06) and verified on fakes only; the sandbox run is P7-07. |
@@ -76,6 +77,7 @@ workspaces:
     generic_query: true
     member_emails: false
     attachments: { download: false, max_bytes: 1048576, types: [text/plain, text/csv] }
+    images: { download: false, max_bytes: 1048576 }
     limits: { max_limit: 100, call_budget: 1000 }
 ```
 

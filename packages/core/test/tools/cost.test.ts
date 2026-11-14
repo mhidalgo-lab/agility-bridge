@@ -33,7 +33,7 @@ describe('worst-case cost of every tool (L-114)', () => {
         (o) =>
           ctx({
             clock: { now: () => NOW },
-            limits: { ...DEFAULT_LIMITS, attachmentDownload: true, reports: true },
+            limits: { ...DEFAULT_LIMITS, attachmentDownload: true, imageDownload: true, reports: true },
             ...o,
           }),
         fixture?.args,

@@ -21,7 +21,7 @@ const rig = () => baseRig({ fake: costFakeOptions() });
 const GRANTED = READ_TOOLS.map((t) => t.name);
 const over = {
   granted: GRANTED,
-  ctx: { limits: { ...DEFAULT_LIMITS, attachmentDownload: true, reports: true } },
+  ctx: { limits: { ...DEFAULT_LIMITS, attachmentDownload: true, imageDownload: true, reports: true } },
 } as never;
 
 type Result = Record<string, unknown>;

@@ -17,7 +17,7 @@ import { Secret } from './secret.ts';
 import type { ToolDefinition } from './tool.ts';
 
 /**
- * Groups the public catalogue lists. The opt-in groups (`attachments`, `reports`, `writes`) are never in it: whether a
+ * Groups the public catalogue lists. The opt-in groups (`attachments`, `images`, `reports`, `writes`) are never in it: whether a
  * deployment offers them is exactly the kind of thing the catalogue must not reveal.
  */
 export const PUBLIC_CATALOG_GROUPS: readonly string[] = Object.freeze([

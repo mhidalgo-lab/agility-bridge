@@ -15,7 +15,7 @@ export const DEFAULT_CATALOGUE_TARGET_BYTES = 37_600;
 /** One tool's entry in `tools/list` (description, input and output schema); the generic `query_assets` is the largest. */
 export const TOOL_MAX_BYTES = 4_000;
 /** Groups a workspace must switch on (docs/reference/tool-catalogue.md): not part of the default catalogue. */
-export const OPT_IN_GROUPS: readonly string[] = ['attachments', 'reports', 'writes'];
+export const OPT_IN_GROUPS: readonly string[] = ['attachments', 'images', 'reports', 'writes'];
 
 /** The tools a workspace gets without switching on an opt-in group. */
 export const defaultCatalogue = (tools: readonly ToolDefinition[]): ToolDefinition[] =>

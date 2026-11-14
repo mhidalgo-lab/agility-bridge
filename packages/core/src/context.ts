@@ -89,7 +89,22 @@ export interface Limits {
   readonly attachmentMaxBytes: number;
   /** Content types `get_attachment` may return, as `type/subtype` in lower case (checked on metadata and response). */
   readonly attachmentTypes: readonly string[];
+  /** Offer `get_embedded_image`, an image pasted into a work item's rich text (P9-24, THREAT_MODEL A8). Off by default. */
+  readonly imageDownload: boolean;
+  /** Largest image `get_embedded_image` reads, counted on the stream; the response cap bounds it too. */
+  readonly imageMaxBytes: number;
 }
+
+/** Image types `get_embedded_image` returns (checked on the response header and on the bytes). SVG never. */
+export const IMAGE_TYPES: readonly string[] = Object.freeze([
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+]);
+
+/** Default `imageMaxBytes` (P9-24). */
+export const DEFAULT_IMAGE_MAX_BYTES = 1_048_576;
 
 /** Default text types of `get_attachment` (D-08). */
 export const DEFAULT_ATTACHMENT_TYPES: readonly string[] = Object.freeze([
@@ -128,6 +143,8 @@ export const DEFAULT_LIMITS: Limits = Object.freeze({
   reports: false,
   attachmentMaxBytes: 1_048_576,
   attachmentTypes: DEFAULT_ATTACHMENT_TYPES,
+  imageDownload: false,
+  imageMaxBytes: DEFAULT_IMAGE_MAX_BYTES,
 });
 
 /** Per-request budget of Agility requests (ADR-0010). Every attempt, retries included, spends from it. */

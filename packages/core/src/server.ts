@@ -353,7 +353,10 @@ function withDeepLinks(ctx: ToolContext, out: ToolOutput): ToolOutput {
 /** The MCP result for a handler's output. */
 export function toCallToolResult(out: ToolOutput): CallToolResult {
   return {
-    content: [{ type: 'text', text: out.text }],
+    content: [
+      { type: 'text', text: out.text },
+      ...(out.images ?? []).map((i) => ({ type: 'image' as const, data: i.data, mimeType: i.mimeType })),
+    ],
     ...(out.structured === undefined ? {} : { structuredContent: out.structured as Record<string, unknown> }),
     ...(out.meta === undefined ? {} : { _meta: out.meta }),
   };

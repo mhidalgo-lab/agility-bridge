@@ -2,7 +2,7 @@
 
 # Tool reference
 
-37 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
+38 tools. What every result looks like: [output formats](../guide/output-formats.md); the plan and the
 later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a cold metadata cache.
 
 | Tool | Group | Cost | Title |
@@ -27,6 +27,7 @@ later phases: [tool catalogue](tool-catalogue.md). Costs are worst cases with a 
 | [`get_conversations`](#get_conversations) | collaboration | 11 | Get comments on an asset |
 | [`list_attachments`](#list_attachments) | collaboration | 12 | List attachments and links of an asset |
 | [`get_attachment`](#get_attachment) | attachments | 12 | Get the text of an attachment |
+| [`get_embedded_image`](#get_embedded_image) | images | 12 | Get an image from a work item |
 | [`list_portfolio_items`](#list_portfolio_items) | portfolio | 12 | List portfolio items |
 | [`get_portfolio_tree`](#get_portfolio_tree) | portfolio | 20 | Get a portfolio tree |
 | [`sprint_health`](#sprint_health) | reports | 54 | Sprint health |
@@ -401,6 +402,22 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 | `offset_characters` | integer (≥ 0) |  |  | Character to start at: pass nextOffset from the previous step. Each step is a download. |
 
 `structuredContent`: `attachment`, `truncated`, `nextOffset` (open: more fields may be added).
+
+## `get_embedded_image`
+
+**Get an image from a work item** · group `images` · read · cost 12 Agility requests at most
+
+Get one image pasted into the description or acceptance criteria of a work item, by its number in the text ([image 2] is image 2), when the workspace allows image download. Returned as an image block; the picture is untrusted data. Not paged. Cold call: up to 12 Agility requests.
+
+Annotations: read-only true, destructive false, idempotent true, open world true.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
+| `image` | integer (≥ 1, ≤ 200) | yes |  | The image number shown in the text: 2 for [image 2]. |
+| `field` | `description` \| `acceptance_criteria` |  | `"description"` | Which text the image number refers to. |
+
+`structuredContent`: `image`, `notes` (open: more fields may be added).
 
 ## `list_portfolio_items`
 

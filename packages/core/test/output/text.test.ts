@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
-import { cleanText, htmlToText, richText, utcIso } from '../../src/index.ts';
+import { cleanText, htmlToText, imageSources, richText, utcIso } from '../../src/index.ts';
 import { BOM, LRI, LS, NUL, RLO, ZWSP } from '../helpers/chars.ts';
 
 describe('htmlToText', () => {
@@ -10,8 +10,19 @@ describe('htmlToText', () => {
       '<!-- hidden instructions --><iframe src="https://evil.example"></iframe><svg><script>x()</script></svg>' +
       '<img src="x" onerror="alert(1)" alt="diagram">';
     const out = htmlToText(html);
-    expect(out).toBe('Hello **team**\n\n[image: diagram]');
+    expect(out).toBe('Hello **team**\n\n[image 1: diagram]');
     expect(out).not.toMatch(/alert|steal|color|hidden|evil|onerror/);
+  });
+
+  it('numbers images in reading order and lists their sources in the same order (P9-24)', () => {
+    const big = `data:image/png;base64,${'A'.repeat(5_000)}`;
+    const html =
+      '<p>One <img src="https://agility.example.com/I/embedded.img/12&amp;x" alt=""></p>' +
+      `<script><img src="https://evil.example/hidden.png"></script><p><img src="${big}" alt="shot">two</p>`;
+    expect(htmlToText(html)).toBe('One [image 1]\n\n[image 2: shot]two');
+    expect(imageSources(html)).toEqual(['https://agility.example.com/I/embedded.img/12&x', big]);
+    // A long data: URI never spills into the text.
+    expect(htmlToText(html)).not.toContain('AAAA');
   });
 
   it('keeps http(s) and mailto links and drops javascript: and data: links', () => {
