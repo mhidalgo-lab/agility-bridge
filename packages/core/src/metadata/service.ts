@@ -41,7 +41,15 @@ export interface FieldTiers {
 /** How a request for an asset type is kept inside the workspace's Agility projects (ARCHITECTURE §6.3). */
 export type ScopeStrategy =
   | { readonly kind: 'direct'; readonly path: 'Scope' }
-  | { readonly kind: 'derived'; readonly path: string }
+  | {
+      readonly kind: 'derived';
+      readonly path: string;
+      /**
+       * Other paths that also place a row in the workspace (ORed with `path`): a reply to a comment reaches its work item
+       * through the comment it replies to (P9-25). Present only when at least one resolved on this instance.
+       */
+      readonly also?: readonly string[];
+    }
   | { readonly kind: 'workspace_bounded'; readonly via: 'self' | 'schedule' }
   | { readonly kind: 'global' }
   | { readonly kind: 'denied' };
@@ -102,6 +110,22 @@ export const DERIVED_SCOPE_PATHS: Readonly<Record<string, string>> = Object.free
   Actual: 'Workitem.Scope',
   Expression: 'Mentions:Workitem.Scope',
 });
+
+/**
+ * Alternative paths for a derived type, ORed with its main path (P9-25). A reply (`InReplyTo` set) usually mentions
+ * nothing: it belongs to the work item its comment mentions. One level only, as Agility threads are a comment and its
+ * replies. An alternative that does not resolve on the instance is left out (the main path still applies).
+ */
+export const DERIVED_SCOPE_ALTERNATIVES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  Expression: Object.freeze(['InReplyTo.Mentions:Workitem.Scope']),
+});
+
+/** Every path that places a row of a direct or derived type in the workspace (main path first). */
+export function scopePaths(strategy: ScopeStrategy): string[] {
+  if (strategy.kind === 'direct') return [strategy.path];
+  if (strategy.kind === 'derived') return [strategy.path, ...(strategy.also ?? [])];
+  return [];
+}
 
 const PROJECT_TREE_TTL_MS = 600_000;
 const MAX_ABSENT_PER_CALL = 3;
@@ -702,7 +726,19 @@ export class InstanceMetadata {
     if (derived !== undefined) {
       try {
         const resolved = await this.resolvePath(meta.name, derived);
-        if (resolved.attribute?.relatedType === 'Scope') return { kind: 'derived', path: derived };
+        if (resolved.attribute?.relatedType === 'Scope') {
+          const also: string[] = [];
+          for (const alt of DERIVED_SCOPE_ALTERNATIVES[meta.name] ?? []) {
+            try {
+              if ((await this.resolvePath(meta.name, alt)).attribute?.relatedType === 'Scope') also.push(alt);
+            } catch (error) {
+              if (!isAbError(error) || error.code !== ErrorCode.InputInvalid) throw error;
+            }
+          }
+          return also.length === 0
+            ? { kind: 'derived', path: derived }
+            : { kind: 'derived', path: derived, also };
+        }
       } catch (error) {
         if (!isAbError(error) || error.code !== ErrorCode.InputInvalid) throw error;
       }

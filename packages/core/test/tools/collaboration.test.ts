@@ -65,6 +65,18 @@ function world(poisoned: boolean, hostileType?: string): NonNullable<FakeAgility
     BelongsTo: 'Conversation:7',
     AssetState: 64,
   });
+  // A reply mentions nothing: it reaches its work item through the comment it answers (P9-25).
+  const reply = (id: number, to: string, parentScope: string | undefined, at: string, text: string) => ({
+    _oid: `Expression:${id}`,
+    InReplyTo: to,
+    'InReplyTo.Mentions:Workitem.Scope': parentScope === undefined ? [] : [parentScope],
+    Author: 'Member:20',
+    'Author.Name': p(1, 'Ann Example'),
+    AuthoredAt: at,
+    Content: `<p>${text}</p>`,
+    BelongsTo: 'Conversation:7',
+    AssetState: 64,
+  });
   const attachment = (id: number, on: string, scope: string, type: string, name: string) => ({
     _oid: `Attachment:${id}`,
     Asset: on,
@@ -86,6 +98,10 @@ function world(poisoned: boolean, hostileType?: string): NonNullable<FakeAgility
       comment(2, 'Story:1001', 'Scope:1001', '2026-10-02T09:00:00Z', 'Second'),
       comment(3, 'Story:1001', 'Scope:1001', '2026-10-03T09:00:00Z', 'Third'),
       comment(4, 'Story:1002', 'Scope:2000', '2026-10-04T09:00:00Z', 'OTHER-PROJECT-SECRET'),
+      reply(10, 'Expression:2', 'Scope:1001', '2026-10-02T10:00:00Z', p(6, 'Reply one')),
+      reply(11, 'Expression:2', 'Scope:1001', '2026-10-02T11:00:00Z', 'Reply two'),
+      reply(12, 'Expression:4', 'Scope:2000', '2026-10-04T10:00:00Z', 'OTHER-PROJECT-REPLY-SECRET'),
+      reply(13, 'Expression:10', undefined, '2026-10-02T12:00:00Z', 'NESTED-REPLY'),
     ],
     Attachment: [
       attachment(1, 'Story:1001', 'Scope:1001', 'text/plain; charset=utf-8', p(4, 'notes.txt')),
@@ -172,7 +188,13 @@ describe('get_conversations', () => {
     const { ctx } = setup();
     const r = await call(getConversations, ctx(), { asset: 'B-01001' });
     expect(r['isError'], text(r)).toBeUndefined();
-    expect(s(r).items.map((i) => i['oid'])).toEqual(['Expression:3', 'Expression:2', 'Expression:1']);
+    expect(s(r).items.map((i) => i['oid'])).toEqual([
+      'Expression:3',
+      'Expression:2',
+      'Expression:10',
+      'Expression:11',
+      'Expression:1',
+    ]);
     expect(s(r).items[0]).toMatchObject({
       author: { oid: 'Member:20', name: 'Ann Example' },
       authoredAt: '2026-10-03T09:00:00.000Z',
@@ -185,7 +207,12 @@ describe('get_conversations', () => {
   it('pages without repeating or skipping, and refuses a cursor of another asset', async () => {
     const { ctx } = setup();
     const first = await call(getConversations, ctx(), { asset: 'B-01001', limit: 2 });
-    expect(s(first).items.map((i) => i['oid'])).toEqual(['Expression:3', 'Expression:2']);
+    expect(s(first).items.map((i) => i['oid'])).toEqual([
+      'Expression:3',
+      'Expression:2',
+      'Expression:10',
+      'Expression:11',
+    ]);
     const cursor = s(first)['nextCursor'];
     expect(typeof cursor).toBe('string');
     const second = await call(getConversations, ctx(), { asset: 'B-01001', limit: 2, cursor });
@@ -208,7 +235,45 @@ describe('get_conversations', () => {
     const r = await call(getConversations, ctx(), { asset: 'B-01001' });
     expect(r['isError'], text(r)).toBeUndefined();
     expect(JSON.stringify(r)).not.toContain('OTHER-PROJECT-SECRET');
+    expect(JSON.stringify(r)).not.toContain('OTHER-PROJECT-REPLY-SECRET');
     expect(s(r)['hiddenOutsideScope']).toBe(true);
+  });
+
+  it('lists the replies of each comment right after it, oldest first, with inReplyTo (P9-25)', async () => {
+    const { ctx, fake } = setup();
+    const r = await call(getConversations, ctx(), { asset: 'B-01001' });
+    expect(r['isError'], text(r)).toBeUndefined();
+    const items = s(r).items;
+    expect(items.filter((i) => i['inReplyTo'] === 'Expression:2').map((i) => i['oid'])).toEqual([
+      'Expression:10',
+      'Expression:11',
+    ]);
+    expect(items.find((i) => i['oid'] === 'Expression:3')?.['inReplyTo']).toBeUndefined();
+    expect(text(r)).toContain('3 comments and 2 replies on B-01001');
+    // The replies are read only for the comments of the page, and the workspace's projects still bound the query.
+    const replyQuery = fake.calls
+      .map((c) => JSON.stringify(c.body) ?? '')
+      .find((b) => b.includes('InReplyTo=') && b.includes('"from":"Expression"'));
+    expect(replyQuery).toBeDefined();
+    expect(replyQuery).toContain('InReplyTo.Mentions:Workitem.Scope=$ab_scope');
+    expect(replyQuery).not.toContain('Expression:4');
+  });
+
+  it('never returns a reply to a comment of another project, even when the upstream ignores the filters', async () => {
+    const { ctx } = setup({ filters: 'ignore-filters' });
+    const r = await call(getConversations, ctx(), { asset: 'B-01001' });
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect(JSON.stringify(r)).not.toContain('OTHER-PROJECT-REPLY-SECRET');
+    expect(s(r).items.map((i) => i['oid'])).not.toContain('Expression:12');
+  });
+
+  it('leaves out a reply to a reply, which no scope path reaches', async () => {
+    for (const filters of ['evaluate', 'ignore-filters'] as const) {
+      const { ctx } = setup({ filters });
+      const r = await call(getConversations, ctx(), { asset: 'B-01001' });
+      expect(r['isError'], text(r)).toBeUndefined();
+      expect(JSON.stringify(r), filters).not.toContain('NESTED-REPLY');
+    }
   });
 });
 

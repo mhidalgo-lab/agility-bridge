@@ -145,6 +145,7 @@ export {
 } from './metadata/model.ts';
 export {
   type Aggregation,
+  DERIVED_SCOPE_ALTERNATIVES,
   DERIVED_SCOPE_PATHS,
   type FieldTiers,
   InstanceMetadata,
@@ -158,6 +159,7 @@ export {
   type ScopeStrategy,
   type StatusCategory,
   type StatusEntry,
+  scopePaths,
 } from './metadata/service.ts';
 export {
   envelope,

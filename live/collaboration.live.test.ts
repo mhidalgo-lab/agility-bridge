@@ -85,6 +85,48 @@ describe.skipIf(!target)('collaboration tools against the live tenant (read-only
     expect(present.length).toBeGreaterThan(0);
   });
 
+  it('get_conversations returns the replies of a comment in a restricted workspace (P9-25), ids only', {
+    timeout: 120_000,
+  }, async () => {
+    const ctx = liveContext();
+    const recent = (
+      await agilityClient(ctx).query<Rows>({
+        from: 'Expression',
+        select: ['InReplyTo', 'InReplyTo.Mentions', 'InReplyTo.Mentions:Workitem.Scope'],
+        sort: ['-ID'],
+        page: { start: 0, size: 200 },
+      })
+    ).data[0];
+    const reply = (recent ?? []).find(
+      (r) =>
+        oidOf(r['InReplyTo']) !== undefined &&
+        /^(Story|Defect|Task|Test|Epic|Issue|Request):\d+$/.test(oidOf(r['InReplyTo.Mentions']) ?? '') &&
+        oidOf(r['InReplyTo.Mentions:Workitem.Scope']) !== undefined,
+    );
+    expect(reply, 'one of the latest 200 comments is a reply to a comment on a work item').toBeDefined();
+    if (reply === undefined) return;
+    const scope = oidOf(reply['InReplyTo.Mentions:Workitem.Scope']) as string;
+    const item = oidOf(reply['InReplyTo.Mentions']) as string;
+    // The workspace holds only the project of that work item: the reply is reached through its comment.
+    const restricted = liveContext({ projects: { allowed: [scope], includeChildren: false } });
+    const md = metadataFor(restricted);
+    expect((await md.scopeStrategy('Expression')).kind).toBe('derived');
+    expect(await md.scopeStrategy('Expression')).toHaveProperty('also', [
+      'InReplyTo.Mentions:Workitem.Scope',
+    ]);
+    const r = await rpc(() => buildMcpServer({ tools: [getConversations], ctx: restricted }), 'tools/call', {
+      name: 'get_conversations',
+      arguments: { asset: item, limit: 50 },
+    });
+    expect(code(r)).toBeUndefined();
+    expect(r['isError']).toBeUndefined();
+    const items = (r['structuredContent'] as { items: Array<Record<string, unknown>> }).items;
+    const got = items.find((i) => i['oid'] === oidOf(reply['_oid']));
+    expect(got, 'the reply is listed').toBeDefined();
+    expect(got?.['inReplyTo']).toBe(oidOf(reply['InReplyTo']));
+    expect(restricted.budget.used).toBeLessThanOrEqual(getConversations.cost);
+  });
+
   it('get_conversations and list_attachments answer on real assets, shapes only', {
     timeout: 120_000,
   }, async () => {

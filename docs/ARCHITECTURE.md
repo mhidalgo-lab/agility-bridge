@@ -294,7 +294,8 @@ Raw Agility bodies are never returned to the client: the messages of a 400 trave
 - **Field tiers** (`minimal`, `default`, `full`) computed from the attributes the type has, preferring the `…UTC` dates
   (L-149), with custom attributes only in `full` and `full` capped at `limits.maxFields`; overrides are validated.
 - **Scope strategy** (below) classified from metadata: a single `Scope` relation to `Scope` is direct; `Attachment`,
-  `Link`, `Actual` and `Expression` use a derived path that must resolve on the instance; `Scope` and `Timebox` (through
+  `Link`, `Actual` and `Expression` use a derived path that must resolve on the instance (`Expression` also through
+  `InReplyTo.Mentions:Workitem.Scope`, ORed, so a reply belongs to its comment's work item: P9-25); `Scope` and `Timebox` (through
   `Schedule`) are workspace-bounded; `Member`, `Team` and every `List` subtype are global; abstract and unclassified
   types are denied.
 - **Snapshot and drift** (L-053): a synthetic `meta.v1` snapshot of the 33 types the tools rely on is committed
