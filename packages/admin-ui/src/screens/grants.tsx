@@ -78,6 +78,7 @@ import {
   Screen,
   StatusBadge,
   serverLimitsOf,
+  switchNotes,
   ToolChecklist,
   toolsFrom,
   toolValues,
@@ -341,6 +342,7 @@ export function grantNotes(
         ? g.tools
         : g.tools.filter((t) => ws.enabledTools?.includes(t));
   notes.push(...compositeNotes(effective, tools));
+  notes.push(...switchNotes(effective, groupsOff(ws.limits, g.limits), tools, 'grant'));
   // The tighter budget applies (a grant can only lower the workspace's, L-056); a workspace that sets none inherits the
   // server's (P6-58).
   const own = (v: number | boolean | undefined) => (typeof v === 'number' ? v : undefined);
