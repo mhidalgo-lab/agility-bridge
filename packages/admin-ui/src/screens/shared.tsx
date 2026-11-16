@@ -478,6 +478,38 @@ export function groupsOff(workspace: Limits, grant?: Limits): string[] {
   return off;
 }
 
+/** The limit switch that turns each opt-in group on, as the Limits section labels it (P9-26). */
+const GROUP_SWITCHES: Readonly<Record<string, string>> = {
+  attachments: 'Attachment text download',
+  images: 'Images pasted into descriptions',
+  reports: 'Composite reports',
+};
+
+/**
+ * One fixed sentence per opt-in group that is off, naming the read tools of `list` ("every read tool" when null) it
+ * hides, and the switch that lists them (P9-26): "Every read tool" chooses tools, it does not turn a group on. `grant`
+ * says the switch is the workspace's and the grant must not turn it off.
+ */
+export function switchNotes(
+  list: readonly string[] | null,
+  off: readonly string[],
+  tools: readonly Tool[],
+  where: 'workspace' | 'grant' = 'workspace',
+): string[] {
+  const notes: string[] = [];
+  for (const group of off) {
+    const label = GROUP_SWITCHES[group];
+    if (label === undefined) continue;
+    const hidden = tools.filter(
+      (t) => t.group === group && t.kind === 'read' && (list === null || list.includes(t.name)),
+    );
+    if (hidden.length === 0) continue;
+    const place = where === 'grant' ? `off in the workspace's Limits or in this grant` : 'off under Limits';
+    notes.push(`"${label}" is ${place}, so these are not listed: ${hidden.map((t) => t.name).join(', ')}.`);
+  }
+  return notes;
+}
+
 /**
  * One fixed sentence naming the tools in `list` whose declared cost is above `budget` (the per-call request budget that
  * applies), which are therefore not listed to the caller (P6-36, L-115). "Every read tool" (null) is judged by the read

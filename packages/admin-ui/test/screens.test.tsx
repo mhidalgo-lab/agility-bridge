@@ -16,10 +16,12 @@ import {
   budgetNotes,
   compositeNotes,
   formMessage,
+  groupsOff,
   limitFieldOf,
   limitsFrom,
   paged,
   problemOf,
+  switchNotes,
   toolsFrom,
   wholeNumber,
   withQuery,
@@ -659,6 +661,35 @@ describe('composite grant notes (P6-11)', () => {
     expect(compositeNotes(['sprint_health', 'get_sprint', 'search_work_items'], tools)).toEqual([]);
     expect(compositeNotes(['whoami', 'get_sprint'], tools)).toEqual([]);
     expect(compositeNotes(null, tools)).toEqual([]);
+  });
+
+  it('names the tools an opt-in switch still hides, and the switch to turn on (P9-26)', () => {
+    const t = [
+      { name: 'whoami', kind: 'read', group: 'core', cost: 1, siblings: [] },
+      { name: 'get_attachment', kind: 'read', group: 'attachments', cost: 12, siblings: [] },
+      { name: 'get_embedded_image', kind: 'read', group: 'images', cost: 12, siblings: [] },
+      { name: 'sprint_health', kind: 'read', group: 'reports', cost: 54, siblings: [] },
+    ] as never[];
+    // "Every read tool" with every switch off: one sentence per switch.
+    expect(switchNotes(null, groupsOff({}), t)).toEqual([
+      '"Composite reports" is off under Limits, so these are not listed: sprint_health.',
+      '"Attachment text download" is off under Limits, so these are not listed: get_attachment.',
+      '"Images pasted into descriptions" is off under Limits, so these are not listed: get_embedded_image.',
+    ]);
+    // A switch that is on, or a list that names none of the group's tools, says nothing.
+    expect(
+      switchNotes(null, groupsOff({ reports: true, attachmentDownload: true, imageDownload: true }), t),
+    ).toEqual([]);
+    expect(switchNotes(['whoami'], groupsOff({}), t)).toEqual([]);
+    expect(switchNotes(['whoami', 'get_embedded_image'], groupsOff({}), t)).toEqual([
+      '"Images pasted into descriptions" is off under Limits, so these are not listed: get_embedded_image.',
+    ]);
+    // A grant that turns one off is told where the switch lives.
+    expect(
+      switchNotes(null, groupsOff({ imageDownload: true }, { imageDownload: false }), t, 'grant'),
+    ).toContain(
+      `"Images pasted into descriptions" is off in the workspace's Limits or in this grant, so these are not listed: get_embedded_image.`,
+    );
   });
 
   it('names the listed tools a lower per-call budget hides (P6-36)', () => {

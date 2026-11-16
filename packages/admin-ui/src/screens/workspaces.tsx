@@ -74,6 +74,7 @@ import {
   Screen,
   StatusBadge,
   serverLimitsOf,
+  switchNotes,
   ToolChecklist,
   toolsFrom,
   toolValues,
@@ -249,7 +250,7 @@ function WorkspaceForm(props: WorkspaceFormProps) {
             values={v}
             legend="Tools"
             allLabel="Every read tool"
-            allHint="Includes read tools added later. Write tools are never included."
+            allHint="Includes read tools added later. Write tools are never included. Attachment download, pasted images and reports are listed only once switched on under Limits."
             writesAllowed={owner}
             error={errors['tools']}
           />
@@ -658,6 +659,7 @@ export function registerWorkspaces(ui: Hono, kit: UiKit): void {
               items={[
                 ...compositeNotes(ws.enabledTools, tools.ok ? tools.value : []),
                 ...budgetNotesOf(ws, tools.ok ? tools.value : [], server),
+                ...switchNotes(ws.enabledTools, groupsOff(ws.limits), tools.ok ? tools.value : []),
               ]}
             />
             <div class="actions">
