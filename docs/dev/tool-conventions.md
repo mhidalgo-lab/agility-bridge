@@ -249,7 +249,9 @@ bidi controls and very long values (L-038).
 `[image N: alt]`), numbered in reading order by the same tokenizer that `imageSources()` uses, so a tool that fetches
 "image N" means the one the caller saw. Only `get_embedded_image` returns image content: one MCP `image` block (base64, an
 allowlisted type checked on header and bytes) after the text, which carries the untrusted-data note. A tool never returns
-an image URL and never fetches one the caller supplied.
+an image URL and never fetches one the caller supplied. Images attached to a comment (`ExpressionImage`, P9-27) are not in
+its text: `get_conversations` lists them as `images` (`[image N: name]`, by ascending id) and `get_embedded_image` with
+`field: comment` uses the same numbering.
 
 ## Resources and prompts (manifest)
 

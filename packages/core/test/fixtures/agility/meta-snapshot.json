@@ -6440,6 +6440,22 @@
      "nameref": "Expression",
      "href": "/SyntheticInstance/meta.v1/Expression"
     }
+   },
+   "Expression.ExpressionImages": {
+    "_type": "AttributeDefinition",
+    "Name": "ExpressionImages",
+    "Token": "Expression.ExpressionImages",
+    "DisplayName": "ExpressionImages",
+    "AttributeType": "Relation",
+    "IsReadOnly": true,
+    "IsRequired": false,
+    "IsMultivalue": true,
+    "IsCanned": true,
+    "IsCustom": false,
+    "RelatedAsset": {
+     "nameref": "ExpressionImage",
+     "href": "/SyntheticInstance/meta.v1/ExpressionImage"
+    }
    }
   },
   "Operations": {}
@@ -8956,6 +8972,100 @@
      "nameref": "Timebox",
      "href": "/SyntheticInstance/meta.v1/Timebox"
     }
+   }
+  },
+  "Operations": {}
+ },
+ "ExpressionImage": {
+  "_type": "AssetType",
+  "Name": {
+   "href": "/SyntheticInstance/meta.v1/ExpressionImage/Name",
+   "tokenref": "ExpressionImage.Name"
+  },
+  "Token": "ExpressionImage",
+  "Version": "26.0.3.2",
+  "Abstract": false,
+  "DisplayName": "Synthetic ExpressionImage",
+  "Attributes": {
+   "ExpressionImage.ID": {
+    "_type": "AttributeDefinition",
+    "Name": "ID",
+    "Token": "ExpressionImage.ID",
+    "DisplayName": "ID",
+    "AttributeType": "Relation",
+    "IsReadOnly": true,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": true,
+    "IsCustom": false,
+    "RelatedAsset": {
+     "nameref": "ExpressionImage",
+     "href": "/SyntheticInstance/meta.v1/ExpressionImage"
+    }
+   },
+   "ExpressionImage.Name": {
+    "_type": "AttributeDefinition",
+    "Name": "Name",
+    "Token": "ExpressionImage.Name",
+    "DisplayName": "Name",
+    "AttributeType": "Text",
+    "IsReadOnly": false,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": true,
+    "IsCustom": false
+   },
+   "ExpressionImage.ContentType": {
+    "_type": "AttributeDefinition",
+    "Name": "ContentType",
+    "Token": "ExpressionImage.ContentType",
+    "DisplayName": "ContentType",
+    "AttributeType": "Text",
+    "IsReadOnly": false,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": true,
+    "IsCustom": false
+   },
+   "ExpressionImage.Content": {
+    "_type": "AttributeDefinition",
+    "Name": "Content",
+    "Token": "ExpressionImage.Content",
+    "DisplayName": "Content",
+    "AttributeType": "Blob",
+    "IsReadOnly": false,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": true,
+    "IsCustom": false
+   },
+   "ExpressionImage.Expression": {
+    "_type": "AttributeDefinition",
+    "Name": "Expression",
+    "Token": "ExpressionImage.Expression",
+    "DisplayName": "Expression",
+    "AttributeType": "Relation",
+    "IsReadOnly": false,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": true,
+    "IsCustom": false,
+    "RelatedAsset": {
+     "nameref": "Expression",
+     "href": "/SyntheticInstance/meta.v1/Expression"
+    }
+   },
+   "ExpressionImage.AssetState": {
+    "_type": "AttributeDefinition",
+    "Name": "AssetState",
+    "Token": "ExpressionImage.AssetState",
+    "DisplayName": "AssetState",
+    "AttributeType": "State",
+    "IsReadOnly": true,
+    "IsRequired": false,
+    "IsMultivalue": false,
+    "IsCanned": true,
+    "IsCustom": false
    }
   },
   "Operations": {}

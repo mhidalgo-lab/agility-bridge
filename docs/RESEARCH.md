@@ -193,7 +193,14 @@ except `group`, and adds `op` (POST only). *docs*
   107 had a non-empty `EmbeddedImages` relation, and `EmbeddedImage` by the `src` id returned nothing, so neither says
   which asset an image belongs to. Rarer forms: `downloadblob.img/<40 alphanumerics>` (same host, `image/png`), `data:`
   URIs, and outside addresses. `GET embedded.img/<id>` with the bearer token: `200 image/png`, valid PNG magic,
-  `Cache-Control: private`; without it `401`. None of the latest 300 comments held an image. The content endpoint
+  `Cache-Control: private`; without it `401`. None of the latest 300 comments held an `<img>` in `Content`, but that is not
+where comment images live: *live (2026-11-17, P9-27):* an image attached to a comment is an `ExpressionImage` asset
+(`Name`, `ContentType`, `Content` = blob `<basePath>/expressionimage.img/<id>` with the asset's own id, `Expression` → its
+comment), listed on the comment as `Expression.ExpressionImages` (multi, read-only). 6 of the latest 300 comments held
+them (up to 4 each). `GET expressionimage.img/<id>` with the bearer token: `200 image/png`, valid PNG magic,
+`Cache-Control: private`; without it `401`. `ExpressionImages` and `ExpressionImages.Name` pair by position (59 of 59
+checked), but the relation order is not id order on 2 of 20 multi-image comments, so tools number them by ascending id.
+The UI shows them as chips under the comment, next to a chip for each mentioned asset. The content endpoint
   (`attachments.img/<id>`, as in the developer library's utility endpoints page; `attachment.img` appears in SDK
   examples) and its `Content-Type` behaviour are **unverified**: the read-only tenant's guard allows no such request
   (P6-19).

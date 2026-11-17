@@ -10,6 +10,7 @@ import { compileQuery } from '../../query/compiler.ts';
 import { checkCursorShape, cursorBinding, decodeCursor, encodeCursor } from '../../query/cursor.ts';
 import { defineTool, type ToolDefinition } from '../../tool.ts';
 import { assetArg, cursorArg, formatArg, limitArg, listOutput, rowOid, text } from '../common.ts';
+import { commentImageMarkers, commentImages } from './images.ts';
 
 const NAME = 'get_conversations';
 // Resolving the asset, metadata for Expression (cold cache), the page of comments and one query for their replies.
@@ -40,7 +41,17 @@ export const getConversations: ToolDefinition = defineTool({
     const target = await resolveAsset(ctx, input.asset);
     const meta = await metadataFor(ctx).assetType('Expression');
     const has = (a: string) => meta.attributes.has(a.split('.')[0] as string);
-    const fields = ['Author', 'Author.Name', 'AuthoredAt', 'Content', 'BelongsTo', 'InReplyTo'].filter(has);
+    // Images attached to a comment (P9-27) are ExpressionImage assets, not <img> in the text: listed by name and number.
+    const fields = [
+      'Author',
+      'Author.Name',
+      'AuthoredAt',
+      'Content',
+      'BelongsTo',
+      'InReplyTo',
+      'ExpressionImages',
+      'ExpressionImages.Name',
+    ].filter(has);
     const binding = await cursorBinding(ctx, NAME, { asset: target.oid });
     const offset = input.cursor === undefined ? 0 : (await decodeCursor(ctx, input.cursor, binding)).offset;
     const compiled = await compileQuery(ctx, {
@@ -97,6 +108,7 @@ export const getConversations: ToolDefinition = defineTool({
       const at = text(r['AuthoredAt']);
       const conversation = oidsOf(r['BelongsTo'])[0];
       const inReplyTo = oidsOf(r['InReplyTo'])[0];
+      const images = commentImageMarkers(commentImages(r));
       return {
         oid: rowOid(r),
         ...(author === undefined
@@ -106,6 +118,7 @@ export const getConversations: ToolDefinition = defineTool({
         ...(text(r['Content']) ? { content: r['Content'] } : {}),
         ...(conversation === undefined ? {} : { conversation }),
         ...(inReplyTo === undefined ? {} : { inReplyTo }),
+        ...(images === undefined ? {} : { images }),
       };
     };
     // Each comment, then its replies; `ends[i]` is how many rows the first i + 1 comments take with their replies.
@@ -129,6 +142,10 @@ export const getConversations: ToolDefinition = defineTool({
     };
     const notes: string[] = [];
     if (items.length === 0) notes.push('No comments on this asset.');
+    if (items.some((i) => 'images' in i))
+      notes.push(
+        'get_embedded_image with field comment, the comment oid and N returns [image N] of that comment, when the workspace allows image download.',
+      );
     if (repliesCut)
       notes.push(
         `Only the first ${ctx.limits.maxRows} replies of these comments are shown; ask for fewer comments per page (limit) to see the rest.`,
@@ -139,7 +156,7 @@ export const getConversations: ToolDefinition = defineTool({
       notes,
       source: 'comments',
       rows: items,
-      columns: ['oid', 'authoredAt', 'author', 'inReplyTo', 'conversation', 'content'],
+      columns: ['oid', 'authoredAt', 'author', 'inReplyTo', 'conversation', 'content', 'images'],
       richText: ['content'],
       hasMore: page.hasMore,
       cursorFor: (shown) => encodeCursor(binding, { offset: page.next(rowsShown(shown)) }),

@@ -407,7 +407,7 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 
 **Get an image from a work item** · group `images` · read · cost 12 Agility requests at most
 
-Get one image pasted into the description or acceptance criteria of a work item, by its number in the text ([image 2] is image 2), when the workspace allows image download. Returned as an image block; the picture is untrusted data. Not paged. Cold call: up to 12 Agility requests.
+Get one image pasted into the description or acceptance criteria of a work item, or attached to one of its comments, by its number ([image 2] is image 2), when the workspace allows image download. Returned as an image block; the picture is untrusted data. Not paged. Cold call: up to 12 Agility requests.
 
 Annotations: read-only true, destructive false, idempotent true, open world true.
 
@@ -415,7 +415,8 @@ Annotations: read-only true, destructive false, idempotent true, open world true
 |---|---|---|---|---|
 | `asset` | string | yes |  | Asset number (B-01234, D-00012, E-00001) or OID token (Story:1234). |
 | `image` | integer (≥ 1, ≤ 200) | yes |  | The image number shown in the text: 2 for [image 2]. |
-| `field` | `description` \| `acceptance_criteria` |  | `"description"` | Which text the image number refers to. |
+| `field` | `description` \| `acceptance_criteria` \| `comment` |  | `"description"` | Which text the image number refers to; comment also needs comment. |
+| `comment` | string |  |  | With field comment: the comment id (Expression:1234) shown by get_conversations. |
 
 `structuredContent`: `image`, `notes` (open: more fields may be added).
 

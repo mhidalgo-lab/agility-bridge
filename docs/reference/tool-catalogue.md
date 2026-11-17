@@ -112,7 +112,10 @@ text (`[image N]`), as an MCP image block ([ADR-0019](../adr/0019-images-from-ri
 the workspace limit `imageDownload` is on and the grant keeps it on (`imageMaxBytes` can only be lowered; stdio:
 `AB_IMAGE_DOWNLOAD`, `AB_IMAGE_MAX_BYTES`). The caller never passes a URL: the server reads the field of the asset in
 scope, takes the Nth image and fetches it only from `embedded.img/<id>` or `downloadblob.img/<token>` on the instance (a
-`data:` image is decoded locally); type checked on header and bytes, size on the stream, audited.
+`data:` image is decoded locally); type checked on header and bytes, size on the stream, audited. With `field: comment`
+and a `comment` id from `get_conversations` (which lists each comment's images as `[image N: name]`), it returns an image
+attached to that comment (P9-27): the comment must mention the asset or reply to one that does, and the image is read only
+from `expressionimage.img/<id>`, by the id on that comment's row.
 
 ### Attachments (opt-in)
 
