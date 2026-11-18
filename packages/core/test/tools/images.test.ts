@@ -12,8 +12,11 @@ import {
   type ToolContext,
   type ToolDefinition,
 } from '../../src/index.ts';
+import { getConversations } from '../../src/tools/collaboration/conversations.ts';
 import {
   classifyImageSource,
+  commentImageMarkers,
+  commentImages,
   getEmbeddedImage,
   sniffImageType,
 } from '../../src/tools/collaboration/images.ts';
@@ -58,6 +61,42 @@ function setup(
     story(1001, 'B-01001', 'Scope:1001', description),
     story(1002, 'B-01002', 'Scope:2000', `<img src="${FAKE_BASE_URL}/embedded.img/999" alt="">`),
   ];
+  // P9-27: images attached to comments are ExpressionImage assets of the comment, not <img> in its text.
+  const expression = (
+    id: number,
+    on: { mentions?: string; replyTo?: string; parentMentions?: string },
+    scope: string | undefined,
+    imgs: Array<[number, string]>,
+  ) => ({
+    _oid: `Expression:${id}`,
+    ...(on.mentions === undefined
+      ? {}
+      : { Mentions: [on.mentions], 'Mentions:Workitem.Scope': scope === undefined ? [] : [scope] }),
+    ...(on.replyTo === undefined
+      ? {}
+      : {
+          InReplyTo: on.replyTo,
+          'InReplyTo.Mentions': on.parentMentions === undefined ? [] : [on.parentMentions],
+          'InReplyTo.Mentions:Workitem.Scope': scope === undefined ? [] : [scope],
+        }),
+    Content: '<p>See the screenshot</p>',
+    ExpressionImages: imgs.map(([n]) => `ExpressionImage:${n}`),
+    'ExpressionImages.Name': imgs.map(([, name]) => name),
+    AssetState: 64,
+  });
+  const expressions = [
+    // The relation order is not id order: image 1 is the lower id.
+    expression(501, { mentions: 'Story:1001' }, 'Scope:1001', [
+      [702, options.poisoned ? poison(7) : 'second.png'],
+      [701, 'first.png'],
+    ]),
+    expression(502, { replyTo: 'Expression:501', parentMentions: 'Story:1001' }, 'Scope:1001', [
+      [703, 'reply.png'],
+    ]),
+    expression(503, { mentions: 'Story:1002' }, 'Scope:2000', [[704, 'secret.png']]),
+    expression(504, { mentions: 'Story:1001' }, 'Scope:1001', []),
+    expression(505, { mentions: 'Story:1003' }, 'Scope:1001', [[705, 'elsewhere.png']]),
+  ];
   const images: string[] = [];
   const fake = new FakeAgility({
     meta: SNAPSHOT,
@@ -69,9 +108,10 @@ function setup(
         { _oid: 'Scope:2000', Name: 'Elsewhere', AssetState: 64, ChildrenMeAndDown: ['Scope:2000'] },
       ],
       Member: [{ _oid: 'Member:20', Name: 'Ann Example', Username: 'ann', IsSelf: true, AssetState: 64 }],
+      Expression: expressions,
     },
     override: (_req, call) => {
-      if (!/^(embedded|downloadblob|attachments)\.img\//.test(call.path)) return undefined;
+      if (!/^(embedded|downloadblob|attachments|expressionimage)\.img\//.test(call.path)) return undefined;
       images.push(call.path);
       const r = options.serve?.(call.path) ?? { body: PNG, type: 'image/png' };
       return new Response(r.body, {
@@ -236,6 +276,154 @@ describe('get_embedded_image', () => {
     const { leaks, result } = await probeTool(getEmbeddedImage, ctx(), { asset: 'B-01001', image: 1 });
     expect(result['isError'], text(result)).toBeUndefined();
     expect(leaks).toEqual([]);
+  });
+});
+
+describe('get_embedded_image: images attached to comments (P9-27)', () => {
+  const ask = (args: Record<string, unknown>) => ({ asset: 'B-01001', field: 'comment', ...args });
+
+  it('returns image N of a comment, numbered by id, from expressionimage.img only, audited', async () => {
+    const { ctx, images } = setup();
+    const r = await call(getEmbeddedImage, ctx(), ask({ comment: 'Expression:501', image: 1 }));
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect(content(r).map((b) => b.type)).toEqual(['text', 'image']);
+    expect(text(r)).toContain('untrusted data');
+    expect(text(r)).toContain('Expression:501 on B-01001');
+    expect(images).toEqual(['expressionimage.img/701']);
+    expect(r['structuredContent']).toMatchObject({
+      image: { index: 1, field: 'comment', comment: 'Expression:501', source: 'expression' },
+    });
+    expect((r['_meta'] as Record<string, unknown>)['agility-bridge/download']).toMatchObject({
+      asset: 'B-01001',
+      attachment: 'expressionimage.img/701',
+    });
+    expect(JSON.stringify(r)).not.toContain(FAKE_BASE_URL);
+    const second = await call(getEmbeddedImage, setup().ctx(), ask({ comment: '501', image: 2 }));
+    expect(second['structuredContent']).toMatchObject({ image: { index: 2, comment: 'Expression:501' } });
+  });
+
+  it('stays within the declared cost on a cold call', async () => {
+    const { ctx, fake } = setup();
+    const r = await call(getEmbeddedImage, ctx(), ask({ comment: 'Expression:501', image: 1 }));
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect(fake.calls.length).toBeLessThanOrEqual(getEmbeddedImage.cost);
+  });
+
+  it('reaches the images of a reply through the comment it answers', async () => {
+    const { ctx, images } = setup();
+    const r = await call(getEmbeddedImage, ctx(), ask({ comment: 'Expression:502', image: 1 }));
+    expect(r['isError'], text(r)).toBeUndefined();
+    expect(images).toEqual(['expressionimage.img/703']);
+  });
+
+  it('refuses a comment on another asset or outside the workspace, with no image request', async () => {
+    for (const [asset, comment] of [
+      ['B-01001', 'Expression:503'],
+      ['B-01001', 'Expression:505'],
+      ['B-01001', 'Expression:999'],
+    ] as const) {
+      const { ctx, images } = setup();
+      const r = await call(getEmbeddedImage, ctx(), ask({ asset, comment, image: 1 }));
+      expect(code(r), comment).toBe('AB_NOT_FOUND');
+      expect(text(r)).not.toContain('secret.png');
+      expect(images, comment).toEqual([]);
+    }
+    const { ctx, fake, images } = setup();
+    const r = await call(
+      getEmbeddedImage,
+      ctx(),
+      ask({ asset: 'B-01002', comment: 'Expression:503', image: 1 }),
+    );
+    expect(code(r)).toBe('AB_NOT_FOUND');
+    expect(images).toEqual([]);
+    expect(JSON.stringify(fake.calls.map((c) => c.body))).not.toContain('"from":"Expression"');
+  });
+
+  it('binds the asset and the comment as values, never as query text', async () => {
+    const { ctx, fake } = setup();
+    await call(getEmbeddedImage, ctx(), ask({ comment: 'Expression:501', image: 1 }));
+    const body =
+      fake.calls.map((c) => JSON.stringify(c.body ?? null)).find((b) => b.includes('"from":"Expression"')) ??
+      '';
+    expect(body).toContain('Mentions=$');
+    expect(body).toContain('InReplyTo.Mentions=$');
+    expect(body).not.toMatch(/=['"]?Expression:501/);
+  });
+
+  it('says how many images a comment has when the number is past the last one', async () => {
+    for (const [comment, said] of [
+      ['Expression:501', 'has 2 images'],
+      ['Expression:504', 'has no images'],
+    ] as const) {
+      const { ctx, images } = setup();
+      const r = await call(getEmbeddedImage, ctx(), ask({ comment, image: 3 }));
+      expect(code(r)).toBe('AB_NOT_FOUND');
+      expect(text(r)).toContain(said);
+      expect(images).toEqual([]);
+    }
+  });
+
+  it('refuses field comment without a comment, and a comment with another field, before any request', async () => {
+    for (const args of [
+      { asset: 'B-01001', field: 'comment', image: 1 },
+      { asset: 'B-01001', field: 'description', comment: 'Expression:501', image: 1 },
+      { asset: 'B-01001', comment: 'Expression:501', image: 1 },
+    ]) {
+      const { ctx, fake } = setup();
+      const r = await call(getEmbeddedImage, ctx(), args);
+      expect(code(r), JSON.stringify(args)).toBe('AB_INPUT_INVALID');
+      expect(fake.calls).toHaveLength(0);
+    }
+    for (const comment of ['Attachment:5', 'Expression:0', 'https://evil.example/x.png', '501;Mentions=1']) {
+      const { ctx, fake } = setup();
+      const r = await call(getEmbeddedImage, ctx(), ask({ comment, image: 1 }));
+      expect(r['isError'], comment).toBe(true);
+      expect(fake.calls, comment).toHaveLength(0);
+    }
+  });
+
+  it('is refused with no request when image download is off', async () => {
+    const { ctx, fake } = setup();
+    const r = await call(getEmbeddedImage, ctx({}), ask({ comment: 'Expression:501', image: 1 }));
+    expect(code(r)).toBe('AB_TOOL_DISABLED');
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  it('get_conversations numbers the same images, names enveloped, nothing for comments without', async () => {
+    const { ctx } = setup({ poisoned: true });
+    const r = await call(getConversations, ctx(), { asset: 'B-01001', format: 'json' });
+    expect(r['isError'], text(r)).toBeUndefined();
+    const items = (r['structuredContent'] as { items: Array<Record<string, unknown>> }).items;
+    const byOid = new Map(items.map((i) => [i['oid'], i]));
+    expect(String(byOid.get('Expression:501')?.['images'])).toMatch(/^\[image 1: first\.png\] \[image 2: /);
+    expect(byOid.get('Expression:502')?.['images']).toBe('[image 1: reply.png]');
+    expect(byOid.get('Expression:504')).not.toHaveProperty('images');
+    expect(text(r)).toContain('field comment');
+    expect(JSON.stringify(r)).not.toContain('secret.png');
+  });
+});
+
+describe('comment image numbering', () => {
+  it('pairs names by position, then orders by numeric id', () => {
+    const row = {
+      ExpressionImages: ['ExpressionImage:100', 'ExpressionImage:99', 'ExpressionImage:1000'],
+      'ExpressionImages.Name': ['b.png', 'a.png', 'c.png'],
+    };
+    expect(commentImages(row)).toEqual([
+      { id: '99', name: 'a.png' },
+      { id: '100', name: 'b.png' },
+      { id: '1000', name: 'c.png' },
+    ]);
+    expect(commentImageMarkers(commentImages(row))).toBe(
+      '[image 1: a.png] [image 2: b.png] [image 3: c.png]',
+    );
+    expect(
+      commentImageMarkers([
+        { id: '1', name: 'x]\n[image 9' },
+        { id: '2', name: undefined },
+      ]),
+    ).toBe('[image 1: ximage 9] [image 2]');
+    expect(commentImageMarkers([])).toBeUndefined();
   });
 });
 

@@ -43,7 +43,7 @@ How to use it:
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446, L-483, L-484, L-485, L-493, L-505 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157, L-497, L-498, L-499 – L-503 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241, L-402, L-495, L-496 |
-| [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297, L-335, L-506 |
+| [T. Agility platform behaviours](#t-agility-platform-behaviours) | L-137 – L-149, L-162, L-163, L-276 – L-279, L-283, L-284 – L-287, L-297, L-335, L-506, L-507 |
 | [Top 20](#top-20) | the lessons that save the most time |
 
 ---
@@ -2644,6 +2644,13 @@ showed them and `data-oid` held the literal `undefined` (2026-11-14). `get_embed
 image number, re-reads that asset's field through the scope checks and fetches only the Nth source, rebuilt from a
 validated id on the instance's own endpoint: the caller can name no URL and no id, and the reference itself is the grant.
 *Applied in:* P9-24, [ADR-0019](adr/0019-images-from-rich-text.md), `packages/core/src/tools/collaboration/images.ts`.
+
+**L-507 — "None found" is only as good as the place you looked: check every relation that can hold the thing.**
+P9-24 left comment images out because none of the latest 300 comments held an `<img>`, yet a user's defect showed two
+screenshots on its comments (2026-11-17): Agility stores them as `ExpressionImage` assets of the comment, never in its text.
+Before ruling a case out from live data, list the type's relations in `meta.v1` (here `Expression.ExpressionImages`) and
+compare with what the UI shows for one real example.
+*Applied in:* P9-27, `docs/RESEARCH.md`, `packages/core/src/tools/collaboration/images.ts`.
 
 ---
 

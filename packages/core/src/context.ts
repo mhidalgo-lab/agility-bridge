@@ -89,7 +89,10 @@ export interface Limits {
   readonly attachmentMaxBytes: number;
   /** Content types `get_attachment` may return, as `type/subtype` in lower case (checked on metadata and response). */
   readonly attachmentTypes: readonly string[];
-  /** Offer `get_embedded_image`, an image pasted into a work item's rich text (P9-24, THREAT_MODEL A8). Off by default. */
+  /**
+   * Offer `get_embedded_image`, an image pasted into a work item's rich text (P9-24) or attached to one of its comments
+   * (P9-27), THREAT_MODEL A8. Off by default.
+   */
   readonly imageDownload: boolean;
   /** Largest image `get_embedded_image` reads, counted on the stream; the response cap bounds it too. */
   readonly imageMaxBytes: number;

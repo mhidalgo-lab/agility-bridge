@@ -48,7 +48,8 @@ type Endpoint =
   | 'api/asset'
   | 'attachments.img'
   | 'embedded.img'
-  | 'downloadblob.img';
+  | 'downloadblob.img'
+  | 'expressionimage.img';
 
 interface Call {
   readonly endpoint: Endpoint;
@@ -470,15 +471,21 @@ export class AgilityClient {
   }
 
   /**
-   * One image pasted into rich text (P9-24): `embedded.img/<id>` or `downloadblob.img/<token>` on this instance only. The
-   * path is built from a validated id, never from a URL found in the text; type and size are checked like attachments.
+   * One image pasted into rich text (P9-24): `embedded.img/<id>` or `downloadblob.img/<token>`, or attached to a comment
+   * (P9-27): `expressionimage.img/<id>`, on this instance only. The path is built from a validated id, never from a URL
+   * found in the text; type and size are checked like attachments.
    */
   embeddedImage(
-    ref: { readonly kind: 'embedded' | 'blob'; readonly id: string },
+    ref: { readonly kind: 'embedded' | 'blob' | 'expression'; readonly id: string },
     options: { readonly maxBytes: number; readonly allowedTypes: readonly string[] },
   ): Promise<AgilityResponse<AttachmentContent>> {
-    const endpoint = ref.kind === 'embedded' ? 'embedded.img' : 'downloadblob.img';
-    const id = ref.kind === 'embedded' ? assetId(ref.id) : blobToken(ref.id);
+    const endpoint =
+      ref.kind === 'embedded'
+        ? 'embedded.img'
+        : ref.kind === 'blob'
+          ? 'downloadblob.img'
+          : 'expressionimage.img';
+    const id = ref.kind === 'blob' ? blobToken(ref.id) : assetId(ref.id);
     return this.#send({
       endpoint,
       method: 'GET',

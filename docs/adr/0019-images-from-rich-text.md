@@ -48,3 +48,12 @@ say which asset an image belongs to. `embedded.img` answers the bearer token wit
   size error, never cut.
 - `downloadblob.img` and `data:` images are supported on the same rules; images of `Attachment` assets and images in
   comments stay out of scope (none of the latest 300 comments on the live tenant held one).
+
+## Note (2026-11-17, P9-27)
+
+Comments carry images as `ExpressionImage` assets of the comment, not as `<img>` in its text (verified live). The same
+decision applies: `get_embedded_image` with `field: comment` takes the asset, a comment id and an image number; the
+comment must mention the asset or reply to a comment that does (the `get_conversations` predicate, bound values plus the
+workspace predicate and row recheck); the Nth image is taken from that comment's `ExpressionImages` (by ascending id) and
+fetched only from `expressionimage.img/<id>`, a path rebuilt from the validated id. Switch, type and size checks, budget,
+output and audit are unchanged. This extends point 3 with one more fixed endpoint; it supersedes nothing.

@@ -427,4 +427,5 @@ Status lives in each task file.
 | P9-24 | [Opt-in images embedded in descriptions and comments](tasks/phase-9-hardening-launch/P9-24-description-images.md) | medium | — | review |
 | P9-25 | [Replies to comments in get_conversations](tasks/phase-9-hardening-launch/P9-25-conversation-replies.md) | high | — | review |
 | P9-26 | [Admin panel says which opt-in switches still hide tools](tasks/phase-9-hardening-launch/P9-26-opt-in-switch-notes.md) | low | P9-24 | review |
+| P9-27 | [Opt-in images attached to comments](tasks/phase-9-hardening-launch/P9-27-comment-images.md) | medium | P9-24, P9-25 | review |
 <!-- tasks:end -->
