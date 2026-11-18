@@ -5,7 +5,7 @@
 # filesystem and the database on the /data volume. Base images are pinned by digest (Renovate updates them).
 #   docker build -f docker/Dockerfile -t agility-bridge:local .
 
-ARG BUILD_IMAGE=node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c
+ARG BUILD_IMAGE=node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54
 ARG RUNTIME_IMAGE=gcr.io/distroless/nodejs24-debian13:nonroot@sha256:6abfcb367ebc291572c774c1592a986be2ab26a2486f73093401327495a5962a
 
 FROM --platform=$BUILDPLATFORM ${BUILD_IMAGE} AS build
