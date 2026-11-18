@@ -20,3 +20,9 @@ strictPeerDependencies: true
 overrides:
   # GHSA-xjj6-f33q-929c (DoS on excessive content-encodings): miniflare pins 7.29.1.
   'undici@>=7.18.0 <7.30.1': 7.30.1
+# Advisories `pnpm audit` skips: build-time only, with no fixed version yet (remove once one ships).
+auditConfig:
+  ignoreGhsas:
+    # picomatch <= 4.0.7 ReDoS on repeated extglobs, no patch: reached only through tsdown (a build tool of
+    # packages/storage) with globs from our own config, never from users; not in the CLI, Worker or image.
+    - GHSA-fc5q-39xc-vjpf
