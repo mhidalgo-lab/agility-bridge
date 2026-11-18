@@ -26,3 +26,6 @@ auditConfig:
     # picomatch <= 4.0.7 ReDoS on repeated extglobs, no patch: reached only through tsdown (a build tool of
     # packages/storage) with globs from our own config, never from users; not in the CLI, Worker or image.
     - GHSA-fc5q-39xc-vjpf
+minimumReleaseAgeExclude:
+  # Renovate security update: @hono/node-server@2.1.6
+  - "@hono/node-server@2.1.6"
