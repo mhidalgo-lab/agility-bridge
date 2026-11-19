@@ -13,6 +13,7 @@ import {
   CircuitBreakers,
   CORE_TOOLS,
   CredentialLimiters,
+  consoleLevelSink,
   createLogger,
   type Logger,
   MetadataService,
@@ -157,7 +158,8 @@ export async function boot(
   }
   const logger = createLogger({
     level: settings.logLevel,
-    sink: (line) => console.error(line),
+    // Workers Logs files a line by its console method, so the level picks it (P9-28).
+    sink: consoleLevelSink,
     fields: { mode: 'worker' },
   });
   for (const warning of settingWarnings(settingsEnv, settings)) logger.warn(warning);

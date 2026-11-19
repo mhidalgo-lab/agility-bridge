@@ -183,9 +183,28 @@ A dashboard needs five panels: request rate by `mcp.method.name`; service error 
 `agility_bridge.fault`; p50 and p95 latency by tool; Agility requests per call (the `agility_bridge.requests` attribute on spans, in
 a trace backend rather than as a metric label, since it is a number, not a category).
 
+## Cloudflare Workers Logs
+
+On Cloudflare the committed `apps/worker/wrangler.jsonc` turns on
+[Workers Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/), traces and issue detection,
+every request sampled and kept at Cloudflare for the dashboard (`pnpm cf:setup` copies the block into each deployment's
+config; change it there to sample less). This is separate from the spans above and needs no collector.
+
+- **What is kept:** one invocation record per request or cron run (method, URL **without its query string**, status,
+  outcome, CPU and wall time, request headers), the Worker's own log lines, and trace spans of its D1 queries and outgoing
+  requests. Cloudflare masks `Authorization`, `Cookie` and any header named like a key, secret or token; query strings
+  are dropped (`redact_query_string`) because sign-in and OAuth callbacks carry codes there. D1 spans show the SQL text
+  with `?` placeholders, never the bound values.
+- **Levels:** each line is written with the console method of its level (`console.info` for `info` and so on), so the
+  dashboard's error count and issues are real errors. Before P9-28 every line went through `console.error` and every
+  `booted` or `request` line was shown as an error.
+- **Turn it off:** set `"observability": { "enabled": false }` in the deployment's local config and deploy again, or switch
+  it off in the dashboard (the next deploy sets it back to the config).
+
 ## Not covered
 
-- Metrics and logs over OTLP: the backend derives metrics from spans (above), and logs stay on stderr, redacted.
+- Metrics and logs over OTLP: the backend derives metrics from spans (above), and logs stay on stderr, redacted (on
+  Cloudflare, in [Workers Logs](#cloudflare-workers-logs)).
 - Per-workspace views. A workspace id is not exported; if you need it, the audit log has it per request id
   (`agility_bridge.request_id` is the join key).
 - A tool that fails inside a `200` JSON-RPC error before it runs (an unknown tool name, an invalid `tools/call` envelope) is a

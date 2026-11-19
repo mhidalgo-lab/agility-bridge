@@ -16,14 +16,28 @@ export interface Logger {
   child(fields: LogFields): Logger;
 }
 
-/** Receives one already-redacted JSON line. */
-export type LogSink = (line: string) => void;
+/** Receives one already-redacted JSON line and the record's level. */
+export type LogSink = (line: string, level: LogLevel) => void;
 
 /**
  * Default sink: `console.error`, which is **stderr** on Node (stdout is the stdio MCP channel) and Workers Logs on
  * Workers. Nothing in this project logs to stdout.
  */
 export const stderrSink: LogSink = (line) => console.error(line);
+
+/**
+ * Sink for Cloudflare Workers (P9-28): the console method follows the record's level. Workers Logs files a line by the
+ * method that wrote it, so `console.error` for every line made each `info` record an error and filled issue detection
+ * with false issues. Never use it on Node, where `console.log` and `console.info` write to stdout.
+ */
+export const consoleLevelSink: LogSink = (line, level) => {
+  if (level === 'error') console.error(line);
+  else if (level === 'warn') console.warn(line);
+  // biome-ignore lint/suspicious/noConsole: Workers only, where the console method is the log level (L-508); Node never uses this sink.
+  else if (level === 'info') console.info(line);
+  // biome-ignore lint/suspicious/noConsole: as above.
+  else console.debug(line);
+};
 
 export interface LoggerOptions {
   level?: LogLevel;
@@ -59,7 +73,7 @@ export function createLogger(options: LoggerOptions = {}): Logger {
       ...(redactValue(renameReserved({ ...base, ...fields })) as LogFields),
     };
     try {
-      sink(JSON.stringify(record));
+      sink(JSON.stringify(record), level);
     } catch {
       // Logging must never break a request.
     }

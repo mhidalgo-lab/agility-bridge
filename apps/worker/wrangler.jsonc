@@ -24,6 +24,17 @@
   // Backstops across isolates for the per-isolate rate limits (P3-04): per location, eventually consistent.
   // Housekeeping (P3-08): audit retention, expired kv entries, key rotation and revalidation, in bounded slices.
   "triggers": { "crons": ["*/15 * * * *"] },
+  // Workers Logs, traces and issue detection (P9-28, docs/guide/observability.md#cloudflare-workers-logs). Kept at
+  // Cloudflare (persist), every request sampled. Our own lines are already redacted JSON with a level; query strings are
+  // dropped from logged URLs (sign-in and OAuth callbacks carry codes there); Cloudflare masks Authorization and Cookie.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "redact_query_string": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1, "invocation_logs": true, "persist": true },
+    "traces": { "enabled": true, "head_sampling_rate": 1, "persist": true },
+    "issues": { "enabled": true }
+  },
   // Optional exact limiter (P3-12), off until you add the binding (docs/guide/cloudflare-limits.md):
   //   "durable_objects": { "bindings": [{ "name": "RL_SHARED", "class_name": "SharedLimiter" }] },
   //   "migrations": [{ "tag": "shared-limiter-v1", "new_sqlite_classes": ["SharedLimiter"] }]
