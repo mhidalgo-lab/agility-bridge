@@ -118,6 +118,7 @@ export {
 } from './identity/resolve.ts';
 export { inScope, oidsOf, sanitizeRow } from './identity/scope.ts';
 export {
+  consoleLevelSink,
   createLogger,
   type Logger,
   type LoggerOptions,
