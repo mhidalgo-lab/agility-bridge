@@ -51,8 +51,8 @@
     "@agility-bridge/storage": "workspace:*",
     "@agility-bridge/storage-sqlite": "workspace:*",
     "@modelcontextprotocol/client": "2.4.0",
-    "fast-check": "4.10.2",
-    "tsdown": "0.23.4"
+    "fast-check": "4.10.3",
+    "tsdown": "0.23.7"
   },
   "dependencies": {
     "@hono/node-server": "2.1.6",
