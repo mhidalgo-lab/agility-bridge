@@ -39,7 +39,7 @@ How to use it:
 | [M. Node, Docker and self-hosting](#m-node-docker-and-self-hosting) | L-102 – L-104, L-433, L-445 |
 | [N. Write tools and approvals](#n-write-tools-and-approvals) | L-105 – L-112, L-237, L-383 – L-388, L-390, L-391, L-393 – L-400, L-404 – L-408, L-411, L-412, L-481, L-482 |
 | [O. Caching, quotas and budgets](#o-caching-quotas-and-budgets) | L-113 – L-116, L-327, L-350, L-365, L-413, L-414, L-415, L-416, L-448 – L-452, L-457, L-461, L-462, L-473, L-474, L-475, L-492 |
-| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453, L-467, L-468, L-469 |
+| [P. Observability and logging](#p-observability-and-logging) | L-117 – L-120, L-165, L-238, L-240, L-269, L-330, L-453, L-467, L-468, L-469, L-508 |
 | [Q. Testing, evals and live verification](#q-testing-evals-and-live-verification) | L-121 – L-126, L-159, L-166, L-174, L-178, L-215 – L-217, L-274, L-298, L-299, L-309 – L-312, L-321, L-322, L-329, L-331, L-332, L-334, L-380 – L-382, L-446, L-483, L-484, L-485, L-493, L-505 |
 | [R. CI, release and supply chain](#r-ci-release-and-supply-chain) | L-127 – L-132, L-157, L-497, L-498, L-499 – L-503 |
 | [S. Documentation and configuration](#s-documentation-and-configuration) | L-133 – L-136, L-241, L-402, L-495, L-496 |
@@ -1980,6 +1980,13 @@ The `Bearer` pattern stopped at a colon, and OAuth tokens here are `<user>:<gran
 as `Bearer [REDACTED]:<grant>:<secret>`, with the secret in the clear, because the token pattern that runs next needs all three parts.
 When a new token shape joins the corpus, run it through every scheme and key pattern that can sit in front of it, not only bare.
 *Applied in:* P5-10, `packages/core/src/redact.ts`, `redact.test.ts`.
+
+**L-508 — On Workers the console method is the log level: write each line with the one that matches it.**
+Every structured line went to `console.error`, right on Node (stdout is the stdio MCP channel) but read by Workers Logs as
+an error: the day observability was turned on (2026-11-19), 17 "errors" and 6 open issues were all `info` lines (`booted`,
+`request`, `scheduled jobs`) and every request answered 200. The Worker's sink now picks `console.debug`/`info`/`warn`/`error`
+by level; Node keeps stderr. When a platform files logs by how they were written, check what it does with each method.
+*Applied in:* P9-28, `packages/core/src/logger.ts` (`consoleLevelSink`), `apps/worker/src/boot.ts`.
 
 ## Q. Testing, evals and live verification
 

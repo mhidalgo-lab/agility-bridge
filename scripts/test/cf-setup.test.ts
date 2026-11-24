@@ -98,6 +98,13 @@ describe('cf:setup', () => {
         AB_PUBLIC_URL: 'https://agility-bridge-staging.example.workers.dev',
       },
       d1_databases: [{ binding: 'DB', database_name: 'agility-bridge-staging', database_id: 'uuid-1' }],
+      // Workers Logs and traces come from the committed config, query strings dropped from logged URLs (P9-28).
+      observability: {
+        enabled: true,
+        redact_query_string: true,
+        logs: { persist: true },
+        issues: { enabled: true },
+      },
     });
     // Secrets only through stdin, never in arguments; the file holds them, mode 0600.
     expect(state.calls.join('\n')).not.toMatch(/v1:|ab_admin_/);
