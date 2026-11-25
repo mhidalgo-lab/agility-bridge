@@ -6,7 +6,7 @@
 #   docker build -f docker/Dockerfile -t agility-bridge:local .
 
 ARG BUILD_IMAGE=node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c
-ARG RUNTIME_IMAGE=gcr.io/distroless/nodejs24-debian13:nonroot@sha256:6abfcb367ebc291572c774c1592a986be2ab26a2486f73093401327495a5962a
+ARG RUNTIME_IMAGE=gcr.io/distroless/nodejs24-debian13:nonroot@sha256:675c532423b908f9e56f9d60a4e62309b63cd2a3175acb90a46b96f7ee68e121
 
 FROM --platform=$BUILDPLATFORM ${BUILD_IMAGE} AS build
 ENV CI=true COREPACK_ENABLE_DOWNLOAD_PROMPT=0
