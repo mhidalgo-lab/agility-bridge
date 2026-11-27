@@ -90,8 +90,11 @@ The documentation is also a searchable site: <https://mhidalgo-lab.github.io/agi
 - **Research:** [Agility APIs, MCP, OAuth and platform facts](docs/RESEARCH.md)
 - **Security:** [threat model](docs/THREAT_MODEL.md)
 - **Lessons learned:** [engineering rules and known failure modes](docs/LESSONS-LEARNED.md)
-- **Contributors and AI agents:** [contributing](CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) ·
-  [code of conduct](CODE_OF_CONDUCT.md)
+- **Contributors and AI agents:** [contributing](CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) (agent instructions, also
+  for using agility-bridge from an agent) · [code of conduct](CODE_OF_CONDUCT.md)
+- **Agent and client manifests:** [`server.json`](server.json) (MCP Registry) ·
+  [`plugin.json`](plugin.json) and [`mcp.json`](mcp.json) ([Agent Plugins](https://agent-plugins.org/specification)) ·
+  [Claude Code plugin marketplace](.claude-plugin/marketplace.json) ([plugin](plugins/agility-bridge/README.md))
 - **Releases:** [support, versioning and deprecation policy](docs/guide/versioning.md) ·
   [upgrading](docs/guide/upgrading.md) · [verify a release](docs/guide/verify-release.md)
 - **Security policy:** [SECURITY.md](SECURITY.md) (report vulnerabilities privately) ·
@@ -134,3 +137,6 @@ Digital.ai, Agility and VersionOne are trademarks of their respective owners.
 
 [Apache-2.0](LICENSE) (see also [NOTICE](NOTICE)), with DCO sign-off for contributions
 ([ADR-0003](docs/adr/0003-license-apache-2.md)).
+
+Created and maintained by Matias Hidalgo ([@mhidalgo-lab](https://github.com/mhidalgo-lab) ·
+[for developers and agents](https://mhidalgo.ar/developers/)).

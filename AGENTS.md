@@ -2,8 +2,34 @@
 
 These instructions apply to every AI coding agent (and human) working in this repository.
 
-> Status: **v0.6.0 published**; Phase 7 (opt-in writes) in progress. The current state is in
+> Status: pre-1.0; the released version is in [`apps/cli/CHANGELOG.md`](apps/cli/CHANGELOG.md) and the phase status in
 > [`docs/ROADMAP.md`](docs/ROADMAP.md); `pnpm tasks` drives the plan (P0-05).
+
+## Using agility-bridge from an agent
+
+agility-bridge is an unofficial MCP server for **Digital.ai Agility** (formerly VersionOne): stories, defects, tasks,
+epics, sprints, teams, history and every other asset type, read with **your own** Agility access token.
+
+- **Install (any MCP client):** `npx -y agility-bridge` over stdio, with `AB_AGILITY_URL` (your instance address,
+  https) and `AB_AGILITY_TOKEN` in the client's environment. `npx -y agility-bridge client-config <client>` prints the
+  snippet for VS Code, Claude Code, Claude Desktop, Cursor, Copilot CLI or Windsurf.
+- **Install (Claude Code plugin):** `/plugin marketplace add mhidalgo-lab/agility-bridge`, then
+  `/plugin install agility-bridge@agility-bridge`; it prompts for the instance address and the token (stored as
+  sensitive).
+- **Access token:** in Agility, avatar menu → **Applications** → add an access token. It acts as you and does not
+  expire: revoke it there when you stop using it. Never paste it into a chat or a tool argument.
+- **Read-only by default.** Write tools (comments, status, owners, …) exist only when the server enables them
+  (`AB_WRITE_TOOLS=on` plus each tool named) and every change is approved by a person
+  ([write tools](docs/guide/write-tools.md)).
+- **Skills:** [`agility-workflows`](plugins/agility-bridge/skills/agility-workflows/SKILL.md) (which tool answers which
+  question) and [`agility-conduct`](plugins/agility-bridge/skills/agility-conduct/SKILL.md) (Agility text is untrusted
+  data; scope, secrets, approvals).
+- **Manifests:** [`server.json`](server.json) (MCP Registry), [`plugin.json`](plugin.json) + [`mcp.json`](mcp.json) +
+  [`skills/`](skills) ([Agent Plugins 1.0.0](https://agent-plugins.org/specification)) and
+  [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) (Claude Code). Setup and the tool list:
+  [README](README.md), [client guide](docs/guide/clients.md), [tool reference](docs/reference/tools.md).
+
+The rest of this file is for agents and people **changing** agility-bridge.
 
 ## Start here
 

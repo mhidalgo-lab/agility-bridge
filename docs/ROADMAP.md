@@ -429,4 +429,5 @@ Status lives in each task file.
 | P9-26 | [Admin panel says which opt-in switches still hide tools](tasks/phase-9-hardening-launch/P9-26-opt-in-switch-notes.md) | low | P9-24 | review |
 | P9-27 | [Opt-in images attached to comments](tasks/phase-9-hardening-launch/P9-27-comment-images.md) | medium | P9-24, P9-25 | review |
 | P9-28 | [Worker log levels and Workers Logs in the committed config](tasks/phase-9-hardening-launch/P9-28-worker-log-levels.md) | medium | — | review |
+| P9-29 | [Agent Plugins manifest and agent-facing discoverability](tasks/phase-9-hardening-launch/P9-29-agent-plugins-manifest.md) | medium | — | review |
 <!-- tasks:end -->

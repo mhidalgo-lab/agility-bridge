@@ -23,3 +23,28 @@ export function pluginMcpJson(version: string): string {
 }
 `;
 }
+
+/** The Agent Plugins 1.0.0 manifest and MCP configuration at the repository root (P9-29). */
+export const AGENT_PLUGIN_MANIFEST = 'plugin.json';
+export const AGENT_PLUGIN_MCP = 'mcp.json';
+export const AGENT_PLUGINS_SPEC_VERSION = '1.0.0';
+
+/**
+ * The root `mcp.json` (Agent Plugins 1.0.0). The spec has no user-input placeholders and forbids secrets in `env`
+ * ("visible package data"), so the entry carries none: the client supplies `AB_AGILITY_URL` and `AB_AGILITY_TOKEN`
+ * (or `AB_CONFIG`) the way it manages credentials, and the server only lists its tools until it has them. The settings
+ * are described under the manifest's `extensions` entry.
+ */
+export function agentPluginMcpJson(version: string): string {
+  return `{
+  "$schema": "https://agent-plugins.org/schemas/${AGENT_PLUGINS_SPEC_VERSION}/mcp.schema.json",
+  "mcpServers": {
+    "agility": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "agility-bridge@${version}"]
+    }
+  }
+}
+`;
+}
