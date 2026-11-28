@@ -490,3 +490,14 @@ code, the tests (file and title, checked by CI), the level of evidence and what 
 | T9 / T15 / T10 | open, low | Code burn with a wrong verifier, the refresh claim lifetime, the revoke tombstone and compatibility-form client names: [P9-11](tasks/phase-9-hardening-launch/P9-11-oauth-pre-review-follow-ups.md), [P9-12](tasks/phase-9-hardening-launch/P9-12-client-name-lookalikes.md). Denial of service or display only; no token theft. |
 | A14 / T14 / A5 | open, low | Members read every instance (with `tls.caFile`), an admin can re-enable an instance (D-350), `grants.create` and A5 wording: [P9-10](tasks/phase-9-hardening-launch/P9-10-admin-api-pre-review-follow-ups.md). |
 
+
+## 8l. Agent Plugins manifest (P9-29, 2026-11-27)
+
+The repository root now carries an [Agent Plugins 1.0.0](https://agent-plugins.org/specification) manifest
+(`plugin.json`, `mcp.json`, `skills/` linked to the Claude Code plugin's skills) next to `server.json` and the Claude Code
+marketplace.
+
+| Id | Status | Evidence |
+|---|---|---|
+| T23 | verified | `mcp.json` holds no `env` at all: the spec has no secret mechanism and forbids secrets in `env`, so the token stays with the client (environment, `AB_CONFIG` with a keychain reference, or the Claude Code plugin's sensitive setting). The settings are described, never valued, under the manifest's `extensions` entry; tests compare the committed `mcp.json` with the generated one and scan both manifests' fields. |
+| T18 | verified | `mcp.json` pins `agility-bridge@<version>` exactly; `sync-version --check` (lint) fails when it or `plugin.json` differs from the CLI package; `skills/` must resolve inside the repository (test). |

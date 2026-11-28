@@ -446,6 +446,15 @@ status is in [client-compatibility](reference/client-compatibility.md#remote-sni
   (`spikes/mcp-sdk-v2/RESULTS.md`); the repository README does not document the flags (*live*, not *docs*).
 - **PowerShell**: `Read-Host -MaskInput` needs PowerShell 7.1+ (*unverified*, from memory of the cmdlet's release notes); the
   Windows snippet is marked accordingly.
+- **Agent Plugins 1.0.0** (portable plugin format, read 2026-11-27, *docs*): `plugin.json` at the plugin root with a required
+  `$schema` (`https://agent-plugins.org/schemas/1.0.0/plugin.schema.json`) and `name`, optional metadata (`version`,
+  `description`, `author`, `homepage`, `repository`, `license`, `keywords`) and `extensions` keyed by reverse-domain
+  namespaces; no other fields. MCP servers go in a root `mcp.json` (`stdio`, `streamable-http` or `sse`); `env` and
+  headers must not hold secrets and only `${PLUGIN_ROOT}`/`${PLUGIN_DATA}` expand; credentials are client-managed, and
+  there is no user-config mechanism. Skills are each child of `skills/` holding a `SKILL.md`; symlinks may resolve inside
+  the plugin root. Both schemas are published and their identifiers are never reassigned. No client is known to load it
+  yet (*unverified*). Sources: <https://agent-plugins.org/specification>,
+  <https://agent-plugins.org/schemas/1.0.0/plugin.schema.json>, <https://agent-plugins.org/schemas/1.0.0/mcp.schema.json>.
 
 ## 4. OAuth 2.1 for MCP
 

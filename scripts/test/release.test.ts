@@ -2,7 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import {
@@ -602,5 +602,64 @@ describe('the Claude Code plugin version (P8-06)', () => {
   it('refuses a manifest without a version and a version that is not SemVer', () => {
     expect(() => writePluginManifestVersion('{"name":"x"}', '0.8.0')).toThrow(/no version/);
     expect(() => writePluginManifestVersion(manifest, 'latest')).toThrow(/SemVer/);
+  });
+});
+
+describe('sync-version and the Agent Plugins manifest (P9-29)', () => {
+  const repo = new URL('../..', import.meta.url).pathname;
+  const FILES = [
+    'scripts/release.ts',
+    'apps/cli/src/plugin-mcp.ts',
+    'apps/cli/package.json',
+    'packages/core/src/version.ts',
+    'server.json',
+    'plugins/agility-bridge/.claude-plugin/plugin.json',
+    'plugins/agility-bridge/.mcp.json',
+    'plugin.json',
+    'mcp.json',
+  ];
+  function copy(): string {
+    const root = mkdtempSync(join(tmpdir(), 'rb-sync-'));
+    for (const f of FILES) {
+      mkdirSync(join(root, dirname(f)), { recursive: true });
+      writeFileSync(join(root, f), readFileSync(join(repo, f), 'utf8'));
+    }
+    return root;
+  }
+  const sync = (root: string, ...args: string[]) =>
+    spawnSync(process.execPath, ['scripts/release.ts', 'sync-version', ...args], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+
+  it('--check fails when plugin.json or mcp.json lag behind, and sync-version brings both along', () => {
+    const root = copy();
+    expect(sync(root, '--check').status).toBe(0);
+    const pkgFile = join(root, 'apps/cli/package.json');
+    const cli = JSON.parse(readFileSync(pkgFile, 'utf8')) as { version: string };
+    writeFileSync(pkgFile, JSON.stringify({ ...cli, version: '9.9.9' }));
+    expect(sync(root).status).toBe(0);
+    expect(sync(root, '--check').status).toBe(0);
+    expect(JSON.parse(readFileSync(join(root, 'plugin.json'), 'utf8'))).toMatchObject({ version: '9.9.9' });
+    expect(readFileSync(join(root, 'mcp.json'), 'utf8')).toContain('"agility-bridge@9.9.9"');
+
+    writeFileSync(
+      join(root, 'plugin.json'),
+      readFileSync(join(root, 'plugin.json'), 'utf8').replace('"version": "9.9.9"', '"version": "9.9.8"'),
+    );
+    const stale = sync(root, '--check');
+    expect(stale.status).toBe(1);
+    expect(stale.stderr).toMatch(/plugin\.json has version '9\.9\.8'/);
+  });
+
+  it('--check fails when mcp.json pins another package version', () => {
+    const root = copy();
+    writeFileSync(
+      join(root, 'mcp.json'),
+      readFileSync(join(root, 'mcp.json'), 'utf8').replace(/agility-bridge@[^"]+/, 'agility-bridge@0.0.1'),
+    );
+    const stale = sync(root, '--check');
+    expect(stale.status).toBe(1);
+    expect(stale.stderr).toMatch(/✗ mcp\.json does not pin/);
   });
 });
